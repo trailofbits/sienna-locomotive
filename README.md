@@ -4,7 +4,7 @@ The purpose of this repository is to make a system that enables continous integr
 
 ## Directory Structure
 
-In the repository targeted for fuzzing, you must create a .fuzzci folder. This folder structure is as follows:
+In the repository targeted for fuzzing, you must create a .fuzzci folder. When building, it can be assumed that libFuzzer.a will be in the .fuzzci directory and the build process will be starting from the root of the repository (exception is this repo during testing, which starts in the `sample/` directory). This folder structure is as follows:
 
 ```bash
 .fuzzci/
