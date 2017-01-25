@@ -70,3 +70,9 @@ Web server is prototyped in Flask. To run:
 export FLASK_APP=web.py
 python -m flask run
 ```
+
+Current endpoints:
+
+### /retest/[target]
+
+If visited without optional `[target]`, this will rerun all fuzz targets in the `.fuzzci` folder. If the optional `[target]` is provided, it will run only that target. 
