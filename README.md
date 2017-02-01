@@ -62,6 +62,18 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
 This is the directory where you place your seed files. It will also be used to store crashes (for retest purposes) unless otherwise specified with `-artifact_prefix` under `options` in `config.yml`.
 
+## Binaries
+
+I think binaries should be handled outside of git. Keep their .fuzzci entry the same, with entry points, configs / build commands, and corpora. Instead of them sitting in the git repo, allow users to upload them. This will allow them to add version info and other meta information. 
+
+These binaries need to be ran through the `disass`, `lift`, `opt` process. This may take 30 minutes to 1 hour to produce a binary. This should be a 1 time process for each binary though, store the bit code and avoid doing it again. Provide the download of the bitcode so that users can create good build instructions. (Is the process upload, wait, download, build too cumbersome? We could instead simply compile it back with instrumentation and treat it as a normal library, avoiding the user having to get it back. Best choice is probably to do both, allow the users to provide a build command for a library or a build command for bitcode, specify which with a config option.)
+
+Provide the option to users to do the lifting themselves and upload bitcode, incase they want to make certain custom modifications.
+
+Error reporting needs to be top tier. If remill fails we should know about it. Automatically open a ticket and send it to the user?
+
+Email notifications for when remill completes. I've used [Sparkpost](https://www.sparkpost.com/) before, we'll definitely fit within the free tier.
+
 ## Web Server
 
 Web server is prototyped in Flask. To run:
