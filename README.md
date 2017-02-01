@@ -74,6 +74,8 @@ Error reporting needs to be top tier. If remill fails we should know about it. A
 
 Email notifications for when remill completes. I've used [Sparkpost](https://www.sparkpost.com/) before, we'll definitely fit within the free tier.
 
+Figure out if libfuzzer can disregard or move on after finding certain crashes. An early crash early in a code base could potentially block further fuzzing.
+
 ## Web Server
 
 Web server is prototyped in Flask. To run:
