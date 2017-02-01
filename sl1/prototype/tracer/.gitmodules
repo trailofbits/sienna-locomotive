@@ -1,0 +1,3 @@
+[submodule "ptrace/capstone"]
+	path = ptrace/capstone
+	url = https://github.com/aquynh/capstone.git
