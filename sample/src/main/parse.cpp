@@ -19,7 +19,11 @@ int Parser::parse(const uint8_t *data, size_t size) {
             std::cout << "case " << (curr - prev) << std::endl;
             switch(curr-prev) {
                 case 1:
-                    __builtin_trap();
+#ifdef _MSC_VER
+					__debugbreak();
+#else
+					__builtin_trap();
+#endif
                     break;
                 case 2:
                     uaf = (uint8_t *)malloc(sizeof(uint8_t));

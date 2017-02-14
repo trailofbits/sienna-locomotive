@@ -20,3 +20,5 @@ def retest(target):
         results = fuzz.test_one_target(target)
 
     return json.dumps(results)
+
+app.run(debug=True)

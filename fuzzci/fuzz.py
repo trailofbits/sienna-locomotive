@@ -179,4 +179,4 @@ def test_all_targets():
     return results
 
 if __name__ == '__main__':
-    fuzz_all()
+    fuzz_all_targets()
