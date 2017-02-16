@@ -1,0 +1,16 @@
+path_program: 
+  C:\Program Files\SumatraPDF\
+program_name:
+  SumatraPDF.exe
+using_autoit:
+  yes
+path_autoit:
+  C:\Program Files\AutoIt3\AutoIt3.exe
+path_autoit_script:
+  C:\Users\monty\Desktop\my_tests\sumatra.au3 
+path_radamsa:
+  C:\cygwin\bin\radamsa.exe
+seed_pattern:
+  "*.pdf"
+file_format:
+  ".pdf"

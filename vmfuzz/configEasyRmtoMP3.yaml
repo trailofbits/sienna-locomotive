@@ -1,0 +1,12 @@
+using_autoit:
+  yes
+path_autoit:
+  C:\Program Files\AutoIt3\AutoIt3.exe
+path_autoit_script:
+  C:\Users\monty\Desktop\my_tests\easyRmToMp3Converter.au3 
+path_radamsa:
+  C:\cygwin\bin\radamsa.exe
+seed_pattern:
+  "*.m3u"
+file_format:
+  ".m3u"
