@@ -143,6 +143,10 @@ def launch_fuzzing(config, number_files_to_create,
 def main(config_file, working_directory, log_level):
     """
     Main function
+    Args:
+        config: the configuration file
+        working_directory (string): working directory for inputs files
+        log_level (int): Logging level: 0 debug 1 info, 2 warning, 3 error
     """
     config = parse_config(config_file)
 
