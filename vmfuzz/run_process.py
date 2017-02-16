@@ -1,14 +1,23 @@
-""" Module handling the run of process
-    The AutoIt script must return "no error" if the execution sucessed"""
+""" Module handling the run of process """
 import subprocess
 import time
 
 import crash_detection
 
+def kill_process(process):
+    """
+    Kill a processus
+    Args:
+        process (string): name of the processus
+    """
+    cmd_kill = "Taskkill /IM "+process+" /F"
+    proc = subprocess.Popen(cmd_kill, stdout=subprocess.PIPE)
+    proc.wait()
+
 
 def run(path_program, program_name, parameters, auto_close, running_time):
     """
-    Run autoit scrit
+    Run the program
     Args:
         path_program (string): path the to the program
         program_name (string): name of the program
@@ -17,14 +26,9 @@ def run(path_program, program_name, parameters, auto_close, running_time):
         running_time (int): waiting time in seconds (if auto_close = True)
     Returns:
         bool: True if crash detected, False otherwise
-
-    To detect crashes:
-        
-        - If not, check if WerFault.exe process if running
     """
     cmd = [path_program + program_name] + parameters
-    print cmd
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    subprocess.Popen(cmd, stdout=subprocess.PIPE)
     if auto_close:
         print "Not yet implemented"
         exit()
@@ -33,7 +37,9 @@ def run(path_program, program_name, parameters, auto_close, running_time):
         if not crash_detection.detect_process_running(program_name):
             return True
         if crash_detection.check_wrfault():
+            kill_process(program_name)
             return True
+        kill_process(program_name)
         return False
 
 
