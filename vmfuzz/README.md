@@ -26,6 +26,12 @@ make
 make install 
 ```
 
+- Wingdb: https://developer.microsoft.com/en-us/windows/downloads/windows-10-sdk
+- Visual C++ Redistributable for Visual Studio 2012 https://www.microsoft.com/en-us/download/details.aspx?id=30679
+- !exploitable: https://msecdbg.codeplex.com/
+   - copy and paste MSEC.dll in `winext` of the wingdb directory
+
+
 **Usage**
 
 ```python

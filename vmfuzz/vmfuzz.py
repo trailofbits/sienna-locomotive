@@ -8,6 +8,7 @@ import yaml
 import radamsa
 import autoit
 import run_process
+import exploitable_standalone
 
 
 def parse_config(config_file):
@@ -105,7 +106,9 @@ def launch_fuzzing(config, number_files_to_create,
         number_files_to_create (int): number of file to generate per iteration
         working_directory (string): working directory for inputs files
     """
+    # Hash tab: hash -> input file
     previous_inputs = {}
+    # Couple: (file_name, classification)
     crashes = []
     while True:
         logging.info("Generating new files")
@@ -131,13 +134,22 @@ def launch_fuzzing(config, number_files_to_create,
                                           config['running_time'])
             if crashed:
                 logging.info("Crash detected")
+
+                if config['using_autoit']:
+                    classification = "NOT IMPLEMENTED"
+                else:
+                    classification = exploitable_standalone.run(config['path_program'],
+                                                                config[
+                                                                    'program_name'],
+                                                                [working_directory + new_file])
+                logging.info("Classification: " + classification)
                 new_name = "crash-" + str(len(crashes))
                 try:
                     os.rename(working_directory + new_file,
                               working_directory + new_name)
                 except OSError:
                     logging.error("Error for renaming file")
-                crashes.append(new_name)
+                crashes.append((new_name, classification))
 
 
 def main(config_file, working_directory, log_level):
