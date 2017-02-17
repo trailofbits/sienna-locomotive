@@ -62,10 +62,8 @@ def mkdir_ifne(path):
 def init_dirs(file):
     run_id = str(int(time.time()))
     
-    # in_dir = 'C:\\Users\\Douglas\\Desktop\\fuzz\\%s_in' % run_id
-    in_dir = 'C:\\Users\\Douglas\\Desktop\\fuzz\\in' 
-    # out_dir = 'C:\\Users\\Douglas\\Desktop\\fuzz\\%s_out' % run_id
-    out_dir = 'C:\\Users\\Douglas\\Desktop\\fuzz\\out'
+    in_dir = 'C:\\Users\\Douglas\\Desktop\\fuzz\\%s_in' % run_id
+    out_dir = 'C:\\Users\\Douglas\\Desktop\\fuzz\\%s_out' % run_id
     
     mkdir_ifne('C:\\Users\\Douglas\\Desktop\\fuzz')
     mkdir_ifne(in_dir)
