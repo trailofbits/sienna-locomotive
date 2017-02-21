@@ -23,6 +23,15 @@ def parse_config(config_file):
     config = yaml.load(f_desc)
     f_desc.close()
 
+    return config
+
+
+def check_config(config):
+    """
+    Check the user configuration
+    Args:
+        The configuration as a dict
+    """
     ## Check configuration file
     # Check for using_autoit field
     if 'using_autoit' not in config:
@@ -53,7 +62,9 @@ def parse_config(config_file):
         # If program close itelf no need to running time
         else:
             config['running_time'] = 0
-
+        # If program does not have parameters
+        if 'parameters' not in config:
+            config['parameters'] = []
     # Check for seed_pattern field
     if 'seed_pattern' not in config:
         logging.error("Bad configuration file: missing seed_pattern")
@@ -64,19 +75,17 @@ def parse_config(config_file):
         logging.error("Bad configuration file: missing format_file")
         exit()
 
-    return config
 
-
-def init(config):
+def init(config, config_system):
     """
-    Initialize the CRS
+    Initialize VMfuzz
     Args:
-        The configuration as a dict
+        The user and system configurations as two dict
     """
-    radamsa.RADAMSA_BIN = config['path_radamsa']
+    radamsa.RADAMSA_BIN = config_system['path_radamsa_bin']
+    exploitable_standalone.WINGDB_PATH = config_system['path_wingdb_dir']
     if config['using_autoit']:
-        autoit.AUTOIT_BIN = config['path_autoit']
-        autoit.AUTOIT_SCRIPT = config['path_autoit_script']
+        autoit.AUTOIT_BIN = config_system['path_autoit_bin']
 
 
 def compute_md5(file_name, block_size=2**20):
@@ -124,11 +133,12 @@ def launch_fuzzing(config, number_files_to_create,
                 continue
             previous_inputs[md5_val] = new_file
             if config['using_autoit']:
-                crashed = autoit.run(autoit.AUTOIT_SCRIPT, [
+                crashed = autoit.run(config['autoit_script'], [
                     working_directory + new_file])
             else:
                 crashed = run_process.run(config['path_program'],
                                           config['program_name'],
+                                          config['parameters'] +
                                           [working_directory + new_file],
                                           config['auto_close'],
                                           config['running_time'])
@@ -141,6 +151,8 @@ def launch_fuzzing(config, number_files_to_create,
                     classification = exploitable_standalone.run(config['path_program'],
                                                                 config[
                                                                     'program_name'],
+                                                                config[
+                                                                    'parameters'] +
                                                                 [working_directory + new_file])
                 logging.info("Classification: " + classification)
                 new_name = "crash-" + str(len(crashes))
@@ -152,15 +164,18 @@ def launch_fuzzing(config, number_files_to_create,
                 crashes.append((new_name, classification))
 
 
-def main(config_file, working_directory, log_level):
+def main(config_file, config_system_file, working_directory, log_level):
     """
     Main function
     Args:
-        config: the configuration file
+        config_file: the user configuration file
+        config_sytem_file: the system configuration file
         working_directory (string): working directory for inputs files
         log_level (int): Logging level: 0 debug 1 info, 2 warning, 3 error
     """
     config = parse_config(config_file)
+
+    check_config(config)
 
     if log_level == 0:
         logging.basicConfig(filename="vmfuzz.log",
@@ -175,15 +190,19 @@ def main(config_file, working_directory, log_level):
         logging.basicConfig(filename="vmfuzz.log",
                             filemode='w', level=logging.ERROR)
 
-    init(config)
+    config_system = parse_config(config_system_file)
 
-    launch_fuzzing(config, 10, working_directory)
+    init(config, config_system)
+
+    launch_fuzzing(config, 2, working_directory)
 
 if __name__ == "__main__":
     parser_cmd = argparse.ArgumentParser(
         description='Trail of bits fuzzing system.')
     parser_cmd.add_argument('-c', '--config', help='Yaml configuration file',
                             required=False, default="config.yaml")
+    parser_cmd.add_argument('-cs', '--config_system', help='Yaml configuration file',
+                            required=False, default="system.yaml")
     parser_cmd.add_argument('-w', '--working_directory', help='Working directory',
                             required=False, default="")
     parser_cmd.add_argument('-l', '--log_level', type=int,
@@ -191,5 +210,5 @@ if __name__ == "__main__":
                             required=False, default=0)
     args_vmfuzz = vars(parser_cmd.parse_args())
 
-    main(args_vmfuzz['config'], args_vmfuzz[
-        'working_directory'], args_vmfuzz['log_level', ])
+    main(args_vmfuzz['config'], args_vmfuzz['config_system'],
+         args_vmfuzz['working_directory'], args_vmfuzz['log_level', ])

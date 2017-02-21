@@ -1,0 +1,6 @@
+path_wingdb_dir:
+  C:\Program Files\Windows Kits\10\Debuggers\x86\
+path_radamsa_bin:
+  C:\cygwin\bin\radamsa.exe
+path_autoit_bin:
+  C:\Program Files\AutoIt3\AutoIt3.exe

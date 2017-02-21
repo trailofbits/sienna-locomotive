@@ -4,7 +4,7 @@ import subprocess
 
 import crash_detection
 
-AUTOIT_BIN = r"C:\Program Files\AutoIt3\AutoIt3.exe"
+AUTOIT_BIN = ""
 
 
 def run(autoit_script, parameters):

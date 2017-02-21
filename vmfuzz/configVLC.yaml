@@ -8,8 +8,6 @@ auto_close:
   false
 running_time:
   5
-path_radamsa:
-  C:\cygwin\bin\radamsa.exe
 seed_pattern:
   "*.mp3"
 file_format:
