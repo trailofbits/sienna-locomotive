@@ -4,8 +4,8 @@ VMFuzz
 Tested on Win 7, fuzzing with radamsa.
 
 Programs tested:
-- Sumatra pdf (v.3.2.1)
-- Easy (v2.3.7, with buffer overflow from: https://www.corelan.be/index.php/2009/07/19/exploit-writing-tutorial-part-1-stack-based-overflows/)
+- Sumatra pdf (v.3.2.1): http://www.sumatrapdfreader.org/download-free-pdf-viewer.html
+- Easy (v2.3.7, with buffer overflow from: https://www.exploit-db.com/exploits/9177/)
 - Vlc (v2.2.1, with buffer overflow from: https://www.exploit-db.com/exploits/38485/): https://www.videolan.org/vlc/releases/2.2.1.html
 
 

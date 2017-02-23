@@ -1,7 +1,3 @@
-path_program: 
-  C:\Program Files\SumatraPDF\
-program_name:
-  SumatraPDF.exe
 using_autoit:
   yes
 path_autoit_script:

@@ -133,7 +133,7 @@ def launch_fuzzing(config, number_files_to_create,
                 continue
             previous_inputs[md5_val] = new_file
             if config['using_autoit']:
-                crashed = autoit.run(config['autoit_script'], [
+                crashed = autoit.run(config['path_autoit_script'], [
                     working_directory + new_file])
             else:
                 crashed = run_process.run(config['path_program'],
