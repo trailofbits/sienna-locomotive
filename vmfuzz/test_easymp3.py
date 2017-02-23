@@ -1,2 +1,2 @@
 import vmfuzz
-vmfuzz.main("configEasyRmtoMP3.yaml","system.yaml","C:\\Users\\monty\\Desktop\\dir\\",0)
+vmfuzz.main("yaml_config\\configEasyRmtoMP3.yaml","yaml_config\\system.yaml","C:\\Users\\monty\\Desktop\\dir\\",0)

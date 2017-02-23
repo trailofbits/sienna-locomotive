@@ -1,2 +1,2 @@
 import vmfuzz
-vmfuzz.main("configVLC.yaml","system.yaml","C:\\Users\\monty\\Desktop\\dir\\",0)
+vmfuzz.main("yaml_config\\configVLC.yaml","yaml_config\\system.yaml","C:\\Users\\monty\\Desktop\\dir\\",0)

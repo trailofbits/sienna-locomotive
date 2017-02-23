@@ -1,0 +1,6 @@
+using_autoit:
+  no
+seed_pattern:
+  "*.pdf"
+file_format:
+  ".pdf"

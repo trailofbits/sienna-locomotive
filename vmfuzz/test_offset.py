@@ -19,3 +19,4 @@ compute_offset.print_resultats(res)
 #print "TEST CLAMAV"
 #res = compute_offset.run("C:\\Program Files\\ClamAV\\", "clamscan.exe", [r""])
 #compute_offset.print_resultats(res)
+
