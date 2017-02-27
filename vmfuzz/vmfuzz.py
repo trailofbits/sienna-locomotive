@@ -5,10 +5,10 @@ import argparse
 import logging
 import yaml
 
-import radamsa
+import fuzzers.radamsa.radamsa as radamsa
 import autoit
-import run_process
-import exploitable_standalone
+import utils.run_process as run_process
+import exploitability.exploitable_standalone as exploitable_standalone
 
 
 def parse_config(config_file):

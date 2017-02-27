@@ -1,0 +1,15 @@
+path_program: 
+  C:\Program Files\7-Zip\
+program_name:
+  7z.exe
+using_autoit:
+  no
+auto_close:
+  yes
+parameters:
+ - "-y"
+ - e 
+seed_pattern:
+  "*.zip"
+file_format:
+  ".zip"

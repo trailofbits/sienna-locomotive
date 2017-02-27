@@ -1,8 +1,7 @@
 """ Module handling AutoIt
     The AutoIt script must return "no error" if the execution sucessed"""
 import subprocess
-
-import crash_detection
+import exploitability.crash_detection as crash_detection
 
 AUTOIT_BIN = ""
 

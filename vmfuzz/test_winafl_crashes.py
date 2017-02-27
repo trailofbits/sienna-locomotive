@@ -1,6 +1,6 @@
 import os
 import shutil
-import exploitable_standalone
+import exploitability.exploitable_standalone as exploitable_standalone
 
 '''
 Writes each crash in crash_dir to target_file, 

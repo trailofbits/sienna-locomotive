@@ -30,8 +30,10 @@ def run(path_program, program_name, parameters, auto_close, running_time):
     cmd = [path_program + program_name] + parameters
     subprocess.Popen(cmd, stdout=subprocess.PIPE)
     if auto_close:
-        print "Not yet implemented"
-        exit()
+        if crash_detection.check_wrfault():
+            kill_process(program_name)
+            return True
+        return False
     else:
         time.sleep(running_time)
         if not crash_detection.detect_process_running(program_name):

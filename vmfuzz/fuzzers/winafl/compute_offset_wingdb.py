@@ -3,6 +3,21 @@
 """
 import sys
 import pykd
+import uuid
+
+SIZE_INT = 4
+
+def get_filename(func_name):
+    if func_name == "CreateFileW":
+        filename = pykd.dbgCommand(r'.printf "%mu",poi(esp+'+str(1*SIZE_INT)+')')
+        filename = filename.split("\n")[-1]
+        return filename
+    elif func_name == "CreateFileA" or func_name == "fopen":
+        filename = pykd.dbgCommand(r'.printf "%ma",poi(esp+'+str(1*SIZE_INT)+')')
+        filename = filename.split("\n")[-1]
+        return filename
+    return "NOT_IMPLEM"
+
 
 def get_targeted_call(depth):
     """
@@ -32,11 +47,19 @@ def get_targeted_call(depth):
     """
     ret = pykd.dbgCommand("kn " + str(depth))
     line = ret.rstrip().split("\n")[-1]
+    print "##line "+line
     targeted_call = line.split(' ')[2]
+    print "##Targeted call "+targeted_call
+    print "##ub: "+"ub " + targeted_call + " L2"
     targeted_call = pykd.dbgCommand("ub " + targeted_call + " L2")
+    print "##Targeted call "+targeted_call
     targeted_call = targeted_call.split("\n")[-2]
     targeted_call = targeted_call.split(' ')[-1]
-    return targeted_call[1:-1]
+    targeted_call = targeted_call[1:-1] # remove the ()
+    print targeted_call
+    if targeted_call[-1] == ")": # it is the case if the call is in the form [ ... ()] 
+        targeted_call = targeted_call[:-1]
+    return targeted_call 
 
 def get_offset(targeted_call):
     """
@@ -59,6 +82,18 @@ def get_offset(targeted_call):
     lm_res = pykd.dbgCommand("lm a " + targeted_call)
     lm_res = lm_res.split("\n")[-2]
     module = lm_res.split(' ')[4]
+
+    module_res = pykd.dbgCommand("lmv m " + module)
+    module_res = module_res.split("\n")
+    if module == "image00400000":
+        real_module = [x for x in module_res if "OriginalFilename" in x]
+    else:
+        real_module = [x for x in module_res if "Image path" in x]
+    if len(real_module) !=0 :
+        module = real_module[0].split(' ')[-1]
+        if "\\" in module:
+            module = module[len(module)-module[::-1].index("\\"):]
+
     start = lm_res.split(' ')[0]
     start = int(start, 16)
     addr = int(targeted_call, 16)
@@ -67,8 +102,13 @@ def get_offset(targeted_call):
 
 func_name = sys.argv[1]
 try:
-    call = get_targeted_call(2)
-    (mod, off) = get_offset(call)
-    print "FOUND: func " + func_name + " mod " + mod + " off " + hex(off)
+    uniq_id = uuid.uuid4().get_hex()
+    filename = get_filename(func_name)
+    for i in range(2, 20):
+        call = get_targeted_call(i)
+        print "##CALL "+call
+        (mod, off) = get_offset(call)
+        print "FOUND: func " + func_name + " mod " + mod + \
+              " off " + hex(off) + " depth "+str(i) + " filename "+ filename + " uuid " + uniq_id
 except:
     print "##Error in offset computing"
