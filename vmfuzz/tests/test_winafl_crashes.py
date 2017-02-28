@@ -1,5 +1,6 @@
 import os
 import shutil
+from context import vmfuzz
 import exploitability.exploitable_standalone as exploitable_standalone
 
 '''

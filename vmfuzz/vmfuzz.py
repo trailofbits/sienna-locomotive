@@ -9,6 +9,7 @@ import fuzzers.radamsa.radamsa as radamsa
 import autoit
 import utils.run_process as run_process
 import exploitability.exploitable_standalone as exploitable_standalone
+import exploitability.exploitable_autoit as exploitable_autoit
 
 
 def parse_config(config_file):
@@ -38,18 +39,24 @@ def check_config(config):
         logging.error("Bad configuration file: missing using_autoit field")
         exit()
 
+    # If the path to the program and its name are present
+    if 'path_program' not in config or 'program_name' not in config:
+        logging.error(
+            "Bad configuration file: missing program name or path")
+        exit()
+
     # If autoit used
     if config['using_autoit']:
         if 'path_autoit_script' not in config:
             logging.error(
                 "Bad configuration file: missing path_autoit_script field")
             exit()
+    # If program does not have parameters
+    if 'parameters' not in config:
+            config['parameters'] = []
+
     # If autoit not used
     else:
-        if 'path_program' not in config or 'program_name' not in config:
-            logging.error(
-                "Bad configuration file: missing program name or path")
-            exit()
         if 'auto_close' not in config:
             logging.error("Bad configuration file: missing auto_close field")
             exit()
@@ -62,9 +69,6 @@ def check_config(config):
         # If program close itelf no need to running time
         else:
             config['running_time'] = 0
-        # If program does not have parameters
-        if 'parameters' not in config:
-            config['parameters'] = []
     # Check for seed_pattern field
     if 'seed_pattern' not in config:
         logging.error("Bad configuration file: missing seed_pattern")
@@ -84,6 +88,9 @@ def init(config, config_system):
     """
     radamsa.RADAMSA_BIN = config_system['path_radamsa_bin']
     exploitable_standalone.WINGDB_PATH = config_system['path_wingdb_dir']
+    exploitable_autoit.WINGDB_PATH = config_system['path_wingdb_dir']
+    exploitable_autoit.AUTOIT_BIN = config_system['path_autoit_bin']
+
     if config['using_autoit']:
         autoit.AUTOIT_BIN = config_system['path_autoit_bin']
 
@@ -146,7 +153,14 @@ def launch_fuzzing(config, number_files_to_create,
                 logging.info("Crash detected")
 
                 if config['using_autoit']:
-                    classification = "NOT IMPLEMENTED"
+                    classification = exploitable_autoit.run(config['path_autoit_script'],
+                                                                config[
+                                                                    'path_program'],
+                                                                config[
+                                                                    'program_name'],
+                                                                config[
+                                                                    'parameters'] +
+                                                                [working_directory + new_file])                
                 else:
                     classification = exploitable_standalone.run(config['path_program'],
                                                                 config[
@@ -155,12 +169,14 @@ def launch_fuzzing(config, number_files_to_create,
                                                                     'parameters'] +
                                                                 [working_directory + new_file])
                 logging.info("Classification: " + classification)
-                new_name = "crash-" + str(len(crashes))
+                new_name = "crash-" + str(len(crashes))+config['file_format']
                 try:
                     os.rename(working_directory + new_file,
                               working_directory + new_name)
                 except OSError:
-                    logging.error("Error for renaming file")
+                    os.remove(working_directory + new_name)
+                    os.rename(working_directory + new_file,
+                              working_directory + new_name)
                 crashes.append((new_name, classification))
 
 

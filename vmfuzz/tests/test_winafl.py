@@ -1,5 +1,8 @@
+import os
+from context import vmfuzz
 import fuzzers.winafl.winafl as winafl
 
+os.chdir('..')
 winafl.WINAFL_BIN = "afl-fuzz.exe"
 winafl.DYNAMORIO_PATH = r"C:\Users\monty\Documents\dynamorio\build\bin32"
 winafl.DRRUN = r"C:\Users\monty\Documents\dynamorio\build\bin32\drrun.exe"

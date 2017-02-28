@@ -1,5 +1,7 @@
-# TODO JF : clean file, do something better for testing winafl 
+# TODO JF : clean file
 #
+import os
+from context import vmfuzz
 
 import fuzzers.winafl.compute_offset as compute_offset
 import fuzzers.winafl.winafl as winafl

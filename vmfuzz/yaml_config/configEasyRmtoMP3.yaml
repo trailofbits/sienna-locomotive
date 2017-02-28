@@ -1,11 +1,11 @@
 using_autoit:
   yes
-path_autoit:
-  C:\Program Files\AutoIt3\AutoIt3.exe
+path_program:
+  C:\Program Files\Easy RM to MP3 Converter\
+program_name:
+  RM2MP3Converter.exe 
 path_autoit_script:
-  C:\Users\monty\Desktop\my_tests\easyRmToMp3Converter.au3 
-path_radamsa:
-  C:\cygwin\bin\radamsa.exe
+  sample\auto_it_scripts\easyRmToMp3Converter.au3 
 seed_pattern:
   "*.m3u"
 file_format:

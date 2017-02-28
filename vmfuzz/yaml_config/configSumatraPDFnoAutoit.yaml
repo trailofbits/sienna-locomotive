@@ -1,8 +1,0 @@
-using_autoit:
-  no
-working_dir:
-  C:\Users\monty\Desktop\test_afl_auto
-seed_pattern:
-  "*.pdf"
-file_format:
-  ".pdf"
