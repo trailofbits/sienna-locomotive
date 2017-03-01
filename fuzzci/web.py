@@ -22,3 +22,13 @@ def retest(target):
     return json.dumps(results)
 
 app.run(debug=True)
+
+# sqlalchmey
+
+# create cmd file based
+
+# create gui / autoit
+
+# run fuzzer
+
+# gracefully stop?
