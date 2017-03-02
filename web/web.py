@@ -1,17 +1,52 @@
 from flask import Flask, request, g, escape, send_from_directory
-from multiprocessing import Queue
-from work import Worker, Manager
+from celery import Celery
 # import fuzz
 import sqlite3
 import json
+import time
 import sys
 import os
 
-sys.path.append('../fuzzci')
-import winafl
+# sys.path.append('../fuzzci')
+sys.path.append('C:\\Users\\Douglas\\Documents\\work\\sienna-locomotive\\fuzzci\\')
+from winafl import get_mod_off
 
-app = Flask('Sienna Locomotive 2')
+app = Flask('web')
+
+app.config['CELERY_BROKER_URL'] = 'redis://192.168.1.6:6379/0'
+app.config['CELERY_RESULT_BACKEND'] = 'redis://192.168.1.6:6379/0'
+celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
+celery.conf.update(app.config)
+
 DATABASE = 'sl.db'
+
+def split_cmd(cmd):
+	quotes = False
+	split = []
+	curr = r''
+	for ch in cmd:
+		if ch == ' ' and not quotes:
+			split.append(curr)
+			curr = r''
+		else:
+			if ch == '"':
+				quotes = not quotes
+			curr += ch
+	split.append(curr)
+	split = [ea.strip('"') for ea in split]
+	return split
+
+@celery.task
+def task_mod_off(cmd):
+	print cmd
+	result = get_mod_off(cmd)
+	print result
+	return result
+
+@app.route('/task_status/<task_id>')
+def task_status(task_id):
+	task = task_mod_off.AsyncResult(task_id)
+	return task.state
 
 # get mod off
 @app.route('/winafl_job_mod_off', methods=['POST'])
@@ -33,40 +68,11 @@ def winafl_job_mod_off():
 		return error('Job not found!')
 
 	cmd = results[0][0]
-	data = {
-		'cmd': cmd,
-		'job': values[0],
-		'type': 'mod_off'
-	}
-	in_queue.put(data)
-	out_queue.put('HELLO')
-	# send command to worker
-	# update db when finished
+	print cmd
+	task = task_mod_off.apply_async(args=[split_cmd(cmd)])
+	print task.id
+	print dir(task)
 	return winafl_job_list()
-
-
-NUM_WORKERS = 2
-def init_workers():
-	global pool
-	global cmds
-	global in_queue
-	global out_queue
-	global manager
-
-	pool = []
-	cmds = []
-	
-	in_queue = Queue()
-	out_queue = Queue()
-	
-	for idx in xrange(NUM_WORKERS):
-		command_queue = Queue()
-		pool.append(Worker(idx, in_queue, out_queue, command_queue))
-		pool[-1].start()
-		cmds.append(command_queue)
-
-	manager = Manager(out_queue, in_queue)
-	manager.start()
 
 def init_db(db):
 	print 'init_db'
@@ -87,12 +93,6 @@ def close_connection(exception):
 	db = getattr(g, '_database', None)
 	if db is not None:
 		db.close()
-	for worker in pool:
-		in_queue.put(None)
-	for worker in pool:
-		worker.terminate()
-	out_queue.put(None)
-	manager.terminate()
 
 @app.route('/')
 def root():
@@ -245,5 +245,4 @@ def winafl_job_list():
 	# send kill command via command array
 
 if __name__ == '__main__':
-	init_workers()
 	app.run(debug=True)
