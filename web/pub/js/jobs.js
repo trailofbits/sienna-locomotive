@@ -1,3 +1,20 @@
+function pollTask(taskId) {
+	$.ajax({
+		type: 'GET',
+		url: '/task_status/' + taskId,
+		success: function(data) {
+			console.log(data);
+			if(data == 'PENDING') {
+				setTimeout(function() {
+					pollTask(taskId);
+				}, 500);
+			} else {
+				fetchJobs();
+			}
+		}
+	});
+}
+
 function removeWinaflJob(id) {
 	$.ajax({
 		type: 'POST',
@@ -25,7 +42,9 @@ function getModOffWinaflJob(id) {
 				handleError(data);
 				return;
 			} 
-			listWinaflJobs(data);
+			taskId = data['task_id'];
+			console.log(taskId);
+			pollTask(taskId);
 		}
 	});
 }

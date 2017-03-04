@@ -37,10 +37,17 @@ def split_cmd(cmd):
 	return split
 
 @celery.task
-def task_mod_off(cmd):
+def task_mod_off(rowid, cmd):
 	print cmd
 	result = get_mod_off(cmd)
-	print result
+	print type(result)
+	if type(result) is tuple:
+		mod, off = result
+		with app.app_context():
+			db = get_db()
+			cur = db.cursor()
+			cur.execute('UPDATE winafl_jobs SET module = ?, offset = ? WHERE rowid = ?', [mod, off, rowid])
+			db.commit()
 	return result
 
 @app.route('/task_status/<task_id>')
@@ -69,10 +76,10 @@ def winafl_job_mod_off():
 
 	cmd = results[0][0]
 	print cmd
-	task = task_mod_off.apply_async(args=[split_cmd(cmd)])
+	task = task_mod_off.apply_async(args=[values[0], split_cmd(cmd)])
 	print task.id
 	print dir(task)
-	return winafl_job_list()
+	return json.dumps({'task_id': task.id})
 
 def init_db(db):
 	print 'init_db'
@@ -193,13 +200,31 @@ def winafl_job_create():
 	if len(missing) > 0:
 		return error('Missing required argument(s): %s' % (', '.join(missing)))
 
-	values = [data[key] for key in keys if key != 'id']
-	# print len(values)
+	# have to dynamically generate the sql query
+	# sqlite does not convert explicit null to default col value
+	# have to filter out any empty strings in the request
+	data = dict(data)
+	reduced_keys = [key for key in keys if key != 'id' and data[key][0] != '']
+	values = [data[key][0] if data[key][0] != '' else None for key in reduced_keys if key != 'id']
+	query = 'INSERT INTO winafl_jobs (' + ', '.join(reduced_keys) + ') VALUES (' + ', '.join(['?'] * len(reduced_keys)) + ')'
+
 	db = get_db()
 	cur = db.cursor()
-	cur.execute('INSERT INTO winafl_jobs (name, command, file, module, offset, nargs, timeout) VALUES (?, ?, ?, ?, ?, ?, ?)', values)
+	cur.execute(query, values)
 	db.commit()
 	return winafl_job_list()
+
+
+	# values = [data[key] for key in reduced_keys if key != 'id']
+	# print reduced_keys
+	# print values
+	# db = get_db()
+	# cur = db.cursor()
+	# query = 'INSERT INTO winafl_jobs (' + ', '.join(reduced_keys) + ') VALUES (' + ', '.join(['?'] * len(reduced_keys)) + ')'
+	# print query
+	# cur.execute(query, values)
+	# db.commit()
+	# return winafl_job_list()
 
 @app.route('/winafl_job_remove', methods=['POST'])
 def winafl_job_remove():
@@ -225,6 +250,7 @@ def winafl_job_list():
 	cur = db.cursor()
 	cur.execute('SELECT rowid, * FROM winafl_jobs')
 	lresults = cur.fetchall()
+	print lresults
 	keys = winafl_keys()
 	dresults = [dict(zip(keys, res)) for res in lresults]
 	return json.dumps(dresults)

@@ -14,11 +14,12 @@ def get_fopen(run_cmd):
     ]
 
     dr_cmd += run_cmd
-    print dr_cmd
+    print ' '.join(dr_cmd)
 
     proc = subprocess.Popen(dr_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = proc.communicate()
-    
+    print 'OUT:', out
+    print 'ERR:', err
     candidates = []
     for line in out.split('\n'):
         if line.startswith('***fopen'):
@@ -35,7 +36,7 @@ def get_mod_off(run_cmd):
 
     if len(candidates) == 0:
         print 'No fopen candidates found.'
-        sys.exit(1)
+        return None, None
     elif len(candidates) == 1:
         mod, off = candidates[0]
     else:
