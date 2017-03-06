@@ -1,6 +1,39 @@
-path_wingdb_dir:
-  C:\Program Files\Windows Kits\10\Debuggers\x86\
+fuzzers:
+ - radamsa
+ - winafl
 path_radamsa_bin:
-  C:\cygwin\bin\radamsa.exe
+ C:\cygwin\bin\radamsa.exe
+radamsa_number_files_to_create:
+ 10
+path_radamsa_working_directory:
+ C:\Users\monty\Desktop\dir\
+path_winafl:
+ C:\Users\monty\winafl\bin32\
+winafl_bin:
+ afl-fuzz.exe
+path_dynamorio:
+ C:\Users\monty\Documents\dynamorio\build\bin32
+path_drrun_bin:
+ C:\Users\monty\Documents\dynamorio\build\bin32\drrun.exe
+path_winafl_dll:
+ C:\Users\monty\winafl\bin32\winafl.dll
+path_winafl_working_dir:
+ F:\winafl\
+winafl_default_timeout:
+ 40000
+winafl_last_path_timeout:
+ 10
+winafl_fuzzing_iteration:
+ 100000
+path_autoit_stop_winafl:
+ E:\vmfuzz\autoit_lib\exit_winafl.au3
+path_wingdb_script:
+ E:\\vmfuzz\\fuzzers\\winafl\\compute_offset_wingdb.py
 path_autoit_bin:
-  C:\Program Files\AutoIt3\AutoIt3.exe
+ C:\Program Files\AutoIt3\AutoIt3.exe
+path_autoit_lib:
+ E:\vmfuzz\autoit_lib\
+path_autoit_working_dir:
+ C:\Users\monty\Desktop\autoit\ 
+path_wingdb_dir:
+ C:\Program Files\Windows Kits\10\Debuggers\x86\

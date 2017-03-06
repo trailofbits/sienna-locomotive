@@ -10,7 +10,7 @@ def run(autoit_script, parameters):
     """
     Run autoit scrit
     Args:
-        autoit_script (string): path the to script
+        autoit_script (string): path to the script
         parameters (string list): parameters of the script
     Returns:
         bool: True if crash detected, False otherwise
