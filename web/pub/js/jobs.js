@@ -15,6 +15,37 @@ function pollTask(taskId) {
 	});
 }
 
+function listRuns(results) {
+	var body = $("#run_list_body");
+	body.empty();
+	var keys = schema['run']['order'];
+	for(var ridx in results) {
+		var result = results[ridx];
+		var row = $('<tr></tr>')
+		for(kidx in keys) {
+			var col = $('<td></td>');
+			var key = keys[kidx];
+			col.text(result[key]);
+			row.append(col);
+		}
+		var startButton = $('<button>Start</button>');
+		var killButton = $('<button>Kill</button>');
+		
+		// row.append(editButton);
+		startButton.on('click', function() {
+			console.log('start');
+		});
+		row.append(startButton);
+
+		killButton.on('click', function() {
+			console.log('kill');
+		});
+		row.append(killButton);
+
+		body.append(row);
+	}
+}
+
 function removeWinaflJob(id) {
 	$.ajax({
 		type: 'POST',
@@ -27,6 +58,22 @@ function removeWinaflJob(id) {
 				return;
 			} 
 			listWinaflJobs(data);
+		}
+	});
+}
+
+function createRunWinaflJob(id) {
+	$.ajax({
+		type: 'POST',
+		url: '/winafl_run_create', 
+		data: {'job_id': id}, 
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			listRuns(data);
 		}
 	});
 }
@@ -64,15 +111,16 @@ function listWinaflJobs(results) {
 		}
 		var editButton = $('<button>Edit</button>');
 		var removeButton = $('<button>Remove</button>');
+		var runButton = $('<button>Create Run</button>');
+		
 		// row.append(editButton);
-		row.append(removeButton);
 		removeButton.on('click', function() {
 			var row = $(this).parent();
 			var id = row.children().first().text();
 			console.log(id);
 			removeWinaflJob(id);
 		});
-		body.append(row);
+		row.append(removeButton);
 
 		var modoffButton = $('<button></button>');
 		modoffButton.text('Mod Off');
@@ -82,6 +130,16 @@ function listWinaflJobs(results) {
 			getModOffWinaflJob(id);
 		});
 		row.append(modoffButton);
+
+		runButton.on('click', function() {
+			var row = $(this).parent();
+			var id = row.children().first().text();
+			console.log(id);
+			createRunWinaflJob(id);
+		});
+		row.append(runButton);
+
+		body.append(row);
 	}
 }
 
@@ -91,6 +149,10 @@ function handleError(data) {
 
 function fetchJobs() {
 	$.getJSON('/winafl_job_list', listWinaflJobs);
+}
+
+function fetchRuns() {
+	$.getJSON('/run_list', listRuns);
 }
 
 function buildJob(schema, schemaKey) {
@@ -174,10 +236,24 @@ function buildJob(schema, schemaKey) {
 	$('#' + idAdd).append(addButton);
 }
 
+function buildRun(runSchema) {
+	var order = runSchema['order'];
+	for(var idx in order) {
+		var key = order[idx];
+		console.log(key);
+		var col = $('<td></td>');
+		col.text(key);
+		$('#run_list_head_row').append(col);
+	}
+}
+
 function buildElements() {
+	console.log(schema);
 	for(var key in schema) {
 		if(key.indexOf('job') > -1) {
 			buildJob(schema, key);
+		} else if(key == 'run') {
+			buildRun(schema[key]);
 		}
 	}
 }
@@ -192,4 +268,5 @@ function initPage() {
 $(document).ready(function() {
 	initPage();
 	fetchJobs();
+	fetchRuns();
 });
