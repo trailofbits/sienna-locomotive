@@ -1,0 +1,12 @@
+using_autoit:
+  yes
+path_program:
+  C:\Program Files\WinSCP\
+program_name:
+  WinSCP.exe 
+path_autoit_script:
+  sample\auto_it_scripts\winscp.au3 
+seed_pattern:
+  "*.ini"
+file_format:
+  ".ini"
