@@ -90,9 +90,8 @@ def get_offset(targeted_call):
 
     module_res = pykd.dbgCommand("lmv m " + module)
     module_res = module_res.split("\n")
-    if module == "image00400000":
-        real_module = [x for x in module_res if "OriginalFilename" in x]
-    else:
+    real_module = [x for x in module_res if "OriginalFilename" in x and (".exe" in x or ".dll" in x)]
+    if real_module == []:
         real_module = [x for x in module_res if "Image path" in x]
     if len(real_module) != 0:
         module = real_module[0].split(' ')[-1]

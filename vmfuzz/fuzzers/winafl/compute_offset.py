@@ -4,6 +4,8 @@
 import subprocess
 import os
 from threading import Thread
+import time
+import logging
 
 import utils.autoit_lib as autoit_lib
 
@@ -113,6 +115,9 @@ def launch_autoit(autoit_script, program_name, fuzz_file):
         fuzz_file (string): path to the input to be passed as argument 
     Note: it kills the program when autoit is finished
     """
+    # Small sleep seems needed to avoid wingdb to close? Reason
+    # TODO JF: find the proper explanation
+    time.sleep(5)
     cmd_auto_it = [AUTOIT_BIN, autoit_script, fuzz_file]
     proc_auto_it = subprocess.Popen(cmd_auto_it)
     proc_auto_it.wait()
@@ -149,6 +154,7 @@ def run_autoit(autoit_script, path_program, program_name, fuzz_file):
     autoit_script = autoit_lib.get_autoit_path(autoit_script, "offset")
     t_autoit = Thread(target=launch_autoit, args=(
         autoit_script, program_name, fuzz_file,))
+
     t_autoit.start()
 
     resultats = []

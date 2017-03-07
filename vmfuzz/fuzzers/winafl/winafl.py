@@ -256,8 +256,6 @@ def get_last_path_sec(fuzzer_stats):
         The time in seconds between now and the last path discover
     """
     last_path = int(fuzzer_stats['last_path'])
-    if last_path == 0:
-        return 0
     now = datetime.datetime.utcnow()
     # convert timestamp from windows
     last_path = datetime.datetime(1601, 1, 1) + \
@@ -358,13 +356,14 @@ def automated_winafl(config):
     logging.info("After filter " +str(possible_offsets))
     prop_winafl = compute_offset.winafl_proposition(possible_offsets)
     prop_winafl.reverse()
-    logging.info("Winafl proposition +"+str(prop_winafl))
+    logging.info("Winafl number of propositions: "+str(len(prop_winafl)))
+    logging.info(str(prop_winafl))
     for off, mod in prop_winafl:
         logging.info("Try " + hex(off) + " at mod " + mod)
         config_winafl['offset'] = hex(off)
         config_winafl['module'] = mod
         config_winafl['out_dir'] = out_dir + "_" + mod + "_" + hex(off)
-        cmd = generate_winafl_cmd(config_winafl, running_cmd + [seed_path])
+        cmd = generate_winafl_cmd(config_winafl, running_cmd)
         logging.info("Cmd: "+pp_cmd(cmd))
         if config['using_autoit']:
             (ret, t_autoit_stop) = run_winafl_autoit(config_winafl,

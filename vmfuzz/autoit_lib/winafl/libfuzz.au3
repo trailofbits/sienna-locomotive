@@ -34,7 +34,7 @@ Func Send_fuzz($cmd, $proc)
     if(_check_alive($window_handle)) Then
     	Sleep(2000)
         Send($proc, $cmd)
+    	Sleep(2000)
     EndIf
-
 EndFunc
 
