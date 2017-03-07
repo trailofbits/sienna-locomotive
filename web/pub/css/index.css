@@ -1,4 +1,11 @@
 td {
 	font-family: monospace;
 	padding-right: 50px;
+	word-wrap:break-word;
+}
+
+table {
+	border-collapse:collapse; 
+	table-layout:fixed; 
+	width:100%;
 }

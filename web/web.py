@@ -79,6 +79,22 @@ def task_status(task_id):
 	task = task_mod_off.AsyncResult(task_id)
 	return task.state
 
+def split_cmd(cmd):
+	quotes = False
+	split = []
+	curr = r''
+	for ch in cmd:
+		if ch == ' ' and not quotes:
+			split.append(curr)
+			curr = r''
+		else:
+			if ch == '"':
+				quotes = not quotes
+			curr += ch
+	split.append(curr)
+	split = [ea.strip('"') for ea in split]
+	return split
+
 '''
 WinAFL Job
 '''
@@ -168,22 +184,6 @@ def winafl_job_remove():
 	cur.execute('DELETE FROM winafl_jobs WHERE rowid=?', values)
 	db.commit()
 	return winafl_job_list()
-
-def split_cmd(cmd):
-	quotes = False
-	split = []
-	curr = r''
-	for ch in cmd:
-		if ch == ' ' and not quotes:
-			split.append(curr)
-			curr = r''
-		else:
-			if ch == '"':
-				quotes = not quotes
-			curr += ch
-	split.append(curr)
-	split = [ea.strip('"') for ea in split]
-	return split
 
 @celery.task
 def task_mod_off(rowid, cmd):
@@ -310,44 +310,97 @@ def winafl_run_create():
 	if len(missing) > 0:
 		return error('Missing required argument(s): %s' % (', '.join(missing)))
 
-	# query job
-	# get file
-	# init_dirs(file)
-	# copy file to in_dir
+	job_id = data['job_id']
+	db = get_db()
+	cur = db.cursor()
+
+	file_query = 'SELECT file FROM winafl_jobs WHERE rowid = ?'
+	cur.execute(file_query, job_id)
+	lresults = cur.fetchall()
+
+	if len(lresults) != 1:
+		return error('Job not found with id %s' % job_id)
+
+	initial_file = lresults[0][0]
+	print initial_file
+
+	in_dir, out_dir = init_dirs(initial_file)
 
 	# future: copy corpus
 
-	job_id = data['job_id']
-	values = [job_id, 0]
-	query = 'INSERT INTO runs (job_id, job_type) VALUES (?, ?)'
+	values = [job_id, 0, in_dir, out_dir]
+	query = 'INSERT INTO runs (job_id, job_type, in_dir, out_dir) VALUES (?, ?, ?, ?)'
 
-	db = get_db()
-	cur = db.cursor()
 	cur.execute(query, values)
 	db.commit()
 	return run_list()
 
+# run run
 @app.route('/run', methods=['POST'])
 def run():
-	# required run_id
-	# query run_cmd, config
-	# winafl(run_cmd, config)
-	pass
+	data = get_data()
+	keys = ['run_id']
+	
+	missing = check_params(keys, data)
+	if len(missing) > 0:
+		return error('Missing required argument(s): %s' % (', '.join(missing)))
 
-# create run
-	# create run folder
-		# create in dir
-		# creat out dir
-		# copy input file
-		# copy corpus
-	# store in database
+	run_id = data['run_id']
+	query = '''
+		SELECT 
+			runs.in_dir, 
+			runs.out_dir, 
+			runs.time_limit, 
+			winafl_jobs.file, 
+			winafl_jobs.module, 
+			winafl_jobs.offset, 
+			winafl_jobs.nargs, 
+			winafl_jobs.timeout, 
+			winafl_jobs.command
+		FROM runs INNER JOIN winafl_jobs ON runs.job_id = winafl_jobs.rowid
+		WHERE runs.rowid = ?
+	'''
 
-# run run
+
+	db = get_db()
+	cur = db.cursor()
+	cur.execute(query, run_id)
+	lresults = cur.fetchall()
+	lresults = [ea for ea in lresults[0]]
+
+	config_keys = ['in_dir', 'out_dir', 'time_limit', 'file', 'module', 'offset', 'nargs', 'timeout', 'command']
+	config = dict(zip(config_keys, lresults))
+	config['nargs'] = str(config['nargs'])
+	print config
+	run_cmd = split_cmd(config['command'])
+	print run_cmd
+
+	task = task_winafl_run.apply_async(args=[run_id, run_cmd, config])
+	print task.id
+
+	return json.dumps({'task_id': task.id})
+
+@celery.task
+def task_winafl_run(run_id, run_cmd, config):
+	with app.app_context():
+		db = get_db()
+		cur = db.cursor()
+		cur.execute('UPDATE runs SET start_time = ? WHERE rowid = ?', [int(time.time()), run_id])
+		db.commit()
+
+	winafl(run_cmd, config)
+
+	with app.app_context():
+		db = get_db()
+		cur = db.cursor()
+		cur.execute('UPDATE runs SET end_time = ? WHERE rowid = ?', [int(time.time()), run_id])
+		db.commit()
+		
+	return True
+
+# kill run
 
 # create gui / autoit
-
-# gracefully stop?
-	# send kill command via command array
 
 if __name__ == '__main__':
 	app.run(debug=True)

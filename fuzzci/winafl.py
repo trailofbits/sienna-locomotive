@@ -108,6 +108,7 @@ def winafl(run_cmd, config):
     proc = subprocess.Popen(winafl_cmd, cwd='C:\\Users\\Douglas\\Documents\\work\\winafl\\build64\\Release\\')
     time.sleep(60*config['time_limit'])
     proc.terminate()
+    return True
 
 def restore_sigs():
     file = 'C:\\Users\\Douglas\\Desktop\\fuzz\\sigs.ldb'

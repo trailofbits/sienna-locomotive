@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS runs (
 	job_type INT NOT NULL,
 	start_time INT,
 	end_time INT,
-	time_limit INT DEFAULT 5 NOT NULL, -- minutes
+	time_limit INT DEFAULT 60 NOT NULL, -- minutes
 	crashes INT DEFAULT 0 NOT NULL,
 	hangs INT DEFAULT 0 NOT NULL,
 	in_dir TEXT NOT NULL,

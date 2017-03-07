@@ -15,6 +15,24 @@ function pollTask(taskId) {
 	});
 }
 
+function runRun(run_id) {
+	$.ajax({
+		type: 'POST',
+		url: '/run', 
+		data: {'run_id': run_id}, 
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			taskId = data['task_id'];
+			console.log(taskId);
+			// pollTask(taskId);
+		}
+	});
+}
+
 function listRuns(results) {
 	var body = $("#run_list_body");
 	body.empty();
@@ -33,7 +51,9 @@ function listRuns(results) {
 		
 		// row.append(editButton);
 		startButton.on('click', function() {
-			console.log('start');
+			var data = {};
+			var id = row.children().first().text();
+			runRun(id);
 		});
 		row.append(startButton);
 
