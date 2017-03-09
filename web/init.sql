@@ -15,14 +15,20 @@ CREATE TABLE IF NOT EXISTS runs (
 	job_type INT NOT NULL,
 	start_time INT,
 	end_time INT,
-	time_limit INT DEFAULT 60 NOT NULL, -- minutes
+	time_limit INT DEFAULT 5 NOT NULL, -- minutes
 	crashes INT DEFAULT 0 NOT NULL,
 	hangs INT DEFAULT 0 NOT NULL,
 	in_dir TEXT NOT NULL,
-	out_dir TEXT NOT NULL
+	out_dir TEXT NOT NULL,
+	stopped BOOLEAN DEFAULT 0 NOT NULL 
 	-- Max run
 	-- Crashes
 	-- Hangs
+);
+
+CREATE TABLE IF NOT EXISTS run_task_link_table (
+	run_id INT NOT NULL,
+	task_id INT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS run_crash_link_table (

@@ -1,0 +1,5 @@
+# I aliased Program Files to PF because I was having some issues with spaces and WinAFL
+# Haven't tested it using Program Files through Python
+
+Command: "C:\PF\ClamAV-x64\clamscan.exe" -d C:\Users\Douglas\Documents\work\fuzz\sigs.ldb "C:\PF\ClamAV-x64\clambc.exe"
+File: C:\Users\Douglas\Documents\work\fuzz\sigs.ldb

@@ -15,7 +15,7 @@ function pollTask(taskId) {
 	});
 }
 
-function runRun(run_id) {
+function startRun(run_id) {
 	$.ajax({
 		type: 'POST',
 		url: '/run', 
@@ -28,6 +28,22 @@ function runRun(run_id) {
 			} 
 			taskId = data['task_id'];
 			console.log(taskId);
+			// pollTask(taskId);
+		}
+	});
+}
+
+function killRun(run_id) {
+	$.ajax({
+		type: 'POST',
+		url: '/run_kill', 
+		data: {'run_id': run_id}, 
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
 			// pollTask(taskId);
 		}
 	});
@@ -53,12 +69,14 @@ function listRuns(results) {
 		startButton.on('click', function() {
 			var data = {};
 			var id = row.children().first().text();
-			runRun(id);
+			startRun(id);
 		});
 		row.append(startButton);
 
 		killButton.on('click', function() {
 			console.log('kill');
+			var id = row.children().first().text();
+			killRun(id);
 		});
 		row.append(killButton);
 
