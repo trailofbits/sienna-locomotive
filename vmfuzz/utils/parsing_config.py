@@ -35,16 +35,26 @@ def check_user_config(config):
             "Bad configuration file: missing program name or path")
         exit()
 
-    # If autoit used
+    # Check for seed_pattern field
+    if 'seed_pattern' not in config:
+        logging.error("Bad configuration file: missing seed_pattern")
+        exit()
+
+    # Check for file_format field
+    if 'file_format' not in config:
+        logging.error("Bad configuration file: missing format_file")
+        exit()
+
+    # If program does not have parameters
+    if 'parameters' not in config:
+        config['parameters'] = []
+
+    # If autoit is used
     if config['using_autoit']:
         if 'path_autoit_script' not in config:
             logging.error(
                 "Bad configuration file: missing path_autoit_script field")
             exit()
-    # If program does not have parameters
-    if 'parameters' not in config:
-        config['parameters'] = []
-
     # If autoit not used
     else:
         if 'auto_close' not in config:
@@ -59,15 +69,7 @@ def check_user_config(config):
         # If program close itelf no need to running time
         else:
             config['running_time'] = 0
-    # Check for seed_pattern field
-    if 'seed_pattern' not in config:
-        logging.error("Bad configuration file: missing seed_pattern")
-        exit()
 
-    # Check for file_format field
-    if 'file_format' not in config:
-        logging.error("Bad configuration file: missing format_file")
-        exit()
 
 
 def check_system_config(system_config):
@@ -109,9 +111,9 @@ def check_system_config(system_config):
             logging.error(
                 "Bad system configuration file: missing radamsa_number_files_to_create field")
             exit()
-        if 'path_radamsa_working_directory' not in system_config:
+        if 'path_radamsa_working_dir' not in system_config:
             logging.error(
-                "Bad system configuration file: missing path_radamsa_working_directory field")
+                "Bad system configuration file: missing path_radamsa_working_dir field")
             exit()
 
     if "winafl" in fuzzers:

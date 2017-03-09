@@ -1,21 +1,60 @@
 Configuration
 =====================================
 
-
 The user and system configurations are based on yaml files.
 
-**System config:**
+System configuration
+=====================
+
 ```yaml
-path_radamsa_bin:
-  # path to radamsa
+# Mandatory information
 path_autoit_bin:
   # path to autoit executable
+path_autoit_lib:
+  # path to the autoit libraries
+path_autoit_working_dir:
+  # path used to create tmp files for the autoit lib system
 path_wingdb_dir:
   # path to wingdb binaries directory
-```
-`path_radamsa_bin` and `path_wingdb_dir` are required.
+fuzzers:
+  # list of available fuzzers
 
-**User configuration:**
+# Radamsa information
+path_radamsa_bin:
+  # path to radamsa
+radamsa_number_files_to_create:
+  # number of files create at each radamsa round
+path_radamsa_working_dir:
+  # path to the radamsa working directory
+
+# Winafl information
+path_winafl:
+  # path to the winafl directory
+winafl_bin:
+ # name of the winafl binary
+path_dynamorio:
+ # path to dynamorio
+path_drrun_bin:
+ # path to drrun.exe
+path_winafl_dll:
+ # path to winafl.dll
+path_winafl_working_dir:
+ # path to the winafl working directory
+winafl_default_timeout:
+ # used by winafl if no running time is provided
+winafl_last_path_timeout:
+ # timeout in minutes
+winafl_fuzzing_iteration:
+ # number of iteration before stop and running again the binary
+path_autoit_stop_winafl:
+ # autoit script used to close winafl windows (in case of errors)
+path_wingdb_script:
+ # path to the offset computing system
+```
+
+User configuration
+==================
+
 ```yaml
 using_autoit:
   # yes / no
@@ -42,7 +81,7 @@ file_format:
 `using_autoit`, `path_program`, `program_name`, `seed_patern` and `file_format` are needed.
 
 If `using_autoit` is `true`:
-- `path_auotit` and `path_autoit_script` are needed
+- ``path_autoit_script` s needed
 
 If `using_autoit` is `false`:
 -  `auto_close` is needed

@@ -29,11 +29,11 @@ Func Sleep_fuzz($sec)
     Endif
 EndFunc
 
-Func Send_fuzz($cmd, $proc)
+Func Send_fuzz($cmd, $window_handle)
     ; check that the windows is still active before sending the cmd  
     if(_check_alive($window_handle)) Then
     	Sleep(2000)
-        Send($proc, $cmd)
+        Send($cmd)
     	Sleep(2000)
     EndIf
 EndFunc

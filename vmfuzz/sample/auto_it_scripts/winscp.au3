@@ -18,7 +18,7 @@ Send_fuzz("{ENTER}",$window_handle_login)
 Sleep_fuzz(500)
 Send_fuzz("{ENTER}",$window_handle_login)
 Sleep_fuzz(500)
-Send_fuzz("C:\Users\monty\Desktop\test_afl_auto\in_winscp\test.ini",$window_handle_login)
+Send_fuzz($CmdLine[1],$window_handle_login)
 Sleep_fuzz(500)
 Send_fuzz("{ENTER}",$window_handle_login)
 

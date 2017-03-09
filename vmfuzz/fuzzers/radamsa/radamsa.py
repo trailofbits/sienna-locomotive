@@ -5,6 +5,7 @@ import logging
 import hashlib
 import autoit as autoit
 import utils.run_process as run_process
+import utils.file_manipulation as file_manipulation
 import exploitability.exploitable as exploitable
 import radamsa_constants
 
@@ -20,25 +21,12 @@ def init(config_system):
     radamsa_constants.NUMBER_FILES_TO_CREATE = config_system[
         'radamsa_number_files_to_create']
     radamsa_constants.WORKING_DIRECTORY = config_system[
-        'path_radamsa_working_directory']
-
-
-def compute_md5(file_name, block_size=2**20):
-    """
-    Compute the md5 of a file
-    Args:
-        file_name (string): Name of the fil
-        block_size (int): Size of the block (to compute md5 on large file)
-    """
-    f_desc = open(file_name, "rb")
-    md5 = hashlib.md5()
-    while True:
-        data = f_desc.read(block_size)
-        if not data:
-            break
-        md5.update(data)
-    f_desc.close()
-    return md5.hexdigest()
+        'path_radamsa_working_dir']
+    
+    autoit.AUTOIT_BIN = config_system['path_autoit_bin']
+    
+    exploitable.WINGDB_PATH = config_system['path_wingdb_dir']
+    exploitable.AUTOIT_BIN = config_system['path_autoit_bin']
 
 
 def fuzz_files(pattern_in, name_out, format_file):
@@ -82,7 +70,7 @@ def launch_fuzzing(config):
                                config['file_format'])
         for new_file in new_files:
             logging.info("Run " + new_file)
-            md5_val = compute_md5(
+            md5_val = file_manipulation.compute_md5(
                 radamsa_constants.WORKING_DIRECTORY + new_file)
             if md5_val in previous_inputs:
                 logging.info("Input already saw")

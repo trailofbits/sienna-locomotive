@@ -7,7 +7,8 @@ Programs tested:
 - Sumatra pdf (v.3.2.1): http://www.sumatrapdfreader.org/download-free-pdf-viewer.html
 - Easy RM to MP3 convertor (v2.3.7, with buffer overflow from: https://www.exploit-db.com/exploits/9177/)
 - Vlc (v2.2.1, with buffer overflow from: https://www.exploit-db.com/exploits/38485/): https://www.videolan.org/vlc/releases/2.2.1.html
-
+- WinSCP 
+- 7zip
 
 **Windows Instalation**
 ------------------------
@@ -40,19 +41,24 @@ make install
 
 ```python
 import vmfuzz
-vmfuzz.main("config.yaml","system".yaml,"path_to_working_dir",0)
+vmfuzz.main("config.yaml", "system.yaml", 0)
 ```
 - `"config.yaml"`: the user configuration file
 - `"system.yaml"`: the system configuration file
-- `"path_to_working_dir"`: working directory for inputs files (seeds and generated inputs)
 - `0` is the logging level: 0 debug 1 info, 2 warning, 3 error
 
-Examples are available in `test_sumatra.py` / `test_easymp3.py` / `test_vlc.py`.
+Examples are available in `tests/test_sumatra.py / `tests/test_easymp3.py` / `tests/test_vlc.py`.
 
 `vmfuzz.log` contains the log.
 
-If a crash is detected, a file `crash-N` is created in the working directory.
+**Other documentations**
+-----------------------
 
+- [How to configure the system](yaml_config/README.md)
+- [How to create autoit script](autoit_lib/README.md)
+- [Fuzzers available](fuzzers/README.md)
+- [Exploitatbility analysis](exploitability/README.md) (to be dev)
+- [Modules tests](tests/README.md) 
 
 **Limitations**
 ----------------

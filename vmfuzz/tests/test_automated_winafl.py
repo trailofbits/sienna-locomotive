@@ -21,4 +21,4 @@ winafl.WINAFL_DEFAULT_TIMEOUT = 40000
 
 config = vm.parse_config('yaml_config\\configEasyRmtoMP3.yaml')
 vm.check_config(config)
-winafl.automated_winafl(config)
+winafl.launch_fuzzing(config)

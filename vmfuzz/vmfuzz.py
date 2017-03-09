@@ -61,10 +61,10 @@ def main(config_file, config_system_file, log_level):
         autoit_lib.init_autoit(config)
 
     if "winafl" in config_system['fuzzers']:
-        winafl.automated_winafl(config)
+        winafl.launch_fuzzing(config)
 
-#    if "radamsa" in config_system['fuzzers']:
- #       radamsa.launch_fuzzing(config)
+    if "radamsa" in config_system['fuzzers']:
+        radamsa.launch_fuzzing(config)
 
 if __name__ == "__main__":
     parser_cmd = argparse.ArgumentParser(
