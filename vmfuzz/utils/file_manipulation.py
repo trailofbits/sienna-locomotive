@@ -40,6 +40,8 @@ def move_generated_inputs(path_src, path_dst, file_format, pattern_src="", patte
         copied files are named with random name (+ the file format)
         md5 is used to check that each file is uniq in the dest folder
     """
+    if not os.path.exists(path_src) or not os.path.exists(path_dst):
+        return []
     src_files = [f for f in os.listdir(
         path_src) if os.path.isfile(os.path.join(path_src, f))]
     if pattern_src != "":

@@ -1,0 +1,17 @@
+path_program: 
+  C:\Program Files\ClamAV\
+program_name:
+  clamscan.exe
+using_autoit:
+  no
+auto_close:
+  yes
+running_time:
+ 2
+parameters:
+ - C:\Program Files\ClamAV\clambc.exe
+ - -d 
+seed_pattern:
+  "*.ldb"
+file_format:
+  ".ldb"

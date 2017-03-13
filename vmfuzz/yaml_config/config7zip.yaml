@@ -9,6 +9,8 @@ auto_close:
 parameters:
  - "-y"
  - e 
+running_time:
+ 5
 seed_pattern:
   "*.zip"
 file_format:

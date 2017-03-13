@@ -5,7 +5,7 @@ According to the type running, the proper ```libfuzz.au3``` is selected:
 
 - ```libfuzz.au3``` to be used on normal run (radamsa)
 - ```exploitable\libfuzz.au3``` is used by !exploitable
-- ```offset\libfuzz.au3``` is used by the offset computing system (based on wingdb)
+- ```offset\libfuzz.au3``` is used by the offset computing system (based on windbg)
 - ```winafl\libfuzz.au3``` is used by winafl
 
 Writing AutoIT script
@@ -53,4 +53,4 @@ How it works
 The same user script is run, but the behavior is changed thanks to the library.
 Examples of changes:
 - ```Run_fuzz()``` launches the binary only on normal runs (and does nothing for the other runs)
-- Several sleep() are added, otherwise, the original script would be too fast for slow runs (such as under wingdb)
+- Several sleep() are added, otherwise, the original script would be too fast for slow runs (such as under windbg)

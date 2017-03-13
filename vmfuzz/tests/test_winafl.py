@@ -7,7 +7,7 @@ import fuzzers.winafl.compute_offset as compute_offset
 import fuzzers.winafl.winafl as winafl
 
 compute_offset.WINGDB_PATH = "C:\\Program Files\\Windows Kits\\10\\Debuggers\\x86\\"
-compute_offset.WINGDB_SCRIPT = r"E:\\vmfuzz\\fuzzers\\winafl\\compute_offset_wingdb.py"
+compute_offset.WINGDB_SCRIPT = r"E:\\vmfuzz\\fuzzers\\winafl\\compute_offset_windbg.py"
 
 
 winafl.WINAFL_PATH = "C:\\Users\\monty\\Desktop\\test_afl_auto\\"

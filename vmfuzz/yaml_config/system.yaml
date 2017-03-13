@@ -5,7 +5,7 @@ path_autoit_lib:
  E:\vmfuzz\autoit_lib\
 path_autoit_working_dir:
  C:\Users\monty\Desktop\autoit\ 
-path_wingdb_dir:
+path_windbg_dir:
  C:\Program Files\Windows Kits\10\Debuggers\x86\
 fuzzers:
  - radamsa
@@ -40,6 +40,6 @@ winafl_fuzzing_iteration:
  100000
 path_autoit_stop_winafl:
  E:\vmfuzz\autoit_lib\exit_winafl.au3
-path_wingdb_script:
- E:\\vmfuzz\\fuzzers\\winafl\\compute_offset_wingdb.py
+path_windbg_script:
+ E:\\vmfuzz\\fuzzers\\winafl\\compute_offset_windbg.py
 

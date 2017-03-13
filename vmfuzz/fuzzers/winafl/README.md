@@ -5,7 +5,7 @@ Winafl: User point of view
 
 - A seed file named "seed.extension" in the directory ```in_program_name``` from the path ```path_winafl_working_dir``` ([system configuration](../../yaml_config/README.md#system-configuration))
     - ex: seed.pdf in in_SumatraPDF
-/bin/bash: q: command not found
+- The extension name is provided in ```file_format``` ([user configuration](../../yaml_config/README.md#user-configuration))
 - The seed file is used to compute offsets, other files presents in the ```in_program_name``` directory are used to fuzz
 
 

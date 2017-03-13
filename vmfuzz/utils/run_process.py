@@ -14,6 +14,18 @@ def kill_process(process):
     proc = subprocess.Popen(cmd_kill, stdout=subprocess.PIPE)
     proc.wait()
 
+def kill_process_after_timeout(process, timeout):
+    """
+    Kill a process after a timeout
+    Args:
+        process (string): name of the processus
+        timeout (int): timeout in seconds
+    """
+    time.sleep(timeout)
+    cmd_kill = "Taskkill /IM " + process + " /F"
+    proc = subprocess.Popen(cmd_kill)
+    proc.wait()
+
 
 def run(path_program, program_name, parameters, auto_close, running_time):
     """

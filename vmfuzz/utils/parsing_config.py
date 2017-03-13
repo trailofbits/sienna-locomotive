@@ -60,15 +60,11 @@ def check_user_config(config):
         if 'auto_close' not in config:
             logging.error("Bad configuration file: missing auto_close field")
             exit()
-        # If program does not close itself
-        if not config['auto_close']:
-            if 'running_time' not in config:
-                logging.error(
-                    "Bad configuration file: missing running_time field")
-                exit()
-        # If program close itelf no need to running time
-        else:
-            config['running_time'] = 0
+        # The running_time 
+        if 'running_time' not in config:
+            logging.error(
+                "Bad configuration file: missing running_time field")
+            exit()
 
 
 
@@ -85,9 +81,9 @@ def check_system_config(system_config):
         logging.error(
             "Bad system configuration file: missing path_autoit_bin field")
         exit()
-    if 'path_wingdb_dir' not in system_config:
+    if 'path_windbg_dir' not in system_config:
         logging.error(
-            "Bad system configuration file: missing path_wingdb_dir field")
+            "Bad system configuration file: missing path_windbg_dir field")
         exit()
     if 'path_autoit_lib' not in system_config:
         logging.error(
@@ -157,7 +153,7 @@ def check_system_config(system_config):
             logging.error(
                 "Bad system configuration file: missing path_autoit_stop_winafl field")
             exit()
-        if 'path_wingdb_script' not in system_config:
+        if 'path_windbg_script' not in system_config:
             logging.error(
-                "Bad system configuration file: missing path_wingdb_script field")
+                "Bad system configuration file: missing path_windbg_script field")
             exit()

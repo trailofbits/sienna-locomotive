@@ -10,6 +10,8 @@ Func Close($window_handle, $prog)
 EndFunc
 
 Func Self_close($proc)
+    WinWaitClose($proc)
+    Exit(0)
 EndFunc
 
 Func Sleep_fuzz($sec)

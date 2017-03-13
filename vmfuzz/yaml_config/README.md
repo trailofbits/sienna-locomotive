@@ -14,8 +14,8 @@ path_autoit_lib:
   # path to the autoit libraries
 path_autoit_working_dir:
   # path used to create tmp files for the autoit lib system
-path_wingdb_dir:
-  # path to wingdb binaries directory
+path_windbg_dir:
+  # path to windbg binaries directory
 fuzzers:
   # list of available fuzzers
 
@@ -48,7 +48,7 @@ winafl_fuzzing_iteration:
  # number of iteration before stop and running again the binary
 path_autoit_stop_winafl:
  # autoit script used to close winafl windows (in case of errors)
-path_wingdb_script:
+path_windbg_script:
  # path to the offset computing system
 ```
 
@@ -84,7 +84,6 @@ If `using_autoit` is `true`:
 - ``path_autoit_script` s needed
 
 If `using_autoit` is `false`:
--  `auto_close` is needed
-	- if `auto_close` is `false`, `running_time` is needed
+-  `auto_close` and `runnint_time` are needed
 
 

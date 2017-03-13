@@ -6,7 +6,7 @@ import fuzzers.winafl.winafl as winafl
 os.chdir('..')
 
 compute_offset.WINGDB_PATH = "C:\\Program Files\\Windows Kits\\10\\Debuggers\\x86\\"
-compute_offset.WINGDB_SCRIPT = r"E:\\vmfuzz\\fuzzers\\winafl\\compute_offset_wingdb.py"
+compute_offset.WINGDB_SCRIPT = r"E:\\vmfuzz\\fuzzers\\winafl\\compute_offset_windbg.py"
 compute_offset.AUTOIT_BIN = r"C:\Program Files\AutoIt3\AutoIt3.exe"
 
 
@@ -20,5 +20,5 @@ winafl.WINAFL_WORKING_DIR = "F:\\winafl\\"
 winafl.WINAFL_DEFAULT_TIMEOUT = 40000
 
 config = vm.parse_config('yaml_config\\configEasyRmtoMP3.yaml')
-vm.check_config(config)
+vm.check_user_config(config)
 winafl.launch_fuzzing(config)

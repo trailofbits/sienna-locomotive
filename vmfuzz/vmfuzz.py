@@ -19,7 +19,7 @@ def init_system(config_system):
     autoit.AUTOIT_BIN = config_system['path_autoit_bin']
     autoit_lib.AUTOIT_LIB_DIRECTORY = config_system['path_autoit_lib']
     autoit_lib.AUTOIT_WORKING_DIRECTORY = config_system['path_autoit_working_dir']
-    exploitable.WINGDB_PATH = config_system['path_wingdb_dir']
+    exploitable.WINGDB_PATH = config_system['path_windbg_dir']
     exploitable.AUTOIT_BIN = config_system['path_autoit_bin']
 
     fuzzers = config_system['fuzzers']
@@ -63,8 +63,8 @@ def main(config_file, config_system_file, log_level):
     if "winafl" in config_system['fuzzers']:
         winafl.launch_fuzzing(config)
 
-    if "radamsa" in config_system['fuzzers']:
-        radamsa.launch_fuzzing(config)
+ #   if "radamsa" in config_system['fuzzers']:
+#        radamsa.launch_fuzzing(config)
 
 if __name__ == "__main__":
     parser_cmd = argparse.ArgumentParser(

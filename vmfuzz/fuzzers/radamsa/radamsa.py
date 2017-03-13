@@ -25,7 +25,7 @@ def init(config_system):
     
     autoit.AUTOIT_BIN = config_system['path_autoit_bin']
     
-    exploitable.WINGDB_PATH = config_system['path_wingdb_dir']
+    exploitable.WINGDB_PATH = config_system['path_windbg_dir']
     exploitable.AUTOIT_BIN = config_system['path_autoit_bin']
 
 

@@ -1,4 +1,4 @@
-""" Module handling the offset computation using wingdb (without autoit)
+""" Module handling the offset computation using windbg (without autoit)
     """
 
 import subprocess
@@ -8,6 +8,7 @@ import time
 import logging
 
 import utils.autoit_lib as autoit_lib
+import utils.run_process as run_process
 
 WINGDB_PATH = ""
 
@@ -19,6 +20,16 @@ WINGDB_SCRIPT = r""
 DEBUG = "cdb.exe"
 
 AUTOIT_BIN = ""
+
+
+def init(config_system):
+    global WINGDB_SCRIPT
+    global WINGDB_PATH
+    global AUTOIT_BIN
+
+    WINGDB_PATH = config_system['path_windbg_dir']
+    WINGDB_SCRIPT = config_system['path_windbg_script']
+    AUTOIT_BIN = config_system['path_autoit_bin']
 
 
 def winafl_proposition(res):
@@ -60,9 +71,9 @@ def filter_resultats_by_filename(res, txt):
     return [x for x in res if txt in x[4]]
 
 
-def make_wingdb_cmd(module, function):
+def make_windbg_cmd(module, function, fuzz_file):
     """
-    Create a wingdb cmd:
+    Create a windbg cmd:
         - Add a break at module!function
         - Call the WINGDB_SCRIPT script when the breakpoint is met
     Args:
@@ -71,32 +82,42 @@ def make_wingdb_cmd(module, function):
     Returns:
         the command as a string
     """
-    return r'bp ' + module + '!' + function + r' "!py ' + WINGDB_SCRIPT + ' ' + function + r';gc;";'
+    ## replace needed because windbg interprete \\ as \
+    fuzz_file = fuzz_file.replace("\\", "\\\\")
+    cmd = r'bp ' + module + '!' + function + r' "!py ' + \
+        WINGDB_SCRIPT + ' ' + function + ' ' + fuzz_file + r';gc;";'
+    return cmd
 
 
-def run(path_program, program_name, parameters):
+def run(path_program, program_name, parameters, fuzz_file):
     """
     Run the offset computing
     Args:
         path_program (string): path the to the program
         program_name (string): name of the program
         parameters (string list): parameters of the script
+        fuzz_file (string): path to the input to be passed as argument
     Returns:
         list of triplets: (function, module, offset, depth)
+    Note: fuzz_file needs to be provided, even if its already in the parameters list
     """
-    wingdb_cmd = ".load winext/pykd.pyd;"
-    wingdb_cmd = wingdb_cmd + make_wingdb_cmd("kernel32", "CreateFileW")
-    wingdb_cmd = wingdb_cmd + make_wingdb_cmd("kernel32", "CreateFileA")
-    wingdb_cmd = wingdb_cmd + make_wingdb_cmd("msvcrt", "fopen")
-    wingdb_cmd = wingdb_cmd + make_wingdb_cmd("MSVCR100", "fopen")
+    windbg_cmd = ".load winext/pykd.pyd;"
+    windbg_cmd = windbg_cmd + \
+        make_windbg_cmd("kernel32", "CreateFileW", fuzz_file)
+    windbg_cmd = windbg_cmd + \
+        make_windbg_cmd("kernel32", "CreateFileA", fuzz_file)
+    windbg_cmd = windbg_cmd + make_windbg_cmd("msvcrt", "fopen", fuzz_file)
+    windbg_cmd = windbg_cmd + make_windbg_cmd("MSVCR100", "fopen", fuzz_file)
 
-    wingdb_cmd = wingdb_cmd + "gc;q"
-    cmd = [WINGDB_PATH + DEBUG, "-c", wingdb_cmd,
+    windbg_cmd = windbg_cmd + "gc;q"
+    # -2 needed to open console application in new windows
+    cmd = [WINGDB_PATH + DEBUG, "-2", "-c", windbg_cmd,
            os.path.join(path_program, program_name)] + parameters
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     resultats = []
     for line in iter(proc.stdout.readline, b''):
+        logging.debug(line)
         if line.startswith("FOUND:"):
             line = line.rstrip().split("#")
             func_name, mod, off, depth, filename, uniq_id = line[2], line[
@@ -112,20 +133,17 @@ def launch_autoit(autoit_script, program_name, fuzz_file):
     Args:
         autoit_script (string): path the to script
         path_program (string): path the to the program
-        fuzz_file (string): path to the input to be passed as argument 
+        fuzz_file (string): path to the input to be passed as argument
     Note: it kills the program when autoit is finished
     """
-    # Small sleep seems needed to avoid wingdb to close? Reason
+    # Small sleep seems needed to avoid windbg to close? Reason
     # TODO JF: find the proper explanation
     time.sleep(5)
     cmd_auto_it = [AUTOIT_BIN, autoit_script, fuzz_file]
     proc_auto_it = subprocess.Popen(cmd_auto_it)
     proc_auto_it.wait()
 
-   # be sure that autoit is not running anymore
-    cmd_kill_program = "Taskkill /IM " + program_name + " /F"
-    proc = subprocess.Popen(cmd_kill_program)
-    proc.wait()
+    run_process.kill_process(program_name)
 
 
 def run_autoit(autoit_script, path_program, program_name, fuzz_file):
@@ -139,14 +157,16 @@ def run_autoit(autoit_script, path_program, program_name, fuzz_file):
     Returns:
         list of triplets: (function, module, offset, depth)
     """
-    wingdb_cmd = ".load winext/pykd.pyd;"
-    wingdb_cmd = wingdb_cmd + make_wingdb_cmd("kernel32", "CreateFileW")
-    wingdb_cmd = wingdb_cmd + make_wingdb_cmd("kernel32", "CreateFileA")
-    wingdb_cmd = wingdb_cmd + make_wingdb_cmd("msvcrt", "fopen")
-    wingdb_cmd = wingdb_cmd + make_wingdb_cmd("MSVCR100", "fopen")
+    windbg_cmd = ".load winext/pykd.pyd;"
+    windbg_cmd = windbg_cmd + \
+        make_windbg_cmd("kernel32", "CreateFileW", fuzz_file)
+    windbg_cmd = windbg_cmd + \
+        make_windbg_cmd("kernel32", "CreateFileA", fuzz_file)
+    windbg_cmd = windbg_cmd + make_windbg_cmd("msvcrt", "fopen", fuzz_file)
+    windbg_cmd = windbg_cmd + make_windbg_cmd("MSVCR100", "fopen", fuzz_file)
 
-    wingdb_cmd = wingdb_cmd + "gc;q"
-    cmd = [WINGDB_PATH + DEBUG, "-c", wingdb_cmd,
+    windbg_cmd = windbg_cmd + "gc;q"
+    cmd = [WINGDB_PATH + DEBUG, "-c", windbg_cmd,
            os.path.join(path_program, program_name)]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stdin=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -167,8 +187,6 @@ def run_autoit(autoit_script, path_program, program_name, fuzz_file):
     resultats_set = set(resultats)
 
     # be sure that autoit is not running anymore
-    cmd_kill_autoit = "Taskkill /IM AutoIT3.exe /F"
-    proc = subprocess.Popen(cmd_kill_autoit)
-    proc.wait()
+    run_process.kill_process("AutoIT3.exe")
 
     return resultats_set

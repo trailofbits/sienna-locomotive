@@ -32,31 +32,18 @@ make install
 - Wingdb: https://developer.microsoft.com/en-us/windows/downloads/windows-10-sdk
 - Visual C++ Redistributable for Visual Studio 2012 https://www.microsoft.com/en-us/download/details.aspx?id=30679
 - !exploitable: https://msecdbg.codeplex.com/
-   - copy and paste MSEC.dll in `winext` of the wingdb directory
+   - copy and paste MSEC.dll in `winext` of the windbg directory
 
 - pykd (TODO doc)
 
-**Usage**
----------
-
-```python
-import vmfuzz
-vmfuzz.main("config.yaml", "system.yaml", 0)
-```
-- `"config.yaml"`: the user configuration file
-- `"system.yaml"`: the system configuration file
-- `0` is the logging level: 0 debug 1 info, 2 warning, 3 error
-
-Examples are available in `tests/test_sumatra.py / `tests/test_easymp3.py` / `tests/test_vlc.py`.
-
-`vmfuzz.log` contains the log.
 
 **Other documentations**
 -----------------------
-
+- [Minimal usage](Usage.md)
 - [How to configure the system](yaml_config/README.md)
 - [How to create autoit script](autoit_lib/README.md)
 - [Fuzzers available](fuzzers/README.md)
+- [Particular behaviors details](Behavior.md)
 - [Exploitatbility analysis](exploitability/README.md) (to be dev)
 - [Modules tests](tests/README.md) 
 
