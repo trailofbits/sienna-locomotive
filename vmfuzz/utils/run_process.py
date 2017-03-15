@@ -2,7 +2,7 @@
 import subprocess
 import time
 
-import crash_detection
+import exploitability.crash_detection as crash_detection
 
 def kill_process(process):
     """
