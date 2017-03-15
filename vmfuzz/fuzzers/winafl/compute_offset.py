@@ -35,10 +35,11 @@ def init(config_system):
 def winafl_proposition(res):
     """
     Sort results and return a list of proposition to be used with winafl
+
     Args:
         res : resultats to sorted
     Returns:
-        list of couple (offset,module)
+        (int,string) list: list of couple (offset, module)
     """
     res = [(x[2], x[1], x[3]) for x in res]
     res = set(res)
@@ -52,8 +53,9 @@ def winafl_proposition(res):
 def print_resultats(res):
     """
     Print resultats (sorted by modules) (debug function)
+
     Args:
-        res (list) resultats to print
+        res (list): resultats to print
     """
     sorted_res = sorted(res, key=lambda x: (x[5], x[3]))
     for func, mod, off, depth, filename, uniq_id in sorted_res:
@@ -65,8 +67,9 @@ def print_resultats(res):
 def filter_resultats_by_filename(res, txt):
     """
     Print resultats (sorted by modules) (debug function)
+
     Args:
-        res (list) resultats to print
+        res (list): resultats to print
     """
     return [x for x in res if txt in x[4]]
 
@@ -76,12 +79,14 @@ def make_windbg_cmd(module, function, fuzz_file):
     Create a windbg cmd:
         - Add a break at module!function
         - Call the WINGDB_SCRIPT script when the breakpoint is met
+
     Args:
         module (string): targeted module
         function (string): targeted function
     Returns:
-        the command as a string
+        string: the command 
     """
+    
     ## replace needed because windbg interprete \\ as \
     fuzz_file = fuzz_file.replace("\\", "\\\\")
     cmd = r'bp ' + module + '!' + function + r' "!py ' + \
@@ -92,6 +97,7 @@ def make_windbg_cmd(module, function, fuzz_file):
 def run(path_program, program_name, parameters, fuzz_file):
     """
     Run the offset computing
+
     Args:
         path_program (string): path the to the program
         program_name (string): name of the program
@@ -99,7 +105,8 @@ def run(path_program, program_name, parameters, fuzz_file):
         fuzz_file (string): path to the input to be passed as argument
     Returns:
         list of triplets: (function, module, offset, depth)
-    Note: fuzz_file needs to be provided, even if its already in the parameters list
+    Note:
+        fuzz_file needs to be provided, even if its already in the parameters list
     """
     windbg_cmd = ".load winext/pykd.pyd;"
     windbg_cmd = windbg_cmd + \
@@ -130,11 +137,13 @@ def run(path_program, program_name, parameters, fuzz_file):
 def launch_autoit(autoit_script, program_name, fuzz_file):
     """
     Launch the autoit script
+
     Args:
         autoit_script (string): path the to script
         path_program (string): path the to the program
         fuzz_file (string): path to the input to be passed as argument
-    Note: it kills the program when autoit is finished
+    Note: 
+        it kills the program when autoit is finished
     """
     # Small sleep seems needed to avoid windbg to close? Reason
     # TODO JF: find the proper explanation
@@ -149,6 +158,7 @@ def launch_autoit(autoit_script, program_name, fuzz_file):
 def run_autoit(autoit_script, path_program, program_name, fuzz_file):
     """
     Run the offset computing with an autoit script
+
     Args:
         autoit_script (string): path the to script
         path_program (string): path the to the program
@@ -179,6 +189,7 @@ def run_autoit(autoit_script, path_program, program_name, fuzz_file):
 
     resultats = []
     for line in iter(proc.stdout.readline, b''):
+        logging.debug(line)
         if line.startswith("FOUND:"):
             line = line.rstrip().split("#")
             func_name, mod, off, depth, filename, uniq_id = line[2], line[

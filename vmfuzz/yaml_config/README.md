@@ -30,14 +30,8 @@ path_radamsa_working_dir:
 # Winafl information
 path_winafl:
   # path to the winafl directory
-winafl_bin:
- # name of the winafl binary
 path_dynamorio:
  # path to dynamorio
-path_drrun_bin:
- # path to drrun.exe
-path_winafl_dll:
- # path to winafl.dll
 path_winafl_working_dir:
  # path to the winafl working directory
 winafl_default_timeout:

@@ -9,6 +9,7 @@ AUTOIT_WORKING_DIRECTORY = ""
 def set_lib(autoit_script, name_lib):
     """
     Initiate the autoit script with the targeted libary
+
     Args:
         autoit_script (string): path to the autoit script
         name_lib (string) name of the libary
@@ -30,11 +31,12 @@ def set_lib(autoit_script, name_lib):
 def get_autoit_path(autoit_script, name_lib):
     """
     Return the autoit path adjusted with the targeted libary
-    Args :
+
+    Args:
         autoit_script (string): path to the autoit script
         name_lib (string) name of the libary
     Returns:
-        path to the adjusted autoit script (string)
+        string: path to the adjusted autoit script
     """
     autoit_name = os.path.basename(autoit_script)
     return os.path.join(AUTOIT_WORKING_DIRECTORY, name_lib, autoit_name)
@@ -43,6 +45,7 @@ def get_autoit_path(autoit_script, name_lib):
 def init_autoit(config):
     """
     Initiate the module
+
     Args:
         config: the configuration as a dict
     """

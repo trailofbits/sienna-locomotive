@@ -6,10 +6,11 @@ import yaml
 def parse_config(config_file):
     """
     Parse the configuration file
+
     Args:
         config_file (string): Name of the yaml configuration file
-    Returns!
-        The configuration as a dict
+    Returns:
+        dict: The configuration 
     """
     f_desc = open(config_file, 'r')
     config = yaml.load(f_desc)
@@ -20,8 +21,9 @@ def parse_config(config_file):
 def check_user_config(config):
     """
     Check the user configuration
+
     Args:
-        The configuration as a dict
+        config (dict): The user configuration 
     """
     ## Check configuration file
     # Check for using_autoit field
@@ -71,8 +73,9 @@ def check_user_config(config):
 def check_system_config(system_config):
     """
     Check the system configuration
+
     Args:
-        The configuration as a dict
+        system_config (dict): The system configuration 
     """
     if "fuzzers" not in system_config:
         logging.error("Bad system configuration file: missing fuzzers field")
@@ -117,21 +120,9 @@ def check_system_config(system_config):
             logging.error(
                 "Bad system configuration file: missing path_winafl field")
             exit()
-        if 'winafl_bin' not in system_config:
-            logging.error(
-                "Bad system configuration file: missing winafl_bin field")
-            exit()
         if 'path_dynamorio' not in system_config:
             logging.error(
                 "Bad system configuration file: missing path_dynamorio field")
-            exit()
-        if 'path_drrun_bin' not in system_config:
-            logging.error(
-                "Bad system configuration file: missing path_drrun_bin field")
-            exit()
-        if 'path_winafl_dll' not in system_config:
-            logging.error(
-                "Bad system configuration file: missing path_winafl_dll field")
             exit()
         if 'path_winafl_working_dir' not in system_config:
             logging.error(

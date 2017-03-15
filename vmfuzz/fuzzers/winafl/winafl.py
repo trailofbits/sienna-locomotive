@@ -18,15 +18,13 @@ import utils.run_process as run_process
 def init(config_system):
     """
     Initialize the constantss used by the module
+
     Args:
-        The system configuration as a dict
+        config_system (dict): The system configuration
     """
     winafl_constants.AUTOIT_BIN = config_system['path_autoit_bin']
     winafl_constants.WINAFL_PATH = config_system['path_winafl']
-    winafl_constants.WINAFL_BIN = config_system['winafl_bin']
     winafl_constants.DYNAMORIO_PATH = config_system['path_dynamorio']
-    winafl_constants.DRRUN = config_system['path_drrun_bin']
-    winafl_constants.WINAFLDLL = config_system['path_winafl_dll']
     winafl_constants.WINAFL_WORKING_DIR = config_system[
         'path_winafl_working_dir']
     winafl_constants.WINAFL_DEFAULT_TIMEOUT = config_system[
@@ -48,16 +46,19 @@ def init(config_system):
 def generate_drrun_cmd(config, running_cmd):
     """
     Generate drrun.exe command line
+
     Args:
-        config (dict): configuration
-        running_cmd (list string)
+        config (dict): The user configuration
+        running_cmd (list string): the running command
     Returns:
-        drrun.exe cmd (list string)
+        list string: drrun.exe cmd 
     """
     drrun_cmd = [
-        winafl_constants.DRRUN,
+        os.path.join(winafl_constants.DYNAMORIO_PATH,
+                     winafl_constants.DRRUN_BIN),
         "-c",
-        winafl_constants.WINAFLDLL,
+        os.path.join(winafl_constants.WINAFL_PATH,
+                     winafl_constants.WINAFL_DLL),
         "-debug",
         "-target_module",
         config['module'],
@@ -75,11 +76,12 @@ def generate_drrun_cmd(config, running_cmd):
 def generate_winafl_cmd(config, running_cmd):
     """
     Generate winafl command line
+
     Args:
-        config (dict): configuration
-        running_cmd (list string)
+        config (dict): The user configuration
+        running_cmd (list string): the running command
     Returns:
-        winafl cmd (list string)
+        list string: winafl cmd 
     """
     winafl_cmd = [
         winafl_constants.WINAFL_PATH + winafl_constants.WINAFL_BIN,
@@ -113,10 +115,11 @@ def generate_winafl_cmd(config, running_cmd):
 def pp_cmd(cmd):
     """
     Convert a list of string to a string
+
     Args:
         cmd (list of string)
     Returns:
-        cmd as a string
+        string: cmd as a string
     """
     return ' '.join(cmd)
 
@@ -124,11 +127,12 @@ def pp_cmd(cmd):
 def run_drrun(config, running_cmd):
     """
     Run drrun.exe (debug function)
+
     Args:
         config (dict): configuration
         running_cmd (list string)
-
-    Log stdout in log_out file, stderr in log_err file
+    Note:
+        Log stdout in log_out file, stderr in log_err file
     """
     cmd = generate_drrun_cmd(config, running_cmd)
     log_out = open("log_out", 'w')
@@ -139,31 +143,35 @@ def run_drrun(config, running_cmd):
     proc.wait()
 
 
-def run_winafl(config_winafl, running_cmd):
+def run_winafl_without_autoit(config_winafl, running_cmd):
     """
     Run winafl
+
     Args:
         config_winafl (dict): winafl configuration
         running_cmd (list string)
-    Returns: 0 if error, 1 if success
-    TODO JF: To be improved: using timeout and detecting if process still running
+    Returns:
+        int: 0 if error, 1 if success
+    Note:
+        Check every 10 secondes for 1 min if the process is running
     """
 
     cmd = generate_winafl_cmd(config_winafl, running_cmd)
     logging.debug(pp_cmd(cmd))
+    cmd_drrun = generate_drrun_cmd(config_winafl, running_cmd)
+    logging.debug(pp_cmd(cmd_drrun))
     proc = subprocess.Popen(pp_cmd(cmd), cwd=config_winafl['working_dir'])
-    time.sleep(60)
-    if proc.poll() is None:
-        logging.info("Winafl running!")
-        return 1
-    else:
-        logging.info("Winafl not running")
-        return 0
+    for i in range(0, 6):
+        time.sleep(10)
+        if proc.poll() is not None:
+            return 0
+    return 1
 
 
 def launch_autoit(path_autoit_script, fuzz_file, stop):
     """
     Launches auto recursively (untill stop is set)
+
     Args:
         path_autoit_script (string): path to the autoit to execute
         fuzz_file (string): the input passed as argument to the autoit script
@@ -186,14 +194,23 @@ def launch_autoit(path_autoit_script, fuzz_file, stop):
 def run_winafl_autoit(config_winafl, path_autoit_script, program_name, running_cmd, fuzz_file):
     """
     Run winafl
+
     Args:
         config_winafl (dict): winafl configuration
-        running_cmd (list string)
-    Returns: 0 if error, 1 if success
-    TODO JF: To be improved: using timeout and detecting if process still running
+        path_autoit_script (string) : path to the autoit script
+        program_name (string): the program name
+        running_cmd (list string): the runnign command
+        fuzz_file (string): path to the file to fuzz
+    Returns: 
+        (ret, t):
+            ret : 0 if error, 1 if success\n
+            t: used to stop the loop on the autoit script
+    Note:
+        Check every 10 secondes for 1 min if the process is running
     """
 
     cmd = generate_winafl_cmd(config_winafl, running_cmd)
+    logging.debug(pp_cmd(cmd))
     proc = subprocess.Popen(pp_cmd(cmd), cwd=config_winafl['working_dir'])
 
     path_autoit_script = autoit_lib.get_autoit_path(
@@ -204,28 +221,25 @@ def run_winafl_autoit(config_winafl, path_autoit_script, program_name, running_c
         path_autoit_script, fuzz_file, t_autoit_stop,))
     t_autoit.start()
 
-    time.sleep(60)
-    if proc.poll() is None:
-        logging.info("Winafl running!")
-        return (1, t_autoit_stop)
-    else:
-        logging.info("Winafl not running")
-
-        t_autoit_stop.set()
-
-        run_process.kill_process(program_name)
-        run_process.kill_process("AutoIt3.exe")
-        return (0, t_autoit_stop)
-
+    for i in range(0, 6):
+        time.sleep(10)
+        if proc.poll() is not None:
+            t_autoit_stop.set()
+            run_process.kill_process(program_name)
+            run_process.kill_process("AutoIt3.exe")
+            return (0, t_autoit_stop)
+    return (1, t_autoit_stop)
 
 def parsing_stat(file_name):
     """
     Parsing winafl fuzzer_stats file
+
     Args:
         file_name (string): path to the fuzzer_stats file
     Returns:
-        dict with the content of the file
-        iF the fuzzer_stats does not exist, returns an empty dict
+        dict: the content of the file 
+    Note:
+        If the fuzzer_stats does not exist, returns an empty dict
     """
     if not os.path.exists(file_name):
         return {}
@@ -243,10 +257,11 @@ def parsing_stat(file_name):
 def get_last_crash_sec(fuzzer_stats):
     """
     Return the time (in sec) between now and the last crash
+
     Args:
         fuzerer_stats (dict)
-    Returns
-        The time in seconds between now and the last crash
+    Returns:
+        int: The time in seconds between now and the last crash
     """
     last_crash = int(fuzzer_stats['last_crash'])
     if last_crash == 0:
@@ -261,10 +276,11 @@ def get_last_crash_sec(fuzzer_stats):
 def get_last_path_sec(fuzzer_stats):
     """
     Return the time (in sec) between now and the last path discover
+
     Args:
         fuzerer_stats (dict)
-    Returns
-        The time in seconds between now and the last path discover
+    Returns:
+        int: The time in seconds between now and the last path discover
     """
     last_path = int(fuzzer_stats['last_path'])
     now = datetime.datetime.utcnow()
@@ -274,13 +290,43 @@ def get_last_path_sec(fuzzer_stats):
     return (now - last_path).total_seconds()
 
 
-def get_number_crashes(fuzzer_stats):
+def get_number_paths(fuzzer_stats):
     """
-    Returns the number of crashes found
+    Returns the number of paths found
+
     Args:
         fuzerer_stats (dict)
     Returns:
-        The number of crashes (int)
+        int: The number of paths 
+    """
+    return int(fuzzer_stats['paths_found'])
+
+
+def get_number_paths_from_config(config_winafl):
+    """
+    Returns the number of paths found
+
+    Args:
+        config_winafl (dict)
+    Returns:
+        int: The number of paths 
+    """
+    path_fuzzer_stats = os.path.join(
+        winafl_constants.WINAFL_WORKING_DIR, config_winafl['out_dir'], "fuzzer_stats")
+    fuzzer_stats = parsing_stat(path_fuzzer_stats)
+    if not fuzzer_stats:
+        return 0
+    return get_number_paths(fuzzer_stats)
+
+
+def get_number_crashes(fuzzer_stats):
+    """
+    Returns the number of crashes found
+
+    Args:
+        fuzerer_stats (dict)
+    Returns:
+        int: The number of crashes 
     """
     return int(fuzzer_stats['uniq_crashes'])
 
@@ -288,43 +334,69 @@ def get_number_crashes(fuzzer_stats):
 def check_winafl(out_dir):
     """
     Loop until winafl does not found new paths
+    
     Args:
         out_dir (string): path to the out directory of winafl
-    Every WINAFL_LAST_PATH_TIMEOUT, it checks if a new path was disccovered recently
+    Returns:
+        int: the return value
+    Note:
+        The return value can be:
+            - 0: Error (no fuzzer_stats file)
+            - 1: One winafl iteration
+            - 2: At least two winafl iteration
+
+        Every WINAFL_LAST_PATH_TIMEOUT, it checks if a new path was disccovered recently
     """
     fuzzer_stats = parsing_stat(out_dir + "\\fuzzer_stats")
+    logging.debug("WINAFL_LAST_PATH_TIMEOUT: " +
+                  str(winafl_constants.WINAFL_LAST_PATH_TIMEOUT))
     if fuzzer_stats:
+        iteration = 0
         while True:
-            time.sleep(60 * winafl_constants.WINAFL_LAST_PATH_TIMEOUT)
+            time.sleep(60 * 2)
             fuzzer_stats = parsing_stat(out_dir + "\\fuzzer_stats")
             if not fuzzer_stats:
-                break
+                return 0
             last_path_sec = get_last_path_sec(fuzzer_stats)
             logging.info("Last path generated: " + str(last_path_sec) +
                          " secs (" + (str(last_path_sec / 60) + " mins)"))
             if last_path_sec > 60 * winafl_constants.WINAFL_LAST_PATH_TIMEOUT:
                 break
+            iteration = iteration + 1  # TODO JF sensible to overflow
+            if winafl_constants.WINAFL_LOOP_ITERATION != 0:
+                if winafl_constants.WINAFL_LOOP_ITERATION >= iteration:
+                    break
+        if iteration == 0:
+            return 1
+        else:
+            return 2
+    else:
+        return 0
 
 
 def move_generated_inputs(config_winafl, file_format):
     """
     Move generated files
+    
     Args:
         config_winafl (dict): the winafl configuration
         file_format (string) the file format
-    Names of the moved files contains:
-        - "-C" for crashes
-        - "-H" for hangs
-        - "-N" for normals
+    Note:
+        Names of the moved files contains:
+            - "-C" for crashes
+            - "-H" for hangs
+            - "-N" for normals
+            
+        (in dev, only C are copied for now) 
     """
     dst_dir = os.path.join(
         winafl_constants.WINAFL_WORKING_DIR, config_winafl['in_dir'])
     in_dir = os.path.join(
         winafl_constants.WINAFL_WORKING_DIR, config_winafl['out_dir'])
-    file_manipulation.move_generated_inputs(
-        os.path.join(in_dir, "crashes"), dst_dir, "-C" + file_format)
-    file_manipulation.move_generated_inputs(
-        os.path.join(in_dir, "hangs"), dst_dir, "-H" + file_format)
+   # file_manipulation.move_generated_inputs(
+   #     os.path.join(in_dir, "crashes"), dst_dir, "-C" + file_format)
+   # file_manipulation.move_generated_inputs(
+   #     os.path.join(in_dir, "hangs"), dst_dir, "-H" + file_format)
     file_manipulation.move_generated_inputs(
         os.path.join(in_dir, "queue"), dst_dir, "-N" + file_format)
 
@@ -332,8 +404,9 @@ def move_generated_inputs(config_winafl, file_format):
 def generate_config_winafl(config):
     """
     Generate winafl configuration
+    
     Args:
-        The user configuration as a dict
+        config (dict): The user configuration
     Returns:
         The winafl configuration as a dict
     """
@@ -366,8 +439,9 @@ def generate_config_winafl(config):
 def compute_targets(config):
     """
     Compute the possible (offset,module) targets
+    
     Args:
-        The user configuration as a dict
+        config (dict): The user configuration
     Returns:
         List of (offset,module)
     """
@@ -401,8 +475,9 @@ def compute_targets(config):
 def generate_running_cmd(config):
     """
     Generate the runnign cmd
+    
     Args:
-        The user configuration as a dict
+        config (dict): The user configuration
     Returns:
         The running command (string)
     Note:
@@ -415,16 +490,109 @@ def generate_running_cmd(config):
     return running_cmd
 
 
+def generate_path_file_to_fuzz(config_winafl):
+    """
+    Generate the path to the file to fuzz
+
+    Args:
+        The winafl configuration as a dict
+    Returns:
+        The path
+    """
+    path_file_to_fuzz = os.path.join(
+        winafl_constants.WINAFL_WORKING_DIR, config_winafl['file'])
+    return path_file_to_fuzz
+
+
+def update_target_on_winafl_config(config_winafl, target):
+    """
+    Update a winafl with a target
+
+    Args:
+        The winafl configuration as a dict
+        target (int,string): the target (offset,module)
+    Returns:
+        The winafl configuration updated
+    """
+
+    off, mod = target
+    logging.info("Target " + hex(off) + " at mod " + mod)
+    config_winafl['offset'] = hex(off)
+    config_winafl['module'] = mod
+    config_winafl['out_dir'] = config_winafl[
+        'out_dir_ori'] + "_" + mod + "_" + hex(off)
+
+
+def run_winafl(config, config_winafl, running_cmd, path_file_to_fuzz):
+    """
+    Run winafl
+
+    Args:
+        config_winafl (dict): user configuration
+        config_winafl (dict): winafl configuration
+        running_cmd (list string): the running command
+        path_file_to_fuzz (string): the path to the file to fuzz
+    Returns:
+        0 : 0 winafl iteration
+        1 : one winafl iteration
+        2 : at least two winafl iteration
+    Note:
+        Returns when winafl is finished (error or no path recently discovered)
+        A winafl iteration = WINAFL_LAST_PATH_TIMEOUT
+        With autoit, path_autoit_script is given to the autoit script
+        Without, is it given added to the running command
+    """
+    if config['using_autoit']:
+        (ret, t_autoit_stop) = run_winafl_autoit(config_winafl,
+                                                 config[
+                                                     'path_autoit_script'],
+                                                 config['program_name'],
+                                                 running_cmd,
+                                                 path_file_to_fuzz)
+    else:
+        ret = run_winafl_without_autoit(
+            config_winafl, running_cmd + [path_file_to_fuzz])
+
+    if ret == 1:
+        logging.debug("Winafl started")
+        ret = check_winafl(winafl_constants.WINAFL_WORKING_DIR +
+                           config_winafl['out_dir'])
+        if config['using_autoit']:
+            t_autoit_stop.set()
+    return ret
+
+
+def kill_all(config):
+    """
+    Kill all processes related to winafl
+
+    Args:
+        config (dict): The user configuration
+    """
+    run_process.kill_process("AutoIT3.exe")
+    run_process.kill_process(winafl_constants.WINAFL_BIN)
+
+    # Use autoit to close windows opened during the close of winafl
+    cmd_auto_it = [winafl_constants.AUTOIT_BIN,
+                   winafl_constants.WINAFL_AUTOIT_STOP]
+    proc_auto_it = subprocess.Popen(cmd_auto_it)
+    proc_auto_it.wait()
+
+    run_process.kill_process(config['program_name'])
+
+
 def launch_fuzzing(config):
     """
     Automated winafl launching
-    Args:
-        The user configuration as a dict
 
-    On a program:
-        - compute the set of possible (offset,module)
-        - Launches on each (offset,module) winafl
-        - Run winafl until no new path has been found recently
+    Args:
+        config (dict): The user configuration
+    
+    Note:   
+        On a program:
+            - compute the set of possible (offset,module)
+            - Launches on each (offset,module) winafl
+            - Run winafl until no new path has been found recently
     """
     logging.info("Starting automated winafl")
 
@@ -433,49 +601,13 @@ def launch_fuzzing(config):
     logging.info(str(targets))
 
     config_winafl = generate_config_winafl(config)
-
     running_cmd = generate_running_cmd(config)
+    path_file_to_fuzz = generate_path_file_to_fuzz(config_winafl)
 
-    for off, mod in targets:
-        logging.info("Try " + hex(off) + " at mod " + mod)
-        config_winafl['offset'] = hex(off)
-        config_winafl['module'] = mod
-        config_winafl['out_dir'] = config_winafl[
-            'out_dir_ori'] + "_" + mod + "_" + hex(off)
-        cmd = generate_winafl_cmd(config_winafl, running_cmd)
-        logging.info("Cmd: " + pp_cmd(cmd))
-
-        path_file_to_fuzz = os.path.join(
-            winafl_constants.WINAFL_WORKING_DIR, config_winafl['file'])
-
-        if config['using_autoit']:
-            (ret, t_autoit_stop) = run_winafl_autoit(config_winafl,
-                                                     config[
-                                                         'path_autoit_script'],
-                                                     config['program_name'],
-                                                     running_cmd,
-                                                     path_file_to_fuzz)
-        else:
-            ret = run_winafl(config_winafl, running_cmd + [path_file_to_fuzz])
-
-        if ret == 1:
-            check_winafl(winafl_constants.WINAFL_WORKING_DIR +
-                         config_winafl['out_dir'])
-            if config['using_autoit']:
-                t_autoit_stop.set()
-
-        run_process.kill_process("AutoIT3.exe")
-        run_process.kill_process(winafl_constants.WINAFL_BIN)
-        run_process.kill_process(winafl_constants.WINAFL_BIN)
-
-        # Use autoit to close windows open during the close of winafl
-        cmd_auto_it = [winafl_constants.AUTOIT_BIN,
-                       winafl_constants.WINAFL_AUTOIT_STOP]
-        proc_auto_it = subprocess.Popen(cmd_auto_it)
-        proc_auto_it.wait()
-
-        run_process.kill_process(config['program_name'])
-
+    for target in targets:
+        update_target_on_winafl_config(config_winafl, target)
+        run_winafl(config, config_winafl, running_cmd, path_file_to_fuzz)
+        kill_all(config)
         move_generated_inputs(config_winafl, config['file_format'])
 
     logging.info('All modules tested')

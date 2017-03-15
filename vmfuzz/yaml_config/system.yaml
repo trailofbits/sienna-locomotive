@@ -24,18 +24,17 @@ path_winafl:
  C:\Users\monty\winafl\bin32\
 winafl_bin:
  afl-fuzz.exe
+winafl_dll:
+ winafl.dll
 path_dynamorio:
  C:\Users\monty\Documents\dynamorio\build\bin32
-path_drrun_bin:
- C:\Users\monty\Documents\dynamorio\build\bin32\drrun.exe
-path_winafl_dll:
- C:\Users\monty\winafl\bin32\winafl.dll
+ drrun.exe
 path_winafl_working_dir:
  F:\winafl\
 winafl_default_timeout:
  40000
 winafl_last_path_timeout:
- 15
+ 45
 winafl_fuzzing_iteration:
  100000
 path_autoit_stop_winafl:

@@ -1,5 +1,6 @@
 """ Module handling AutoIt
     The AutoIt script must return 0 if the execution sucessed"""
+
 import subprocess
 import exploitability.crash_detection as crash_detection
 
@@ -9,12 +10,12 @@ AUTOIT_BIN = ""
 def run(autoit_script, parameters):
     """
     Run autoit scrit
+
     Args:
         autoit_script (string): path to the script
         parameters (string list): parameters of the script
     Returns:
         bool: True if crash detected, False otherwise
-
     To detect crashes:
         - Check if WerFault.exe process if running
         - If not, check the return value of the autoit script (0: no error)

@@ -9,11 +9,12 @@ import uuid
 def compute_md5(file_name, block_size=2**20):
     """
     Compute the md5 of a file
+
     Args:
-        file_name (string): Name of the fil
+        file_name (string): Name of the file
         block_size (int): Size of the block (to compute md5 on large file)
-    Return:
-    md5 of the file (string)
+    Returns:
+        string: md5 of the file
     """
     f_desc = open(file_name, "rb")
     md5 = hashlib.md5()
@@ -29,14 +30,15 @@ def compute_md5(file_name, block_size=2**20):
 def move_generated_inputs(path_src, path_dst, file_format, pattern_src="", pattern_dst=""):
     """
     Move inputs files
+
     Args:
         path_src (string): source path 
         path_dst (string): destination path 
         file_format (string): file format of the files
-        pattern_in (string): regex used to match files in the source folder
-        pattern_out (string): regex used to match files in the dest folder
+        pattern_src (string): regex used to match files in the source folder
+        pattern_dst (string): regex used to match files in the dest folder
     Returns:
-        md5 of all files now present in the dest folder
+        string list: md5 of all files now present in the dest folder
         copied files are named with random name (+ the file format)
         md5 is used to check that each file is uniq in the dest folder
     """

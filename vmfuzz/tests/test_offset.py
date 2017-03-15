@@ -1,9 +1,12 @@
 import os
+import logging
 from context import vmfuzz
 
 import fuzzers.winafl.winafl as winafl
 import utils.parsing_config as parsing_config
 os.chdir('..')
+
+logging.basicConfig(filename="test_offset.log", filemode='w', level=logging.DEBUG)
 
 config_system = parsing_config.parse_config('yaml_config\\system.yaml')
 parsing_config.check_system_config(config_system)

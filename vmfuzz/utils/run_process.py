@@ -7,6 +7,7 @@ import crash_detection
 def kill_process(process):
     """
     Kill a processus
+
     Args:
         process (string): name of the processus
     """
@@ -17,6 +18,7 @@ def kill_process(process):
 def kill_process_after_timeout(process, timeout):
     """
     Kill a process after a timeout
+
     Args:
         process (string): name of the processus
         timeout (int): timeout in seconds
@@ -30,6 +32,7 @@ def kill_process_after_timeout(process, timeout):
 def run(path_program, program_name, parameters, auto_close, running_time):
     """
     Run the program
+
     Args:
         path_program (string): path the to the program
         program_name (string): name of the program

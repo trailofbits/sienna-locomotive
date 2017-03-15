@@ -13,6 +13,7 @@ import exploitability.exploitable as exploitable
 def init_system(config_system):
     """
     Initialize VMfuzz
+
     Args:
         The system configurations as a dict
     """
@@ -32,6 +33,7 @@ def init_system(config_system):
 def main(config_file, config_system_file, log_level):
     """
     Main function
+
     Args:
         config_file: the user configuration file
         config_sytem_file: the system configuration file

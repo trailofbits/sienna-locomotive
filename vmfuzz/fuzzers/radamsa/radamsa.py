@@ -13,8 +13,9 @@ import radamsa_constants
 def init(config_system):
     """
     Initialize the constantss used by the module
+
     Args:
-        The system configuration as a dict
+        config_system (dict): The system configuration 
     """
 
     radamsa_constants.RADAMSA_BIN = config_system['path_radamsa_bin']
@@ -32,9 +33,11 @@ def init(config_system):
 def fuzz_files(pattern_in, name_out, format_file):
     """
     Launch radamsa
+
     Args:
-        pattern_in: pattern of inputs file used by radamsa
-        format_file: file format of the generated inputs
+        pattern_in (string): pattern of input files used by radamsa
+        name_out (string): pattern of mutated files 
+        format_file (string): file format of the generated inputs
     Returns:
         string list: Files created
     """
@@ -45,7 +48,6 @@ def fuzz_files(pattern_in, name_out, format_file):
         os.chdir(radamsa_constants.WORKING_DIRECTORY)
     cmd = [radamsa_constants.RADAMSA_BIN, "-o", name_out + "-%n" + format_file, "-n",
            str(radamsa_constants.NUMBER_FILES_TO_CREATE), pattern_in]
-    print cmd
     subprocess.call(cmd)
     # restore previous directory
     if radamsa_constants.WORKING_DIRECTORY != "":
@@ -57,8 +59,9 @@ def fuzz_files(pattern_in, name_out, format_file):
 def launch_fuzzing(config):
     """
     Launch the fuzzing
+
     Args:
-        config: the configuration as a dict
+        config (dict): the user configuration 
     """
     # Hash tab: hash -> input file
     previous_inputs = {}

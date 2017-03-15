@@ -1,5 +1,7 @@
 #include-once
 
+#include <AutoItConstants.au3>
+
 Func Run_fuzz($cmd) 
     Sleep(4000)
 EndFunc
@@ -23,6 +25,7 @@ Func Sleep_fuzz($sec)
 EndFunc
 
 Func Send_fuzz($cmd, $proc)
+    WinSetOnTop($proc, "", $WINDOWS_ONTOP)
     Sleep(4000)
     Send($cmd)
     Sleep(4000)
