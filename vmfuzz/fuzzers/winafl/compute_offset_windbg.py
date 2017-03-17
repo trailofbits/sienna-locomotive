@@ -1,5 +1,8 @@
 """
     Pykd script use to retrieve the caller of the current instruction
+    Note:
+        !py compute_offset_windbg.py Function File Arch
+        Where Function is the I/O targeted function, File the input file, and Arch x86 or x64
 """
 import sys
 import uuid
@@ -14,24 +17,44 @@ MODULES_FOUND = {}
 MODULE_OFF_FOUND = {}
 
 
-def get_filename(func_name):
+def clean_val(val):
+    """
+    windbg can print 64 bits address  as XXXXX`XXXXX, so we remove the `
+    Args:
+        val (string): value to clean
+    Returns:
+        string: cleaned value
+    """
+    return val.replace('`', '')
+
+
+def get_filename(func_name, arch):
     """
     Retrieve the filename used
     Args:
         func_name (string): name of the I/O function
     Returns:
-    The filename open by the I/O function 
+    The filename open by the I/O function
     """
+
+    if arch == "x86":
+        param = "poi(esp+" + str(1 * SIZE_INT) + ")"
+    elif arch == "x64":
+        param = "(@rcx)"
+    else:
+        print "Error arch not supported: " + arch
+        return
+
     if func_name == "CreateFileW":
-        filename = pykd.dbgCommand(
-            r'.printf "%mu",poi(esp+' + str(1 * SIZE_INT) + ')')
-        filename = filename.split("\n")[-1]
-        return filename
+        file_name = pykd.dbgCommand(
+            r'.printf "%mu",' + param)
+        file_name = file_name.split("\n")[-1]
+        return file_name
     elif func_name == "CreateFileA" or func_name == "fopen":
-        filename = pykd.dbgCommand(
-            r'.printf "%ma",poi(esp+' + str(1 * SIZE_INT) + ')')
-        filename = filename.split("\n")[-1]
-        return filename
+        file_name = pykd.dbgCommand(
+            r'.printf "%ma",' + param)
+        file_name = file_name.split("\n")[-1]
+        return file_name
     return "NOT_IMPLEM"
 
 
@@ -63,6 +86,7 @@ def get_targeted_call(line):
     """
     global TARGETED_CALLS_FOUND
     targeted_call = line.split(' ')[2]
+    targeted_call = clean_val(targeted_call)
     if targeted_call in TARGETED_CALLS_FOUND:
         return TARGETED_CALLS_FOUND[targeted_call]
     targeted_call_index = targeted_call
@@ -71,6 +95,7 @@ def get_targeted_call(line):
     targeted_call = pykd.dbgCommand("ub " + targeted_call + " L2")
     targeted_call = targeted_call.split("\n")[-2]
     targeted_call = targeted_call.split(' ')[-1]
+    targeted_call = clean_val(targeted_call)
     if targeted_call.endswith(')'):
         targeted_call = targeted_call[:-1]
     if targeted_call.startswith('('):
@@ -121,21 +146,22 @@ def get_offset(targeted_call):
         MODULES_FOUND[module_index] = module
 
     start = lm_res.split(' ')[0]
-    start = int(start, 16)
+    start = clean_val(start)
+    start = int(start.rstrip("L"), 16)
     addr = int(targeted_call, 16)
     computed_off = addr - start
     MODULE_OFF_FOUND[targeted_call] = (module, computed_off)
     return (module, computed_off)
 
 func_name = sys.argv[1]
-filename = get_filename(func_name)
+filename = get_filename(func_name, sys.argv[3])
 print "## Func " + func_name
-print "## File '" + sys.argv[2]+"'"
+print "## File '" + sys.argv[2] + "'"
 if filename.endswith(sys.argv[2]):
     uniq_id = uuid.uuid4().get_hex()
     list_cs = pykd.dbgCommand("kn 100")
     list_cs = list_cs.split("\n")
-    # remove warning print by windbg
+    # remove warning printed by windbg
     list_cs = filter(lambda x: not x.startswith(
         "WARNING: Stack unwind ") and x != '', list_cs)
     # remove heasder
@@ -149,9 +175,9 @@ if filename.endswith(sys.argv[2]):
             print "## Call " + str(call)
             (mod, off) = get_offset(call)
             print "FOUND: #func #" + func_name + "# mod #" + mod + \
-                  "# off #" + hex(off) + "# depth #" + str(i) + \
+                  "# off #" + hex(off).rstrip("L") + "# depth #" + str(i) + \
                 "# filename #" + filename + "# uuid #" + uniq_id
         except:
             print "##Error in offset computing"
 else:
-    print "#Other file: '" + str(filename)+"'"
+    print "#Other file: '" + str(filename) + "'"

@@ -1,6 +1,7 @@
 """ Module handling the run of process """
 import subprocess
 import time
+import os
 
 import exploitability.crash_detection as crash_detection
 
@@ -42,7 +43,7 @@ def run(path_program, program_name, parameters, auto_close, running_time):
     Returns:
         bool: True if crash detected, False otherwise
     """
-    cmd = [path_program + program_name] + parameters
+    cmd = [os.path.join(path_program, program_name)] + parameters
     subprocess.Popen(cmd, stdout=subprocess.PIPE)
     if auto_close:
         if crash_detection.check_wrfault():

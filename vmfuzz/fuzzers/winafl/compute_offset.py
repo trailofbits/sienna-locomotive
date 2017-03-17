@@ -10,11 +10,10 @@ import logging
 import utils.autoit_lib as autoit_lib
 import utils.run_process as run_process
 
-WINGDB_PATH = ""
+WINDBG_PATH32 = ""
+WINDBG_PATH64 = ""
 
-# WINGDB_SCRIPT needs the path containing \\ and r
-# example: WINGDB_SCRIPT = r"C:\\Users\\tob\\script.py"
-WINGDB_SCRIPT = r""
+WINDBG_SCRIPT = r""
 
 # cdb.exe: user mode debuger with command line interface
 DEBUG = "cdb.exe"
@@ -23,12 +22,24 @@ AUTOIT_BIN = ""
 
 
 def init(config_system):
-    global WINGDB_SCRIPT
-    global WINGDB_PATH
+    """
+    Initialize the constants used by the module
+
+    Args:
+        config_system (dict): The system configuration
+    """
+
+    global WINDBG_SCRIPT
+    global WINDBG_PATH32
+    global WINDBG_PATH64
     global AUTOIT_BIN
 
-    WINGDB_PATH = config_system['path_windbg_dir']
-    WINGDB_SCRIPT = config_system['path_windbg_script']
+    WINDBG_PATH32 = os.path.join(config_system['path_windbg_dir'], 'x86')
+    WINDBG_PATH64 = os.path.join(config_system['path_windbg_dir'], 'x64')
+    WINDBG_SCRIPT = os.path.join(
+        config_system['path_vmfuzz'], r"fuzzers\winafl\compute_offset_windbg.py")
+    ## replace needed because windbg interprete \\ as \
+    WINDBG_SCRIPT = WINDBG_SCRIPT.replace("\\", "\\\\")
     AUTOIT_BIN = config_system['path_autoit_bin']
 
 
@@ -74,31 +85,34 @@ def filter_resultats_by_filename(res, txt):
     return [x for x in res if txt in x[4]]
 
 
-def make_windbg_cmd(module, function, fuzz_file):
+def make_windbg_cmd(arch, module, function, fuzz_file):
     """
     Create a windbg cmd:
         - Add a break at module!function
-        - Call the WINGDB_SCRIPT script when the breakpoint is met
+        - Call the WINDBG_SCRIPT script when the breakpoint is met
 
     Args:
+        arch (string): architecture of the program (x86 or x64)
         module (string): targeted module
         function (string): targeted function
     Returns:
-        string: the command 
+        string: the command
     """
-    
+
     ## replace needed because windbg interprete \\ as \
     fuzz_file = fuzz_file.replace("\\", "\\\\")
+    script = WINDBG_SCRIPT
     cmd = r'bp ' + module + '!' + function + r' "!py ' + \
-        WINGDB_SCRIPT + ' ' + function + ' ' + fuzz_file + r';gc;";'
+        script + ' ' + function + ' ' + fuzz_file + ' ' + arch + r';gc;";'
     return cmd
 
 
-def run(path_program, program_name, parameters, fuzz_file):
+def run(arch, path_program, program_name, parameters, fuzz_file):
     """
     Run the offset computing
 
     Args:
+        arch (string): architecture of the program (x86 or x64)
         path_program (string): path the to the program
         program_name (string): name of the program
         parameters (string list): parameters of the script
@@ -110,15 +124,26 @@ def run(path_program, program_name, parameters, fuzz_file):
     """
     windbg_cmd = ".load winext/pykd.pyd;"
     windbg_cmd = windbg_cmd + \
-        make_windbg_cmd("kernel32", "CreateFileW", fuzz_file)
+        make_windbg_cmd(arch, "kernel32", "CreateFileW", fuzz_file)
     windbg_cmd = windbg_cmd + \
-        make_windbg_cmd("kernel32", "CreateFileA", fuzz_file)
-    windbg_cmd = windbg_cmd + make_windbg_cmd("msvcrt", "fopen", fuzz_file)
-    windbg_cmd = windbg_cmd + make_windbg_cmd("MSVCR100", "fopen", fuzz_file)
+        make_windbg_cmd(arch, "kernel32", "CreateFileA", fuzz_file)
+    windbg_cmd = windbg_cmd + \
+        make_windbg_cmd(arch, "msvcrt", "fopen", fuzz_file)
+    windbg_cmd = windbg_cmd + \
+        make_windbg_cmd(arch, "MSVCR100", "fopen", fuzz_file)
 
     windbg_cmd = windbg_cmd + "gc;q"
+
+    if arch == "x86":
+        windbg_bin = os.path.join(WINDBG_PATH32, DEBUG)
+    elif arch == "x64":
+        windbg_bin = os.path.join(WINDBG_PATH64, DEBUG)
+    else:
+        logging.error("Arch not supported " + arch)
+        exit(0)
     # -2 needed to open console application in new windows
-    cmd = [WINGDB_PATH + DEBUG, "-2", "-c", windbg_cmd,
+    print windbg_bin
+    cmd = [windbg_bin, "-2", "-c", windbg_cmd,
            os.path.join(path_program, program_name)] + parameters
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stdin=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -142,7 +167,7 @@ def launch_autoit(autoit_script, program_name, fuzz_file):
         autoit_script (string): path the to script
         path_program (string): path the to the program
         fuzz_file (string): path to the input to be passed as argument
-    Note: 
+    Note:
         it kills the program when autoit is finished
     """
     # Small sleep seems needed to avoid windbg to close? Reason
@@ -155,11 +180,12 @@ def launch_autoit(autoit_script, program_name, fuzz_file):
     run_process.kill_process(program_name)
 
 
-def run_autoit(autoit_script, path_program, program_name, fuzz_file):
+def run_autoit(arch, autoit_script, path_program, program_name, fuzz_file):
     """
     Run the offset computing with an autoit script
 
     Args:
+        arch (string): architecture of the program (x86 or x64)
         autoit_script (string): path the to script
         path_program (string): path the to the program
         program_name (string): name of the program
@@ -169,14 +195,25 @@ def run_autoit(autoit_script, path_program, program_name, fuzz_file):
     """
     windbg_cmd = ".load winext/pykd.pyd;"
     windbg_cmd = windbg_cmd + \
-        make_windbg_cmd("kernel32", "CreateFileW", fuzz_file)
+        make_windbg_cmd(arch, "kernel32", "CreateFileW", fuzz_file)
     windbg_cmd = windbg_cmd + \
-        make_windbg_cmd("kernel32", "CreateFileA", fuzz_file)
-    windbg_cmd = windbg_cmd + make_windbg_cmd("msvcrt", "fopen", fuzz_file)
-    windbg_cmd = windbg_cmd + make_windbg_cmd("MSVCR100", "fopen", fuzz_file)
+        make_windbg_cmd(arch, "kernel32", "CreateFileA", fuzz_file)
+    windbg_cmd = windbg_cmd + \
+        make_windbg_cmd(arch, "msvcrt", "fopen", fuzz_file)
+    windbg_cmd = windbg_cmd + \
+        make_windbg_cmd(arch, "MSVCR100", "fopen", fuzz_file)
 
     windbg_cmd = windbg_cmd + "gc;q"
-    cmd = [WINGDB_PATH + DEBUG, "-c", windbg_cmd,
+
+    if arch == "x86":
+        windbg_bin = os.path.join(WINDBG_PATH32, DEBUG)
+    elif arch == "x64":
+        windbg_bin = os.path.join(WINDBG_PATH64, DEBUG)
+    else:
+        logging.error("Arch not supported " + arch)
+        exit(0)
+
+    cmd = [windbg_bin, "-c", windbg_cmd,
            os.path.join(path_program, program_name)]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stdin=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -198,6 +235,6 @@ def run_autoit(autoit_script, path_program, program_name, fuzz_file):
     resultats_set = set(resultats)
 
     # be sure that autoit is not running anymore
-    run_process.kill_process("AutoIT3.exe")
+    run_process.kill_process("AutoIt3.exe")
 
     return resultats_set

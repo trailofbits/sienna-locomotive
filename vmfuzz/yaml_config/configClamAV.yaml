@@ -1,5 +1,7 @@
+arch:
+  x86
 path_program: 
-  C:\Program Files\ClamAV\
+  C:\Program Files\ClamAV
 program_name:
   clamscan.exe
 using_autoit:

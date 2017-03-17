@@ -26,14 +26,36 @@ def compute_md5(file_name, block_size=2**20):
     f_desc.close()
     return md5.hexdigest()
 
+def create_dir(directory):
+    """
+    Create the directory if it does not exist
+
+    Args:
+        directory (string): dir to create
+    """
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+def move_dir(dir_src, dir_dst):
+    """
+    Move a directory 
+
+    Args:
+        dir_src (strng): source dir
+        dir_dst (string: destination dir
+    Note:
+        If the destination existed, it is erased
+    """
+    shutil.rmtree(dir_dst, ignore_errors=True, onerror=None)
+    shutil.copytree(dir_src, dir_dst)
 
 def move_generated_inputs(path_src, path_dst, file_format, pattern_src="", pattern_dst=""):
     """
     Move inputs files
 
     Args:
-        path_src (string): source path 
-        path_dst (string): destination path 
+        path_src (string): source path
+        path_dst (string): destination path
         file_format (string): file format of the files
         pattern_src (string): regex used to match files in the source folder
         pattern_dst (string): regex used to match files in the dest folder
@@ -60,7 +82,7 @@ def move_generated_inputs(path_src, path_dst, file_format, pattern_src="", patte
 
     for x in src_files:
         md5 = compute_md5(os.path.join(path_src, x))
-        if(md5 not in dst_md5):
+        if md5 not in dst_md5:
             dst_md5.append(md5)
             dst_filename = str(uuid.uuid4()) + file_format
             src = os.path.join(path_src, x)

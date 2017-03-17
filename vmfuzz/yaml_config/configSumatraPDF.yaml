@@ -1,3 +1,5 @@
+arch:
+  x86
 using_autoit:
   yes
 path_program:

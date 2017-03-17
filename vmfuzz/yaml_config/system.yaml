@@ -1,44 +1,39 @@
-# Mandatory information
+# Mandatory Information
 path_autoit_bin:
  C:\Program Files\AutoIt3\AutoIt3.exe
-path_autoit_lib:
- E:\vmfuzz\autoit_lib\
-path_autoit_working_dir:
- C:\Users\monty\Desktop\autoit\ 
 path_windbg_dir:
- C:\Program Files\Windows Kits\10\Debuggers\x86\
+ C:\Program Files\Windows Kits\10\Debuggers
+path_radamsa_bin:
+ C:\cygwin\bin\radamsa.exe
+path_dynamorio:
+ C:\Users\monty\DynamoRIO
+path_winafl:
+ C:\Users\monty\winafl
+path_vmfuzz:
+ E:\vmfuzz
+
+# Autoit Information
+path_autoit_working_dir:
+ C:\Users\monty\Desktop\autoit 
+
+# Fuzzers Information
 fuzzers:
  - radamsa
  - winafl
 
-# Radamsa information
-path_radamsa_bin:
- C:\cygwin\bin\radamsa.exe
+# Radamsa Information
 radamsa_number_files_to_create:
- 10
+ 100
 path_radamsa_working_dir:
- C:\Users\monty\Desktop\dir\
+ C:\Users\monty\Desktop\dir
 
-# Winafl information
-path_winafl:
- C:\Users\monty\winafl\bin32\
-winafl_bin:
- afl-fuzz.exe
-winafl_dll:
- winafl.dll
-path_dynamorio:
- C:\Users\monty\Documents\dynamorio\build\bin32
- drrun.exe
+# Winafl Information
 path_winafl_working_dir:
- F:\winafl\
+ F:\winafl2
 winafl_default_timeout:
  40000
 winafl_last_path_timeout:
  45
 winafl_fuzzing_iteration:
  100000
-path_autoit_stop_winafl:
- E:\vmfuzz\autoit_lib\exit_winafl.au3
-path_windbg_script:
- E:\\vmfuzz\\fuzzers\\winafl\\compute_offset_windbg.py
 

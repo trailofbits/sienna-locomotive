@@ -1,12 +1,14 @@
 """ Constant used by winafl scripts """
 
-WINAFL_PATH = ""
-WINAFL_BIN = "afl-fuzz.exe"
-WINAFL_DLL = "winafl.dll"
+WINAFL_PATH32 = ""
+WINAFL_PATH64 = ""
+WINAFL_BIN = r"afl-fuzz.exe"
+WINAFL_DLL = r"winafl.dll"
 AUTOIT_BIN = ""
 WINAFL_WORKING_DIR = ""
-DYNAMORIO_PATH = ""
-DRRUN_BIN = "drrun.exe"
+DYNAMORIO_PATH32 = ""
+DYNAMORIO_PATH64 = ""
+DRRUN_BIN = r"drrun.exe"
 WINAFL_DEFAULT_TIMEOUT = 0
 WINAFL_LAST_PATH_TIMEOUT = 0
 WINAFL_FUZZING_ITERATION = 0
