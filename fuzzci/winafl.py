@@ -1,19 +1,20 @@
 import subprocess
 import shutil
+import yaml
 import time
 import sys
 import os
 import re
 
-def get_fopen(run_cmd):
+def get_fopen(sys_config, run_config):
     dr_cmd = [
-        'C:\\Users\\Douglas\\Documents\\work\\dynamorio\\bin64\\drrun.exe',
+        os.path.join(sys_config['path_dynamorio'], 'drrun.exe'),
         '-c',
-        'C:\\Users\\Douglas\\Documents\\work\\dynamorio\\samples\\build\\bin\\instrcalls.dll',
+        os.path.join(sys_config['path_dynamorio'], 'samples\\build\\bin\\instrcalls.dll'),
         '--'
     ]
 
-    dr_cmd += run_cmd
+    dr_cmd += run_config['command']
     print ' '.join(dr_cmd)
 
     proc = subprocess.Popen(dr_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -60,42 +61,45 @@ def mkdir_ifne(path):
         os.mkdir(path)
 
 # create in and out directories and copy file to in_dir
-def init_dirs(file):
+def init_dirs(sys_config, run_config):
     run_id = str(int(time.time()))
     
-    in_dir = 'C:\\Users\\Douglas\\Desktop\\fuzz\\%s_in' % run_id
-    out_dir = 'C:\\Users\\Douglas\\Desktop\\fuzz\\%s_out' % run_id
+    base = sys_config['path_winafl_working_dir']
+    in_dir = os.path.join(base, '%s_in' % run_id)
+    crash_dir = os.path.join(base, '%s_crash' % run_id)
     
-    mkdir_ifne('C:\\Users\\Douglas\\Desktop\\fuzz')
+    mkdir_ifne(base)
     mkdir_ifne(in_dir)
     mkdir_ifne(out_dir)
 
-    shutil.copy(file, in_dir)
+    shutil.copy(run_config['file'], in_dir)
     return in_dir, out_dir
 
 # create winafl command
-def winafl(run_cmd, config):
+def winafl(sys_config, run_config):
     winafl_cmd = [
-        'C:\\Users\\Douglas\\Documents\\work\\winafl\\build64\\Release\\afl-fuzz.exe',
+        # 'C:\\Users\\Douglas\\Documents\\work\\winafl\\build64\\Release\\afl-fuzz.exe',
+        os.path.join(sys_config['path_winafl'], 'afl-fuzz.exe'),
         '-i',
-        config['in_dir'],
+        run_config['in_dir'],
         '-o',
-        config['out_dir'],
+        run_config['crash_dir'],
         '-D',
-        'C:\\Users\\Douglas\\Documents\\work\\dynamorio\\bin64\\',
+        sys_config['path_dynamorio'],
+        # 'C:\\Users\\Douglas\\Documents\\work\\dynamorio\\bin64\\',
         '-t',
-        config['timeout'],
+        run_config['winafl_timeout'],
         '-f',
-        config['file'],
+        run_config['file'],
         '--',
         '-coverage_module',
-        config['module'],
+        run_config['module'],
         '-target_module',
-        config['module'],
+        run_config['module'],
         '-target_offset',
-        config['offset'],
+        run_config['offset'],
         '-nargs',
-        config['nargs'],
+        run_config['winafl_nargs'],
         '--'
     ]
 
@@ -105,42 +109,39 @@ def winafl(run_cmd, config):
     print
 
     # run
-    proc = subprocess.Popen(winafl_cmd, cwd='C:\\Users\\Douglas\\Documents\\work\\winafl\\build64\\Release\\')
+    proc = subprocess.Popen(winafl_cmd, cwd=sys_config['path_winafl'])
     return proc
 
-def restore_sigs():
-    file = 'C:\\Users\\Douglas\\Desktop\\fuzz\\sigs.ldb'
-    shutil.copy('C:\\Users\\Douglas\\Desktop\\fuzz\\_sigs.ldb', 'C:\\Users\\Douglas\\Desktop\\fuzz\\sigs.ldb')
+# same as vmfuzz utils, didn't want to import
+def load_config(config_file):
+    f = open(config_file, 'r')
+    config = yaml.load(f)
+    f.close()
+    return config
 
-def main():
-    # specify run command 
-    run_cmd = [
-        'C:\\PF\\ClamAV-x64\\clamscan.exe',
-        '-d',
-        'C:\\Users\\Douglas\\Desktop\\fuzz\\sigs.ldb',
-        'C:\\PF\\ClamAV-x64\\clambc.exe'
-    ]
+def check_config(config, required):
+    missing = []
+    for req in required:
+        if req not in config:
+            missing.append(req)
+    return missing
 
-    restore_sigs()
+def check_configs(sys_config, run_config):
+    sys_required = ['path_winafl', 'path_dynamorio', 'path_winafl_working_dir']
+    sys_missing = check_config(sys_config, sys_required)
+    run_required = ['job_name', 'command', 'file', 'module', 'offset', 'winafl_nargs', 'winafl_timeout', 'run_time']
+    run_missing = check_config(run_config, run_required)
+    return {'sys': sys_missing, 'run': run_missing}
 
-    # specify file
-    file = 'C:\\Users\\Douglas\\Desktop\\fuzz\\sigs.ldb'
+def run_configs_file(sys_config_file, run_config_file):
+    sys_config = load_config(sys_config_file)
+    run_config = load_config(run_config_file)
+    run_configs(sys_config, run_config)
 
-    mod, off = get_mod_off(run_cmd)
+def run_configs(sys_config, run_config)
+    missing = check_configs(sys_config, run_config)
 
-    in_dir, out_dir = init_dirs(file)
-
-    config = {
-        'in_dir': in_dir,
-        'out_dir': out_dir,
-        'file': 'C:\\Users\\Douglas\\Desktop\\fuzz\\sigs.ldb',
-        'module': mod,
-        'offset': off,
-        'nargs': '5',
-        'timeout': '10000+',
-    }
-
-    winafl(run_cmd, config)
-
-if __name__ == '__main__':
-    main()
+    # at this point nothing should be missing
+    # web interface should handle it
+    if len(missing['sys']) != 0 or len(missing['job']) != 0:
+        return {'status': 'error', 'missing': missing}
