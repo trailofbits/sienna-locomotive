@@ -1,3 +1,35 @@
+function systemAdd(yaml) {
+	$.ajax({
+		type: 'POST',
+		url: '/add_sys', 
+		data: {'yaml': yaml}, 
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			systemId = data['system_id'];
+			console.log(systemId);
+			// pollTask(taskId);
+		}
+	});
+}
+
+function handleError(data) {
+	console.log('ERROR: ', data['message']);
+}
+
+$(document).ready(function() {
+	$("#system_add_btn").on('click', function() {
+		var yaml = $("#system_add_yaml").val()
+		console.log(yaml);
+		systemAdd(yaml);	
+	});
+});
+
+/* OLD */
+
 function pollTask(taskId) {
 	$.ajax({
 		type: 'GET',
@@ -181,10 +213,6 @@ function listWinaflJobs(results) {
 	}
 }
 
-function handleError(data) {
-	console.log('ERROR: ', data['message']);
-}
-
 function fetchJobs() {
 	$.getJSON('/winafl_job_list', listWinaflJobs);
 }
@@ -302,9 +330,3 @@ function initPage() {
 		buildElements();
 	});
 }
-
-$(document).ready(function() {
-	initPage();
-	fetchJobs();
-	fetchRuns();
-});
