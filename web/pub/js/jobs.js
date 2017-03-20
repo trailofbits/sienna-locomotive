@@ -107,6 +107,14 @@ function systemInit() {
 		systemAdd(yaml);	
 	});
 
+	$("#system_edit_btn").on('click', function() {
+		// do something
+	});
+
+	$("#system_delete_btn").on('click', function() {
+		// do something
+	});
+
 	$('#system_select').change(systemSelect);
 
 	systemList();
