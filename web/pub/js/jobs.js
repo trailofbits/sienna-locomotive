@@ -1,7 +1,52 @@
+function systemList() {
+	$.ajax({
+		type: 'GET',
+		url: '/sys_list',
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+
+			var order = data['order'];
+			var systems = data['systems'];
+
+			// save the order for use in systemSelect
+			$('#system_div').data('order', order);
+
+			// store current and empty
+			var selected = $('#system_select').val();
+			$('#system_select').empty();
+
+			// add placeholder
+			var empty_opt = $('<option></option>');
+			empty_opt.text('--');
+			empty_opt.val('--');
+			$('#system_select').append(empty_opt);
+
+			// add systems
+			for(var idx in systems) {
+				system = systems[idx];
+				var opt = $('<option></option>');
+				opt.text(system['name']);
+				opt.val(system['_id']);
+				opt.data('system', system);
+				$('#system_select').append(opt);
+			}
+
+			// restore current
+			if($('#system_select').children('[value='+selected+']').length == 1)
+				$('#system_select').val(selected);
+
+		}
+	});
+}
+
 function systemAdd(yaml) {
 	$.ajax({
 		type: 'POST',
-		url: '/add_sys', 
+		url: '/sys_add', 
 		data: {'yaml': yaml}, 
 		success: function(data) {
 			data = JSON.parse(data);
@@ -11,21 +56,76 @@ function systemAdd(yaml) {
 			} 
 			systemId = data['system_id'];
 			console.log(systemId);
-			// pollTask(taskId);
+			// TODO: have sys_add return system_list so we don't make two requests
+			systemList();
 		}
 	});
 }
 
-function handleError(data) {
-	console.log('ERROR: ', data['message']);
+function systemSelect() {
+	var option = $('#system_select').children(':selected');
+	var system = option.data('system');
+	console.log(system);
+
+	if(system == undefined) {
+		return;
+	}
+
+	$('#system_info_div').empty();
+
+	var order = $('#system_div').data('order');
+	for(var idx in order) {
+		var key = order[idx];
+		var value = system[key];
+
+		var label = $('<h3></h3>');
+		label.text(key);
+		$('#system_info_div').append(label);
+
+		if(typeof(value) == 'string') {
+			var content = $('<div></div>');
+			content.addClass('config_content');
+			content.text(value);
+			$('#system_info_div').append(content);
+		} else if(typeof(value) == 'object' && Array.isArray(value)) {
+			console.log(value);
+			for(var idx in value) {
+				var content = $('<div></div>');
+				content.addClass('config_content');
+				content.text(value[idx]);
+				$('#system_info_div').append(content);
+			}
+		}
+
+	}
 }
 
-$(document).ready(function() {
+function systemInit() {
 	$("#system_add_btn").on('click', function() {
 		var yaml = $("#system_add_yaml").val()
 		console.log(yaml);
 		systemAdd(yaml);	
 	});
+
+	$('#system_select').change(systemSelect);
+
+	systemList();
+}
+
+function handleError(data) {
+	console.log('ERROR: ', data['message']);
+	$('#error_span').text(data['message']);
+	$('#error_div').show();
+}
+
+$(document).ready(function() {
+	$('#error_div').hide();
+	
+	$('#error_dismiss_btn').on('click', function() {
+		$('#error_div').hide();
+	});
+
+	systemInit();
 });
 
 /* OLD */

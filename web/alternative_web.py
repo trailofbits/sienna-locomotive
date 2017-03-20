@@ -1,4 +1,5 @@
 from flask import Flask, request, g, escape, send_from_directory
+from mongoengine.queryset import NotUniqueError
 from flask_mongoengine import MongoEngine
 from celery.result import AsyncResult
 from celery import Celery
@@ -31,28 +32,28 @@ DATA MODEL
 class System(db.Document):
     required = [
         'name',
+        'path_vmfuzz', 
         'path_winafl', 
         'path_dynamorio', 
+        'path_windbg', 
+        'path_radamsa', 
+        'path_autoit', 
         'path_winafl_working_dir', 
         'path_autoit_working_dir', 
-        'path_windbg_dir', 
-        'path_autoit_bin', 
-        'path_radamsa_bin', 
-        'path_vmfuzz', 
-        'fuzzers', 
-        'path_radamsa_working_dir']
+        'path_radamsa_working_dir',
+        'fuzzers']
 
-    name = db.StringField()
+    name = db.StringField(unique=True)
     path_winafl = db.StringField()
     path_dynamorio = db.StringField()
+    path_windbg = db.StringField()
+    path_autoit = db.StringField()
+    path_radamsa = db.StringField()
+    path_vmfuzz = db.StringField()
     path_winafl_working_dir = db.StringField()
     path_autoit_working_dir = db.StringField()
-    path_windbg_dir = db.StringField()
-    path_autoit_bin = db.StringField()
-    path_radamsa_bin = db.StringField()
-    path_vmfuzz = db.StringField()
-    fuzzers = db.ListField(db.StringField())
     path_radamsa_working_dir = db.StringField()
+    fuzzers = db.ListField(db.StringField())
 
 # vmfuzz parent class
 class Program(db.Document):
@@ -65,7 +66,8 @@ class Program(db.Document):
             'path_program',
             'program_name',
             'seed_pattern',
-            'file_format']    
+            'file_format',
+            'system']    
 
     # Required
     arch = db.StringField()
@@ -74,6 +76,7 @@ class Program(db.Document):
     program_name = db.StringField()
     seed_pattern = db.StringField()
     file_format = db.StringField()
+    system = db.ReferenceField(System)
 
 
 class ProgramAutoIT(Program):
@@ -85,6 +88,7 @@ class ProgramAutoIT(Program):
             'program_name',
             'seed_pattern',
             'file_format',
+            'system',
             'path_autoit_script']
 
     # With Autoit
@@ -99,6 +103,7 @@ class ProgramCMD(Program):
             'program_name',
             'seed_pattern',
             'file_format',
+            'system',
             'auto_close',
             'running_time',
             'program_params',]
@@ -121,9 +126,10 @@ class Run(db.Document):
             'winafl_default_timeout',
             'winafl_last_path_timeout',
             'winafl_fuzzing_iteration',
-            ]
+            'program']
 
-     # WebApp
+    program = db.ReferenceField(Program)
+    # WebApp
     input_dir = db.StringField()
     crash_dir = db.StringField()
     fuzz_time = db.IntField() # kill fuzzing after time (minutes)
@@ -155,8 +161,8 @@ def send_js(path):
 def send_css(path):
     return send_from_directory('pub/css', path)
 
-@app.route('/add_sys', methods=['POST'])
-def add_sys():
+@app.route('/sys_add', methods=['POST'])
+def sys_add():
     config_str = request.form['yaml']
     config = yaml.load(config_str)
     print config
@@ -173,10 +179,24 @@ def add_sys():
         if key not in System.required:
             config.pop(key, None)
 
-    sys = System(**config)
-    sys.save()
+    try:
+        sys = System(**config)
+        sys.save()
+    except NotUniqueError:
+        return error('Name already in use: %s' % config['name'])
 
     return json.dumps({'system_id': str(sys.id)})
+
+@app.route('/sys_list')
+def sys_list():
+    systems = [sys.to_mongo().to_dict() for sys in System.objects()]
+    print systems
+    for sys in systems:
+        sys['_id'] = str(sys['_id'])
+
+    systems_info = {'order': System.required, 'systems': systems}
+    return json.dumps(systems_info)
+
 
 '''
 TASKS

@@ -1,11 +1,11 @@
-td {
+body {
 	font-family: monospace;
-	padding-right: 50px;
-	word-wrap:break-word;
 }
 
-table {
-	border-collapse:collapse; 
-	table-layout:fixed; 
-	width:100%;
+.config_content {
+	margin-left: 20px;
+}
+
+h3 {
+	margin-bottom: 0px;
 }

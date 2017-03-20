@@ -5,7 +5,34 @@
 		<link rel="stylesheet" type="text/css" href="/css/index.css">
 	</head>
 	<body>
-		<textarea id='system_add_yaml'></textarea><br/>
-		<button id='system_add_btn'>Add System</button>
+		<div id='error_div'>
+			<span id='error_span' style='background-color: red;'></span>
+			<br/>
+			<button id='error_dismiss_btn'>Dismiss</button>
+		</div>
+		<!-- SYSTEMS -->
+		<div id='system_div'>
+			<h1>Systems</h1>
+			<textarea id='system_add_yaml'></textarea><br/>
+			<button id='system_add_btn'>Add System</button>
+			<br/>
+			<select id='system_select'>
+				<option value='--'>--</option>
+			</select>
+			<div id='system_info_div'>
+			</div>
+			<button id='system_edit_btn'>Edit</button>
+			<button id='system_delete_btn'>Delete</button>
+		</div>
+		<!-- JOBS -->
+		<div id='job_div'>
+			<h1>Jobs</h1>
+			<textarea id='job_add_yaml'></textarea><br/>
+			<button id='job_add_btn'>Add System</button>
+			<br/>
+			<select id='job_select'>
+				<option value='--'>--</option>
+			</select>
+		</div>
 	</body>
 </html>
