@@ -1,14 +1,15 @@
 """ Main module, it loops between the fuzzer and the autoit script """
 import argparse
 import os
+import time
 import logging
 
 import fuzzers.radamsa.radamsa as radamsa
 import fuzzers.winafl.winafl as winafl
 import fuzzers.winafl.recon as winafl_recon
-import autoit
+import autoit.autoit as autoit
+import autoit.autoit_lib as autoit_lib
 import utils.parsing_config as parsing_config
-import utils.autoit_lib as autoit_lib
 import exploitability.exploitable as exploitable
 
 
@@ -46,13 +47,13 @@ def init_system(config_system):
     Args:
         config_system (dict): the system configuration
     """
-    autoit.AUTOIT_BIN = config_system['path_autoit_bin']
+    autoit.init(config_system)
+
     autoit_lib.AUTOIT_LIB_DIRECTORY = os.path.join(
         config_system['path_vmfuzz'], "autoit_lib")
     autoit_lib.AUTOIT_WORKING_DIRECTORY = config_system[
         'path_autoit_working_dir']
-    exploitable.WINGDB_PATH = config_system['path_windbg_dir']
-    exploitable.AUTOIT_BIN = config_system['path_autoit_bin']
+    exploitable.WINGDB_PATH = config_system['path_windbg']
 
     fuzzers = config_system['fuzzers']
     if 'radamsa' in fuzzers:
@@ -61,39 +62,46 @@ def init_system(config_system):
         winafl.init(config_system)
 
 
-
-def init(config_file, config_system_file, log_level):
+def init(config_system, config_program, config_run, log_level):
     """
     Initialize Vmfuzz
 
-    Args:
-        config_file (string): the user configuration file
-        config_system_file (string): the user configuration file
         log_level (int): Logging level: 0 debug 1 info, 2 warning, 3 error
     Returns:
         (dict,dict): the user and system configuration dict
+    Notes:
+        The user configuration is the program and run configuration merged
     """
 
     init_log(log_level)
 
-    config = parsing_config.parse_config(config_file)
-    parsing_config.check_user_config(config)
-    config_system = parsing_config.parse_config(config_system_file)
     parsing_config.check_system_config(config_system)
+    parsing_config.check_program_config(config_program)
+    parsing_config.check_run_config(config_run)
+
+    config = dict(config_program.items() + config_run.items())
+
+    if 'timestamp' not in config:
+        config['timestamp'] = str(int(time.time()))
+
     init_system(config_system)
 
-    if config['using_autoit']:
-        autoit_lib.init_autoit(config)
+    if config_program['using_autoit']:
+        autoit_lib.init_autoit(config_program)
 
     if "winafl" in config_system['fuzzers']:
         winafl.init_directories(config)
     if "radamsa" in config_system['fuzzers']:
         radamsa.init_directories(config)
 
+    if 'timestamp' not in config:
+        config['timestamp'] = str(int(time.time()))
+
     return (config, config_system)
 
 
-def winafl_launch_recon(config_file, config_system_file, log_level, target_file):
+def winafl_launch_recon(config_system_file, config_program_file, config_run_file,
+                        log_level, target_file):
     """
     Recon mode
     The recon mode compute the offsets, try each one \n
@@ -110,12 +118,21 @@ def winafl_launch_recon(config_file, config_system_file, log_level, target_file)
         0x1,module2
     """
 
-    config, config_system = init(config_file, config_system_file, log_level)
+    config_system, config_program, config_run = parsing_config.parse_all_configs(
+        config_system_file, config_program_file, config_run_file)
+
+    config, config_system = init(
+        config_system, config_program, config_run, log_level)
+
+    if 'timestamp' not in config:
+        config['timestamp'] = str(int(time.time()))
+
     interesting_targets = winafl_recon.launch_recon(config)
     winafl_recon.save_targets(interesting_targets, target_file)
 
 
-def fuzz_winafl_one_target(config_file, config_system_file, log_level, offset, module):
+def fuzz_winafl_one_target(config_system_file, config_program_file, config_run_file,
+                           log_level, offset, module):
     """
     Launch winafl on one target
 
@@ -126,7 +143,14 @@ def fuzz_winafl_one_target(config_file, config_system_file, log_level, offset, m
         offset (int): offset targeted
         module (string): module targeted
     """
-    config, config_system = init(config_file, config_system_file, log_level)
+    config_system, config_program, config_run = parsing_config.parse_all_configs(
+        config_system_file, config_program_file, config_run_file)
+
+    config, config_system = init(
+        config_system, config_program, config_run, log_level)
+
+    if 'timestamp' not in config:
+        config['timestamp'] = str(int(time.time()))
 
     if "winafl" in config_system['fuzzers']:
         config_winafl = winafl.generate_config_winafl(config)
@@ -139,7 +163,8 @@ def fuzz_winafl_one_target(config_file, config_system_file, log_level, offset, m
         winafl.kill_all(config)
 
 
-def fuzz_winafl_targets(config_file, config_system_file, log_level, target_file):
+def fuzz_winafl_targets(config_system_file, config_program_file, config_run_file,
+                        log_level, target_file):
     """
     Launch winafl on a set of targets
 
@@ -153,13 +178,18 @@ def fuzz_winafl_targets(config_file, config_system_file, log_level, target_file)
         0x0,module1
         0x1,module2
     """
-    config, config_system = init(config_file, config_system_file, log_level)
+    config_system, config_program, config_run = parsing_config.parse_all_configs(
+        config_system_file, config_program_file, config_run_file)
+
+    config, config_system = init(
+        config_system, config_program, config_run, log_level)
 
     if "winafl" in config_system['fuzzers']:
         targets = winafl_recon.get_targets(target_file)
         winafl_recon.winafl_on_targets(config, targets)
 
-def fuzz_winafl(config_file, config_system_file, log_level):
+
+def fuzz_winafl(config_system_file, config_program_file, config_run_file, log_level):
     """
     Launch winafl
 
@@ -170,13 +200,17 @@ def fuzz_winafl(config_file, config_system_file, log_level):
     Note:
         Offsets are computed automatically
     """
-    config, config_system = init(config_file, config_system_file, log_level)
+    config_system, config_program, config_run = parsing_config.parse_all_configs(
+        config_system_file, config_program_file, config_run_file)
+
+    config, config_system = init(
+        config_system, config_program, config_run, log_level)
 
     if "winafl" in config_system['fuzzers']:
         winafl.launch_fuzzing(config)
 
 
-def fuzz_radamsa(config_file, config_system_file, log_level):
+def fuzz_radamsa(config_system_file, config_program_file, config_run_file, log_level):
     """
     Launch radamsa
 
@@ -185,13 +219,17 @@ def fuzz_radamsa(config_file, config_system_file, log_level):
         config_sytem_file: the system configuration file
         log_level (int): Logging level: 0 debug 1 info, 2 warning, 3 error
     """
-    config, config_system = init(config_file, config_system_file, log_level)
+    config_system, config_program, config_run = parsing_config.parse_all_configs(
+        config_system_file, config_program_file, config_run_file)
+
+    config, config_system = init(
+        config_system, config_program, config_run, log_level)
 
     if "radamsa" in config_system['fuzzers']:
         radamsa.launch_fuzzing(config)
 
 
-def main(config_file, config_system_file, log_level):
+def main(config_system_file, config_program_file, config_run_file, log_level):
     """
     Main function
 
@@ -204,27 +242,73 @@ def main(config_file, config_system_file, log_level):
         Use the recon mode for winafl
     """
 
-    config, config_system = init(config_file, config_system_file, log_level)
+    config_system, config_program, config_run = parsing_config.parse_all_configs(
+        config_system_file, config_program_file, config_run_file)
+
+    config, config_system = init(
+        config_system, config_program, config_run, log_level)
 
     if "winafl" in config_system['fuzzers']:
         targets = winafl_recon.launch_recon(config)
-        winafl_recon.save_targets(targets, config['program_name']+".targets")
+        winafl_recon.save_targets(targets, config['program_name'] + ".targets")
         winafl_recon.winafl_on_targets(config, targets)
 
     if "radamsa" in config_system['fuzzers']:
         radamsa.launch_fuzzing(config)
 
+
+def fuzz(config_system, config_program, config_run):
+    """
+    Run winafl from the web app
+    Args:
+        config_system (dict): system configuration
+        program_system (dict): program configuration
+        config_run (dict): run configuration
+    """
+
+    config, config_system = init(config_system, config_program, config_run, 0)
+
+    logging.debug("Config: " + str(config))
+
+    if config['type'] == 'all':
+        targets = winafl_recon.launch_recon(config)
+        winafl_recon.save_targets(targets, config['program_name'] + ".targets")
+        winafl_recon.winafl_on_targets(config, targets)
+        logging.info("Winafl done, start radamsa")
+        radamsa.launch_fuzzing(config)
+
+    elif config['type'] == 'radamsa':
+        radamsa.launch_fuzzing(config)
+
+    elif config['type'] == 'winafl':
+        targets = winafl_recon.launch_recon(config)
+        winafl_recon.save_targets(targets, config['program_name'] + ".targets")
+        winafl_recon.winafl_on_targets(config, targets)
+
+    elif config['type'] == 'winafl_run_targets':
+        winafl_recon.winafl_on_targets(config, config['targets'])
+
+    elif config['type'] == 'winafl_get_targets':
+        logging.error('Not yet implemented')
+    elif config['type'] == 'winafl_get_targets_recon_mode':
+        logging.error('Not yet implemented')
+
+    return
+
+
 if __name__ == "__main__":
     parser_cmd = argparse.ArgumentParser(
         description='Trail of bits fuzzing system.')
-    parser_cmd.add_argument('-c', '--config', help='Yaml configuration file',
-                            required=False, default="config.yaml")
+    parser_cmd.add_argument('-cp', '--config_program', help='Yaml configuration file',
+                            required=False, default="program.yaml")
     parser_cmd.add_argument('-cs', '--config_system', help='Yaml configuration file',
                             required=False, default="system.yaml")
+    parser_cmd.add_argument('-cr', '--config_run', help='Yaml configuration file',
+                            required=False, default="run.yaml")
     parser_cmd.add_argument('-l', '--log_level', type=int,
                             help='Logging level: 0 debug 1 info, 2 warning, 3 error',
                             required=False, default=0)
     args_vmfuzz = vars(parser_cmd.parse_args())
 
-    main(args_vmfuzz['config'], args_vmfuzz[
-        'config_system'], args_vmfuzz['log_level', ])
+    main(args_vmfuzz['config_system'], args_vmfuzz[
+        'config_program'], args_vmfuzz['config_run'], args_vmfuzz['log_level', ])

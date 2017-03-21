@@ -2,5 +2,8 @@ import os
 from context import vmfuzz
 os.chdir('..')
 
-vmfuzz.main("yaml_config\\configSumatraPDF.yaml",
-            "yaml_config\\system.yaml",0)
+system = r"sample\config\system\system.yaml"
+program = r"sample\config\program\sumatraPDF.yaml"
+run = r"sample\config\run\sumatraPDFAll.yaml"
+
+vmfuzz.main(system, program, run, 0)

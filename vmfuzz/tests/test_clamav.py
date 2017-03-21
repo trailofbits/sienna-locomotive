@@ -2,5 +2,8 @@ import os
 from context import vmfuzz
 os.chdir('..')
 
-vmfuzz.main("yaml_config\\configClamAV.yaml",
-            "yaml_config\\system.yaml",0)
+system = r"sample\config\system\system.yaml"
+program = r"sample\config\program\clamav.yaml"
+run = r"sample\config\run\clamavAll.yaml"
+
+vmfuzz.main(system, program, run, 0)

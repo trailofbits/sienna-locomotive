@@ -17,20 +17,93 @@ def parse_config(config_file):
     f_desc.close()
     return config
 
-
-def check_user_config(config):
+def parse_all_configs(config_system_file, config_program_file, config_run_file):
     """
-    Check the user configuration
+    Parse the configurations files
 
     Args:
-        config (dict): The user configuration
+        config_system_file (string): the system configuration file
+        config_program_file (string): the program configuration file
+        config_run_file (string): the run configuration file
+    Returns:
+        (dict,dict,ditc): the configurations parsed
+    """
+    config_system = parse_config(config_system_file)
+    config_program = parse_config(config_program_file)
+    config_run = parse_config(config_run_file)
+    return config_system, config_program, config_run
+
+
+def check_run_config(run_config):
+    """
+    Check the run configuration
+
+    Args:
+        config (dict): The run configuration
+    """
+    if 'type' not in run_config:
+        logging.error(
+            "bad run configuration file: missing type field")
+        exit()
+
+    if run_config['type'] not in ['all', 'radamsa', 'winafl',
+                                  'winafl_run_targets', 'winafl_get_targets',
+                                  'winafl_get_targets_recon_mode']:
+        logging.error(
+            "bad run configuration file: unknown type of run")
+        exit()
+
+    if 'input_dir' not in run_config:
+        logging.error(
+            "bad run configuration file: missing input_dir field")
+        exit()
+
+    if 'crash_dir' not in run_config:
+        logging.error(
+            "bad run configuration file: missing crash_dir field")
+        exit()
+
+    if run_config['type'] in ['all', 'radamsa']:
+        if 'radamsa_number_files_to_create' not in run_config:
+            logging.error(
+                "bad run configuration file: missing radamsa_number_files_to_create field")
+            exit()
+
+    if run_config['type'] in ['all', 'winafl', 'winafl_run_targets',
+                              'winafl_get_targets', 'winafl_get_targets_recon_mode']:
+        if 'winafl_default_timeout' not in run_config:
+            logging.error(
+                "bad run configuration file: missing winafl_default_timeout field")
+            exit()
+        if 'winafl_last_path_timeout' not in run_config:
+            logging.error(
+                "bad run configuration file: missing winafl_last_path_timeout field")
+            exit()
+        if 'winafl_fuzzing_iteration' not in run_config:
+            logging.error(
+                "bad run configuration file: missing winafl_fuzzing_iteration field")
+            exit()
+    if run_config['type'] in ['winafl_get_targets']:
+        if 'targets' not in run_config:
+            logging.error(
+                "bad run configuration file: missing targets field")
+            exit()
+
+
+def check_program_config(config):
+    """
+    Check the program configuration
+
+    Args:
+        program_config (dict): The program configuration
     """
     ## Check configuration file
     if 'arch' not in config:
         logging.error("Bad configuration file: missing arch field")
         exit()
     if config['arch'] != 'x86' and config['arch'] != 'x64':
-        logging.error("Bad configuration file: bad architecture (only x86 and x64 supported)")
+        logging.error(
+            "Bad configuration file: bad architecture (only x86 and x64 supported)")
         exit()
     # Check for using_autoit field
     if 'using_autoit' not in config:
@@ -75,7 +148,6 @@ def check_user_config(config):
             exit()
 
 
-
 def check_system_config(system_config):
     """
     Check the system configuration
@@ -84,18 +156,17 @@ def check_system_config(system_config):
         system_config (dict): The system configuration
     """
 
-
-    if 'path_autoit_bin' not in system_config:
+    if 'path_autoit' not in system_config:
         logging.error(
-            "Bad system configuration file: missing path_autoit_bin field")
+            "Bad system configuration file: missing path_autoit field")
         exit()
-    if 'path_windbg_dir' not in system_config:
+    if 'path_windbg' not in system_config:
         logging.error(
-            "Bad system configuration file: missing path_windbg_dir field")
+            "Bad system configuration file: missing path_windbg field")
         exit()
-    if 'path_radamsa_bin' not in system_config:
+    if 'path_radamsa' not in system_config:
         logging.error(
-            "Bad system configuration file: missing path_radamsa_bin field")
+            "Bad system configuration file: missing path_radamsa field")
         exit()
     if 'path_dynamorio' not in system_config:
         logging.error(
@@ -106,7 +177,8 @@ def check_system_config(system_config):
             "Bad system configuration file: missing path_winafl field")
         exit()
     if "path_vmfuzz" not in system_config:
-        logging.error("Bad system configuration file: missing path_vmfuzz field")
+        logging.error(
+            "Bad system configuration file: missing path_vmfuzz field")
         exit()
 
     if "fuzzers" not in system_config:
@@ -118,30 +190,12 @@ def check_system_config(system_config):
             "Bad system configuration file: missing path_autoit_working_dir field")
         exit()
 
-
-    if 'radamsa_number_files_to_create' not in system_config:
-        logging.error(
-            "Bad system configuration file: missing radamsa_number_files_to_create field")
-        exit()
-    if 'path_radamsa_working_dir' not in system_config:
-        logging.error(
-            "Bad system configuration file: missing path_radamsa_working_dir field")
-        exit()
-
     if 'path_winafl_working_dir' not in system_config:
         logging.error(
-            "Bad system configuration file: missing path_winafl_working_dir field")
-        exit()
-    if 'winafl_default_timeout' not in system_config:
-        logging.error(
-            "Bad system configuration file: missing winafl_default_timeout field")
-        exit()
-    if 'winafl_last_path_timeout' not in system_config:
-        logging.error(
-            "Bad system configuration file: missing winafl_last_path_timeout field")
-        exit()
-    if 'winafl_fuzzing_iteration' not in system_config:
-        logging.error(
-            "Bad system configuration file: missing winafl_fuzzing_iteration field")
+            "bad system configuration file: missing path_winafl_working_dir field")
         exit()
 
+    if 'path_radamsa_working_dir' not in system_config:
+        logging.error(
+            "bad system configuration file: missing path_radamsa_working_dir field")
+        exit()

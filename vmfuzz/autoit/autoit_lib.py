@@ -14,7 +14,8 @@ def set_lib(autoit_script, name_lib):
         autoit_script (string): path to the autoit script
         name_lib (string) name of the libary
     Move the autoit script to the working directory and copy the targeted libary inside
-    See https://www.autoitscript.com/autoit3/docs/keywords/include.htm for different solutions to include user-defined libraries
+    See https://www.autoitscript.com/autoit3/docs/keywords/include.htm
+    for different solutions to include user-defined libraries
     """
     new_dir = os.path.join(AUTOIT_WORKING_DIRECTORY, name_lib)
     autoit_name = os.path.basename(autoit_script)
@@ -50,6 +51,6 @@ def init_autoit(config):
         config: the configuration as a dict
     """
     path_autoit_script = config['path_autoit_script']
-    set_lib(path_autoit_script , 'exploitable')
+    set_lib(path_autoit_script, 'exploitable')
     set_lib(path_autoit_script, 'offset')
     set_lib(path_autoit_script, 'winafl')

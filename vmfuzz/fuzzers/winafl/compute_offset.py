@@ -7,7 +7,8 @@ from threading import Thread
 import time
 import logging
 
-import utils.autoit_lib as autoit_lib
+import autoit.autoit as autoit
+import autoit.autoit_lib as autoit_lib
 import utils.run_process as run_process
 
 WINDBG_PATH32 = ""
@@ -17,8 +18,6 @@ WINDBG_SCRIPT = r""
 
 # cdb.exe: user mode debuger with command line interface
 DEBUG = "cdb.exe"
-
-AUTOIT_BIN = ""
 
 
 def init(config_system):
@@ -32,15 +31,15 @@ def init(config_system):
     global WINDBG_SCRIPT
     global WINDBG_PATH32
     global WINDBG_PATH64
-    global AUTOIT_BIN
 
-    WINDBG_PATH32 = os.path.join(config_system['path_windbg_dir'], 'x86')
-    WINDBG_PATH64 = os.path.join(config_system['path_windbg_dir'], 'x64')
+    autoit.init(config_system)
+
+    WINDBG_PATH32 = os.path.join(config_system['path_windbg'], 'x86')
+    WINDBG_PATH64 = os.path.join(config_system['path_windbg'], 'x64')
     WINDBG_SCRIPT = os.path.join(
         config_system['path_vmfuzz'], r"fuzzers\winafl\compute_offset_windbg.py")
     ## replace needed because windbg interprete \\ as \
     WINDBG_SCRIPT = WINDBG_SCRIPT.replace("\\", "\\\\")
-    AUTOIT_BIN = config_system['path_autoit_bin']
 
 
 def winafl_proposition(res):
@@ -50,14 +49,17 @@ def winafl_proposition(res):
     Args:
         res : resultats to sorted
     Returns:
-        (int,string) list: list of couple (offset, module)
+        (string list) list: list of targets
+    Note:
+        one target = (module, offset, module_cov1, module_cov2, ..)
     """
-    res = [(x[2], x[1], x[3]) for x in res]
+    res = [(x[2], x[1], x[4], x[3]) for x in res]
     res = set(res)
-    res = [(x, y) for (x, y, _) in sorted(res, key=lambda x: x[2])]
+    res = [(x, y, z) for (x, y, _, z) in sorted(res, key=lambda x: x[2])]
     res_uniq = []
     # remove duplicates
     [res_uniq.append(x) for x in res if x not in res_uniq]
+    res_uniq = [[y, x] + z.split("%") for (x, y, z) in res_uniq]
     return res_uniq
 
 
@@ -71,7 +73,7 @@ def print_resultats(res):
     sorted_res = sorted(res, key=lambda x: (x[5], x[3]))
     for func, mod, off, depth, filename, uniq_id in sorted_res:
         print "Func " + func + " found in module " + mod +\
-              " at off " + hex(off) + " (depth " + str(depth) + ") (" +\
+              " at off " + off + " (depth " + str(depth) + ") (" +\
               filename + ") " + uniq_id
 
 
@@ -153,8 +155,10 @@ def run(arch, path_program, program_name, parameters, fuzz_file):
         if line.startswith("FOUND:"):
             line = line.rstrip().split("#")
             func_name, mod, off, depth, filename, uniq_id = line[2], line[
-                4], int(line[6], 16), int(line[8]), line[10], line[12]
-            resultats.append((func_name, mod, off, depth, filename, uniq_id))
+                4], line[6], int(line[8]), line[10], line[12]
+            cov_mod = mod
+            resultats.append(
+                (func_name, mod, off, cov_mod, depth, filename, uniq_id))
     resultats_set = set(resultats)
     return resultats_set
 
@@ -173,9 +177,7 @@ def launch_autoit(autoit_script, program_name, fuzz_file):
     # Small sleep seems needed to avoid windbg to close? Reason
     # TODO JF: find the proper explanation
     time.sleep(5)
-    cmd_auto_it = [AUTOIT_BIN, autoit_script, fuzz_file]
-    proc_auto_it = subprocess.Popen(cmd_auto_it)
-    proc_auto_it.wait()
+    autoit.run_and_wait(autoit_script, [fuzz_file])
 
     run_process.kill_process(program_name)
 
@@ -230,8 +232,10 @@ def run_autoit(arch, autoit_script, path_program, program_name, fuzz_file):
         if line.startswith("FOUND:"):
             line = line.rstrip().split("#")
             func_name, mod, off, depth, filename, uniq_id = line[2], line[
-                4], int(line[6], 16), int(line[8]), line[10], line[12]
-            resultats.append((func_name, mod, off, depth, filename, uniq_id))
+                4], line[6], int(line[8]), line[10], line[12]
+            cov_mod = mod
+            resultats.append(
+                (func_name, mod, off, cov_mod, depth, filename, uniq_id))
     resultats_set = set(resultats)
 
     # be sure that autoit is not running anymore
