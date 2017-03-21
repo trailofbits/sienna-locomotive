@@ -12,7 +12,7 @@ VMFuzz
 -----------------------
 - [Installation Guide](Install.md)
 - [Minimal usage](Usage.md)
-- [Configuration Guide](yaml_config/)
+- [Configuration Guide](Configuration.md)
 - [How to create an autoit script](autoit_lib/)
 - [Fuzzers available](fuzzers/README.md)
 - [Particular behaviors details](Behavior.md)

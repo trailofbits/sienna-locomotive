@@ -1,9 +1,8 @@
 """ Module handling Radamsa """
 import os
-import time
 import subprocess
 import logging
-import autoit as autoit
+import autoit.autoit as autoit
 import utils.run_process as run_process
 import utils.file_manipulation as file_manipulation
 import exploitability.exploitable as exploitable
@@ -18,20 +17,16 @@ def init(config_system):
         config_system (dict): The system configuration
     """
 
-    radamsa_constants.RADAMSA_BIN = config_system['path_radamsa_bin']
-    radamsa_constants.NUMBER_FILES_TO_CREATE = config_system[
-        'radamsa_number_files_to_create']
+    radamsa_constants.RADAMSA_BIN = os.path.join(config_system['path_radamsa'], "radamsa.exe")
 
-    radamsa_constants.WORKING_DIRECTORY = os.path.join(
-        config_system['path_radamsa_working_dir'],
-        str(int(time.time())))
+    radamsa_constants.WORKING_DIRECTORY = config_system['path_radamsa_working_dir']
 
     file_manipulation.create_dir(radamsa_constants.WORKING_DIRECTORY)
 
-    autoit.AUTOIT_BIN = config_system['path_autoit_bin']
+    autoit.init(config_system)
 
-    exploitable.WINGDB_PATH = config_system['path_windbg_dir']
-    exploitable.AUTOIT_BIN = config_system['path_autoit_bin']
+    exploitable.WINGDB_PATH = config_system['path_windbg']
+    exploitable.AUTOIT_BIN = autoit.AUTOIT_BIN
 
 
 def init_directories(config):
@@ -41,13 +36,16 @@ def init_directories(config):
     Args:
         config (dict): The user configuration
     """
+    if 'timestamp' in config:
+        radamsa_constants.WORKING_DIRECTORY = os.path.join(
+            radamsa_constants.WORKING_DIRECTORY, config['timestamp'])
 
     if 'input_dir' in config:
         file_manipulation.move_dir(
             config['input_dir'], radamsa_constants.WORKING_DIRECTORY)
 
 
-def fuzz_files(pattern_in, name_out, format_file):
+def fuzz_files(pattern_in, name_out, format_file, number_files_to_create):
     """
     Launch radamsa
 
@@ -55,6 +53,7 @@ def fuzz_files(pattern_in, name_out, format_file):
         pattern_in (string): pattern of input files used by radamsa
         name_out (string): pattern of mutated files
         format_file (string): file format of the generated inputs
+        number_files_to_create (int): number of files to create at each round
     Returns:
         string list: Files created
     """
@@ -64,12 +63,12 @@ def fuzz_files(pattern_in, name_out, format_file):
         prev_dir = os.getcwd()
         os.chdir(radamsa_constants.WORKING_DIRECTORY)
     cmd = [radamsa_constants.RADAMSA_BIN, "-o", name_out + "-%n" + format_file, "-n",
-           str(radamsa_constants.NUMBER_FILES_TO_CREATE), pattern_in]
+           str(number_files_to_create), pattern_in]
     subprocess.call(cmd)
     # restore previous directory
     if radamsa_constants.WORKING_DIRECTORY != "":
         os.chdir(prev_dir)
-    range_files = range(1, 1 + radamsa_constants.NUMBER_FILES_TO_CREATE)
+    range_files = range(1, 1 + number_files_to_create)
     return [name_out + "-" + str(x) + format_file for x in range_files]
 
 
@@ -87,7 +86,7 @@ def launch_fuzzing(config):
     while True:
         logging.info("Generating new files")
         new_files = fuzz_files(config['seed_pattern'], "fuzz",
-                               config['file_format'])
+                               config['file_format'], config['number_files_to_create'])
         for new_file in new_files:
             logging.info("Run " + new_file)
             md5_val = file_manipulation.compute_md5(os.path.join(

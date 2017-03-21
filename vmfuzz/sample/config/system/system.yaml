@@ -1,10 +1,10 @@
 # Mandatory Information
-path_autoit_bin:
- C:\Program Files\AutoIt3\AutoIt3.exe
-path_windbg_dir:
+path_autoit:
+ C:\Program Files\AutoIt3
+path_windbg:
  C:\Program Files\Windows Kits\10\Debuggers
-path_radamsa_bin:
- C:\cygwin\bin\radamsa.exe
+path_radamsa:
+ C:\cygwin\bin
 path_dynamorio:
  C:\Users\monty\DynamoRIO
 path_winafl:
@@ -22,18 +22,10 @@ fuzzers:
  - winafl
 
 # Radamsa Information
-radamsa_number_files_to_create:
- 100
 path_radamsa_working_dir:
- C:\Users\monty\Desktop\dir
+ F:\radamsa
 
 # Winafl Information
 path_winafl_working_dir:
- F:\winafl2
-winafl_default_timeout:
- 40000
-winafl_last_path_timeout:
- 45
-winafl_fuzzing_iteration:
- 100000
+ F:\winafl3
 

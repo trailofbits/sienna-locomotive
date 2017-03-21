@@ -68,7 +68,7 @@ prop_winafl = compute_offset.winafl_proposition(res)
 prop_winafl.reverse()
 
 config_vlc = {'in_dir': "in_vlc",
-              'out_dir': "out2",
+              'out_dir': "out3",
               "timeout": str(1000 * 20),
               "file": "test.mp3",
               "module": "vlc.exe",

@@ -1,0 +1,20 @@
+type:
+    all
+input_dir:
+    F:\winafl\in_vlc
+crash_dir:
+    F:\winafl\crash_vlc
+
+# Radamsa Information
+radamsa_number_files_to_create:
+ 100
+
+# Winafl Information
+winafl_default_timeout:
+ 40000
+winafl_last_path_timeout:
+ 45
+winafl_fuzzing_iteration:
+ 100000
+
+

@@ -2,6 +2,8 @@
 import logging
 import fuzzers.winafl.winafl as winafl
 import fuzzers.winafl.winafl_constants as winafl_constants
+import fuzzers.winafl.stats as winafl_stats
+
 
 
 def get_targets(path_file):
@@ -38,8 +40,8 @@ def save_targets(interesting_targets, path_file):
         0x1,module2
     """
     output_file = open(path_file, "w")
-    for (off, mod) in interesting_targets:
-        output_file.write(hex(off) + ";" + mod + "\n")
+    for (off, mod, _) in interesting_targets:
+        output_file.write(off + ";" + mod + "\n")
     output_file.close()
 
 
@@ -57,8 +59,8 @@ def launch_recon(config):
         Winafl is launched for 2 min on each target.
         If not new path is found the target is not considered
     """
-    prev_last_path_timeout = winafl_constants.WINAFL_LAST_PATH_TIMEOUT
-    winafl_constants.WINAFL_LAST_PATH_TIMEOUT = 2
+    prev_last_path_timeout = config['winafl_last_path_timeout']
+    config['winafl_last_path_timeout'] = 2
     winafl_constants.WINAFL_LOOP_ITERATION = 1
 
     targets = winafl.compute_targets(config)
@@ -82,17 +84,18 @@ def launch_recon(config):
             # we now, we also keep these target as winafl works on it
             interesting_targets.append(target)
         elif ret == 2:
-            number_paths = winafl.get_number_paths_from_config(config_winafl)
+            number_paths = winafl_stats.get_number_paths_from_config(config_winafl)
             logging.info("Interesting target " + str(number_paths))
             interesting_targets.append(target)
         else:
             logging.debug("Unknown return value")
         winafl.kill_all(config)
 
-    winafl_constants.WINAFL_LAST_PATH_TIMEOUT = prev_last_path_timeout
+    config['winafl_last_path_timeout'] = prev_last_path_timeout
     winafl_constants.WINAFL_LOOP_ITERATION = 0
     logging.info("Interesting targets:\n" + str(interesting_targets))
     return interesting_targets
+
 
 def winafl_on_targets(config, targets):
     """
@@ -100,17 +103,18 @@ def winafl_on_targets(config, targets):
 
     Args:
         config (dict): the user configuration
-        targets ((int,string) list): targets
+        targets (string list) list: targets
+    Note:
+        one target = (module, offset, module_cov1, module_cov2, ..)
     """
 
     config_winafl = winafl.generate_config_winafl(config)
     running_cmd = winafl.generate_running_cmd(config)
     path_file_to_fuzz = winafl.generate_path_file_to_fuzz(config_winafl)
     for target in targets:
-        logging.info("Launch on "+str(target))
+        logging.info("Launch on " + str(target))
         winafl.update_target_on_winafl_config(config_winafl, target)
         winafl.run_winafl(config, config_winafl,
                           running_cmd, path_file_to_fuzz)
         winafl.kill_all(config)
     logging.info("End of winafl")
-

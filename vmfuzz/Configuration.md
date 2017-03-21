@@ -8,11 +8,11 @@ System configuration
 
 ```yaml
 # Installation Information
-path_autoit_bin:
+path_autoit:
   # path to autoit executable
-path_windbg_dir:
+path_windbg:
   # path to windbg Debuggers directory
-path_radamsa_bin:
+path_radamsa:
   # path to radamsa
 path_dynamorio:
   # path to dynamorio
@@ -29,21 +29,12 @@ fuzzers:
 path_autoit_working_dir:
   # path used to create tmp files for the autoit lib system
 
-# Radamsa Information
-radamsa_number_files_to_create:
-  # number of files create at each radamsa round
 path_radamsa_working_dir:
   # path to the radamsa working directory
 
 # Winafl Information
 path_winafl_working_dir:
  # path to the winafl working directory
-winafl_default_timeout:
- # used by winafl if no running time is provided
-winafl_last_path_timeout:
- # timeout in minutes
-winafl_fuzzing_iteration:
- # number of iteration before stop and running again the binary
 ```
 
 **Instlation Information**
@@ -59,21 +50,12 @@ Available:
 - `path_autoit_working_dir`: Empty directory used by vmfuzz
 
 **Radamsa Information**
-- `radamsa_number_files_to_create`: See the [radamsa documentation](
-)
-    - Recommended: 100
 - `path_radamsa_working_dir`: Empty directory used to generate mutated files by radamsa
 
 **Winafl Information**
 - `path_winafl_working_dir`:  Empty directory used to fuzz by winafl 
-- `winafl_default_timeout`: See the [winafl documentation](https://github.com/ivanfratric/winafl)
-    - Recommended: 40000
-- `winafl_last_path_timeout`: Used to stop winafl when no paths are found. See the [winafl implementation details](fuzzers/winafl#winafl-implementation-details)
-    - Recommended: 45
-- `winafl_fuzzing_iteration`: See the [winafl documentation](https://github.com/ivanfratric/winafl)
-    - default: 100000 
 
-User configuration
+Program configuration
 ==================
 
 ```yaml
@@ -105,12 +87,6 @@ program_params:
   - args2
   # list of program args
 
-
-# Inputs Information
-input_dir:
-  # path to the inputs directory
-crash_dir:
-  # path to the crashes directory
 ```
 **Mandatory Information**
 `arch`, `using_autoit`, `path_program`, `program_name`, `seed_patern` and `file_format` are needed.
@@ -123,5 +99,74 @@ If `using_autoit` is `true`:
 If `using_autoit` is `false`:
 -  `auto_close` and `runnint_time` are needed
 
+Run configuration
+==================
+
+```yaml
+type:
+ # type of job
+# Inputs Information
+input_dir:
+ # path to the inputs directory
+crash_dir:
+ # path to the crashed directory
+
+# Radamsa Information
+radamsa_number_files_to_create:
+  # number of files create at each radamsa round
+
+# Winafl Information
+winafl_default_timeout:
+ # used by winafl if no running time is provided
+winafl_last_path_timeout:
+ # timeout in minutes
+winafl_fuzzing_iteration:
+ # number of iteration before stop and running again the binary
+
+# Targets Information
+targets:
+ # nested list of targets
+```
+
+- `type`: types available:
+    - `all`
+    - `radamsa`
+    - `winafl`
+    - `winafl_run_targets`
+    - `winafl_get_targets`
+    - `winafl_get_targets_recon_mode`
+
 **Inputs Information**
 - `input_dir`: inputs directory. **Must contains at leat one file named seed.ext file**
+- `crash_dir`: directory where crashes will be stored
+
+**Radamsa Information**
+- `radamsa_number_files_to_create`: See the [radamsa documentation]()
+    - Recommended: 100
+
+
+**Winafl Information**
+- `winafl_default_timeout`: See the [winafl documentation](https://github.com/ivanfratric/winafl)
+    - Recommended: 40000
+- `winafl_last_path_timeout`: Used to stop winafl when no paths are found. See the [winafl implementation details](fuzzers/winafl#winafl-implementation-details)
+    - Recommended: 45
+- `winafl_fuzzing_iteration`: See the [winafl documentation](https://github.com/ivanfratric/winafl)
+    - default: 100000 
+
+**Target Informations**
+- `targets`: List of targets (only for type `winafl_run_targets`). Syntax:
+```yaml
+target:
+    -   
+        - module1
+        - offset1
+        - module_coverage1_1
+        - module_coverage1_2
+        - .. 
+    -   
+        - module2
+        - offset2
+        - module_coverage2_1
+        - module_coverage2_2
+        - ..
+```

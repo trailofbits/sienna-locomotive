@@ -38,7 +38,7 @@ def create_dir(directory):
 
 def move_dir(dir_src, dir_dst):
     """
-    Move a directory 
+    Move a directory
 
     Args:
         dir_src (strng): source dir
@@ -80,12 +80,12 @@ def move_generated_inputs(path_src, path_dst, file_format, pattern_src="", patte
 
     dst_md5 = [compute_md5(os.path.join(path_dst, x)) for x in dst_files]
 
-    for x in src_files:
-        md5 = compute_md5(os.path.join(path_src, x))
+    for src_file in src_files:
+        md5 = compute_md5(os.path.join(path_src, src_file))
         if md5 not in dst_md5:
             dst_md5.append(md5)
             dst_filename = str(uuid.uuid4()) + file_format
-            src = os.path.join(path_src, x)
+            src = os.path.join(path_src, src_file)
             dst = os.path.join(path_dst, dst_filename)
             shutil.copy(src, dst)
     return dst_md5
