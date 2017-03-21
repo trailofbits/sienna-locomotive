@@ -1,4 +1,8 @@
-function systemList() {
+/*
+** SYSTEM
+*/
+
+function systemList(empty_list=false) {
 	$.ajax({
 		type: 'GET',
 		url: '/sys_list',
@@ -36,14 +40,19 @@ function systemList() {
 			}
 
 			// restore current
-			if($('#system_select').children('[value='+selected+']').length == 1)
+			var child = $('#system_select').children('[value='+selected+']');
+			if(!empty_list && child.length == 1) {
 				$('#system_select').val(selected);
+			} else {
+				empty();
+			}
 
 		}
 	});
 }
 
-function systemAdd(yaml) {
+function systemAdd() {
+	var yaml = $("#system_add_yaml").val();
 	$.ajax({
 		type: 'POST',
 		url: '/sys_add', 
@@ -57,7 +66,7 @@ function systemAdd(yaml) {
 			systemId = data['system_id'];
 			console.log(systemId);
 			// TODO: have sys_add return system_list so we don't make two requests
-			systemList();
+			systemList(true);
 		}
 	});
 }
@@ -68,11 +77,13 @@ function systemSelect() {
 	console.log(system);
 
 	if(system == undefined) {
+		empty();
 		return;
 	}
 
 	$('#system_info_div').empty();
 
+	var yaml = '';
 	var order = $('#system_div').data('order');
 	for(var idx in order) {
 		var key = order[idx];
@@ -83,41 +94,94 @@ function systemSelect() {
 		$('#system_info_div').append(label);
 
 		if(typeof(value) == 'string') {
+			yaml += key + ':\n';
+			yaml += ' ' + value + '\n';
+
 			var content = $('<div></div>');
 			content.addClass('config_content');
 			content.text(value);
 			$('#system_info_div').append(content);
 		} else if(typeof(value) == 'object' && Array.isArray(value)) {
 			console.log(value);
+			yaml += key + ':\n';
+
 			for(var idx in value) {
 				var content = $('<div></div>');
 				content.addClass('config_content');
 				content.text(value[idx]);
 				$('#system_info_div').append(content);
+				yaml += ' - ' + value[idx] + '\n';
 			}
 		}
-
 	}
+	$('#system_edit_yaml').val(yaml);
+}
+
+function systemDelete() {
+	var system_id = $('#system_select').val();
+	$.ajax({
+		type: 'POST',
+		url: '/sys_delete', 
+		data: {'system_id': system_id}, 
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			systemList(true);
+		}
+	});
+}
+
+function systemEdit(yaml) {
+	var yaml = $("#system_edit_yaml").val();
+	var system_id = $('#system_select').val();
+
+	$.ajax({
+		type: 'POST',
+		url: '/sys_edit', 
+		data: {'system_id': system_id, 'yaml': yaml}, 
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			systemId = data['system_id'];
+			console.log(systemId);
+			// TODO: have sys_add return system_list so we don't make two requests
+			systemList(true);
+		}
+	});
 }
 
 function systemInit() {
 	$("#system_add_btn").on('click', function() {
-		var yaml = $("#system_add_yaml").val()
-		console.log(yaml);
-		systemAdd(yaml);	
+		systemAdd();	
 	});
 
 	$("#system_edit_btn").on('click', function() {
-		// do something
+		systemEdit();
 	});
 
 	$("#system_delete_btn").on('click', function() {
-		// do something
+		systemDelete();
 	});
 
 	$('#system_select').change(systemSelect);
 
 	systemList();
+}
+
+/*
+** JOB
+*/
+
+function empty() {
+	$('#system_add_yaml').val('');
+	$('#system_info_div').empty();
+	$('#system_edit_yaml').val('');
 }
 
 function handleError(data) {

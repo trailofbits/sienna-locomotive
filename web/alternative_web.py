@@ -119,7 +119,7 @@ class Run(db.Document):
         return [
             'input_dir',
             'crash_dir',
-            'modules_and_offsets',
+            'winafl_targets',
             'fuzz_time',
             'job_type',
             'radamsa_number_files_to_create',
@@ -133,7 +133,7 @@ class Run(db.Document):
     input_dir = db.StringField()
     crash_dir = db.StringField()
     fuzz_time = db.IntField() # kill fuzzing after time (minutes)
-    modules_and_offsets = db.ListField(db.ListField(db.StringField()))
+    winafl_targets = db.ListField(db.ListField(db.StringField()))
     job_type = db.StringField()
     # radamsa
     radamsa_number_files_to_create = db.IntField()
@@ -197,6 +197,28 @@ def sys_list():
     systems_info = {'order': System.required, 'systems': systems}
     return json.dumps(systems_info)
 
+@app.route('/sys_delete', methods=['POST'])
+def sys_delete():
+    system_id = request.form['system_id']
+    system = System.objects(id=system_id)
+    if len(system) != 1:
+        return error('System with id not found: %s' % system_id)
+    system[0].delete()
+    return json.dumps({'success': True, 'message': 'Successfully deleted %s' % system_id})
+
+@app.route('/sys_edit', methods=['POST'])
+def sys_edit():
+    system_id = request.form['system_id']
+
+    system = System.objects(id=system_id)
+    if len(system) != 1:
+        return error('System with id not found: %s' % system_id)
+
+    config_str = request.form['yaml']
+    config = yaml.load(config_str)
+
+    system[0].modify(**config)
+    return json.dumps({'success': True, 'message': 'Successfully edited %s' % system_id})
 
 '''
 TASKS
