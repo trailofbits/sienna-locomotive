@@ -33,6 +33,7 @@ class System(db.Document):
     required = [
         'name',
         'path_vmfuzz', 
+        'path_input_crashes',
         'path_winafl', 
         'path_dynamorio', 
         'path_windbg', 
@@ -44,12 +45,13 @@ class System(db.Document):
         'fuzzers']
 
     name = db.StringField(unique=True)
+    path_vmfuzz = db.StringField()
+    path_input_crashes = db.StringField()
     path_winafl = db.StringField()
     path_dynamorio = db.StringField()
     path_windbg = db.StringField()
     path_autoit = db.StringField()
     path_radamsa = db.StringField()
-    path_vmfuzz = db.StringField()
     path_winafl_working_dir = db.StringField()
     path_autoit_working_dir = db.StringField()
     path_radamsa_working_dir = db.StringField()
@@ -59,8 +61,8 @@ class System(db.Document):
 class Program(db.Document):
     meta = {'allow_inheritance': True}
 
-    def required(self):
-        return [
+    required = [
+            'name',
             'arch',
             'using_autoit',
             'path_program',
@@ -70,6 +72,7 @@ class Program(db.Document):
             'system']    
 
     # Required
+    name = db.StringField(unique=True)
     arch = db.StringField()
     using_autoit = db.BooleanField()
     path_program = db.StringField()
@@ -80,8 +83,8 @@ class Program(db.Document):
 
 
 class ProgramAutoIT(Program):
-    def required(self):
-        return [
+    required = [
+            'name',
             'arch',
             'using_autoit', # true
             'path_program',
@@ -95,8 +98,8 @@ class ProgramAutoIT(Program):
     path_autoit_script = db.StringField()
 
 class ProgramCMD(Program):
-    def required(self):
-        return [
+    required = [
+            'name',
             'arch',
             'using_autoit', # false
             'path_program',
@@ -109,14 +112,14 @@ class ProgramCMD(Program):
             'program_params',]
 
     # Without Autoit
-    auto_close = db.StringField()
+    auto_close = db.BooleanField()
     running_time = db.IntField()
     program_params = db.ListField(db.StringField())
 
 
 class Run(db.Document):
-    def required(self):
-        return [
+    required = [
+            'name',
             'input_dir',
             'crash_dir',
             'winafl_targets',
@@ -128,23 +131,35 @@ class Run(db.Document):
             'winafl_fuzzing_iteration',
             'program']
 
+    required_all = [
+            'name',
+            'input_dir',
+            'crash_dir',
+            'job_type',
+            'program']
+
+    # all
     program = db.ReferenceField(Program)
+    name = db.StringField()
+    job_type = db.StringField()
     # WebApp
     input_dir = db.StringField()
     crash_dir = db.StringField()
     fuzz_time = db.IntField() # kill fuzzing after time (minutes)
-    winafl_targets = db.ListField(db.ListField(db.StringField()))
-    job_type = db.StringField()
     # radamsa
     radamsa_number_files_to_create = db.IntField()
     # winafl
     winafl_default_timeout = db.IntField()
     winafl_last_path_timeout = db.IntField()
     winafl_fuzzing_iteration = db.IntField()
+    winafl_targets = db.ListField(db.ListField(db.StringField()))
+
 
 '''
 WEB ENDPOINTS
 '''
+
+# MISC
 
 def error(msg):
     return json.dumps({'error': True, 'message': msg})
@@ -160,6 +175,11 @@ def send_js(path):
 @app.route('/css/<path:path>')
 def send_css(path):
     return send_from_directory('pub/css', path)
+
+def is_hex(target):
+    return all(ch in 'ABCDEFabcdef0123456789' for ch in target)
+
+# SYSTEM
 
 @app.route('/sys_add', methods=['POST'])
 def sys_add():
@@ -199,6 +219,7 @@ def sys_list():
 
 @app.route('/sys_delete', methods=['POST'])
 def sys_delete():
+    # TODO: Delete all programs, runs associated
     system_id = request.form['system_id']
     system = System.objects(id=system_id)
     if len(system) != 1:
@@ -219,6 +240,117 @@ def sys_edit():
 
     system[0].modify(**config)
     return json.dumps({'success': True, 'message': 'Successfully edited %s' % system_id})
+
+# PROGRAM
+
+@app.route('/prog_add_gui', methods=['POST'])
+def prog_add_gui():
+    config_str = request.form['yaml']
+    config = yaml.load(config_str)
+    print config
+
+    missing = []
+    for key in ProgramAutoIT.required:
+        if key not in config:
+            missing.append(key)    
+
+    if len(missing) != 0:
+        return error('Missing required fields: %s' % ' '.join(missing))
+
+    for key in config:
+        if key not in ProgramAutoIT.required:
+            config.pop(key, None)
+
+    try:
+        prog = ProgramAutoIT(**config)
+        prog.save()
+    except NotUniqueError:
+        return error('Name already in use: %s' % config['name'])
+
+    return json.dumps({'program_id': str(prog.id)})
+
+@app.route('/prog_add_cmd', methods=['POST'])
+def prog_add_cmd():
+    config_str = request.form['yaml']
+    config = yaml.load(config_str)
+    print config
+
+    missing = []
+    for key in ProgramCMD.required:
+        if key not in config:
+            missing.append(key)    
+
+    if len(missing) != 0:
+        return error('Missing required fields: %s' % ' '.join(missing))
+
+    system_id = config['system']
+    if len(system_id) not in [12, 24] or not is_hex(system_id):
+        return error('System id invalid: %s' % system_id)
+
+    system = System.objects(id=system_id)
+    if len(system) != 1:
+        return error('System with id not found: %s' % system_id)
+
+    for key in config:
+        if key not in ProgramCMD.required:
+            config.pop(key, None)
+
+    try:
+        prog = ProgramCMD(**config)
+        prog.save()
+    except NotUniqueError:
+        return error('Name already in use: %s' % config['name'])
+
+    return json.dumps({'program_id': str(prog.id)})
+
+@app.route('/prog_list/<system_id>')
+def prog_list(system_id):
+    programs_gui = [prog.to_mongo().to_dict() for prog in ProgramAutoIT.objects(system=system_id)]
+    print programs_gui
+    for prog in programs_gui:
+        prog['_id'] = str(prog['_id'])
+        prog['system'] = str(prog['system'])
+
+    programs_cmd = [prog.to_mongo().to_dict() for prog in ProgramCMD.objects(system=system_id)]
+    print programs_cmd
+    for prog in programs_cmd:
+        prog['_id'] = str(prog['_id'])
+        prog['system'] = str(prog['system'])
+
+    program_info = {
+        'order_gui': ProgramAutoIT.required, 
+        'order_cmd': ProgramCMD.required, 
+        # 'programs_gui': programs_gui,
+        # 'programs_cmd': programs_cmd,
+        'programs': programs_gui + programs_cmd,
+    }
+    return json.dumps(program_info)
+
+@app.route('/prog_delete', methods=['POST'])
+def prog_delete():
+    program_id = request.form['program_id']
+    program = Program.objects(id=program_id)
+    if len(program) != 1:
+        return error('Program with id not found: %s' % program_id)
+    program[0].delete()
+    return json.dumps({'success': True, 'message': 'Successfully deleted %s' % program_id})
+
+@app.route('/prog_edit', methods=['POST'])
+def prog_edit():
+    program_id = request.form['program_id']
+
+    program = Program.objects(id=program_id)
+    if len(program) != 1:
+        return error('Program with id not found: %s' % program_id)
+
+    config_str = request.form['yaml']
+    config = yaml.load(config_str)
+
+    program[0].modify(**config)
+    return json.dumps({'success': True, 'message': 'Successfully edited %s' % program_id})
+
+# RUN
+
 
 '''
 TASKS

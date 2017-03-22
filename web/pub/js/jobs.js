@@ -1,4 +1,10 @@
 /*
+** TODO:
+** 		
+*/
+
+
+/*
 ** SYSTEM
 */
 
@@ -35,6 +41,7 @@ function systemList(empty_list=false) {
 				var opt = $('<option></option>');
 				opt.text(system['name']);
 				opt.val(system['_id']);
+				opt.addClass('system_option');
 				opt.data('system', system);
 				$('#system_select').append(opt);
 			}
@@ -46,7 +53,6 @@ function systemList(empty_list=false) {
 			} else {
 				empty();
 			}
-
 		}
 	});
 }
@@ -81,40 +87,9 @@ function systemSelect() {
 		return;
 	}
 
-	$('#system_info_div').empty();
-
-	var yaml = '';
 	var order = $('#system_div').data('order');
-	for(var idx in order) {
-		var key = order[idx];
-		var value = system[key];
-
-		var label = $('<h3></h3>');
-		label.text(key);
-		$('#system_info_div').append(label);
-
-		if(typeof(value) == 'string') {
-			yaml += key + ':\n';
-			yaml += ' ' + value + '\n';
-
-			var content = $('<div></div>');
-			content.addClass('config_content');
-			content.text(value);
-			$('#system_info_div').append(content);
-		} else if(typeof(value) == 'object' && Array.isArray(value)) {
-			console.log(value);
-			yaml += key + ':\n';
-
-			for(var idx in value) {
-				var content = $('<div></div>');
-				content.addClass('config_content');
-				content.text(value[idx]);
-				$('#system_info_div').append(content);
-				yaml += ' - ' + value[idx] + '\n';
-			}
-		}
-	}
-	$('#system_edit_yaml').val(yaml);
+	displayConfig(system, 'system', order, []);
+	programList();
 }
 
 function systemDelete() {
@@ -175,13 +150,276 @@ function systemInit() {
 }
 
 /*
-** JOB
+** PROGRAM
 */
 
-function empty() {
+function programList(empty_list=false) {
+	var system_id = $('#system_select').val();
+	if(system_id == '--')
+		return;
+
+	$.ajax({
+		type: 'GET',
+		url: '/prog_list/' + system_id,
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+
+			var order_gui = data['order_gui'];
+			var order_cmd = data['order_cmd'];
+			var programs = data['programs'];
+
+			// save the order for use in programSelect
+			$('#program_div').data('order_gui', order_gui);
+			$('#program_div').data('order_cmd', order_cmd);
+
+			// store current and empty
+			var selected = $('#program_select').val();
+			$('#program_select').empty();
+
+			// add placeholder
+			var empty_opt = $('<option></option>');
+			empty_opt.text('--');
+			empty_opt.val('--');
+			$('#program_select').append(empty_opt);
+
+			// add programs
+			for(var idx in programs) {
+				program = programs[idx];
+				var opt = $('<option></option>');
+
+				switch(program['_cls']) {
+					case 'Program.ProgramAutoIT':
+						var type = 'gui';
+						break;
+					case 'Program.ProgramCMD':
+						var type = 'cmd';
+						break;
+					default:
+						var type = 'unk';
+						brea
+				}
+
+				var prefix = '(' + type.toUpperCase() + ') ';
+				opt.text(prefix + program['name']);
+				opt.val(program['_id']);
+
+				opt.data('program', program);
+				opt.data('type', type);
+				opt.addClass('program_option');
+
+				$('#program_select').append(opt);
+			}
+
+			// restore current
+			var child = $('#program_select').children('[value='+selected+']');
+			if(!empty_list && child.length == 1) {
+				$('#program_select').val(selected);
+			} else {
+				emptyProgram();
+			}
+
+		}
+	});
+}
+
+function programAddGUI() {
+	var yaml = $("#program_add_yaml").val();
+	
+	var system_id = $('#system_select').val();
+	yaml += '\nsystem:\n';
+	yaml += ' ' + system_id;
+	
+	$.ajax({
+		type: 'POST',
+		url: '/prog_add_gui', 
+		data: {'yaml': yaml}, 
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			programId = data['program_id'];
+			console.log(programId);
+			// TODO: have prog_add return program_list so we don't make two requests
+			programList(true);
+		}
+	});
+}
+
+function programAddCMD() {
+	var yaml = $("#program_add_yaml").val();
+	
+	var system_id = $('#system_select').val();
+	yaml += '\nsystem:\n';
+	yaml += ' ' + system_id;
+
+	$.ajax({
+		type: 'POST',
+		url: '/prog_add_cmd', 
+		data: {'yaml': yaml}, 
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			programId = data['program_id'];
+			console.log(programId);
+			// TODO: have prog_add return program_list so we don't make two requests
+			programList(true);
+		}
+	});
+}
+
+function programSelect() {
+	var option = $('#program_select').children(':selected');
+	var program = option.data('program');
+	var type = option.data('type');
+	console.log(program);
+
+	if(program == undefined) {
+		emptyProgram();
+		return;
+	}
+
+	var order = $('#program_div').data('order_'+type);
+	displayConfig(program, 'program', order, ['system']);
+}
+
+function programDelete() {
+	var program_id = $('#program_select').val();
+	$.ajax({
+		type: 'POST',
+		url: '/prog_delete', 
+		data: {'program_id': program_id}, 
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			programList(true);
+		}
+	});
+}
+
+function programEdit(yaml) {
+	var yaml = $("#program_edit_yaml").val();
+	var program_id = $('#program_select').val();
+
+	$.ajax({
+		type: 'POST',
+		url: '/prog_edit', 
+		data: {'program_id': program_id, 'yaml': yaml}, 
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			programId = data['program_id'];
+			console.log(programId);
+			// TODO: have prog_add return program_list so we don't make two requests
+			programList(true);
+		}
+	});
+}
+
+function programInit() {
+	$("#program_add_gui_btn").on('click', function() {
+		programAddGUI();	
+	});
+
+	$("#program_add_cmd_btn").on('click', function() {
+		programAddCMD();	
+	});
+
+	$("#program_edit_btn").on('click', function() {
+		programEdit();
+	});
+
+	$("#program_delete_btn").on('click', function() {
+		programDelete();
+	});
+
+	$('#program_select').change(programSelect);
+
+	// programList();
+}
+
+
+/*
+** MISC
+*/
+
+function displayConfig(config, prefix, order, skip) {
+	console.log(order);
+	var id_prefix = '#' + prefix;
+	var yaml = '';
+
+	$(id_prefix+'_info_div').empty();
+	for(var idx in order) {
+		var key = order[idx];
+		if(skip.indexOf(key) > -1)
+			continue;
+
+		var value = config[key];
+
+		var label = $('<h3></h3>');
+		label.text(key);
+		$(id_prefix+'_info_div').append(label);
+
+		if(typeof(value) == 'string' 
+			|| typeof(value) == 'boolean'
+			|| typeof(value) == 'number') {
+			yaml += key + ':\n';
+			if(typeof(value) == 'string')
+				yaml += ' \'' + value + '\'\n';
+			else
+				yaml += ' ' + value + '\n';
+
+			var content = $('<div></div>');
+			content.addClass('config_content');
+			content.text(value);
+			$(id_prefix+'_info_div').append(content);
+		} else if(typeof(value) == 'object' && Array.isArray(value)) {
+			console.log(value);
+			yaml += key + ':\n';
+
+			for(var idx in value) {
+				var content = $('<div></div>');
+				content.addClass('config_content');
+				content.text(value[idx]);
+				$(id_prefix+'_info_div').append(content);
+				yaml += ' - \'' + value[idx] + '\'\n';
+			}
+		} 
+	}
+	$(id_prefix+'_edit_yaml').val(yaml);
+}
+
+function emptyProgram() {
+	$('#program_add_yaml').val('');
+	$('#program_info_div').empty();
+	$('#program_edit_yaml').val('');
+	$('.run_option').remove();
+}
+
+function emptySystem() {
 	$('#system_add_yaml').val('');
 	$('#system_info_div').empty();
 	$('#system_edit_yaml').val('');
+	$('.program_option').remove();
+}
+
+function empty() {
+	emptySystem();
+	emptyProgram();
 }
 
 function handleError(data) {
@@ -198,6 +436,7 @@ $(document).ready(function() {
 	});
 
 	systemInit();
+	programInit();
 });
 
 /* OLD */
@@ -250,255 +489,5 @@ function killRun(run_id) {
 			} 
 			// pollTask(taskId);
 		}
-	});
-}
-
-function listRuns(results) {
-	var body = $("#run_list_body");
-	body.empty();
-	var keys = schema['run']['order'];
-	for(var ridx in results) {
-		var result = results[ridx];
-		var row = $('<tr></tr>')
-		for(kidx in keys) {
-			var col = $('<td></td>');
-			var key = keys[kidx];
-			col.text(result[key]);
-			row.append(col);
-		}
-		var startButton = $('<button>Start</button>');
-		var killButton = $('<button>Kill</button>');
-		
-		// row.append(editButton);
-		startButton.on('click', function() {
-			var data = {};
-			var id = row.children().first().text();
-			startRun(id);
-		});
-		row.append(startButton);
-
-		killButton.on('click', function() {
-			console.log('kill');
-			var id = row.children().first().text();
-			killRun(id);
-		});
-		row.append(killButton);
-
-		body.append(row);
-	}
-}
-
-function removeWinaflJob(id) {
-	$.ajax({
-		type: 'POST',
-		url: '/winafl_job_remove', 
-		data: {'id': id}, 
-		success: function(data) {
-			data = JSON.parse(data);
-			if('error' in data) {
-				handleError(data);
-				return;
-			} 
-			listWinaflJobs(data);
-		}
-	});
-}
-
-function createRunWinaflJob(id) {
-	$.ajax({
-		type: 'POST',
-		url: '/winafl_run_create', 
-		data: {'job_id': id}, 
-		success: function(data) {
-			data = JSON.parse(data);
-			if('error' in data) {
-				handleError(data);
-				return;
-			} 
-			listRuns(data);
-		}
-	});
-}
-
-function getModOffWinaflJob(id) {
-	$.ajax({
-		type: 'POST',
-		url: 'winafl_job_mod_off', 
-		data: {'id': id}, 
-		success: function(data) {
-			data = JSON.parse(data);
-			if('error' in data) {
-				handleError(data);
-				return;
-			} 
-			taskId = data['task_id'];
-			console.log(taskId);
-			pollTask(taskId);
-		}
-	});
-}
-
-function listWinaflJobs(results) {
-	var body = $("#winafl_job_list_body");
-	body.empty();
-	var keys = schema['winafl_job']['order'];
-	for(var ridx in results) {
-		var result = results[ridx];
-		var row = $('<tr></tr>')
-		for(kidx in keys) {
-			var col = $('<td></td>');
-			var key = keys[kidx];
-			col.text(result[key]);
-			row.append(col);
-		}
-		var editButton = $('<button>Edit</button>');
-		var removeButton = $('<button>Remove</button>');
-		var runButton = $('<button>Create Run</button>');
-		
-		// row.append(editButton);
-		removeButton.on('click', function() {
-			var row = $(this).parent();
-			var id = row.children().first().text();
-			console.log(id);
-			removeWinaflJob(id);
-		});
-		row.append(removeButton);
-
-		var modoffButton = $('<button></button>');
-		modoffButton.text('Mod Off');
-		modoffButton.on('click', function() {
-			var data = {};
-			var id = row.children().first().text();
-			getModOffWinaflJob(id);
-		});
-		row.append(modoffButton);
-
-		runButton.on('click', function() {
-			var row = $(this).parent();
-			var id = row.children().first().text();
-			console.log(id);
-			createRunWinaflJob(id);
-		});
-		row.append(runButton);
-
-		body.append(row);
-	}
-}
-
-function fetchJobs() {
-	$.getJSON('/winafl_job_list', listWinaflJobs);
-}
-
-function fetchRuns() {
-	$.getJSON('/run_list', listRuns);
-}
-
-function buildJob(schema, schemaKey) {
-	var idBase = schemaKey;
-	var idAdd = idBase + '_add';
-	var idList = idBase + '_list';
-	var keys = schema[schemaKey]['order'];
-
-	for(var idx in keys) {
-		var key = keys[idx];
-		var type = schema[schemaKey][key]['type'];
-		var required = schema[schemaKey][key]['required'];
-		var colName = keys[idx];
-		if(colName != 'id') {
-			var addLabel = $('<label></label>');
-			switch(type) {
-				case 'text':
-					var addInput = $('<textarea></textarea>');
-					break;
-				case 'str':
-					var addInput = $('<input></input>');
-					addInput.attr('type', 'text');
-					break;
-				case 'num':
-					var addInput = $('<input></input>');
-					addInput.attr('type', 'number');
-					break;
-				default:
-					var addInput = $('<input></input>');
-					break;
-			}
-			var idAddInput = idBase + '_input_' + colName;
-			
-			addLabel.attr('for', idAddInput);
-			var req = required ? '*' : '';
-			addLabel.text(colName + req);
-
-			addInput.attr('id', idAddInput);
-			addInput.attr('name', colName);
-			$('#' + idAdd).append(addLabel);
-			$('#' + idAdd).append($('<br/>'));
-
-			$('#' + idAdd).append(addInput);
-			$('#' + idAdd).append($('<br/>'));
-		}
-
-		var colHead = $('<td></td>');
-		colHead.text(colName);
-		$('#' + idList + '_head_row').append(colHead);
-	}
-
-	var addButton = $('<button></button>');
-	addButton.attr('id', idAdd + '_btn');
-	addButton.text('Create');
-	addButton.on('click', function() {
-		var data = {};
-		for(var idx in keys) {
-			var key = keys[idx];
-			if(key == 'id') {
-				continue;
-			}
-
-			data[key] = $('#' + idBase + '_input_' + key).val();
-		}
-		var endpoint = '/' + idBase + '_create';
-		$.ajax({
-			type: 'POST',
-			url: endpoint, 
-			data: data, 
-			success: function(data) {
-				data = JSON.parse(data);
-				if('error' in data) {
-					handleError(data);
-					return;
-				} 
-				listWinaflJobs(data);
-			}
-		});
-		console.log(data);
-	});
-	$('#' + idAdd).append(addButton);
-}
-
-function buildRun(runSchema) {
-	var order = runSchema['order'];
-	for(var idx in order) {
-		var key = order[idx];
-		console.log(key);
-		var col = $('<td></td>');
-		col.text(key);
-		$('#run_list_head_row').append(col);
-	}
-}
-
-function buildElements() {
-	console.log(schema);
-	for(var key in schema) {
-		if(key.indexOf('job') > -1) {
-			buildJob(schema, key);
-		} else if(key == 'run') {
-			buildRun(schema[key]);
-		}
-	}
-}
-
-function initPage() {
-	$.getJSON('/schema', function(results) {
-		schema = results;
-		buildElements();
 	});
 }

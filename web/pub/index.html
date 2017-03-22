@@ -11,35 +11,65 @@
 			<button id='error_dismiss_btn'>Dismiss</button>
 		</div>
 		<!-- SYSTEM -->
-		<div id='system_div'>
+		<div id='system_div' class='column'>
 			<h1>Systems</h1>
-			<textarea id='system_add_yaml'></textarea><br/>
-			<button id='system_add_btn'>Add System</button>
-			<br/>
 			<select id='system_select'>
 				<option value='--'>--</option>
 			</select>
-			<div id='system_info_div'>
-			</div>
-			<button id='system_delete_btn'>Delete</button><br/>
-			<textarea id='system_edit_yaml'></textarea><br/>
+			
+			<div id='system_info_div'></div>
+			<button id='system_delete_btn'>Delete</button>
+			<br/>
+
+			<textarea id='system_edit_yaml'></textarea>
+			<br/>
 			<button id='system_edit_btn'>Edit</button>
+			<br/>
+			
+			<textarea id='system_add_yaml'></textarea><br/>
+			<button id='system_add_btn'>Add System</button>
 		</div>
 		<!-- PROGRAM -->
-		<div id='program_div'>
+		<div id='program_div' class='column'>
 			<h1>Programs</h1>
-			<textarea id='program_add_yaml'></textarea><br/>
-			<button id='program_add_autoit_btn'>Add GUI</button>
-			<button id='program_add_cmd_btn'>Add CMD</button>
-			<br/>
 			<select id='program_select'>
 				<option value='--'>--</option>
 			</select>
-			<div id='program_info_div'>
-			</div>
-			<button id='program_delete_btn'>Delete</button><br/>
-			<textarea id='program_edit_yaml'></textarea><br/>
+
+			<div id='program_info_div'></div>
+			<button id='program_delete_btn'>Delete</button>
+			<br/>
+
+			<textarea id='program_edit_yaml'></textarea>
+			<br/>
 			<button id='program_edit_btn'>Edit</button>
+			<br/>
+
+			<textarea id='program_add_yaml'></textarea><br/>
+			<button id='program_add_gui_btn'>Add GUI</button>
+			<button id='program_add_cmd_btn'>Add CMD</button>
+			<br/>
+		</div>
+
+		<!-- RUN -->
+		<div id='run_div' class='column'>
+			<h1>Runs</h1>
+			<select id='run_select'>
+				<option value='--'>--</option>
+			</select>
+
+			<div id='run_info_div'></div>
+			<button id='run_delete_btn'>Delete</button>
+			<br/>
+
+			<textarea id='run_edit_yaml'></textarea>
+			<br/>
+			<button id='run_edit_btn'>Edit</button>
+			<br/>
+
+			<textarea id='run_add_yaml'></textarea><br/>
+			<button id='run_add_btn'>Add Run</button>
+			<br/>
 		</div>
 	</body>
 </html>

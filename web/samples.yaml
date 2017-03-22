@@ -24,6 +24,8 @@ fuzzers:
  - winafl
 
 # program cmd
+name:
+  ClamAV
 arch:
   x86
 using_autoit:
@@ -46,6 +48,8 @@ program_params:
   - C:\Program Files\ClamAV-x64\clambc.exe
 
 # program gui
+name:
+  MicroDicom
 arch:
   x86
 using_autoit:
@@ -60,3 +64,8 @@ file_format:
   ".dcm"
 path_autoit_script:
   sample\auto_it_scripts\dicom.au3 
+
+
+# run
+name:
+  Run 1
