@@ -62,6 +62,18 @@ def init_system(config_system):
         winafl.init(config_system)
 
 
+def user_check(config):
+    """
+    Check user information
+
+    Note:
+        TODO JF: To be improved
+    """
+
+    if not os.path.exists(config['crash_dir']):
+        logging.info('Crash_dir created')
+        os.makedirs(config['crash_dir'])
+
 def init(config_system, config_program, config_run, log_level):
     """
     Initialize Vmfuzz
@@ -96,6 +108,8 @@ def init(config_system, config_program, config_run, log_level):
 
     if 'timestamp' not in config:
         config['timestamp'] = str(int(time.time()))
+
+    user_check(config)
 
     return (config, config_system)
 

@@ -11,8 +11,9 @@ auto_close:
 running_time:
  2
 parameters:
- - C:\Program Files\ClamAV\clambc.exe
  - -d 
+ - <FILE>
+ - C:\Program Files\ClamAV\clambc.exe
 seed_pattern:
   "*.ldb"
 file_format:

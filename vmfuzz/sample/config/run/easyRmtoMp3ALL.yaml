@@ -1,0 +1,7 @@
+type:
+    all
+input_dir:
+    F:\winafl\in_easymp3
+crash_dir:
+    F:\winafl\crash_easymp3
+

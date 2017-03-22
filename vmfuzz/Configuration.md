@@ -29,6 +29,7 @@ fuzzers:
 path_autoit_working_dir:
   # path used to create tmp files for the autoit lib system
 
+# Radamsa Information
 path_radamsa_working_dir:
   # path to the radamsa working directory
 
@@ -86,6 +87,7 @@ program_params:
   - args1
   - args2
   # list of program args
+  # Input file is <FILE>
 
 ```
 **Mandatory Information**
@@ -99,6 +101,9 @@ If `using_autoit` is `true`:
 If `using_autoit` is `false`:
 -  `auto_close` and `runnint_time` are needed
 
+**Parameters**
+
+In the parameters list, the name of the input needs to be `<FILE>`
 Run configuration
 ==================
 
@@ -111,9 +116,14 @@ input_dir:
 crash_dir:
  # path to the crashed directory
 
+
+# Optional 
+
 # Radamsa Information
 radamsa_number_files_to_create:
   # number of files create at each radamsa round
+seed_pattern:
+  # seed pattern used by radamsa
 
 # Winafl Information
 winafl_default_timeout:
@@ -140,20 +150,22 @@ targets:
 - `input_dir`: inputs directory. **Must contains at leat one file named seed.ext file**
 - `crash_dir`: directory where crashes will be stored
 
-**Radamsa Information**
+
+**Radamsa Information (optional)**
 - `radamsa_number_files_to_create`: See the [radamsa documentation]()
-    - Recommended: 100
+    - Default: 100
+- `radamsa_seed_pattern`: See the [radamsa documentation]()
+    - Default `*.file_format`
 
-
-**Winafl Information**
+**Winafl Information (optional)**
 - `winafl_default_timeout`: See the [winafl documentation](https://github.com/ivanfratric/winafl)
-    - Recommended: 40000
+    - Default: 40000
 - `winafl_last_path_timeout`: Used to stop winafl when no paths are found. See the [winafl implementation details](fuzzers/winafl#winafl-implementation-details)
-    - Recommended: 45
+    - Default: 45
 - `winafl_fuzzing_iteration`: See the [winafl documentation](https://github.com/ivanfratric/winafl)
-    - default: 100000 
+    - Default: 100000 
 
-**Target Informations**
+**Target Informations (optional)**
 - `targets`: List of targets (only for type `winafl_run_targets`). Syntax:
 ```yaml
 target:

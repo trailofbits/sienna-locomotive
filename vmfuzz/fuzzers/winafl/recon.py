@@ -40,8 +40,8 @@ def save_targets(interesting_targets, path_file):
         0x1,module2
     """
     output_file = open(path_file, "w")
-    for (off, mod, _) in interesting_targets:
-        output_file.write(off + ";" + mod + "\n")
+    for target in interesting_targets:
+        output_file.write(";".join(target)+"\n")
     output_file.close()
 
 

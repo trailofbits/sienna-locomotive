@@ -194,6 +194,10 @@ def generate_winafl_cmd(config_winafl, running_cmd):
         coverage_module.append('-coverage_module')
         coverage_module.append(cov_mod)
 
+    if not coverage_module:
+        logging.error("No modules to be covered? (" +
+                      str(config_winafl['modules_cov']) + ")")
+
     winafl_cmd = [
         winafl_path_bin,
         '-i',
@@ -328,6 +332,8 @@ def run_winafl_autoit(config_winafl, path_autoit_script, program_name, running_c
     ## Need winafl.dll in the wokring directory (x86 or x64)
     #move_winafl_dll(config_winafl)
 
+    cmd_drrun = generate_drrun_cmd(config_winafl, running_cmd)
+    logging.debug("drrun cmd: " + pp_cmd(cmd_drrun))
     cmd = generate_winafl_cmd(config_winafl, running_cmd)
     logging.debug("winafl cmd: " + pp_cmd(cmd))
 
@@ -422,6 +428,8 @@ def move_generated_inputs(config_winafl, file_format):
         os.path.join(in_dir, "queue"), dst_dir, "-N" + file_format)
 
 
+
+
 def move_crashes(config_winafl, file_format):
     """
     Move crashes
@@ -503,11 +511,12 @@ def compute_targets(config):
                                             config['running_time'] * 2 + 25,))
             t_kill.start()
 
+        parameters = file_manipulation.generate_parameters(
+            config['parameters'], seed_offset_path)
         possible_offsets = compute_offset.run(config['arch'],
                                               config['path_program'],
                                               config['program_name'],
-                                              config['parameters'] +
-                                              [seed_offset_path],
+                                              parameters,
                                               seed_offset_name)
 
     targets = compute_offset.winafl_proposition(possible_offsets)
@@ -529,8 +538,11 @@ def generate_running_cmd(config):
         If you are using autoit, it is given to the autoit script
         If not, you need to add it in the running command
     """
+    parameters = file_manipulation.generate_parameters(
+        config['parameters'], "seed" + config['file_format'])
+
     running_cmd = ['"' + os.path.join(config['path_program'],
-                                      config["program_name"]) + '"'] + config['parameters']
+                                      config["program_name"]) + '"'] + parameters
     return running_cmd
 
 
@@ -599,8 +611,7 @@ def run_winafl(config, config_winafl, running_cmd, path_file_to_fuzz):
                                                  running_cmd,
                                                  path_file_to_fuzz)
     else:
-        ret = run_winafl_without_autoit(
-            config_winafl, running_cmd + [path_file_to_fuzz])
+        ret = run_winafl_without_autoit(config_winafl, running_cmd)
     logging.debug("Return value " + str(ret))
     if ret == 1:
         logging.debug("Winafl started")

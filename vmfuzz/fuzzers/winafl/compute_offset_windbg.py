@@ -10,6 +10,9 @@ import pykd
 
 SIZE_INT = 4
 
+#modules not to be explored
+IGNORED_MODULES = ["kernel32.dll","KERNELBASE.dll","MSVCR100.dll","msvcrt.dll"]
+
 # keeping results in hastabl
 # avoid several calls to dgbCommand
 TARGETED_CALLS_FOUND = {}
@@ -104,6 +107,36 @@ def get_targeted_call(line):
     return targeted_call
 
 
+def get_module_name(module):
+    module_res = pykd.dbgCommand("lmv m " + module)
+    module_res = module_res.split("\n")
+    # remove no information lines
+    module_res = filter(lambda x : ':' in x, module_res)
+    # split ' xxx : YYY' to (xxx,yyu)
+    module_res = [(x[:x.find(':')].lstrip(),x[x.find(':')+1:].lstrip()) for x in module_res]
+    module_dict = dict(module_res)
+    if 'Image path' in module_dict:
+        if '\\' in module_dict['Image path']:
+            name = module_dict['Image path']
+            name = name[len(name) - name[::-1].index("\\"):]
+            return name
+    if "OriginalFilename" in module_dict:
+        if '\\' in module_dict['OriginalFilename']:
+            name = module_dict['OriginalFilename']
+            name = name[len(name) - name[::-1].index("\\"):]
+            return name
+        return module_dict['OriginalFilename']
+    print "Module name not found? "+str(module_dict)
+#    real_module = [x for x in module_res if "OriginalFilename" in x and (
+#        ".exe" in x or ".dll" in x)]
+#    if real_module == []:
+#        real_modult()
+#= [x for x in module_res if "Image path" in x]
+#    if len(real_module) != 0:
+#        module = real_module[0].split(' ')[-1]
+#        if "\\" in module:
+#            module = module[len(module) - module[::-1].index("\\"):]
+
 def get_offset(targeted_call):
     """
     Get the module and offset of an given address
@@ -133,16 +166,7 @@ def get_offset(targeted_call):
         module = MODULES_FOUND[module]
     else:
         module_index = module
-        module_res = pykd.dbgCommand("lmv m " + module)
-        module_res = module_res.split("\n")
-        real_module = [x for x in module_res if "OriginalFilename" in x and (
-            ".exe" in x or ".dll" in x)]
-        if real_module == []:
-            real_module = [x for x in module_res if "Image path" in x]
-        if len(real_module) != 0:
-            module = real_module[0].split(' ')[-1]
-            if "\\" in module:
-                module = module[len(module) - module[::-1].index("\\"):]
+        module = get_module_name(module)
         MODULES_FOUND[module_index] = module
 
     start = lm_res.split(' ')[0]
@@ -167,6 +191,7 @@ if filename.endswith(sys.argv[2]):
     # remove heasder
     list_cs = list_cs[2:]
     i = 0
+    coverage = set()
     for l in list_cs:
         i = i + 1
         try:
@@ -174,9 +199,12 @@ if filename.endswith(sys.argv[2]):
             call = get_targeted_call(l)
             print "## Call " + str(call)
             (mod, off) = get_offset(call)
-            print "FOUND: #func #" + func_name + "# mod #" + mod + \
-                  "# off #" + hex(off).rstrip("L") + "# depth #" + str(i) + \
-                "# filename #" + filename + "# uuid #" + uniq_id
+            if mod not in IGNORED_MODULES:
+                coverage.add(mod)
+            if coverage:
+                print "FOUND: #func #" + func_name + "# mod #" + mod + \
+                      "# off #" + hex(off).rstrip("L") + "# depth #" + str(i) + \
+                    "# filename #" + filename + "# coverage #"+'%'.join(coverage)+ "# uuid #" + uniq_id 
         except:
             print "##Error in offset computing"
 else:

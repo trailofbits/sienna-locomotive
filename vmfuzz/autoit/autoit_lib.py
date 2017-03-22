@@ -54,3 +54,4 @@ def init_autoit(config):
     set_lib(path_autoit_script, 'exploitable')
     set_lib(path_autoit_script, 'offset')
     set_lib(path_autoit_script, 'winafl')
+    set_lib(path_autoit_script, '')

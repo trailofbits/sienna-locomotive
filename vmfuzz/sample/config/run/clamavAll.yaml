@@ -1,9 +1,9 @@
 type:
     all
 input_dir:
-    F:\winafl\in_clamav
+    F:\winafl\in_clamscan
 crash_dir:
-    F:\winafl\crash_vlc
+    F:\winafl\crash_clamsac
 
 # Radamsa Information
 radamsa_number_files_to_create:

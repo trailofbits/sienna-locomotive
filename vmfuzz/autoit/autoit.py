@@ -3,6 +3,7 @@
 
 import subprocess
 import os
+import logging
 import exploitability.crash_detection as crash_detection
 
 AUTOIT_BIN = ""
@@ -29,6 +30,7 @@ def run(autoit_script, parameters):
         The function returns as soon that the script is launched
     """
     cmd = [AUTOIT_BIN, autoit_script] + parameters
+    logging.debug("Run autoit: "+str(cmd))
     subprocess.Popen(cmd, stdout=subprocess.PIPE)
 
 def run_and_wait(autoit_script, parameters):

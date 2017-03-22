@@ -65,24 +65,20 @@ def check_run_config(run_config):
 
     if run_config['type'] in ['all', 'radamsa']:
         if 'radamsa_number_files_to_create' not in run_config:
-            logging.error(
-                "bad run configuration file: missing radamsa_number_files_to_create field")
-            exit()
+            logging.info("no radamsa_number_files_to_create field; using default (100)")
+            run_config['radamsa_number_files_to_create'] = 100
 
     if run_config['type'] in ['all', 'winafl', 'winafl_run_targets',
                               'winafl_get_targets', 'winafl_get_targets_recon_mode']:
         if 'winafl_default_timeout' not in run_config:
-            logging.error(
-                "bad run configuration file: missing winafl_default_timeout field")
-            exit()
+            logging.info("no winafl_default_timeout field; using default (40000)")
+            run_config['winafl_default_timeout'] = 40000
         if 'winafl_last_path_timeout' not in run_config:
-            logging.error(
-                "bad run configuration file: missing winafl_last_path_timeout field")
-            exit()
+            logging.info("no winafl_last_path_timeout field; using default (45)")
+            run_config['winafl_last_path_timeout'] = 45
         if 'winafl_fuzzing_iteration' not in run_config:
-            logging.error(
-                "bad run configuration file: missing winafl_fuzzing_iteration field")
-            exit()
+            logging.info("no winafl_fuzzing_iteration field; using default (100000)")
+            run_config['winafl_fuzzing_iteration'] = 100000
     if run_config['type'] in ['winafl_get_targets']:
         if 'targets' not in run_config:
             logging.error(
@@ -114,11 +110,6 @@ def check_program_config(config):
     if 'path_program' not in config or 'program_name' not in config:
         logging.error(
             "Bad configuration file: missing program name or path")
-        exit()
-
-    # Check for seed_pattern field
-    if 'seed_pattern' not in config:
-        logging.error("Bad configuration file: missing seed_pattern")
         exit()
 
     # Check for file_format field

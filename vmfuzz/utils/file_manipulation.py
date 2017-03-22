@@ -89,3 +89,7 @@ def move_generated_inputs(path_src, path_dst, file_format, pattern_src="", patte
             dst = os.path.join(path_dst, dst_filename)
             shutil.copy(src, dst)
     return dst_md5
+
+def generate_parameters(parameters, fuzz_file):
+    return [fuzz_file if x == "<FILE>" else x for x in parameters]
+

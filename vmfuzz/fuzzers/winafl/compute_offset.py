@@ -19,7 +19,6 @@ WINDBG_SCRIPT = r""
 # cdb.exe: user mode debuger with command line interface
 DEBUG = "cdb.exe"
 
-
 def init(config_system):
     """
     Initialize the constants used by the module
@@ -41,6 +40,11 @@ def init(config_system):
     ## replace needed because windbg interprete \\ as \
     WINDBG_SCRIPT = WINDBG_SCRIPT.replace("\\", "\\\\")
 
+def parse_line_result_script(line):
+    line = line.rstrip().split("#")
+    func_name, mod, off, depth, filename, coverage, uniq_id = line[2], line[
+        4], line[6], int(line[8]), line[10], line[12], line[14]
+    return func_name, mod, off, depth, filename, coverage, uniq_id
 
 def winafl_proposition(res):
     """
@@ -53,7 +57,7 @@ def winafl_proposition(res):
     Note:
         one target = (module, offset, module_cov1, module_cov2, ..)
     """
-    res = [(x[2], x[1], x[4], x[3]) for x in res]
+    res = [(x[2], x[1], x[3], x[5]) for x in res]
     res = set(res)
     res = [(x, y, z) for (x, y, _, z) in sorted(res, key=lambda x: x[2])]
     res_uniq = []
@@ -144,21 +148,16 @@ def run(arch, path_program, program_name, parameters, fuzz_file):
         logging.error("Arch not supported " + arch)
         exit(0)
     # -2 needed to open console application in new windows
-    print windbg_bin
     cmd = [windbg_bin, "-2", "-c", windbg_cmd,
            os.path.join(path_program, program_name)] + parameters
+    logging.debug('Windbg: '+str(cmd))
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     resultats = []
     for line in iter(proc.stdout.readline, b''):
         logging.debug(line)
         if line.startswith("FOUND:"):
-            line = line.rstrip().split("#")
-            func_name, mod, off, depth, filename, uniq_id = line[2], line[
-                4], line[6], int(line[8]), line[10], line[12]
-            cov_mod = mod
-            resultats.append(
-                (func_name, mod, off, cov_mod, depth, filename, uniq_id))
+            resultats.append(parse_line_result_script(line))
     resultats_set = set(resultats)
     return resultats_set
 
@@ -230,12 +229,7 @@ def run_autoit(arch, autoit_script, path_program, program_name, fuzz_file):
     for line in iter(proc.stdout.readline, b''):
         logging.debug(line)
         if line.startswith("FOUND:"):
-            line = line.rstrip().split("#")
-            func_name, mod, off, depth, filename, uniq_id = line[2], line[
-                4], line[6], int(line[8]), line[10], line[12]
-            cov_mod = mod
-            resultats.append(
-                (func_name, mod, off, cov_mod, depth, filename, uniq_id))
+            resultats.append(parse_line_result_script(line))
     resultats_set = set(resultats)
 
     # be sure that autoit is not running anymore
