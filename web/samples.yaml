@@ -69,3 +69,22 @@ path_autoit_script:
 # run
 name:
   Run 1
+winafl_targets:
+ - cov_modules: [clamav, libclamav]
+   module: clamav
+   offset: 64
+ - cov_modules: [libclamav]
+   module: clamav
+   offset: 2
+fuzz_time:
+  60
+job_type:
+  all
+radamsa_number_files_to_create:
+  100
+winafl_default_timeout:
+  10000+
+winafl_last_path_timeout:
+  45
+winafl_fuzzing_iteration:
+  100000

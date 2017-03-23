@@ -4,7 +4,9 @@ from flask_mongoengine import MongoEngine
 from celery.result import AsyncResult
 from celery import Celery
 import json
+import time
 import yaml
+import os
 
 '''
 INITIALIZATION
@@ -23,6 +25,9 @@ app.config['CELERY_BROKER_URL'] = 'redis://192.168.1.6:6379/0'
 app.config['CELERY_RESULT_BACKEND'] = 'redis://192.168.1.6:6379/0'
 celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
 celery.conf.update(app.config)
+
+# input_crashes from the web app's view
+PATH_SHARED_INPUT_CRASHES = 'X:\\input_crashes'
 
 '''
 DATA MODEL
@@ -124,35 +129,41 @@ class Run(db.Document):
             'crash_dir',
             'winafl_targets',
             'fuzz_time',
-            'job_type',
+            'run_type',
             'radamsa_number_files_to_create',
             'winafl_default_timeout',
             'winafl_last_path_timeout',
             'winafl_fuzzing_iteration',
             'program']
 
+    user_all = [
+            'name',
+            'run_type',
+            'program']
+
     required_all = [
             'name',
+            'run_type',
             'input_dir',
             'crash_dir',
-            'job_type',
             'program']
 
     # all
+    name = db.StringField(unique=True)
+    run_type = db.StringField()
     program = db.ReferenceField(Program)
-    name = db.StringField()
-    job_type = db.StringField()
-    # WebApp
+    fuzz_time = db.IntField()
+    # webapp
     input_dir = db.StringField()
     crash_dir = db.StringField()
-    fuzz_time = db.IntField() # kill fuzzing after time (minutes)
     # radamsa
     radamsa_number_files_to_create = db.IntField()
     # winafl
+    winafl_targets = db.DictField()
     winafl_default_timeout = db.IntField()
     winafl_last_path_timeout = db.IntField()
     winafl_fuzzing_iteration = db.IntField()
-    winafl_targets = db.ListField(db.ListField(db.StringField()))
+
 
 
 '''
@@ -163,6 +174,10 @@ WEB ENDPOINTS
 
 def error(msg):
     return json.dumps({'error': True, 'message': msg})
+
+def mkdir_ifne(path):
+    if not os.path.exists(path):
+        os.mkdir(path)
 
 @app.route('/')
 def root():
@@ -351,6 +366,54 @@ def prog_edit():
 
 # RUN
 
+@app.route('/run_add', methods=['POST'])
+def run_add():
+    config_str = request.form['yaml']
+    config = yaml.load(config_str)
+    print config
+
+    missing = []
+    for key in Run.user_all:
+        if key not in config:
+            missing.append(key)    
+
+    if len(missing) != 0:
+        return error('Missing required fields: %s' % ' '.join(missing))
+
+    if config['run_type'] not in ['all']:
+        return error('Unsupported run type: %s' % ' '.join(config['run_type']))
+
+    # get system path_input_crashes
+    path_input_crashes = ''
+
+    # create input dir
+    input_dir = 'input_%s' % hex(int(time.time()))[2:] 
+    # create output dir
+    crash_dir = 'crash_%s' % hex(int(time.time()))[2:]
+    
+    web_input_dir = os.path.join(PATH_SHARED_INPUT_CRASHES, input_dir)
+    web_crash_dir = os.path.join(PATH_SHARED_INPUT_CRASHES, crash_dir)
+    
+    mkdir_ifne(web_input_dir)
+    mkdir_ifne(web_crash_dir)
+
+    vm_input_dir = os.path.join(path_input_crashes, input_dir)
+    vm_crash_dir = os.path.join(path_input_crashes, crash_dir)
+
+    config['input_dir'] = vm_input_dir
+    config['crash_dir'] = vm_crash_dir
+
+    for key in config:
+        if key not in Run.required_all:
+            config.pop(key, None)
+
+    try:
+        run = Run(**config)
+        run.save()
+    except NotUniqueError:
+        return error('Name already in use: %s' % config['name'])
+
+    return json.dumps({'run_id': str(run.id)})
 
 '''
 TASKS

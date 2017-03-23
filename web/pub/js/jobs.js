@@ -352,6 +352,55 @@ function programInit() {
 	// programList();
 }
 
+/*
+** RUN
+*/
+
+function runAdd() {
+	var yaml = $("#run_add_yaml").val();
+	
+	var run_type = $('#run_type_select').val();
+	yaml += '\nrun_type:\n';
+	yaml += ' ' + run_type;
+
+	var program_id = $('#program_select').val();
+	yaml += '\nprogram:\n';
+	yaml += ' ' + program_id;
+	
+	$.ajax({
+		type: 'POST',
+		url: '/run_add', 
+		data: {'yaml': yaml}, 
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			runId = data['run_id'];
+			console.log(runId);
+			// runList(true);
+		}
+	});
+}
+
+function runInit() {
+	$("#run_add_btn").on('click', function() {
+		runAdd();	
+	});
+
+	// $("#run_edit_btn").on('click', function() {
+	// 	runEdit();
+	// });
+
+	// $("#run_delete_btn").on('click', function() {
+	// 	runDelete();
+	// });
+
+	// $('#run_select').change(runSelect);
+
+	// runList();
+}
 
 /*
 ** MISC
@@ -437,6 +486,7 @@ $(document).ready(function() {
 
 	systemInit();
 	programInit();
+	runInit();
 });
 
 /* OLD */
