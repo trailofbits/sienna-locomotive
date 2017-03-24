@@ -57,14 +57,19 @@ def winafl_proposition(res):
     Note:
         one target = (module, offset, module_cov1, module_cov2, ..)
     """
-    res = [(x[2], x[1], x[3], x[5]) for x in res]
-    res = set(res)
-    res = [(x, y, z) for (x, y, _, z) in sorted(res, key=lambda x: x[2])]
-    res_uniq = []
-    # remove duplicates
-    [res_uniq.append(x) for x in res if x not in res_uniq]
-    res_uniq = [[y, x] + z.split("%") for (x, y, z) in res_uniq]
-    return res_uniq
+    # ((mod, off), [mod_cod] )
+    res = [ ((x[1], x[2]),list(set(x[5].split('%')))) for x in res]
+    res_dict = {}
+    # use a dict on mod,off to remove dupplicate
+    # merge mod_cov if they share the same (mod,off)
+    for (k,v) in res:
+        if k in res_dict:
+            res_dict[k] = list(set(res_dict[k] + v))
+        else:
+            res_dict[k] = v
+    # transform to a list of dict
+    res = [{'module': mod, 'offset': off, 'cov_modules':cov_mod} for ((mod,off), cov_mod) in res_dict.iteritems()]
+    return res
 
 
 def print_resultats(res):

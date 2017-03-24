@@ -7,6 +7,7 @@ import logging
 import fuzzers.radamsa.radamsa as radamsa
 import fuzzers.winafl.winafl as winafl
 import fuzzers.winafl.recon as winafl_recon
+import fuzzers.winafl.cmin as winafl_cmin
 import autoit.autoit as autoit
 import autoit.autoit_lib as autoit_lib
 import utils.parsing_config as parsing_config
@@ -70,9 +71,10 @@ def user_check(config):
         TODO JF: To be improved
     """
 
-    if not os.path.exists(config['crash_dir']):
-        logging.info('Crash_dir created')
-        os.makedirs(config['crash_dir'])
+    if config['run_type'] in ['all', 'radamsa', 'winafl', 'winafl_run_targets', 'winafl_get_targets', 'winafl_get_target_recon_mode']:
+        if not os.path.exists(config['crash_dir']):
+            logging.info('Crash_dir created')
+            os.makedirs(config['crash_dir'])
 
 def init(config_system, config_program, config_run, log_level):
     """
@@ -101,10 +103,11 @@ def init(config_system, config_program, config_run, log_level):
     if config_program['using_autoit']:
         autoit_lib.init_autoit(config_program)
 
-    if "winafl" in config_system['fuzzers']:
-        winafl.init_directories(config)
-    if "radamsa" in config_system['fuzzers']:
-        radamsa.init_directories(config)
+    if config_run['run_type'] in ['all', 'radamsa', 'winafl', 'winafl_run_targets', 'winafl_get_targets', 'winafl_get_target_recon_mode']:
+        if "winafl" in config_system['fuzzers']:
+            winafl.init_directories(config)
+        if "radamsa" in config_system['fuzzers']:
+            radamsa.init_directories(config)
 
     if 'timestamp' not in config:
         config['timestamp'] = str(int(time.time()))
@@ -262,13 +265,31 @@ def main(config_system_file, config_program_file, config_run_file, log_level):
     config, config_system = init(
         config_system, config_program, config_run, log_level)
 
-    if "winafl" in config_system['fuzzers']:
+    if config['run_type'] == 'all':
         targets = winafl_recon.launch_recon(config)
-        winafl_recon.save_targets(targets, config['program_name'] + ".targets")
+        winafl_recon.save_targets(targets, config['program_name'] + "-targets.yaml")
+        winafl_recon.winafl_on_targets(config, targets)
+        logging.info("Winafl done, start radamsa")
+        radamsa.launch_fuzzing(config)
+
+    elif config['run_type'] == 'radamsa':
+        radamsa.launch_fuzzing(config)
+
+    elif config['run_type'] == 'winafl':
+        targets = winafl_recon.launch_recon(config)
+        winafl_recon.save_targets(targets, config['program_name'] + "-targets.yaml")
         winafl_recon.winafl_on_targets(config, targets)
 
-    if "radamsa" in config_system['fuzzers']:
-        radamsa.launch_fuzzing(config)
+    elif config['run_type'] == 'winafl_run_targets':
+        winafl_recon.winafl_on_targets(config, config['targets'])
+
+    elif config['run_type'] == 'winafl_cmin_targets':
+        winafl_cmin.cmin_on_targets(config, config['targets'])
+
+    elif config['run_type'] == 'winafl_get_targets':
+        logging.error('Not yet implemented')
+    elif config['run_type'] == 'winafl_get_targets_recon_mode':
+        logging.error('Not yet implemented')
 
 
 def fuzz(config_system, config_program, config_run):
@@ -284,27 +305,30 @@ def fuzz(config_system, config_program, config_run):
 
     logging.debug("Config: " + str(config))
 
-    if config['type'] == 'all':
+    if config['run_type'] == 'all':
         targets = winafl_recon.launch_recon(config)
-        winafl_recon.save_targets(targets, config['program_name'] + ".targets")
+        winafl_recon.save_targets(targets, config['program_name'] + "-targets.yaml")
         winafl_recon.winafl_on_targets(config, targets)
         logging.info("Winafl done, start radamsa")
         radamsa.launch_fuzzing(config)
 
-    elif config['type'] == 'radamsa':
+    elif config['run_type'] == 'radamsa':
         radamsa.launch_fuzzing(config)
 
-    elif config['type'] == 'winafl':
+    elif config['run_type'] == 'winafl':
         targets = winafl_recon.launch_recon(config)
-        winafl_recon.save_targets(targets, config['program_name'] + ".targets")
+        winafl_recon.save_targets(targets, config['program_name'] + "-targets.yaml")
         winafl_recon.winafl_on_targets(config, targets)
 
-    elif config['type'] == 'winafl_run_targets':
+    elif config['run_type'] == 'winafl_run_targets':
         winafl_recon.winafl_on_targets(config, config['targets'])
 
-    elif config['type'] == 'winafl_get_targets':
+    elif config['run_type'] == 'winafl_cmin_targets':
+        winafl_cmin.cmin_on_targets(config, config['targets'])
+
+    elif config['run_type'] == 'winafl_get_targets':
         logging.error('Not yet implemented')
-    elif config['type'] == 'winafl_get_targets_recon_mode':
+    elif config['run_type'] == 'winafl_get_targets_recon_mode':
         logging.error('Not yet implemented')
 
     return
