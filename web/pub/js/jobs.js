@@ -384,6 +384,22 @@ function runAdd() {
 	});
 }
 
+function listCorpusFiles() {
+
+}
+
+function listRunFiles() {
+
+}
+
+function addFileToRun() {
+
+}
+
+function removeFileFromRun() {
+	
+}
+
 function runInit() {
 	$("#run_add_btn").on('click', function() {
 		runAdd();	

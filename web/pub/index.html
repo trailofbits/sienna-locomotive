@@ -59,13 +59,13 @@
 			</select>
 
 			<div id='run_info_div'></div>
-			<button id='run_delete_btn'>Delete</button>
+			<!--button id='run_delete_btn'>Delete</button>
 			<br/>
 
 			<textarea id='run_edit_yaml'></textarea>
 			<br/>
 			<button id='run_edit_btn'>Edit</button>
-			<br/>
+			<br/-->
 
 			<textarea id='run_add_yaml'></textarea><br/>
 			<select id='run_type_select'>>
@@ -73,6 +73,22 @@
 			</select>
 			<button id='run_add_btn'>Add Run</button>
 			<br/>
+			<div id='run_file_mgr'>
+				<div id='run_files'>
+					<h3>Run Files</h3>
+					<select id='run_files_select' multiple='true'>
+					</select>
+					<br/>
+					<button id='run_file_remove_btn'>Remove from Run</button>
+				<div id='corpus_files'>
+					<h3>Available Files</h3>
+					<select id='corpus_files_select' multiple='true'>
+					</select>
+					<br/>
+					<button id='run_file_add_btn'>Add to Run</button>
+				</div>
+				<a href='/corpora' target='_blank'>Add files to corpus</a>
+			</div>
 		</div>
 	</body>
 </html>

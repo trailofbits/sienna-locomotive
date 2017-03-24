@@ -1,5 +1,6 @@
-from flask import Flask, request, g, escape, send_from_directory
+from flask import Flask, request, g, escape, send_from_directory, redirect
 from mongoengine.queryset import NotUniqueError
+from werkzeug.utils import secure_filename
 from flask_mongoengine import MongoEngine
 from celery.result import AsyncResult
 from celery import Celery
@@ -414,6 +415,42 @@ def run_add():
         return error('Name already in use: %s' % config['name'])
 
     return json.dumps({'run_id': str(run.id)})
+
+# upload seed file
+def run_add_file():
+    # copy file to input directory
+    pass
+
+def run_list_files():
+    pass
+
+# start run
+def run_start():
+    pass
+
+# CORPORA
+
+@app.route('/corpus_list_files')
+def corpus_list_files():
+    corpus_dir = os.path.join(PATH_SHARED_INPUT_CRASHES, 'corpora')
+    flist = os.listdir(corpus_dir)
+    return json.dumps(flist)
+
+@app.route('/corpora', methods=['GET', 'POST'])
+def corpora():
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            return '<pre>Error: no file found</pre>'
+        file = request.files['file']
+        if not file or file.filename == '':
+            return '<pre>Error: no file found</pre>'
+
+        fname = secure_filename(file.filename)
+        corpus_dir = os.path.join(PATH_SHARED_INPUT_CRASHES, 'corpora')
+        fpath = os.path.join(corpus_dir, fname)
+        file.save(fpath)
+        return redirect('/')
+    return send_from_directory('pub', 'corpora.html')
 
 '''
 TASKS
