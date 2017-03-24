@@ -4,6 +4,7 @@ from werkzeug.utils import secure_filename
 from flask_mongoengine import MongoEngine
 from celery.result import AsyncResult
 from celery import Celery
+import shutil
 import json
 import time
 import yaml
@@ -416,13 +417,89 @@ def run_add():
 
     return json.dumps({'run_id': str(run.id)})
 
-# upload seed file
-def run_add_file():
-    # copy file to input directory
-    pass
+@app.route('/run_list/<program_id>')
+def run_list(program_id):
+    runs = [run.to_mongo().to_dict() for run in Run.objects(program=program_id)]
+    for run in runs:
+        run['_id'] = str(run['_id'])
+        run['program'] = str(run['program'])
 
-def run_list_files():
-    pass
+    run_info = {'order': Run.required, 'runs': runs}
+    return json.dumps(run_info)
+
+# upload seed file
+@app.route('/run_files_add', methods=['POST'])
+def run_files_add():
+    # copy file to input directory
+    run_id = request.json['run_id']
+    print request.json['files']
+    fnames = [secure_filename(fname) for fname in request.json['files']]
+
+    run = Run.objects(id=run_id)
+    if len(run) != 1:
+        return error('Run with id not found: %s' % run_id)
+
+    input_path = os.path.join(PATH_SHARED_INPUT_CRASHES, run[0].input_dir)
+
+    not_found = []
+    for fname in fnames:
+        corpus_dir = os.path.join(PATH_SHARED_INPUT_CRASHES, 'corpora')
+        corpus_file = os.path.join(corpus_dir, fname)
+
+        if not os.path.exists(corpus_file):
+            not_found.append(fname)
+            continue
+
+        shutil.copy2(corpus_file, input_path)
+
+    if len(not_found) > 0:
+        return error('File not found: %s' % ', '.join(fname))
+
+    flist = os.listdir(input_path)
+
+    return json.dumps(flist)
+
+# upload seed file
+@app.route('/run_files_remove', methods=['POST'])
+def run_files_remove():
+    # copy file to input directory
+    run_id = request.json['run_id']
+    print request.json['files']
+    fnames = [secure_filename(fname) for fname in request.json['files']]
+
+    run = Run.objects(id=run_id)
+    if len(run) != 1:
+        return error('Run with id not found: %s' % run_id)
+
+    input_path = os.path.join(PATH_SHARED_INPUT_CRASHES, run[0].input_dir)
+
+    not_found = []
+    for fname in fnames:
+        input_file = os.path.join(input_path, fname)
+
+        if not os.path.exists(input_file):
+            not_found.append(fname)
+            continue
+
+        os.remove(input_file)
+
+    if len(not_found) > 0:
+        return error('File not found: %s' % ', '.join(fname))
+
+    flist = os.listdir(input_path)
+
+    return json.dumps(flist)
+
+@app.route('/run_files_list/<run_id>')
+def run_files_list(run_id):
+    run = Run.objects(id=run_id)
+    if len(run) != 1:
+        return error('Run with id not found: %s' % run_id)
+
+    input_path = os.path.join(PATH_SHARED_INPUT_CRASHES, run[0].input_dir)
+    flist = os.listdir(input_path)
+
+    return json.dumps(flist)
 
 # start run
 def run_start():
@@ -430,8 +507,8 @@ def run_start():
 
 # CORPORA
 
-@app.route('/corpus_list_files')
-def corpus_list_files():
+@app.route('/corpus_files_list')
+def corpus_files_list():
     corpus_dir = os.path.join(PATH_SHARED_INPUT_CRASHES, 'corpora')
     flist = os.listdir(corpus_dir)
     return json.dumps(flist)

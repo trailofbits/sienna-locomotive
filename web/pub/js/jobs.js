@@ -289,6 +289,7 @@ function programSelect() {
 
 	var order = $('#program_div').data('order_'+type);
 	displayConfig(program, 'program', order, ['system']);
+	runList();
 }
 
 function programDelete() {
@@ -356,6 +357,74 @@ function programInit() {
 ** RUN
 */
 
+function runList(empty_list=false) {
+	var program_id = $('#program_select').val();
+	if(program_id == '--')
+		return;
+
+	$.ajax({
+		type: 'GET',
+		url: '/run_list/' + program_id,
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+
+			var order = data['order'];
+			var runs = data['runs'];
+
+			// save the order for use in runSelect
+			$('#run_div').data('order', order);
+
+			// store current and empty
+			var selected = $('#run_select').val();
+			$('#run_select').empty();
+
+			// add placeholder
+			var empty_opt = $('<option></option>');
+			empty_opt.text('--');
+			empty_opt.val('--');
+			$('#run_select').append(empty_opt);
+
+			// add runs
+			for(var idx in runs) {
+				run = runs[idx];
+				var opt = $('<option></option>');
+				opt.text(run['name']);
+				opt.val(run['_id']);
+				opt.addClass('run_option');
+				opt.data('run', run);
+				$('#run_select').append(opt);
+			}
+
+			// restore current
+			var child = $('#run_select').children('[value='+selected+']');
+			if(!empty_list && child.length == 1) {
+				$('#run_select').val(selected);
+			} else {
+				empty();
+			}
+		}
+	});
+}
+
+function runSelect() {
+	var option = $('#run_select').children(':selected');
+	var run = option.data('run');
+
+	if(run == undefined) {
+		emptyRun();
+		return;
+	}
+
+	var order = $('#run_div').data('order');
+	displayConfig(run, 'run', order, ['program']);
+	runFilesList();
+	corpusFilesList();
+}
+
 function runAdd() {
 	var yaml = $("#run_add_yaml").val();
 	
@@ -384,20 +453,103 @@ function runAdd() {
 	});
 }
 
-function listCorpusFiles() {
+function corpusFilesList() {
+	$.ajax({
+		type: 'GET',
+		url: '/corpus_files_list', 
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			
+			$('#corpus_files_select').empty();
 
+			for(var idx in data) {
+				var file = data[idx];
+				var opt = $('<option></option>');
+				opt.text(file);
+				opt.val(file);
+				$('#corpus_files_select').append(opt);
+			}
+		}
+	});
 }
 
-function listRunFiles() {
+function runFilesList() {
+	var run_id = $('#run_select').val();
+	$.ajax({
+		type: 'GET',
+		url: '/run_files_list/' + run_id, 
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			
+			$('#run_files_select').empty();
 
+			for(var idx in data) {
+				var file = data[idx];
+				var opt = $('<option></option>');
+				opt.text(file);
+				opt.val(file);
+				$('#run_files_select').append(opt);
+			}
+		}
+	});
 }
 
-function addFileToRun() {
+function runFilesAdd() {
+	var run_id = $('#run_select').val();
+	var files = $('#corpus_files_select').val();
+	$.ajax({
+		type: 'POST',
+		url: '/run_files_add', 
+		data: JSON.stringify({
+			'run_id': run_id,
+			'files': files,
+		}), 
+		dataType: "json",
+  		contentType: "application/json",
+		success: function(data) {
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			runId = data['run_id'];
+			console.log(runId);
 
+			runFilesList();
+		}
+	});
 }
 
-function removeFileFromRun() {
-	
+function runFilesRemove() {
+	var run_id = $('#run_select').val();
+	var files = $('#run_files_select').val();
+	$.ajax({
+		type: 'POST',
+		url: '/run_files_remove', 
+		data: JSON.stringify({
+			'run_id': run_id,
+			'files': files,
+		}), 
+		dataType: "json",
+  		contentType: "application/json",
+		success: function(data) {
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			runId = data['run_id'];
+			console.log(runId);
+
+			runFilesList();
+		}
+	});
 }
 
 function runInit() {
@@ -413,7 +565,15 @@ function runInit() {
 	// 	runDelete();
 	// });
 
-	// $('#run_select').change(runSelect);
+	$('#run_select').change(runSelect);
+	
+	$('#run_file_add_btn').on('click', function() {
+		runFilesAdd();
+	});
+
+	$('#run_file_remove_btn').on('click', function() {
+		runFilesRemove();
+	});
 
 	// runList();
 }
