@@ -1,4 +1,5 @@
 """ Module used to perform quick winafl testing """
+import yaml
 import logging
 import fuzzers.winafl.winafl as winafl
 import fuzzers.winafl.winafl_constants as winafl_constants
@@ -20,14 +21,12 @@ def get_targets(path_file):
         0x1,module2
     """
     input_file = open(path_file, "r")
-    targets = input_file.read()
-    targets = targets.split('\n')
-    targets = [x.rstrip('\r').split(';') for x in targets]
-    targets = [(int(x, 16), y) for (x, y) in targets[:-1]]
-    return targets
+    targets = yaml.load(input_file)
+    input_file.close()
+    return targets['targets']
 
 
-def save_targets(interesting_targets, path_file):
+def save_targets(targets, path_file):
     """
     Save targets into a file
 
@@ -40,8 +39,8 @@ def save_targets(interesting_targets, path_file):
         0x1,module2
     """
     output_file = open(path_file, "w")
-    for target in interesting_targets:
-        output_file.write(";".join(target)+"\n")
+    targets = {'targets' : targets}
+    yaml.dump(targets, output_file)
     output_file.close()
 
 
@@ -80,12 +79,19 @@ def launch_recon(config):
         if ret == 0:
             logging.info("Winafl not running")
         elif ret == 1:
-            logging.info("No path discoverd")
             # we now, we also keep these target as winafl works on it
-            interesting_targets.append(target)
+            execs_sec = winafl_stats.get_execs_sec_from_config(config_winafl)
+            logging.info("No path discoverd "+str(execs_sec))
+            if int(execs_sec) > 100:
+                target['type'] = 'NO_PATH_RECON'
+                interesting_targets.append(target)
         elif ret == 2:
             number_paths = winafl_stats.get_number_paths_from_config(config_winafl)
-            logging.info("Interesting target " + str(number_paths))
+            execs_sec = winafl_stats.get_execs_sec_from_config(config_winafl)
+            target['type'] = 'PATHS_RECON'
+            target['execs_sec_recon'] = execs_sec
+            target['number_paths_recon'] = number_paths
+            logging.info("Interesting target " + str(number_paths)+ " "+str(execs_sec))
             interesting_targets.append(target)
         else:
             logging.debug("Unknown return value")
@@ -117,4 +123,5 @@ def winafl_on_targets(config, targets):
         winafl.run_winafl(config, config_winafl,
                           running_cmd, path_file_to_fuzz)
         winafl.kill_all(config)
+        winafl.move_generated_inputs(config_winafl, config['file_format'])
     logging.info("End of winafl")

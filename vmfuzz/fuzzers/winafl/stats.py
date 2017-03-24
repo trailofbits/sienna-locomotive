@@ -116,6 +116,18 @@ def get_number_paths(fuzzer_stats):
     """
     return int(fuzzer_stats['paths_found'])
 
+def get_execs_sec_paths(fuzzer_stats):
+    """
+    Returns the number of executions per sec
+
+    Args:
+        fuzerer_stats (dict)
+    Returns:
+        int: The number of executions per sec
+    """
+    return float(fuzzer_stats['execs_per_sec'])
+
+
 
 def get_number_paths_from_config(config_winafl):
     """
@@ -132,6 +144,22 @@ def get_number_paths_from_config(config_winafl):
     if not fuzzer_stats:
         return 0
     return get_number_paths(fuzzer_stats)
+
+def get_execs_sec_from_config(config_winafl):
+    """
+    Returns the number of paths found
+
+    Args:
+        config_winafl (dict)
+    Returns:
+        int: The number of paths
+    """
+    path_fuzzer_stats = os.path.join(
+        winafl_constants.WINAFL_WORKING_DIR, config_winafl['out_dir'], "fuzzer_stats")
+    fuzzer_stats = parsing_stat(path_fuzzer_stats)
+    if not fuzzer_stats:
+        return 0
+    return get_execs_sec_paths(fuzzer_stats)
 
 
 def get_number_crashes(fuzzer_stats):

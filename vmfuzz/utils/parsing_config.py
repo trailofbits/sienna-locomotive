@@ -17,6 +17,7 @@ def parse_config(config_file):
     f_desc.close()
     return config
 
+
 def parse_all_configs(config_system_file, config_program_file, config_run_file):
     """
     Parse the configurations files
@@ -41,16 +42,17 @@ def check_run_config(run_config):
     Args:
         config (dict): The run configuration
     """
-    if 'type' not in run_config:
+    if 'run_type' not in run_config:
         logging.error(
-            "bad run configuration file: missing type field")
+            "bad run configuration file: missing run_type field")
         exit()
 
-    if run_config['type'] not in ['all', 'radamsa', 'winafl',
-                                  'winafl_run_targets', 'winafl_get_targets',
-                                  'winafl_get_targets_recon_mode']:
+    if run_config['run_type'] not in ['all', 'radamsa', 'winafl',
+                                      'winafl_run_targets', 'winafl_get_targets',
+                                      'winafl_get_targets_recon_mode',
+                                      'winafl_cmin_targets', 'exploitable']:
         logging.error(
-            "bad run configuration file: unknown type of run")
+            "bad run configuration file: unknown run_type of run: " + run_config['run_type'])
         exit()
 
     if 'input_dir' not in run_config:
@@ -58,28 +60,36 @@ def check_run_config(run_config):
             "bad run configuration file: missing input_dir field")
         exit()
 
-    if 'crash_dir' not in run_config:
-        logging.error(
-            "bad run configuration file: missing crash_dir field")
-        exit()
+    if run_config['run_type'] in ['all', 'radamsa', 'winafl' 'winafl_run_targets',
+                                  'winafl_get_targets', 'winafl_get_targets_recon_mode']:
 
-    if run_config['type'] in ['all', 'radamsa']:
+        if 'crash_dir' not in run_config:
+            logging.error(
+                "bad run configuration file: missing crash_dir field")
+            exit()
+
+    if run_config['run_type'] in ['all', 'radamsa']:
+
         if 'radamsa_number_files_to_create' not in run_config:
-            logging.info("no radamsa_number_files_to_create field; using default (100)")
+            logging.info(
+                "no radamsa_number_files_to_create field; using default (100)")
             run_config['radamsa_number_files_to_create'] = 100
 
-    if run_config['type'] in ['all', 'winafl', 'winafl_run_targets',
-                              'winafl_get_targets', 'winafl_get_targets_recon_mode']:
+    if run_config['run_type'] in ['all', 'winafl', 'winafl_run_targets',
+                                  'winafl_get_targets', 'winafl_get_targets_recon_mode']:
         if 'winafl_default_timeout' not in run_config:
-            logging.info("no winafl_default_timeout field; using default (40000)")
+            logging.info(
+                "no winafl_default_timeout field; using default (40000)")
             run_config['winafl_default_timeout'] = 40000
         if 'winafl_last_path_timeout' not in run_config:
-            logging.info("no winafl_last_path_timeout field; using default (45)")
+            logging.info(
+                "no winafl_last_path_timeout field; using default (45)")
             run_config['winafl_last_path_timeout'] = 45
         if 'winafl_fuzzing_iteration' not in run_config:
-            logging.info("no winafl_fuzzing_iteration field; using default (100000)")
+            logging.info(
+                "no winafl_fuzzing_iteration field; using default (100000)")
             run_config['winafl_fuzzing_iteration'] = 100000
-    if run_config['type'] in ['winafl_get_targets']:
+    if run_config['run_type'] in ['winafl_get_targets', 'winafl_cmin_targets']:
         if 'targets' not in run_config:
             logging.error(
                 "bad run configuration file: missing targets field")

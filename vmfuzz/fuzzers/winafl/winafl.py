@@ -24,6 +24,8 @@ def init(config_system):
     Args:
         config_system (dict): The system configuration
     """
+    winafl_constants.WINAFL_PATH_CMIN = os.path.join(
+        config_system['path_winafl'], "winafl-cmin.py")
     winafl_constants.WINAFL_PATH32 = os.path.join(
         config_system['path_winafl'], "bin32")
     winafl_constants.WINAFL_PATH64 = os.path.join(
@@ -88,16 +90,21 @@ def move_winafl_dll(config):
         right version of winafl.dll (x86 or x64)
     """
     if config['arch'] == "x86":
-        src = os.path.join(winafl_constants.WINAFL_PATH32,
-                           winafl_constants.WINAFL_DLL)
+        src_dll = os.path.join(winafl_constants.WINAFL_PATH32,
+                               winafl_constants.WINAFL_DLL)
+        src_showmap = os.path.join(winafl_constants.WINAFL_PATH32,
+                                   winafl_constants.WINAFL_SHOWMAP)
     elif config['arch'] == "x64":
-        src = os.path.join(winafl_constants.WINAFL_PATH64,
-                           winafl_constants.WINAFL_DLL)
+        src_dll = os.path.join(winafl_constants.WINAFL_PATH64,
+                               winafl_constants.WINAFL_DLL)
+        src_showmap = os.path.join(winafl_constants.WINAFL_PATH64,
+                                   winafl_constants.WINAFL_SHOWMAP)
     else:
         logging.error("Architecture not supported " + config['arch'])
         exit(0)
     dst = winafl_constants.WINAFL_WORKING_DIR
-    shutil.copy(src, dst)
+    shutil.copy(src_dll, dst)
+    shutil.copy(src_showmap, dst)
 
 
 def init_directories(config):
@@ -266,7 +273,7 @@ def run_winafl_without_autoit(config_winafl, running_cmd):
         config_winafl (dict): winafl configuration
         running_cmd (list string)
     Returns:
-        int: 0 if error, 1 if success
+        (int, proc): 0 if error, 1 if success and the winafl process
     Note:
         Check every 10 secondes for 1 min if the process is running
     """
@@ -287,9 +294,9 @@ def run_winafl_without_autoit(config_winafl, running_cmd):
         logging.debug("On run")
         if proc.poll() is not None:
             logging.debug("process stoped?")
-            return 0
+            return (0, proc)
     logging.debug("process running")
-    return 1
+    return (1, proc)
 
 
 def launch_autoit(path_autoit_script, fuzz_file, stop):
@@ -322,9 +329,10 @@ def run_winafl_autoit(config_winafl, path_autoit_script, program_name, running_c
         running_cmd (list string): the runnign command
         fuzz_file (string): path to the file to fuzz
     Returns:
-        (ret, t):
+        (ret, t, proc):
             ret : 0 if error, 1 if success\n
-            t: used to stop the loop on the autoit script
+            t: used to stop the loop on the autoit script\n
+            proc: the winafl process
     Note:
         Check every 10 secondes for 1 min if the process is running
     """
@@ -353,17 +361,18 @@ def run_winafl_autoit(config_winafl, path_autoit_script, program_name, running_c
             t_autoit_stop.set()
             run_process.kill_process(program_name)
             run_process.kill_process("AutoIt3.exe")
-            return (0, t_autoit_stop)
-    return (1, t_autoit_stop)
+            return (0, t_autoit_stop, proc)
+    return (1, t_autoit_stop, proc)
 
 
-def check_winafl(out_dir, last_path_timeout):
+def check_winafl(out_dir, last_path_timeout, winafl_proc):
     """
     Loop until winafl does not found new paths
 
     Args:
         out_dir (string): path to the out directory of winafl
         last_path_timeout (int): timeout
+        winafl_proc (proc): the winafl process
     Returns:
         int: the return value
     Note:
@@ -379,6 +388,12 @@ def check_winafl(out_dir, last_path_timeout):
         iteration = 0
         while True:
             time.sleep(60 * 2)
+            if winafl_proc.poll() is not None:
+                logging.debug("process stoped?")
+                return 0
+            # In case of crash or hangs:
+            run_process.kill_process("WerFault.exe")
+
             fuzzer_stats = winafl_stats.get_stat(out_dir)
             if not fuzzer_stats:
                 logging.debug("No fuzzer_stats file found " + out_dir +
@@ -409,25 +424,19 @@ def move_generated_inputs(config_winafl, file_format):
     Args:
         config_winafl (dict): the winafl configuration
         file_format (string) the file format
-    Note:
-        Names of the moved files contains:
-            - "-C" for crashes
-            - "-H" for hangs
-            - "-N" for normals
-
-        (in dev, only C are copied for now)
     """
     dst_dir = os.path.join(config_winafl['crash_dir'])
     in_dir = os.path.join(
         winafl_constants.WINAFL_WORKING_DIR, config_winafl['out_dir'])
-   # file_manipulation.move_generated_inputs(
-   #     os.path.join(in_dir, "crashes"), dst_dir, "-C" + file_format)
-   # file_manipulation.move_generated_inputs(
-   #     os.path.join(in_dir, "hangs"), dst_dir, "-H" + file_format)
     file_manipulation.move_generated_inputs(
-        os.path.join(in_dir, "queue"), dst_dir, "-N" + file_format)
+        os.path.join(in_dir, "crashes"), dst_dir, "-C" + file_format)
+    file_manipulation.move_generated_inputs(
+        os.path.join(in_dir, "hangs"), dst_dir, "-H" + file_format)
 
-
+    dst_dir = os.path.join(
+        winafl_constants.WINAFL_WORKING_DIR, config_winafl['in_dir'])
+    file_manipulation.move_generated_inputs(
+        os.path.join(in_dir, "queue"), dst_dir, "-generated-" + file_format)
 
 
 def move_crashes(config_winafl, file_format):
@@ -573,9 +582,9 @@ def update_target_on_winafl_config(config_winafl, target):
         one target = (module, offset, module_cov1, module_cov2, ..)
     """
 
-    mod = target[0]
-    off = target[1]
-    mod_cov = target[2:]
+    mod = target['module']
+    off = target['offset']
+    mod_cov = target['cov_modules']
     logging.info("Target is " + off + " at mod " + mod)
     config_winafl['offset'] = off
     config_winafl['module'] = mod
@@ -604,20 +613,22 @@ def run_winafl(config, config_winafl, running_cmd, path_file_to_fuzz):
         Without, is it given added to the running command
     """
     if config['using_autoit']:
-        (ret, t_autoit_stop) = run_winafl_autoit(config_winafl,
-                                                 config[
-                                                     'path_autoit_script'],
-                                                 config['program_name'],
-                                                 running_cmd,
-                                                 path_file_to_fuzz)
+        (ret, t_autoit_stop, winafl_proc) = run_winafl_autoit(config_winafl,
+                                                              config[
+                                                                  'path_autoit_script'],
+                                                              config[
+                                                                  'program_name'],
+                                                              running_cmd,
+                                                              path_file_to_fuzz)
     else:
-        ret = run_winafl_without_autoit(config_winafl, running_cmd)
+        (ret, winafl_proc) = run_winafl_without_autoit(config_winafl, running_cmd)
     logging.debug("Return value " + str(ret))
     if ret == 1:
         logging.debug("Winafl started")
         ret = check_winafl(os.path.join(winafl_constants.WINAFL_WORKING_DIR,
                                         config_winafl['out_dir']),
-                           config_winafl['last_path_timeout'])
+                           config_winafl['last_path_timeout'],
+                           winafl_proc)
         if config['using_autoit']:
             t_autoit_stop.set()
     return ret
@@ -633,11 +644,10 @@ def kill_all(config):
     if config['using_autoit']:
         run_process.kill_process("AutoIt3.exe")
     run_process.kill_process(winafl_constants.WINAFL_BIN)
-
+    run_process.kill_process(config['program_name'])
+    run_process.kill_process("WerFault.exe")
     # Use autoit to close windows opened during the close of winafl
     autoit.run_and_wait(winafl_constants.WINAFL_AUTOIT_STOP, [])
-
-    run_process.kill_process(config['program_name'])
 
 
 def launch_fuzzing(config):
@@ -665,6 +675,6 @@ def launch_fuzzing(config):
         update_target_on_winafl_config(config_winafl, target)
         run_winafl(config, config_winafl, running_cmd, path_file_to_fuzz)
         kill_all(config)
-        #move_generated_inputs(config_winafl, config['file_format'])
+        move_generated_inputs(config_winafl, config['file_format'])
 
     logging.info('All modules tested')

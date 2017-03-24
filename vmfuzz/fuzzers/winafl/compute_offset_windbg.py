@@ -11,7 +11,7 @@ import pykd
 SIZE_INT = 4
 
 #modules not to be explored
-IGNORED_MODULES = ["kernel32.dll","KERNELBASE.dll","MSVCR100.dll","msvcrt.dll"]
+IGNORED_MODULES = ["kernel32.dll","KERNELBASE.dll","MSVCR100.dll","msvcrt.dll","COMDLG32.dll","USER32.dll","ntdll.dll"]
 
 # keeping results in hastabl
 # avoid several calls to dgbCommand
