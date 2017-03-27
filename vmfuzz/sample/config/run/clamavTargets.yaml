@@ -1,20 +1,22 @@
-type:
-    all
+run_type:
+    winafl_run_targets
 input_dir:
     F:\winafl\in_clamav
 crash_dir:
     F:\winafl\crash_vlc
 
-# Radamsa Information
-radamsa_number_files_to_create:
- 100
 
-# Winafl Information
-winafl_default_timeout:
- 40000
-winafl_last_path_timeout:
- 45
-winafl_fuzzing_iteration:
- 100000
-
+targets:
+- cov_modules: [libclamav.dll]
+  module: libclamav.dll
+  offset: '0x8cbe0'
+  type: NO_PATH_RECON
+- cov_modules: [libclamav.dll, clamscan.exe]
+  module: clamscan.exe
+  offset: '0x1040'
+  type: NO_PATH_RECON
+- cov_modules: [libclamav.dll, clamscan.exe]
+  module: clamscan.exe
+  offset: '0x1000'
+  type: NO_PATH_RECON
 

@@ -1,4 +1,4 @@
-type:
+run_type:
     all
 input_dir:
     F:\winafl\in_easymp3

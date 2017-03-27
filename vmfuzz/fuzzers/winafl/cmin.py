@@ -76,9 +76,6 @@ def run_cmin_without_autoit(config_winafl, running_cmd):
     os.chdir(config_winafl['working_dir'])
     os.system(winafl.pp_cmd(cmd))
     os.chdir(prev_dir)
-#    proc = subprocess.Popen(cmd, shell=True,
-#                            cwd=config_winafl['working_dir'])
-#    proc.wait()
 
 
 def run_cmin_autoit(config_winafl, path_autoit_script, program_name, running_cmd, fuzz_file):

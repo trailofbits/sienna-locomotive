@@ -15,7 +15,7 @@ config_system = {'fuzzers': ['radamsa', 'winafl'],
 
 
 config_program_clamav = {'path_program': 'C:\\Program Files\\ClamAV',
-                         'parameters': ['C:\\Program Files\\ClamAV\\clambc.exe', '-d'],
+                         'parameters': ['C:\\Program Files\\ClamAV\\clambc.exe', '-d', '<FILE>'],
                          'file_format': '.ldb', 'seed_pattern': '*.ldb',
                          'auto_close': True,
                          'using_autoit': False,
@@ -24,27 +24,21 @@ config_program_clamav = {'path_program': 'C:\\Program Files\\ClamAV',
                          'running_time': 2}
 
 config_run_clamav_all = {'input_dir': 'F:\\winafl\\in_clamscan',
-                         'crash_dir': 'F:\\crashes',
+                         'crash_dir': 'F:\\winafl\\crash_clamsav',
                          'timestamp': 'XXXX',
-                         'radamsa_number_files_to_create': 100,
-                         'winafl_last_path_timeout': 45,
-                         'winafl_fuzzing_iteration': 100000,
-                         'winafl_default_timeout': 40000,
-                         'type': 'all'}
+                         'run_type': 'all'}
 
 config_run_clamav_winafl_targets = {'input_dir': 'F:\\winafl\\in_clamscan',
                                     'crash_dir': 'F:\\crashes',
-                                    'radamsa_number_files_to_create': 100,
-                                    'winafl_last_path_timeout': 45,
-                                    'winafl_fuzzing_iteration': 100000,
-                                    'winafl_default_timeout': 40000,
                                     'timestamp': 'YYYY',
-                                    'type': 'winafl_run_targets',
-                                    'targets': [['libclamav.dll', '0x8cbe0', 'libclamav.dll'],
-                                                ['clamscan.exe', '0x1000', 'clamscan.exe'],
-                                                ['clamscan.exe', '0x1040', 'clamscan.exe']]}
+                                    'run_type': 'winafl_run_targets',
+                                    'targets': [{'module': 'libclamav.dll', 'offset': '0x8cbe0', 'cov_modules': ['libclamav.dll']},
+                                                {'module': 'clamscan.exe', 'offset': '0x1000', 'cov_modules': ['libclamav.dll', 'clamscan.exe']},
+                                                {'module': 'clamscan.exe', 'offset': '0x1040', 'cov_modules': ['libclamav.dll', 'clamscan.exe']}
+                                               ]
+                                    }
 
 
 #vmfuzz.fuzz(config_system, config_program_clamav, config_run_clamav_all)
-vmfuzz.fuzz(config_system, config_program_clamav,
-            config_run_clamav_winafl_targets)
+
+vmfuzz.fuzz(config_system, config_program_clamav, config_run_clamav_winafl_targets)
