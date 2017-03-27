@@ -65,7 +65,7 @@ def launch_recon(config):
     targets = winafl.compute_targets(config)
     config_winafl = winafl.generate_config_winafl(config)
 
-    config_winafl["in_dir"] = winafl.get_in_dir_seed(config)
+    config_winafl["in_dir"] = winafl.get_in_dir(config)
     config_winafl["out_dir_ori"] = config_winafl["out_dir_ori"] + "_recon"
 
     running_cmd = winafl.generate_running_cmd(config)
@@ -82,9 +82,9 @@ def launch_recon(config):
             # we now, we also keep these target as winafl works on it
             execs_sec = winafl_stats.get_execs_sec_from_config(config_winafl)
             logging.info("No path discoverd "+str(execs_sec))
-            if int(execs_sec) > 100:
-                target['type'] = 'NO_PATH_RECON'
-                interesting_targets.append(target)
+            target['execs_sec_recon'] = execs_sec
+            target['type'] = 'PATHS_RECON'
+            interesting_targets.append(target)
         elif ret == 2:
             number_paths = winafl_stats.get_number_paths_from_config(config_winafl)
             execs_sec = winafl_stats.get_execs_sec_from_config(config_winafl)

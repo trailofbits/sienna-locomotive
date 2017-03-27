@@ -104,6 +104,8 @@ If `using_autoit` is `false`:
 **Parameters**
 
 In the parameters list, the name of the input needs to be `<FILE>`
+
+
 Run configuration
 ==================
 

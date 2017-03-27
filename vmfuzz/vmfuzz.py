@@ -72,7 +72,7 @@ def user_check(config):
     """
 
     if config['run_type'] in ['all', 'radamsa', 'winafl', 'winafl_run_targets',
-                              'winafl_get_targets', 'winafl_get_target_recon_mode']:
+                              'winafl_get_targets', 'winafl_get_targets_recon_mode']:
         if not os.path.exists(config['crash_dir']):
             logging.info('Crash_dir created')
             os.makedirs(config['crash_dir'])
@@ -106,7 +106,7 @@ def init(config_system, config_program, config_run, log_level):
         autoit_lib.init_autoit(config_program)
 
     if config_run['run_type'] in ['all', 'radamsa', 'winafl', 'winafl_run_targets',
-                                  'winafl_get_targets', 'winafl_get_target_recon_mode']:
+                                  'winafl_get_targets', 'winafl_get_targets_recon_mode']:
         if "winafl" in config_system['fuzzers']:
             winafl.init_directories(config)
         if "radamsa" in config_system['fuzzers']:
@@ -161,7 +161,8 @@ def fuzz(config_system, config_program, config_run, log_level=0):
     elif config['run_type'] == 'winafl_get_targets':
         logging.error('Not yet implemented')
     elif config['run_type'] == 'winafl_get_targets_recon_mode':
-        logging.error('Not yet implemented')
+        interested_targets = winafl_recon.launch_recon(config)
+        winafl_recon.save_targets(interested_targets, config['program_name']+"-target.yaml")
 
     return
 
