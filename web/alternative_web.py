@@ -8,13 +8,17 @@ import shutil
 import json
 import time
 import yaml
+import sys
 import os
+
+sys.path.append('C:\\Users\\dougl\\Documents\\sienna-locomotive\\vmfuzz\\')
+import vmfuzz
 
 '''
 INITIALIZATION
 '''
 
-app = Flask('web')
+app = Flask('alternative_web')
 
 app.config['MONGODB_SETTINGS'] = {
     'db': 'fuzzdb',
@@ -116,12 +120,12 @@ class ProgramCMD(Program):
             'system',
             'auto_close',
             'running_time',
-            'program_params',]
+            'parameters',]
 
     # Without Autoit
     auto_close = db.BooleanField()
     running_time = db.IntField()
-    program_params = db.ListField(db.StringField())
+    parameters = db.ListField(db.StringField())
 
 
 class Run(db.Document):
@@ -202,7 +206,7 @@ def is_hex(target):
 def sys_add():
     config_str = request.form['yaml']
     config = yaml.load(config_str)
-    print config
+    # print config
 
     missing = []
     for key in System.required:
@@ -226,8 +230,12 @@ def sys_add():
 
 @app.route('/sys_list')
 def sys_list():
-    systems = [sys.to_mongo().to_dict() for sys in System.objects()]
-    print systems
+    objs = System.objects()
+    if len(objs) < 1:
+        return json.dumps([])
+
+    systems = [sys.to_mongo().to_dict() for sys in objs]
+    # print systems
     for sys in systems:
         sys['_id'] = str(sys['_id'])
 
@@ -264,7 +272,7 @@ def sys_edit():
 def prog_add_gui():
     config_str = request.form['yaml']
     config = yaml.load(config_str)
-    print config
+    # print config
 
     missing = []
     for key in ProgramAutoIT.required:
@@ -290,7 +298,7 @@ def prog_add_gui():
 def prog_add_cmd():
     config_str = request.form['yaml']
     config = yaml.load(config_str)
-    print config
+    # print config
 
     missing = []
     for key in ProgramCMD.required:
@@ -323,13 +331,13 @@ def prog_add_cmd():
 @app.route('/prog_list/<system_id>')
 def prog_list(system_id):
     programs_gui = [prog.to_mongo().to_dict() for prog in ProgramAutoIT.objects(system=system_id)]
-    print programs_gui
+    # print programs_gui
     for prog in programs_gui:
         prog['_id'] = str(prog['_id'])
         prog['system'] = str(prog['system'])
 
     programs_cmd = [prog.to_mongo().to_dict() for prog in ProgramCMD.objects(system=system_id)]
-    print programs_cmd
+    # print programs_cmd
     for prog in programs_cmd:
         prog['_id'] = str(prog['_id'])
         prog['system'] = str(prog['system'])
@@ -372,7 +380,7 @@ def prog_edit():
 def run_add():
     config_str = request.form['yaml']
     config = yaml.load(config_str)
-    print config
+    # print config
 
     missing = []
     for key in Run.user_all:
@@ -386,7 +394,11 @@ def run_add():
         return error('Unsupported run type: %s' % ' '.join(config['run_type']))
 
     # get system path_input_crashes
-    path_input_crashes = ''
+    prog = Program.objects(id=config['program'])
+    if len(prog) != 1:
+        return error('Invalid program id: %s' % config['program'])
+    sys = prog[0]['system']
+    path_input_crashes = sys['path_input_crashes']
 
     # create input dir
     input_dir = 'input_%s' % hex(int(time.time()))[2:] 
@@ -432,7 +444,7 @@ def run_list(program_id):
 def run_files_add():
     # copy file to input directory
     run_id = request.json['run_id']
-    print request.json['files']
+    # print request.json['files']
     fnames = [secure_filename(fname) for fname in request.json['files']]
 
     run = Run.objects(id=run_id)
@@ -464,7 +476,7 @@ def run_files_add():
 def run_files_remove():
     # copy file to input directory
     run_id = request.json['run_id']
-    print request.json['files']
+    # print request.json['files']
     fnames = [secure_filename(fname) for fname in request.json['files']]
 
     run = Run.objects(id=run_id)
@@ -501,9 +513,37 @@ def run_files_list(run_id):
 
     return json.dumps(flist)
 
-# start run
-def run_start():
-    pass
+@app.route('/run_start/<run_id>', methods=['POST'])
+def run_start(run_id):
+    runs = Run.objects(id=run_id)
+    # TODO: check length
+
+    run = runs[0].to_mongo().to_dict()
+    run['_id'] = str(run['_id'])
+    run['program'] = str(run['program'])
+    # print run
+
+    progs = Program.objects(id=run['program'])
+    prog = progs[0].to_mongo().to_dict()
+
+    prog['_id'] = str(prog['_id'])
+    prog['system'] = str(prog['system'])
+    # print prog
+
+    syss = System.objects(id=prog['system'])
+    sys = syss[0].to_mongo().to_dict()
+
+    sys['_id'] = str(sys['_id'])
+    # print sys
+
+    task = task_run_start.apply_async(args=[sys, prog, run])
+    # print task.id
+    return json.dumps({'task_id': task.id})
+
+def run_get_system(run):
+    prog = run['program']
+    sys = prog['system']
+    return sys
 
 # CORPORA
 
@@ -533,7 +573,9 @@ def corpora():
 TASKS
 '''
 
-
+@celery.task
+def task_run_start(sys, prog, run):
+    vmfuzz.fuzz(sys, prog, run)
 
 '''
 MAIN

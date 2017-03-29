@@ -552,9 +552,29 @@ function runFilesRemove() {
 	});
 }
 
+function runStart() {
+	var run_id = $('#run_select').val();
+	$.ajax({
+		type: 'POST',
+		url: '/run_start/' + run_id, 
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			console.log(data['task_id']);
+		}
+	});
+}
+
 function runInit() {
 	$("#run_add_btn").on('click', function() {
 		runAdd();	
+	});
+
+	$("#run_start_btn").on('click', function() {
+		runStart();	
 	});
 
 	// $("#run_edit_btn").on('click', function() {
@@ -680,40 +700,6 @@ function pollTask(taskId) {
 			} else {
 				fetchJobs();
 			}
-		}
-	});
-}
-
-function startRun(run_id) {
-	$.ajax({
-		type: 'POST',
-		url: '/run', 
-		data: {'run_id': run_id}, 
-		success: function(data) {
-			data = JSON.parse(data);
-			if('error' in data) {
-				handleError(data);
-				return;
-			} 
-			taskId = data['task_id'];
-			console.log(taskId);
-			// pollTask(taskId);
-		}
-	});
-}
-
-function killRun(run_id) {
-	$.ajax({
-		type: 'POST',
-		url: '/run_kill', 
-		data: {'run_id': run_id}, 
-		success: function(data) {
-			data = JSON.parse(data);
-			if('error' in data) {
-				handleError(data);
-				return;
-			} 
-			// pollTask(taskId);
 		}
 	});
 }
