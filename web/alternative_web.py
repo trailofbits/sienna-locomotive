@@ -10,6 +10,7 @@ import time
 import yaml
 import sys
 import os
+import re
 
 sys.path.append('C:\\Users\\dougl\\Documents\\sienna-locomotive\\vmfuzz\\')
 import vmfuzz
@@ -169,6 +170,9 @@ class Run(db.Document):
     winafl_default_timeout = db.IntField()
     winafl_last_path_timeout = db.IntField()
     winafl_fuzzing_iteration = db.IntField()
+    # book keeping
+    status = db.StringField()
+    workers = db.ListField(db.StringField())
 
 
 
@@ -516,7 +520,8 @@ def run_files_list(run_id):
 @app.route('/run_start/<run_id>', methods=['POST'])
 def run_start(run_id):
     runs = Run.objects(id=run_id)
-    # TODO: check length
+    if len(runs) != 1:
+        return error('No run found with id: %s' % run_id)
 
     run = runs[0].to_mongo().to_dict()
     run['_id'] = str(run['_id'])
@@ -536,9 +541,24 @@ def run_start(run_id):
     sys['_id'] = str(sys['_id'])
     # print sys
 
-    task = task_run_start.apply_async(args=[sys, prog, run])
+    for worker_id in xrange(1):
+        task = task_run_start.apply_async(args=[sys, prog, run, worker_id])
+        runs[0].workers.append('STARTED')
+    runs[0]['status'] = 'STARTING'
+    runs[0].save()
     # print task.id
-    return json.dumps({'task_id': task.id})
+    return json.dumps({'run_id': run['_id']})
+
+@app.route('/run_stop/<run_id>', methods=['POST'])
+def run_stop(run_id):
+    runs = Run.objects(id=run_id)
+    if len(runs) != 1:
+        return error('No run found with id: %s' % run_id)
+    
+    runs[0]['status'] = 'STOPPING'
+    runs[0].save()
+    # print task.id
+    return json.dumps({'run_id': run['_id']})
 
 def run_get_system(run):
     prog = run['program']
@@ -574,8 +594,49 @@ TASKS
 '''
 
 @celery.task
-def task_run_start(sys, prog, run):
+def task_run_start(sys, prog, run, worker_id):
     vmfuzz.fuzz(sys, prog, run)
+
+'''
+COMMUNICATION
+'''
+
+@app.route('/_get_status/<run_id>')
+def _get_status(run_id):
+    if re.match('^[0-9a-fA-F]{24}$', run_id) is None:
+        return error('Invalid run id: %s' % run_id)
+        
+    runs = Run.objects(id=run_id)
+    if len(runs) != 1:
+        return error('No run found with id: %s' % run_id)
+    run = runs[0]
+
+    return json.dumps({'status': run['status']})
+
+@app.route('/_set_status/<run_id>/<worker_id>/<status>', methods=['POST'])
+def _set_status(run_id, worker_id, status):
+    runs = Run.objects(id=run_id)
+    if len(runs) != 1:
+        return error('No run found with id: %s' % run_id)
+    
+    worker_id = int(worker_id)
+
+    if status not in ['STARTED', 'ERROR', 'STOPPED']:
+        return error('Invalid status: %s' % status)    
+
+    run = runs[0]
+    run.workers[worker_id] = status
+
+    if all([ea == 'STOPPED' for ea in run.workers]):
+        run['status'] = 'STOPPED'
+
+    if all([ea == 'STARTED' for ea in run.workers]):
+        run['status'] = 'RUNNING'
+
+    run.save()
+
+    return json.dumps({'status': run['status']})
+
 
 '''
 MAIN
