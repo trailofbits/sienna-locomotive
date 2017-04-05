@@ -1,6 +1,8 @@
 """ Main module, it loops between the fuzzer and the autoit script """
 import argparse
 import os
+#import multiprocessing
+import threading
 import time
 import logging
 
@@ -11,6 +13,7 @@ import fuzzers.winafl.cmin as winafl_cmin
 import autoit.autoit as autoit
 import autoit.autoit_lib as autoit_lib
 import utils.parsing_config as parsing_config
+import utils.database as database
 import exploitability.exploitable as exploitable
 
 
@@ -26,6 +29,7 @@ def init_log(log_level):
         2 = Warning \n
         3 = Error
     """
+
 
     if log_level == 0:
         logging.basicConfig(filename="vmfuzz.log",
@@ -49,12 +53,13 @@ def init_system(config_system):
         config_system (dict): the system configuration
     """
     autoit.init(config_system)
+    exploitable.init(config_system)
+    database.init(config_system)
 
     autoit_lib.AUTOIT_LIB_DIRECTORY = os.path.join(
         config_system['path_vmfuzz'], "autoit_lib")
     autoit_lib.AUTOIT_WORKING_DIRECTORY = config_system[
         'path_autoit_working_dir']
-    exploitable.WINGDB_PATH = config_system['path_windbg']
 
     fuzzers = config_system['fuzzers']
     if 'radamsa' in fuzzers:
@@ -97,8 +102,8 @@ def init(config_system, config_program, config_run, log_level):
 
     config = dict(config_program.items() + config_run.items())
 
-    if 'timestamp' not in config:
-        config['timestamp'] = str(int(time.time()))
+    if '_id' not in config:
+        config['_id'] = str(int(time.time()))
 
     init_system(config_system)
 
@@ -112,12 +117,66 @@ def init(config_system, config_program, config_run, log_level):
         if "radamsa" in config_system['fuzzers']:
             radamsa.init_directories(config)
 
-    if 'timestamp' not in config:
-        config['timestamp'] = str(int(time.time()))
-
     user_check(config)
 
     return (config, config_system)
+
+
+def launch_fuzz(config, t_fuzz_stopped):
+    """
+    Launch the fuzzing
+    Args:
+        config (dict): user configuration
+        t_fuzz_stopped (threading.Event): Event use to stop the fuzzing
+    """
+
+    if config['run_type'] == 'all':
+        if 'targets' not in config:
+            targets = winafl_recon.launch_recon(config, t_fuzz_stopped)
+            database.send_targets(config, targets)
+            winafl_recon.save_targets(
+                targets, config['program_name'] + "-targets.yaml")
+        else:
+            targets = config['targets']
+        if t_fuzz_stopped.is_set():
+            return
+        winafl_recon.winafl_on_targets(config, targets, t_fuzz_stopped)
+        logging.info("Winafl done, start radamsa")
+        if t_fuzz_stopped.is_set():
+            return
+        radamsa.launch_fuzzing(config, t_fuzz_stopped)
+
+    elif config['run_type'] == 'radamsa':
+        radamsa.launch_fuzzing(config, t_fuzz_stopped)
+
+    elif config['run_type'] == 'winafl':
+        targets = winafl_recon.launch_recon(config, t_fuzz_stopped)
+        database.send_targets(config, targets)
+        winafl_recon.save_targets(
+            targets, config['program_name'] + "-targets.yaml")
+        if t_fuzz_stopped.is_set():
+            return
+        winafl_recon.winafl_on_targets(config, targets, t_fuzz_stopped)
+
+    elif config['run_type'] == 'winafl_run_targets':
+        winafl_recon.winafl_on_targets(config, config['targets'], t_fuzz_stopped)
+
+    elif config['run_type'] == 'winafl_cmin_targets':
+        winafl_cmin.cmin_on_targets(config, config['targets'])
+
+    elif config['run_type'] == 'winafl_get_targets':
+        logging.error('Not yet implemented')
+    elif config['run_type'] == 'winafl_get_targets_recon_mode':
+        targets = winafl_recon.launch_recon(config, t_fuzz_stopped)
+        database.send_targets(config, targets)
+        winafl_recon.save_targets(targets, config['program_name']+"-targets.yaml")
+
+    elif config['run_type'] == '!exploitable':
+        exploitable.launch_exploitable(config)
+        
+    t_fuzz_stopped.set()
+
+    return
 
 
 def fuzz(config_system, config_program, config_run, log_level=0):
@@ -133,37 +192,20 @@ def fuzz(config_system, config_program, config_run, log_level=0):
     config, config_system = init(
         config_system, config_program, config_run, log_level)
 
-    logging.debug("Config: " + str(config))
+    t_fuzz_stopped = threading.Event()
 
-    if config['run_type'] == 'all':
-        targets = winafl_recon.launch_recon(config)
-        winafl_recon.save_targets(
-            targets, config['program_name'] + "-targets.yaml")
-        winafl_recon.winafl_on_targets(config, targets)
-        logging.info("Winafl done, start radamsa")
-        radamsa.launch_fuzzing(config)
+    t_fuzz = threading.Thread(target=launch_fuzz, args=(
+        config, t_fuzz_stopped,))
+    t_fuzz.daemon = True
+    t_fuzz.start()
 
-    elif config['run_type'] == 'radamsa':
-        radamsa.launch_fuzzing(config)
+    while not t_fuzz_stopped.is_set():
+        time.sleep(10)
+        if database.ask_status(config) not in ['STARTING']:
+            print "End of fuzzing"
+            t_fuzz_stopped.set()
 
-    elif config['run_type'] == 'winafl':
-        targets = winafl_recon.launch_recon(config)
-        winafl_recon.save_targets(
-            targets, config['program_name'] + "-targets.yaml")
-        winafl_recon.winafl_on_targets(config, targets)
-
-    elif config['run_type'] == 'winafl_run_targets':
-        winafl_recon.winafl_on_targets(config, config['targets'])
-
-    elif config['run_type'] == 'winafl_cmin_targets':
-        winafl_cmin.cmin_on_targets(config, config['targets'])
-
-    elif config['run_type'] == 'winafl_get_targets':
-        logging.error('Not yet implemented')
-    elif config['run_type'] == 'winafl_get_targets_recon_mode':
-        interested_targets = winafl_recon.launch_recon(config)
-        winafl_recon.save_targets(interested_targets, config['program_name']+"-target.yaml")
-
+    winafl.kill_all(config)
     return
 
 

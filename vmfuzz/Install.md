@@ -13,6 +13,10 @@ Please note that several path defined here are used in the configuration of vmfu
 - Python yaml:
     - http://pyyaml.org/download/pyyaml/PyYAML-3.12.win32-py2.7.exe (32 bits VM)
     - Or http://pyyaml.org/download/pyyaml/PyYAML-3.12.win-amd64-py2.7.exe (64 bits VM)
+- Python request:
+```bash
+pip install requests
+```
 
 **Autoit**
 - Autoit (https://www.autoitscript.com/site/autoit/downloads/):

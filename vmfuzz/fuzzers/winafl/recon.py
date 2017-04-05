@@ -1,4 +1,5 @@
 """ Module used to perform quick winafl testing """
+import os
 import yaml
 import logging
 import fuzzers.winafl.winafl as winafl
@@ -20,7 +21,7 @@ def get_targets(path_file):
         0x0,module1
         0x1,module2
     """
-    input_file = open(path_file, "r")
+    input_file = open(os.path.join(winafl_constants.WINAFL_WORKING_DIR, path_file), "r")
     targets = yaml.load(input_file)
     input_file.close()
     return targets['targets']
@@ -38,13 +39,13 @@ def save_targets(targets, path_file):
         0x0,module1
         0x1,module2
     """
-    output_file = open(path_file, "w")
+    output_file = open(os.path.join(winafl_constants.WINAFL_WORKING_DIR, path_file), "w")
     targets = {'targets' : targets}
     yaml.dump(targets, output_file)
     output_file.close()
 
 
-def launch_recon(config):
+def launch_recon(config, t_fuzz_stopped):
     """
     Launch the recon mode of winafl \n
     The recon mode compute the offsets, try each one \n
@@ -62,7 +63,9 @@ def launch_recon(config):
     config['winafl_last_path_timeout'] = 2
     winafl_constants.WINAFL_LOOP_ITERATION = 1
 
-    targets = winafl.compute_targets(config)
+    targets = winafl.compute_targets(config) 
+
+    print "Targets "+str(targets)
     config_winafl = winafl.generate_config_winafl(config)
 
     config_winafl["in_dir"] = winafl.get_in_dir(config)
@@ -76,6 +79,9 @@ def launch_recon(config):
         winafl.update_target_on_winafl_config(config_winafl, target)
         ret = winafl.run_winafl(config, config_winafl,
                                 running_cmd, path_file_to_fuzz)
+        if t_fuzz_stopped.is_set():
+            winafl.kill_all(config)
+            break
         if ret == 0:
             logging.info("Winafl not running")
         elif ret == 1:
@@ -103,7 +109,7 @@ def launch_recon(config):
     return interesting_targets
 
 
-def winafl_on_targets(config, targets):
+def winafl_on_targets(config, targets, t_fuzz_stopped):
     """
     Launch winafl on the targets
 
@@ -124,4 +130,7 @@ def winafl_on_targets(config, targets):
                           running_cmd, path_file_to_fuzz)
         winafl.kill_all(config)
         winafl.move_generated_inputs(config_winafl, config['file_format'])
+        if t_fuzz_stopped.is_set():
+            break
+
     logging.info("End of winafl")

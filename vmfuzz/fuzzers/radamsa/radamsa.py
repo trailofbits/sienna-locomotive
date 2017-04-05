@@ -8,7 +8,6 @@ import autoit.autoit as autoit
 import autoit.autoit_lib as autoit_lib
 import utils.run_process as run_process
 import utils.file_manipulation as file_manipulation
-import exploitability.exploitable as exploitable
 import fuzzers.radamsa.radamsa_constants as radamsa_constants
 
 
@@ -29,7 +28,6 @@ def init(config_system):
     file_manipulation.create_dir(radamsa_constants.WORKING_DIRECTORY)
 
     autoit.init(config_system)
-    exploitable.init(config_system)
 
     autoit_lib.AUTOIT_LIB_DIRECTORY = os.path.join(
         config_system['path_vmfuzz'], "autoit_lib")
@@ -45,9 +43,9 @@ def init_directories(config):
     Args:
         config (dict): The user configuration
     """
-    if 'timestamp' in config:
+    if '_id' in config:
         radamsa_constants.WORKING_DIRECTORY = os.path.join(
-            radamsa_constants.WORKING_DIRECTORY, config['timestamp'])
+            radamsa_constants.WORKING_DIRECTORY, config['_id'])
 
     if 'input_dir' in config:
         file_manipulation.move_dir(
@@ -81,18 +79,20 @@ def fuzz_files(pattern_in, name_out, format_file, number_files_to_create):
     return [name_out + "-" + str(x) + format_file for x in range_files]
 
 
-def launch_fuzzing(config):
+def launch_fuzzing(config, t_fuzz_stopped):
     """
     Launch the fuzzing
 
     Args:
         config (dict): the user configuration
+        t_fuzz_stopped (threading.Event): Event use to stop the fuzzing
     """
+
     # Hash tab: hash -> input file
     previous_inputs = {}
     # Couple: (file_name, classification)
     crashes = []
-    while True:
+    while not t_fuzz_stopped.is_set():
         logging.info("Generating new files")
         if 'radamsa_seed_pattern' in config:
             seed_pattern = config['radamsa_seed_pattern']
@@ -101,6 +101,8 @@ def launch_fuzzing(config):
         new_files = fuzz_files(seed_pattern, "fuzz",
                                config['file_format'], config['radamsa_number_files_to_create'])
         for new_file in new_files:
+            if t_fuzz_stopped.is_set():
+                break
             logging.info("Run " + new_file)
             md5_val = file_manipulation.compute_md5(os.path.join(
                 radamsa_constants.WORKING_DIRECTORY, new_file))
@@ -125,30 +127,8 @@ def launch_fuzzing(config):
                                           config['running_time'])
             if crashed:
                 logging.info("Crash detected")
-
-                if config['using_autoit']:
-                    parameters = [os.path.join(
-                        radamsa_constants.WORKING_DIRECTORY, new_file)]
-                    path_autoit_script = autoit_lib.get_autoit_path(
-                        config['path_autoit_script'], "exploitable")
-                    classification = exploitable.run_autoit(path_autoit_script,
-                                                            config[
-                                                                'path_program'],
-                                                            config[
-                                                                'program_name'],
-                                                            parameters,
-                                                            config['arch'])
-                else:
-                    params = [os.path.join(
-                        radamsa_constants.WORKING_DIRECTORY, new_file)]
-                    classification = exploitable.run(config['path_program'],
-                                                     config['program_name'],
-                                                     config['parameters'] +
-                                                     params,
-                                                     config['arch'])
-                logging.info("Classification: " + classification)
                 new_name = "crash-" + str(uuid.uuid4()) + config['file_format']
                 src = os.path.join(radamsa_constants.WORKING_DIRECTORY, new_file)
                 dst = os.path.join(config['crash_dir'], new_name)
-                shutil.copyfile(src,dst)
+                shutil.copyfile(src, dst)
                 crashes.append((new_name, classification))

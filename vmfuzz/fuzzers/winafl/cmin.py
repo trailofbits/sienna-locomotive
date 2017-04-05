@@ -162,9 +162,9 @@ def update_target_on_cmin_config(config_cmin, target):
 def cmin_on_targets(config, targets):
     """ test
     """
-    if 'timestamp' in config:
+    if '_id' in config:
         winafl_constants.WINAFL_WORKING_DIR = os.path.join(
-            winafl_constants.WINAFL_WORKING_DIR, config['timestamp'])
+            winafl_constants.WINAFL_WORKING_DIR, config['_id'])
 
     config_cmin = generate_config_cmin(config)
     running_cmd = winafl.generate_running_cmd(config)
