@@ -410,6 +410,61 @@ function runList(empty_list=false) {
 	});
 }
 
+// select the last run and init its corpus
+function initLastRun(empty_list=false) {
+	var program_id = $('#program_select').val();
+	if(program_id == '--')
+		return;
+
+	$.ajax({
+		type: 'GET',
+		url: '/run_list/' + program_id,
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+
+			var order = data['order'];
+			var runs = data['runs'];
+
+			// save the order for use in runSelect
+			$('#run_div').data('order', order);
+
+			$('#run_select').empty();
+
+			// add placeholder
+			var empty_opt = $('<option></option>');
+			empty_opt.text('--');
+			empty_opt.val('--');
+			$('#run_select').append(empty_opt);
+
+			// add runs
+			for(var idx in runs) {
+				run = runs[idx];
+				var opt = $('<option></option>');
+				opt.text(run['name']);
+				opt.val(run['_id']);
+				opt.addClass('run_option');
+				opt.data('run', run);
+				$('#run_select').append(opt);
+			}
+            // select last run
+            $('#run_select option:last').prop('selected', true);
+            console.log($('#run_select').val());
+
+            // init the corpus
+            runDefaultCorpus();
+            runFilesList();
+            corpusFilesList();
+
+		}
+	});
+}
+
+
+
 function runSelect() {
 	var option = $('#run_select').children(':selected');
 	var run = option.data('run');
@@ -428,9 +483,9 @@ function runSelect() {
 function runAdd() {
 	var yaml = $("#run_add_yaml").val();
 	
-	var run_type = $('#run_type_select').val();
-	yaml += '\nrun_type:\n';
-	yaml += ' ' + run_type;
+//	var run_type = $('#run_type_select').val();
+//	yaml += '\nrun_type:\n';
+//	yaml += ' ' + run_type;
 
 	var program_id = $('#program_select').val();
 	yaml += '\nprogram:\n';
@@ -452,6 +507,92 @@ function runAdd() {
 		}
 	});
 }
+
+function runCreate() {
+	var yaml = 'run_type:\n';
+    yaml += ' all'
+
+	var program_id = $('#program_select').val();
+	yaml += '\nprogram:\n';
+	yaml += ' ' + program_id;
+	
+	$.ajax({
+		type: 'POST',
+		url: '/run_add', 
+		data: {'yaml': yaml}, 
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			runId = data['run_id'];
+			console.log(runId);
+	        initLastRun();
+            
+		}
+	});
+
+}
+
+// init the corpus
+// Add all files with the targeted extension by default
+function runDefaultCorpus() {
+	var run_id = $('#run_select').val();
+    console.log('Dans run default')
+    console.log($('#run_select').val());
+    console.log(run_id);
+    
+    console.log('Avant ajax run default')
+	$.ajax({
+		type: 'GET',
+		url: '/run_default_corpus/' + $('#run_select').val(), 
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			runId = data['run_id'];
+			console.log(runId);
+		}
+	});
+}
+
+function runDetail() {
+	var run_id = $('#run_select').val();
+	$.ajax({
+		type: 'GET',
+		url: '/_run_detail/' + run_id, 
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			console.log(data['task_id']);
+		}
+	});
+}
+
+function runRemove() {
+	var run_id = $('#run_select').val();
+	$.ajax({
+		type: 'GET',
+		url: '/_run_remove/' + run_id, 
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			console.log(data['task_id']);
+            $('#run_select option:first').prop('selected', true);
+            runList()
+		}
+	});
+}
+
 
 function corpusFilesList() {
 	$.ajax({
@@ -568,6 +709,55 @@ function runStart() {
 	});
 }
 
+function runStop() {
+	var run_id = $('#run_select').val();
+	$.ajax({
+		type: 'POST',
+		url: '/run_stop/' + run_id, 
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			console.log(data['task_id']);
+		}
+	});
+}
+
+function runExploitable() {
+	var run_id = $('#run_select').val();
+	$.ajax({
+		type: 'GET',
+		url: '/run_exploitable/' + run_id, 
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			console.log(data['task_id']);
+		}
+	});
+}
+
+function runStats() {
+	var run_id = $('#run_select').val();
+	$.ajax({
+		type: 'GET',
+		url: '/run_stats/' + run_id, 
+		success: function(data) {
+			data = JSON.parse(data);
+			if('error' in data) {
+				handleError(data);
+				return;
+			} 
+			console.log(data['task_id']);
+		}
+	});
+}
+
+
 function runInit() {
 	$("#run_add_btn").on('click', function() {
 		runAdd();	
@@ -577,6 +767,29 @@ function runInit() {
 		runStart();	
 	});
 
+	$("#run_stop_btn").on('click', function() {
+		runStop();	
+	});
+
+	$("#run_create_btn").on('click', function() {
+		runCreate();	
+	});
+
+	$("#run_detail_btn").on('click', function() {
+		runDetail();	
+	});
+
+	$("#run_remove_btn").on('click', function() {
+		runRemove();	
+	});
+
+	$("#run_exploitable_btn").on('click', function() {
+		runExploitable();	
+	});
+
+	$("#run_stats_btn").on('click', function() {
+		runStats();	
+	});
 	// $("#run_edit_btn").on('click', function() {
 	// 	runEdit();
 	// });

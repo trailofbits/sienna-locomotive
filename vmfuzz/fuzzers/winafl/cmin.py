@@ -29,13 +29,13 @@ def generate_cmin_cmd(config_winafl, running_cmd):
         logging.error("Unkwon archictecture " + config_winafl['arch'])
 
     coverage_module = []
-    for cov_mod in config_winafl['modules_cov']:
+    for cov_mod in config_winafl['cov_modules']:
         coverage_module.append('-coverage_module')
         coverage_module.append(cov_mod)
 
     if not coverage_module:
         logging.error("No modules to be covered? (" +
-                      str(config_winafl['modules_cov']) + ")")
+                      str(config_winafl['cov_modules']) + ")")
 
     cmin_cmd = [
         sys.executable,
@@ -154,7 +154,7 @@ def update_target_on_cmin_config(config_cmin, target):
     logging.info("Target is " + off + " at mod " + mod)
     config_cmin['offset'] = off
     config_cmin['module'] = mod
-    config_cmin['modules_cov'] = mod_cov
+    config_cmin['cov_modules'] = mod_cov
     config_cmin['out_dir'] = config_cmin[
         'out_dir_ori'] + "_" + mod + "_" + off
 

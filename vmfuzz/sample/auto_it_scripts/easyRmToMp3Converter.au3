@@ -11,7 +11,7 @@ ControlClick($window_handle, "", "[ID:1001]")
 
 ; Wait for the Open windows
 ; Change Ouvrir to Open in us based windows
-$window_handle_open = WinWaitActive("Ouvrir")
+$window_handle_open = WinWaitActive("Open")
 Send_fuzz($CmdLine[1], $window_handle)
 
 ; Clic on Load button 

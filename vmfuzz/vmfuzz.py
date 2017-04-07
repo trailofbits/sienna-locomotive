@@ -101,9 +101,8 @@ def init(config_system, config_program, config_run, log_level):
     parsing_config.check_run_config(config_run)
 
     config = dict(config_program.items() + config_run.items())
-
-    if '_id' not in config:
-        config['_id'] = str(int(time.time()))
+    config['_program_id'] = config_program['_id']
+    config['_run_id'] = config_run['_id']
 
     init_system(config_system)
 
@@ -129,9 +128,11 @@ def launch_fuzz(config, t_fuzz_stopped):
         config (dict): user configuration
         t_fuzz_stopped (threading.Event): Event use to stop the fuzzing
     """
-
     if config['run_type'] == 'all':
-        if 'targets' not in config:
+        has_target = 'targets' in config
+        if has_target:
+            has_target = config['targets'] != []
+        if not has_target:
             targets = winafl_recon.launch_recon(config, t_fuzz_stopped)
             database.send_targets(config, targets)
             winafl_recon.save_targets(
@@ -144,7 +145,8 @@ def launch_fuzz(config, t_fuzz_stopped):
         logging.info("Winafl done, start radamsa")
         if t_fuzz_stopped.is_set():
             return
-        radamsa.launch_fuzzing(config, t_fuzz_stopped)
+        print 'End'
+#        radamsa.launch_fuzzing(config, t_fuzz_stopped)
 
     elif config['run_type'] == 'radamsa':
         radamsa.launch_fuzzing(config, t_fuzz_stopped)
@@ -171,8 +173,10 @@ def launch_fuzz(config, t_fuzz_stopped):
         database.send_targets(config, targets)
         winafl_recon.save_targets(targets, config['program_name']+"-targets.yaml")
 
-    elif config['run_type'] == '!exploitable':
+    elif config['run_type'] == 'exploitable':
+        print "Start exploitable"
         exploitable.launch_exploitable(config)
+        print "Stop exploitable"
         
     t_fuzz_stopped.set()
 

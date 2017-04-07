@@ -1,8 +1,8 @@
 """ Module handling the communication with the database """
-
+import time
 import requests
 
-DATABASE = ''
+WEBAPP_IP = ''
 
 # TODO JF : Use the real id (worker_id, program_id, ...)
 
@@ -14,8 +14,8 @@ def init(config_system):
         config_system (dict): The system configuration
     """
 
-    global DATABASE
-    DATABASE = config_system['database_ip']
+    global WEBAPP_IP
+    WEBAPP_IP = config_system['webapp_ip']
 
 def ask_status(config):
     """
@@ -26,7 +26,7 @@ def ask_status(config):
         string: the status
     """
     try:
-        resp = requests.get('http://'+DATABASE+':5000/_get_status/' + config['_id'])
+        resp = requests.get('http://'+WEBAPP_IP+':5000/_get_status/' + config['_run_id'])
         return resp.json()['status']
     except:
         return 'ERROR'
@@ -39,8 +39,8 @@ def send_stats(config, data):
         data (dict): data to be sent
     """
 
-    url = 'http://%s:5000/_set_stats/%s/%s' % (DATABASE, config['_id'], config['_id'])
-    requests.post(url, data=data)
+    url = 'http://%s:5000/_set_stats/%s/%s' % (WEBAPP_IP, config['_run_id'], config['_worker_id'])
+    requests.post(url, json=data)
 
 def send_targets(config, targets):
     """
@@ -50,8 +50,8 @@ def send_targets(config, targets):
         data (dict): data to be sent
     """
 
-    url = 'http://%s:5000/_set_targets/%s' % (DATABASE, config['_id'])
-    requests.post(url, data=targets)
+    url = 'http://%s:5000/_set_targets/%s' % (WEBAPP_IP, config['_program_id'])
+    requests.post(url, json={'targets': targets})
 
 def send_classification(config, data):
     """
@@ -61,5 +61,5 @@ def send_classification(config, data):
         data (dict): data to be sent
     """
 
-    url = 'http://%s:5000/_set_classification/%s' % (DATABASE, config['_id'])
-    requests.post(url, data=data)
+    url = 'http://%s:5000/_set_classification/%s' % (WEBAPP_IP, config['_program_id'])
+    requests.post(url, json=data)

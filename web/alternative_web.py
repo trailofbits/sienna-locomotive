@@ -3,7 +3,7 @@ from mongoengine.queryset import NotUniqueError
 from werkzeug.utils import secure_filename
 from flask_mongoengine import MongoEngine
 from celery.result import AsyncResult
-from celery import Celery
+from celery import Celery, signals
 import shutil
 import json
 import time
@@ -12,29 +12,35 @@ import sys
 import os
 import re
 
-sys.path.append('C:\\Users\\dougl\\Documents\\sienna-locomotive\\vmfuzz\\')
+from bson.objectid import ObjectId
+
+
+sys.path.append(os.path.join('..','vmfuzz'))
 import vmfuzz
 
 '''
 INITIALIZATION
 '''
 
+WEBAPP_IP = '10.0.42.6'
+
 app = Flask('alternative_web')
 
 app.config['MONGODB_SETTINGS'] = {
     'db': 'fuzzdb',
-    'host': '192.168.1.6',
+    'host': WEBAPP_IP,
     'port': 27017
 }
 db = MongoEngine(app)
 
-app.config['CELERY_BROKER_URL'] = 'redis://192.168.1.6:6379/0'
-app.config['CELERY_RESULT_BACKEND'] = 'redis://192.168.1.6:6379/0'
+app.config['CELERY_BROKER_URL'] = 'redis://'+WEBAPP_IP+':6379/0'
+app.config['CELERY_RESULT_BACKEND'] = 'redis://'+WEBAPP_IP+':6379/0'
 celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
 celery.conf.update(app.config)
 
 # input_crashes from the web app's view
-PATH_SHARED_INPUT_CRASHES = 'X:\\input_crashes'
+PATH_SHARED_INPUT_CRASHES = 'F:\winafl3'
+
 
 '''
 DATA MODEL
@@ -69,6 +75,7 @@ class System(db.Document):
     path_radamsa_working_dir = db.StringField()
     fuzzers = db.ListField(db.StringField())
 
+
 # vmfuzz parent class
 class Program(db.Document):
     meta = {'allow_inheritance': True}
@@ -79,7 +86,6 @@ class Program(db.Document):
             'using_autoit',
             'path_program',
             'program_name',
-            'seed_pattern',
             'file_format',
             'system']    
 
@@ -93,6 +99,8 @@ class Program(db.Document):
     file_format = db.StringField()
     system = db.ReferenceField(System)
 
+    targets = db.ListField(db.DictField())
+    crashes_classified = db.ListField(db.DictField())
 
 class ProgramAutoIT(Program):
     required = [
@@ -101,7 +109,6 @@ class ProgramAutoIT(Program):
             'using_autoit', # true
             'path_program',
             'program_name',
-            'seed_pattern',
             'file_format',
             'system',
             'path_autoit_script']
@@ -116,7 +123,6 @@ class ProgramCMD(Program):
             'using_autoit', # false
             'path_program',
             'program_name',
-            'seed_pattern',
             'file_format',
             'system',
             'auto_close',
@@ -127,6 +133,7 @@ class ProgramCMD(Program):
     auto_close = db.BooleanField()
     running_time = db.IntField()
     parameters = db.ListField(db.StringField())
+
 
 
 class Run(db.Document):
@@ -173,7 +180,8 @@ class Run(db.Document):
     # book keeping
     status = db.StringField()
     workers = db.ListField(db.StringField())
-
+    # stats
+    stats = db.ListField(db.DictField())
 
 
 '''
@@ -187,11 +195,16 @@ def error(msg):
 
 def mkdir_ifne(path):
     if not os.path.exists(path):
+        print "Make dir "+str(path)
         os.mkdir(path)
 
 @app.route('/')
 def root():
     return send_from_directory('pub', 'index.html')
+
+@app.route('/client')
+def client():
+    return send_from_directory('pub', 'client.html')
 
 @app.route('/js/<path:path>')
 def send_js(path):
@@ -220,9 +233,9 @@ def sys_add():
     if len(missing) != 0:
         return error('Missing required fields: %s' % ' '.join(missing))
 
-    for key in config:
-        if key not in System.required:
-            config.pop(key, None)
+#    for key in config:
+#        if key not in System.required:
+#            config.pop(key, None)
 
     try:
         sys = System(**config)
@@ -286,9 +299,9 @@ def prog_add_gui():
     if len(missing) != 0:
         return error('Missing required fields: %s' % ' '.join(missing))
 
-    for key in config:
-        if key not in ProgramAutoIT.required:
-            config.pop(key, None)
+#    for key in config:
+#        if key not in ProgramAutoIT.required:
+#            config.pop(key, None)
 
     try:
         prog = ProgramAutoIT(**config)
@@ -320,9 +333,9 @@ def prog_add_cmd():
     if len(system) != 1:
         return error('System with id not found: %s' % system_id)
 
-    for key in config:
-        if key not in ProgramCMD.required:
-            config.pop(key, None)
+#    for key in config.item():
+#        if key not in ProgramCMD.required:
+#            config.pop(key, None)
 
     try:
         prog = ProgramCMD(**config)
@@ -384,7 +397,11 @@ def prog_edit():
 def run_add():
     config_str = request.form['yaml']
     config = yaml.load(config_str)
+    print config
     # print config
+
+    if 'name' not in config:
+        config['name'] = 'run_'+str(time.strftime("%Y-%m-%d-%H:%M"))
 
     missing = []
     for key in Run.user_all:
@@ -394,7 +411,8 @@ def run_add():
     if len(missing) != 0:
         return error('Missing required fields: %s' % ' '.join(missing))
 
-    if config['run_type'] not in ['all']:
+    print config['run_type']
+    if config['run_type'] not in ['all', 'exploitable']:
         return error('Unsupported run type: %s' % ' '.join(config['run_type']))
 
     # get system path_input_crashes
@@ -418,14 +436,19 @@ def run_add():
     vm_input_dir = os.path.join(path_input_crashes, input_dir)
     vm_crash_dir = os.path.join(path_input_crashes, crash_dir)
 
-    config['input_dir'] = vm_input_dir
-    config['crash_dir'] = vm_crash_dir
+    if 'input_dir' not in config:
+        config['input_dir'] = vm_input_dir
+    if 'crash_dir' not in config:
+        config['crash_dir'] = vm_crash_dir
 
-    for key in config:
-        if key not in Run.required_all:
-            config.pop(key, None)
+    print config
+#    for key in config:
+#        if key not in Run.required_all:
+#	    print key
+#           config.pop(key, None)
 
     try:
+        print config
         run = Run(**config)
         run.save()
     except NotUniqueError:
@@ -435,10 +458,12 @@ def run_add():
 
 @app.route('/run_list/<program_id>')
 def run_list(program_id):
+    print "Program id " + str(program_id)
     runs = [run.to_mongo().to_dict() for run in Run.objects(program=program_id)]
     for run in runs:
         run['_id'] = str(run['_id'])
         run['program'] = str(run['program'])
+	print "Run id "+str(run['_id'])
 
     run_info = {'order': Run.required, 'runs': runs}
     return json.dumps(run_info)
@@ -506,6 +531,29 @@ def run_files_remove():
 
     return json.dumps(flist)
 
+# Add all files in the corpora dir that end with the targeted extension
+@app.route('/run_default_corpus/<run_id>', methods=['GET'])
+def run_default_corpus(run_id):
+    run = Run.objects(id=run_id)[0]
+    prog = run['program']
+
+    corpus_dir = os.path.join(PATH_SHARED_INPUT_CRASHES, 'corpora')
+    fnames = [f for f in os.listdir(corpus_dir) if os.path.isfile(os.path.join(corpus_dir, f)) \
+                                           and f.endswith(prog['file_format'])]
+
+    input_path = os.path.join(PATH_SHARED_INPUT_CRASHES, run.input_dir)
+    
+    for fname in fnames:
+        corpus_dir = os.path.join(PATH_SHARED_INPUT_CRASHES, 'corpora')
+        corpus_file = os.path.join(corpus_dir, fname)
+
+        shutil.copy2(corpus_file, input_path)
+
+    flist = os.listdir(input_path)
+
+    return json.dumps(flist)
+
+
 @app.route('/run_files_list/<run_id>')
 def run_files_list(run_id):
     run = Run.objects(id=run_id)
@@ -519,6 +567,7 @@ def run_files_list(run_id):
 
 @app.route('/run_start/<run_id>', methods=['POST'])
 def run_start(run_id):
+    print "Run id:"+str(run_id)
     runs = Run.objects(id=run_id)
     if len(runs) != 1:
         return error('No run found with id: %s' % run_id)
@@ -529,6 +578,7 @@ def run_start(run_id):
     # print run
 
     progs = Program.objects(id=run['program'])
+    print "Program id "+str(run['program'])
     prog = progs[0].to_mongo().to_dict()
 
     prog['_id'] = str(prog['_id'])
@@ -541,23 +591,75 @@ def run_start(run_id):
     sys['_id'] = str(sys['_id'])
     # print sys
 
+    sys['webapp_ip'] = WEBAPP_IP 
+
     for worker_id in xrange(1):
-        task = task_run_start.apply_async(args=[sys, prog, run, worker_id])
+        run['_worker_id'] = worker_id
+        task = task_run_start.apply_async(args=[sys, prog, run])
         runs[0].workers.append('STARTED')
-    runs[0]['status'] = 'STARTING'
-    runs[0].save()
+
+    run_to_update = runs[0]
+    run_to_update.status = 'STARTING'
+    run_to_update.save()
     # print task.id
     return json.dumps({'run_id': run['_id']})
+
+
 
 @app.route('/run_stop/<run_id>', methods=['POST'])
 def run_stop(run_id):
     runs = Run.objects(id=run_id)
     if len(runs) != 1:
         return error('No run found with id: %s' % run_id)
-    
-    runs[0]['status'] = 'STOPPING'
-    runs[0].save()
+    run_to_update = runs[0] 
+    run_to_update['status'] = 'STOPPING'
+    run_to_update.save()
+    return ""
+
+@app.route('/_run_remove/<run_id>', methods=['GET'])
+def run_remove(run_id):
+    runs = Run.objects(id=run_id)
+    if len(runs) != 1:
+        return error('No run found with id: %s' % run_id)
+    run_to_remove = runs[0] 
+    run_to_remove.delete()
     # print task.id
+    return json.dumps({'success': True, 'message': 'Successfully deleted %s' % run_id})
+
+
+
+# Launch !exploitable on the crash_dir on a previosu run
+# Create a temporary run sent to celery, but do not save this run.
+@app.route('/run_exploitable/<run_id>', methods=['GET'])
+def run_exploitable(run_id):
+    print "Run !exploitable on id:"+str(run_id)
+    runs = Run.objects(id=run_id)
+    if len(runs) != 1:
+        return error('No run found with id: %s' % run_id)
+
+    run = runs[0].to_mongo().to_dict()
+    run['_id'] = str(run['_id'])
+    run['program'] = str(run['program'])
+
+    progs = Program.objects(id=run['program'])
+    prog = progs[0].to_mongo().to_dict()
+
+    prog['_id'] = str(prog['_id'])
+    prog['system'] = str(prog['system'])
+
+    syss = System.objects(id=prog['system'])
+    sys = syss[0].to_mongo().to_dict()
+
+    sys['_id'] = str(sys['_id'])
+
+    sys['webapp_ip'] = WEBAPP_IP 
+
+    run['run_type'] = 'exploitable'
+
+    task = task_run_start.apply_async(args=[sys, prog, run])
+    
+    runs[0].workers.append('STARTED')
+
     return json.dumps({'run_id': run['_id']})
 
 def run_get_system(run):
@@ -594,7 +696,7 @@ TASKS
 '''
 
 @celery.task
-def task_run_start(sys, prog, run, worker_id):
+def task_run_start(sys, prog, run):
     vmfuzz.fuzz(sys, prog, run)
 
 '''
@@ -613,9 +715,9 @@ def _get_status(run_id):
 
     return json.dumps({'status': run['status']})
 
-@app.route('/_set_status/<run_id>/<worker_id>/<status>', methods=['POST'])
+@app.route('/_set_status/<run_id>/<worker_id>/<status>', methods=['POST','GET'])
 def _set_status(run_id, worker_id, status):
-    runs = Run.objects(id=run_id)
+    runs = Run.objects(id=ObjectId(run_id))
     if len(runs) != 1:
         return error('No run found with id: %s' % run_id)
     
@@ -625,21 +727,95 @@ def _set_status(run_id, worker_id, status):
         return error('Invalid status: %s' % status)    
 
     run = runs[0]
-    run.workers[worker_id] = status
+    print (run.workers)
+#    run.workers[worker_id] = status
 
     if all([ea == 'STOPPED' for ea in run.workers]):
-        run['status'] = 'STOPPED'
+        run.status = 'STOPPED'
 
     if all([ea == 'STARTED' for ea in run.workers]):
-        run['status'] = 'RUNNING'
+        run.status = 'RUNNING'
 
     run.save()
 
     return json.dumps({'status': run['status']})
+
+@app.route('/_set_stats/<run_id>/<worker_id>', methods=['POST'])
+def set_stats(run_id, worker_id):
+    runs = Run.objects(id=run_id)
+    run = runs[0] 
+    content = request.get_json()
+    stats = content['stats']
+    run.stats = run.stats + stats
+    run.save()
+    return "" 
+
+# debug function
+@app.route('/_get_stats/<run_id>/<worker_id>', methods=['GET'])
+def get_stats(run_id, worker_id):
+    runs = Run.objects(id=run_id)
+    run = runs[0] 
+    return json.dumps(run.stats)
+
+#debug function
+@app.route('/_remove_stats/<run_id>/<worker_id>', methods=['GET'])
+def remove_stats(run_id, worker_id):
+    runs = Run.objects(id=run_id)
+    run = runs[0] 
+    run.stats = []
+    run.save()
+    return json.dumps(run.stats)
+
+@app.route('/_set_targets/<program_id>', methods=['POST'])
+def set_targets(program_id):
+    program = Program.objects(id=program_id)[0]
+    content = request.get_json()
+    targets = content['targets']
+    program.targets = targets
+    program.save()
+    return "" 
+
+# Debug function
+@app.route('/_get_targets/<program_id>', methods=['GET'])
+def get_targets(program_id):
+    program = Program.objects(id=program_id)[0]
+    return json.dumps(program.targets)
+
+# Debug function
+@app.route('/_remove_targets/<program_id>', methods=['GET'])
+def remove_targets(program_id):
+    program = Program.objects(id=program_id)[0]
+    program.targets = []
+    program.save()
+    return "" 
+
+@app.route('/_set_classification/<program_id>', methods=['POST'])
+def set_classification(program_id):
+    program = Program.objects(id=program_id)[0]
+    content = request.get_json()
+    classification = content['crash_classified']
+    program.crashes_classified.append(classification)
+    program.save()
+    return "" 
+
+# Debug function
+@app.route('/_get_classification/<program_id>', methods=['GET'])
+def get_classification(program_id):
+    program = Program.objects(id=program_id)[0]
+    return json.dumps(program.crashes_classified)
+
+# Debug function
+@app.route('/_remove_classification/<program_id>', methods=['GET'])
+def remove_classification(program_id):
+    program = Program.objects(id=program_id)[0]
+    program.crashes_classified = []
+    program.save()
+    return "" 
+
 
 
 '''
 MAIN
 '''
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host=WEBAPP_IP)

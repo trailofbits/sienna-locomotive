@@ -49,7 +49,7 @@ def launch_recon(config, t_fuzz_stopped):
     """
     Launch the recon mode of winafl \n
     The recon mode compute the offsets, try each one \n
-    for 5 mins and export the one working with winafl
+    for 2 mins and export the one working with winafl
 
     Args:
         config (dict): the user configuration
@@ -60,14 +60,14 @@ def launch_recon(config, t_fuzz_stopped):
         If not new path is found the target is not considered
     """
     prev_last_path_timeout = config['winafl_last_path_timeout']
-    config['winafl_last_path_timeout'] = 2
-    winafl_constants.WINAFL_LOOP_ITERATION = 1
+    config['winafl_last_path_timeout'] = 1
 
     targets = winafl.compute_targets(config) 
 
     print "Targets "+str(targets)
     config_winafl = winafl.generate_config_winafl(config)
 
+    config_winafl['winafl_max_time'] = 60 * 2
     config_winafl["in_dir"] = winafl.get_in_dir(config)
     config_winafl["out_dir_ori"] = config_winafl["out_dir_ori"] + "_recon"
 
@@ -91,7 +91,7 @@ def launch_recon(config, t_fuzz_stopped):
             target['execs_sec_recon'] = execs_sec
             target['type'] = 'PATHS_RECON'
             interesting_targets.append(target)
-        elif ret == 2:
+        elif ret == 2 or ret == 3:
             number_paths = winafl_stats.get_number_paths_from_config(config_winafl)
             execs_sec = winafl_stats.get_execs_sec_from_config(config_winafl)
             target['type'] = 'PATHS_RECON'
@@ -104,7 +104,6 @@ def launch_recon(config, t_fuzz_stopped):
         winafl.kill_all(config)
 
     config['winafl_last_path_timeout'] = prev_last_path_timeout
-    winafl_constants.WINAFL_LOOP_ITERATION = 0
     logging.info("Interesting targets:\n" + str(interesting_targets))
     return interesting_targets
 

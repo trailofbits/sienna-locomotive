@@ -198,13 +198,13 @@ def generate_winafl_cmd(config_winafl, running_cmd):
     logging.debug(winafl_path_bin)
 
     coverage_module = []
-    for cov_mod in config_winafl['modules_cov']:
+    for cov_mod in config_winafl['cov_modules']:
         coverage_module.append('-coverage_module')
         coverage_module.append(cov_mod)
 
     if not coverage_module:
         logging.error("No modules to be covered? (" +
-                      str(config_winafl['modules_cov']) + ")")
+                      str(config_winafl['cov_modules']) + ")")
 
     winafl_cmd = [
         winafl_path_bin,
@@ -289,9 +289,10 @@ def run_winafl_without_autoit(config_winafl, running_cmd):
 
     logging.debug("winafl cmd: " + pp_cmd(cmd))
 
-    proc = subprocess.Popen(pp_cmd(cmd), cwd=config_winafl['working_dir'])
+    config_winafl['starting_time'] = time.time()
+    proc = subprocess.Popen(pp_cmd(cmd), creationflags=subprocess.CREATE_NEW_CONSOLE, cwd=config_winafl['working_dir'])
     for i in range(0, 6):
-        time.sleep(10)
+        time.sleep(10) 
         logging.debug("On run")
         if proc.poll() is not None:
             logging.debug("process stoped?")
@@ -346,6 +347,7 @@ def run_winafl_autoit(config_winafl, path_autoit_script, program_name, running_c
     cmd = generate_winafl_cmd(config_winafl, running_cmd)
     logging.debug("winafl cmd: " + pp_cmd(cmd))
 
+    config_winafl['starting_time'] = time.time()
     proc = subprocess.Popen(pp_cmd(cmd), cwd=config_winafl['working_dir'])
 
     path_autoit_script = autoit_lib.get_autoit_path(
@@ -354,6 +356,7 @@ def run_winafl_autoit(config_winafl, path_autoit_script, program_name, running_c
     t_autoit_stop = threading.Event()
     t_autoit = threading.Thread(target=launch_autoit, args=(
         path_autoit_script, fuzz_file, t_autoit_stop,))
+    t_autoit.daemon = True
     t_autoit.start()
 
     for i in range(0, 6):
@@ -445,19 +448,32 @@ def check_winafl(config, config_winafl, winafl_proc):
         iteration = 0
         f_plot_data = open(os.path.join(out_dir, "plot_data"))
         while True:
-            time.sleep(10)
+            time.sleep(10) 
+
+            if 'winafl_max_time' in config_winafl:
+                if (time.time() - config_winafl['starting_time']) > config_winafl['winafl_max_time']:
+                    kill_all(config)
+                    return 3
 
             # TODO JF add better procedure to check if recon
-            if "recon" not in out_dir:
+            if "recon" not in out_dir or True:
             # curr_pos is used to avoid reading the whole plot_data file
                 curr_pos = f_plot_data.tell()
+                print "curr pos "+str(curr_pos)
                 line = f_plot_data.readline()
-                if not line:
-                    f_plot_data.seek(curr_pos)
-                else:
+                all_data = []
+                while line:
                     data = generate_stats(config_winafl, line)
                     if data:
-                        database.send_stats(config, data)
+                        all_data.append(data)
+                    line = f_plot_data.readline()
+                if all_data:
+                    print "send "+str(len(all_data))
+                    all_data = {'stats': all_data}
+                    database.send_stats(config, all_data)
+                else:
+                    print "restore pos "+str(curr_pos)
+                    f_plot_data.seek(curr_pos)
 
             if winafl_proc.poll() is not None:
                 logging.debug("process stoped?")
@@ -479,9 +495,6 @@ def check_winafl(config, config_winafl, winafl_proc):
             if last_path_sec > 60 * last_path_timeout:
                 break
             iteration = iteration + 1  # TODO JF sensible to overflow
-            if winafl_constants.WINAFL_LOOP_ITERATION != 0:
-                if winafl_constants.WINAFL_LOOP_ITERATION >= iteration:
-                    break
         if iteration == 0:
             f_plot_data.close()
             return 1
@@ -665,9 +678,24 @@ def update_target_on_winafl_config(config_winafl, target):
     logging.info("Target is " + off + " at mod " + mod)
     config_winafl['offset'] = off
     config_winafl['module'] = mod
-    config_winafl['modules_cov'] = mod_cov
+    config_winafl['cov_modules'] = mod_cov
     config_winafl['out_dir'] = config_winafl[
         'out_dir_ori'] + "_" + mod + "_" + off
+
+def kill_all(config):
+    """
+    Kill all processes related to winafl
+
+    Args:
+        config (dict): The user configuration
+    """
+    if config['using_autoit']:
+        run_process.kill_process("AutoIt3.exe")
+    run_process.kill_process(winafl_constants.WINAFL_BIN)
+    run_process.kill_process(config['program_name'])
+    run_process.kill_process("WerFault.exe")
+    # Use autoit to close windows opened during the close of winafl
+    autoit.run_and_wait(winafl_constants.WINAFL_AUTOIT_STOP, [])
 
 
 def run_winafl(config, config_winafl, running_cmd, path_file_to_fuzz):
@@ -706,21 +734,6 @@ def run_winafl(config, config_winafl, running_cmd, path_file_to_fuzz):
             t_autoit_stop.set()
     return ret
 
-
-def kill_all(config):
-    """
-    Kill all processes related to winafl
-
-    Args:
-        config (dict): The user configuration
-    """
-    if config['using_autoit']:
-        run_process.kill_process("AutoIt3.exe")
-    run_process.kill_process(winafl_constants.WINAFL_BIN)
-    run_process.kill_process(config['program_name'])
-    run_process.kill_process("WerFault.exe")
-    # Use autoit to close windows opened during the close of winafl
-    autoit.run_and_wait(winafl_constants.WINAFL_AUTOIT_STOP, [])
 
 def launch_fuzzing(config):
     """

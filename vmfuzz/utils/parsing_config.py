@@ -50,7 +50,7 @@ def check_run_config(run_config):
     if run_config['run_type'] not in ['all', 'radamsa', 'winafl',
                                       'winafl_run_targets', 'winafl_get_targets',
                                       'winafl_get_targets_recon_mode',
-                                      'winafl_cmin_targets', '!exploitable']:
+                                      'winafl_cmin_targets', 'exploitable']:
         logging.error(
             "bad run configuration file: unknown run_type of run: " + run_config['run_type'])
         exit()
@@ -62,7 +62,7 @@ def check_run_config(run_config):
 
     if run_config['run_type'] in ['all', 'radamsa', 'winafl' 'winafl_run_targets',
                                   'winafl_get_targets', 'winafl_get_targets_recon_mode',
-                                  '!exploitable']:
+                                  'exploitable']:
 
         if 'crash_dir' not in run_config:
             logging.error(
