@@ -26,12 +26,22 @@
 				<option value='--'>--</option>
 			</select>
 
-		    <button id='run_create_btn'>Create</button>
 
 			<button id='run_detail_btn'>Detail</button>
 			
             <button id='run_remove_btn'>Remove</button>
 
+            <br>
+
+               
+			<h2>Create a Run</h2>
+            Timeout: <input type="number" id=hours value=0 min="0"> hours 
+            <input type="number" id=mins value=0 min="0"> mins 
+            <input type="number" id=number_workers value=1 min="0"> worker 
+            <br>
+		    <button id='run_create_btn'>Create</button>
+
+			<h2>Inputs</h2>
 			<div id='run_file_mgr'>
 				<div id='run_files'>
 					<h3>Run Files</h3>

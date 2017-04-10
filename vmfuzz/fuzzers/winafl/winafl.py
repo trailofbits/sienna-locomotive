@@ -289,10 +289,13 @@ def run_winafl_without_autoit(config_winafl, running_cmd):
 
     logging.debug("winafl cmd: " + pp_cmd(cmd))
 
-    config_winafl['starting_time'] = time.time()
-    proc = subprocess.Popen(pp_cmd(cmd), creationflags=subprocess.CREATE_NEW_CONSOLE, cwd=config_winafl['working_dir'])
-    for i in range(0, 6):
-        time.sleep(10) 
+    config_winafl['winafl_starting_time'] = time.time()
+    proc = subprocess.Popen(pp_cmd(
+        cmd), creationflags=subprocess.CREATE_NEW_CONSOLE, cwd=config_winafl['working_dir'])
+
+    # let winafl runs for one min
+    for _ in range(0, 6):
+        time.sleep(10)
         logging.debug("On run")
         if proc.poll() is not None:
             logging.debug("process stoped?")
@@ -314,9 +317,9 @@ def launch_autoit(path_autoit_script, fuzz_file, stop):
         autoit.run_and_wait(path_autoit_script, [fuzz_file])
 
         # check if the main thread is still active
-        for t in threading.enumerate():
-            if t.name == "MainThread":
-                if not t.is_alive():
+        for thread in threading.enumerate():
+            if thread.name == "MainThread":
+                if not thread.is_alive():
                     return
 
 
@@ -347,8 +350,9 @@ def run_winafl_autoit(config_winafl, path_autoit_script, program_name, running_c
     cmd = generate_winafl_cmd(config_winafl, running_cmd)
     logging.debug("winafl cmd: " + pp_cmd(cmd))
 
-    config_winafl['starting_time'] = time.time()
-    proc = subprocess.Popen(pp_cmd(cmd), cwd=config_winafl['working_dir'])
+    config_winafl['winafl_starting_time'] = time.time()
+    proc = subprocess.Popen(pp_cmd(
+        cmd), creationflags=subprocess.CREATE_NEW_CONSOLE, cwd=config_winafl['working_dir'])
 
     path_autoit_script = autoit_lib.get_autoit_path(
         path_autoit_script, "winafl")
@@ -359,7 +363,8 @@ def run_winafl_autoit(config_winafl, path_autoit_script, program_name, running_c
     t_autoit.daemon = True
     t_autoit.start()
 
-    for i in range(0, 6):
+    # let winafl runs for one min
+    for _ in range(0, 6):
         time.sleep(10)
         if proc.poll() is not None:
             t_autoit_stop.set()
@@ -420,8 +425,49 @@ def generate_stats(config_winafl, line):
     }
     return data
 
+def check_running_time(config_winafl):
+    """
+    Check the running time of the winafl process
+    Args:
+        config_winafl (dict): The winafl configuration
+    Returns:
+        bool: True if the running time > winafl_max_time
+    """
 
-def check_winafl(config, config_winafl, winafl_proc):
+    if 'winafl_max_time' in config_winafl:
+        diff_time = time.time() - config_winafl['winafl_starting_time']
+        if diff_time > config_winafl['winafl_max_time']:
+            return True
+    return False
+
+def winafl_send_stats(config, config_winafl, f_plot_data):
+    """
+    Send the stats to the webapp
+    Args:
+        config (dict): The user configuration
+        config_winafl (dict): The winafl configuration
+        f_plot_data (file): The fuzzer_stats file
+    Note:
+        The data is sent as a dict {'stats' : stats}
+
+    """
+
+    # curr_pos is used to avoid reading the whole plot_data file
+    curr_pos = f_plot_data.tell()
+    line = f_plot_data.readline()
+    all_data = []
+    while line:
+        data = generate_stats(config_winafl, line)
+        if data:
+            all_data.append(data)
+        line = f_plot_data.readline()
+    if all_data:
+        data_send = {'stats': all_data}
+        database.send_stats(config, data_send)
+    else:
+        f_plot_data.seek(curr_pos)
+
+def process_winafl(config, config_winafl, winafl_proc):
     """
     Loop until winafl does not found new paths. Send stats to the webapp
 
@@ -440,7 +486,8 @@ def check_winafl(config, config_winafl, winafl_proc):
         Every last_path_timeout, it checks if a new path was disccovered recently
 
     """
-    out_dir = os.path.join(winafl_constants.WINAFL_WORKING_DIR, config_winafl['out_dir'])
+    out_dir = os.path.join(
+        winafl_constants.WINAFL_WORKING_DIR, config_winafl['out_dir'])
     last_path_timeout = config_winafl['last_path_timeout']
 
     fuzzer_stats = winafl_stats.get_stat(out_dir)
@@ -448,53 +495,45 @@ def check_winafl(config, config_winafl, winafl_proc):
         iteration = 0
         f_plot_data = open(os.path.join(out_dir, "plot_data"))
         while True:
-            time.sleep(10) 
+            time.sleep(10)
 
-            if 'winafl_max_time' in config_winafl:
-                if (time.time() - config_winafl['starting_time']) > config_winafl['winafl_max_time']:
-                    kill_all(config)
-                    return 3
+            # If there is a limit in the winafl running time
+            if check_running_time(config_winafl):
+                kill_all(config)
+                return 3
 
+            # Send stat to the web app
             # TODO JF add better procedure to check if recon
-            if "recon" not in out_dir or True:
-            # curr_pos is used to avoid reading the whole plot_data file
-                curr_pos = f_plot_data.tell()
-                print "curr pos "+str(curr_pos)
-                line = f_plot_data.readline()
-                all_data = []
-                while line:
-                    data = generate_stats(config_winafl, line)
-                    if data:
-                        all_data.append(data)
-                    line = f_plot_data.readline()
-                if all_data:
-                    print "send "+str(len(all_data))
-                    all_data = {'stats': all_data}
-                    database.send_stats(config, all_data)
-                else:
-                    print "restore pos "+str(curr_pos)
-                    f_plot_data.seek(curr_pos)
+            if "recon" not in out_dir:
+                winafl_send_stats(config, config_winafl, f_plot_data)
 
+            # If the process has stopeed
             if winafl_proc.poll() is not None:
                 logging.debug("process stoped?")
                 f_plot_data.close()
                 return 0
-            # In case of crash or hangs:
+
+            # In case of crash or hangs
             run_process.kill_process("WerFault.exe")
 
+            # Check how long since the last path was found
+            # First check if the fuzzer_stas files exist
             fuzzer_stats = winafl_stats.get_stat(out_dir)
             if not fuzzer_stats:
                 logging.debug("No fuzzer_stats file found " + out_dir +
                               " after " + str(iteration) + " iterations")
                 f_plot_data.close()
                 return 0
-            last_path_sec = winafl_stats.get_last_path_sec(
-                fuzzer_stats)
+
+            last_path_sec = winafl_stats.get_last_path_sec(fuzzer_stats)
+
             logging.info("Last path generated: " + str(last_path_sec) +
                          " secs (" + (str(last_path_sec / 60) + " mins)"))
             if last_path_sec > 60 * last_path_timeout:
                 break
+
             iteration = iteration + 1  # TODO JF sensible to overflow
+
         if iteration == 0:
             f_plot_data.close()
             return 1
@@ -682,6 +721,7 @@ def update_target_on_winafl_config(config_winafl, target):
     config_winafl['out_dir'] = config_winafl[
         'out_dir_ori'] + "_" + mod + "_" + off
 
+
 def kill_all(config):
     """
     Kill all processes related to winafl
@@ -729,7 +769,7 @@ def run_winafl(config, config_winafl, running_cmd, path_file_to_fuzz):
     logging.debug("Return value " + str(ret))
     if ret == 1:
         logging.debug("Winafl started")
-        ret = check_winafl(config, config_winafl, winafl_proc)
+        ret = process_winafl(config, config_winafl, winafl_proc)
         if config['using_autoit']:
             t_autoit_stop.set()
     return ret
@@ -761,4 +801,3 @@ def launch_fuzzing(config):
         move_generated_inputs(config_winafl, config['file_format'])
 
     logging.info('All modules tested')
-

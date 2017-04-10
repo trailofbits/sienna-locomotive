@@ -203,11 +203,21 @@ def fuzz(config_system, config_program, config_run, log_level=0):
     t_fuzz.daemon = True
     t_fuzz.start()
 
+    database.send_status(config, 'STARTED')
+    
+    starting_time = time.time()
     while not t_fuzz_stopped.is_set():
         time.sleep(10)
-        if database.ask_status(config) not in ['STARTING']:
+        if database.ask_status(config) not in ['STARTING', 'STARTED', 'RUNNING']:
             print "End of fuzzing"
             t_fuzz_stopped.set()
+        if 'fuzz_time' in config:
+            if time.time() - starting_time > config['fuzz_time']:
+                print 'Fuzzing time reached'
+                t_fuzz_stopped.set()
+            else:
+                print str(config['fuzz_time'])
+                print str(time.time() - starting_time)
 
     winafl.kill_all(config)
     return

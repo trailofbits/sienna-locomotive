@@ -1,7 +1,7 @@
 """ Module used to perform quick winafl testing """
 import os
-import yaml
 import logging
+import yaml
 import fuzzers.winafl.winafl as winafl
 import fuzzers.winafl.winafl_constants as winafl_constants
 import fuzzers.winafl.stats as winafl_stats
@@ -62,7 +62,7 @@ def launch_recon(config, t_fuzz_stopped):
     prev_last_path_timeout = config['winafl_last_path_timeout']
     config['winafl_last_path_timeout'] = 1
 
-    targets = winafl.compute_targets(config) 
+    targets = winafl.compute_targets(config)
 
     print "Targets "+str(targets)
     config_winafl = winafl.generate_config_winafl(config)

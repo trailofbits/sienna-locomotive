@@ -515,6 +515,18 @@ function runCreate() {
 	var program_id = $('#program_select').val();
 	yaml += '\nprogram:\n';
 	yaml += ' ' + program_id;
+
+	var mins = $('#mins').val();
+	yaml += '\nmins:\n';
+	yaml += ' ' + mins;
+
+	var hours = $('#hours').val();
+	yaml += '\nhours:\n';
+	yaml += ' ' + hours;
+
+	var number_workers = $('#number_workers').val();
+	yaml += '\nnumber_workers:\n';
+	yaml += ' ' + number_workers;
 	
 	$.ajax({
 		type: 'POST',

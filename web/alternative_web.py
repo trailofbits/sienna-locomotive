@@ -180,8 +180,9 @@ class Run(db.Document):
     # book keeping
     status = db.StringField()
     workers = db.ListField(db.StringField())
+    number_workers = db.IntField()
     # stats
-    stats = db.ListField(db.DictField())
+    stats = db.ListField(db.ListField(db.DictField()))
 
 
 '''
@@ -441,6 +442,15 @@ def run_add():
     if 'crash_dir' not in config:
         config['crash_dir'] = vm_crash_dir
 
+    if 'hours' in config and 'mins' in config:
+        timeout = config['mins'] + config['hours'] * 60
+        if timeout>0:
+            config['fuzz_time'] = timeout
+        config.pop('hours')
+        config.pop('mins')
+    else:
+        print 'no fuzz time'
+
     print config
 #    for key in config:
 #        if key not in Run.required_all:
@@ -593,12 +603,21 @@ def run_start(run_id):
 
     sys['webapp_ip'] = WEBAPP_IP 
 
-    for worker_id in xrange(1):
-        run['_worker_id'] = worker_id
-        task = task_run_start.apply_async(args=[sys, prog, run])
-        runs[0].workers.append('STARTED')
+    if 'number_workers' in run:
+        number_workers = max(0,run['number_workers'])
+    else:
+        number_workers = 1
+
+    print "Number of workersr: " + str(number_workers)
 
     run_to_update = runs[0]
+
+    for worker_id in xrange(number_workers):
+        run['_worker_id'] = worker_id
+        task = task_run_start.apply_async(args=[sys, prog, run])
+        run_to_update.workers.append('STARTED')
+        run_to_update.stats.append([])
+
     run_to_update.status = 'STARTING'
     run_to_update.save()
     # print task.id
@@ -658,8 +677,6 @@ def run_exploitable(run_id):
 
     task = task_run_start.apply_async(args=[sys, prog, run])
     
-    runs[0].workers.append('STARTED')
-
     return json.dumps({'run_id': run['_id']})
 
 def run_get_system(run):
@@ -721,50 +738,116 @@ def _set_status(run_id, worker_id, status):
     if len(runs) != 1:
         return error('No run found with id: %s' % run_id)
     
-    worker_id = int(worker_id)
-
     if status not in ['STARTED', 'ERROR', 'STOPPED']:
         return error('Invalid status: %s' % status)    
 
     run = runs[0]
-    print (run.workers)
-#    run.workers[worker_id] = status
+#    print (run.workers)
+    if worker_id.isdigit():
+        worker_id = int(worker_id)
+    else:
+        worker_id = 0
+    if worker_id < run.number_workers and worker_id >= 0:
+        run.workers[worker_id] = status
 
     if all([ea == 'STOPPED' for ea in run.workers]):
         run.status = 'STOPPED'
 
     if all([ea == 'STARTED' for ea in run.workers]):
         run.status = 'RUNNING'
-
+    
     run.save()
 
     return json.dumps({'status': run['status']})
+
+# debug function
+@app.route('/_get_status_worker/<run_id>/<worker_id>', methods=['GET'])
+def get_status_worker(run_id, worker_id):
+    runs = Run.objects(id=run_id)
+    run = runs[0]
+    if worker_id.isdigit():
+        worker_id = int(worker_id)
+    else:
+        worker_id = 0
+    if worker_id < run.number_workers and worker_id >= 0:
+        return json.dumps(run.workers[worker_id])
+    else:
+        return "Error: invalid worker_id: "+str(worker_id)
+
+# debug function
+@app.route('/_get_status_all_workers/<run_id>', methods=['GET'])
+def get_status_all_workers(run_id):
+    runs = Run.objects(id=run_id)
+    run = runs[0]
+    return json.dumps(run.workers)
+
+
 
 @app.route('/_set_stats/<run_id>/<worker_id>', methods=['POST'])
 def set_stats(run_id, worker_id):
     runs = Run.objects(id=run_id)
     run = runs[0] 
     content = request.get_json()
-    stats = content['stats']
-    run.stats = run.stats + stats
-    run.save()
+    if worker_id.isdigit():
+        worker_id = int(worker_id)
+    else:
+        worker_id = 0
+    if worker_id < run.number_workers and worker_id >= 0:
+        stats = content['stats']
+        run.stats[worker_id] = run.stats[worker_id] + stats
+        run.save()
     return "" 
 
+
+
 # debug function
-@app.route('/_get_stats/<run_id>/<worker_id>', methods=['GET'])
-def get_stats(run_id, worker_id):
+@app.route('/_get_stats_worker/<run_id>/<worker_id>', methods=['GET'])
+def get_stats_worker(run_id, worker_id):
     runs = Run.objects(id=run_id)
     run = runs[0] 
-    return json.dumps(run.stats)
+    if worker_id.isdigit():
+        worker_id = int(worker_id)
+    else:
+        worker_id = 0
+
+    if worker_id < run.number_workers and worker_id >= 0:
+        return json.dumps(run.stats[worker_id])
+    else:
+        return "Error: invalid worker_id"
+
+# debug function
+@app.route('/_get_stats_all_workers/<run_id>', methods=['GET'])
+def get_stats_all_workers(run_id):
+    runs = Run.objects(id=run_id)
+    run = runs[0]
+    stats = []
+    for s in run.stats:
+        stats = stats + s
+    return json.dumps(stats)
 
 #debug function
 @app.route('/_remove_stats/<run_id>/<worker_id>', methods=['GET'])
 def remove_stats(run_id, worker_id):
     runs = Run.objects(id=run_id)
     run = runs[0] 
+    if worker_id.isdigit():
+        worker_id = int(worker_id)
+    else:
+        worker_id = 0
+    if worker_id < run.number_workers and worker_id >= 0:
+        run.stats[worker_id] = []
+        run.save()
+    return json.dumps(run.stats)
+
+#debug function
+@app.route('/_remove_all_stats/<run_id>', methods=['GET'])
+def remove_all_stats(run_id):
+    runs = Run.objects(id=run_id)
+    run = runs[0] 
     run.stats = []
     run.save()
     return json.dumps(run.stats)
+
 
 @app.route('/_set_targets/<program_id>', methods=['POST'])
 def set_targets(program_id):

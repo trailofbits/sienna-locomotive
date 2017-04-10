@@ -31,6 +31,17 @@ def ask_status(config):
     except:
         return 'ERROR'
 
+def send_status(config, status):
+    """
+    Ask the statut to the database
+    Args:
+        config (dict): the user configuration
+        status (string): the status to be sent
+    """
+
+    url = 'http://%s:5000/_set_status/%s/%s/%s' % (WEBAPP_IP, config['_run_id'], config['_worker_id'], status)
+    requests.get(url)
+    
 def send_stats(config, data):
     """
     Send the stats to the database
