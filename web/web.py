@@ -609,7 +609,7 @@ def run_files_add():
     if len(run) != 1:
         return error('Run with id not found: %s' % run_id)
 
-    input_path = os.path.join(PATH_SHARED_INPUT_CRASHES, run[0].input_dir)
+    input_path = os.path.join(PATH_SHARED_INPUT_CRASHES, os.path.basename(run[0].input_dir))
 
     not_found = []
     for fname in fnames:
