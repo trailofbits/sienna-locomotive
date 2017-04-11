@@ -1,6 +1,7 @@
 """ Module handling Radamsa """
 import os
 import subprocess
+import time
 import shutil
 import uuid
 import logging
@@ -8,6 +9,7 @@ import autoit.autoit as autoit
 import autoit.autoit_lib as autoit_lib
 import utils.run_process as run_process
 import utils.file_manipulation as file_manipulation
+import utils.database as database
 import fuzzers.radamsa.radamsa_constants as radamsa_constants
 
 
@@ -79,6 +81,28 @@ def fuzz_files(pattern_in, name_out, format_file, number_files_to_create):
     return [name_out + "-" + str(x) + format_file for x in range_files]
 
 
+def generate_stats(cycles_done, runs_total, number_crashes):
+    """
+    Generate the data to be sent to the webapp
+
+    Args:
+    Returns:
+        dict: data to be sent to the webapp
+    """
+
+    unix_time = time.time()
+
+    data = {
+        'fuzzers': "radamsa",
+        'stats': {'unix_time': unix_time,
+                  'cycles_done': cycles_done,
+                  'runs_total': runs_total,
+                  'number_crashes': number_crashes,
+                 }
+    }
+    return data
+
+
 def launch_fuzzing(config, t_fuzz_stopped):
     """
     Launch the fuzzing
@@ -90,8 +114,9 @@ def launch_fuzzing(config, t_fuzz_stopped):
 
     # Hash tab: hash -> input file
     previous_inputs = {}
-    # Couple: (file_name, classification)
     crashes = []
+    cycles_done = 0
+    runs_total = 0
     while not t_fuzz_stopped.is_set():
         logging.info("Generating new files")
         if 'radamsa_seed_pattern' in config:
@@ -131,4 +156,9 @@ def launch_fuzzing(config, t_fuzz_stopped):
                 src = os.path.join(radamsa_constants.WORKING_DIRECTORY, new_file)
                 dst = os.path.join(config['crash_dir'], new_name)
                 shutil.copyfile(src, dst)
-                crashes.append((new_name, classification))
+                crashes.append(new_name)
+
+            cycles_done += 1
+            runs_total += config['radamsa_number_files_to_create']
+            data = generate_stats(cycles_done, runs_total, len(crashes))
+            database.send_stats(config, {'stats': data})

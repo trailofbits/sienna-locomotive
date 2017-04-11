@@ -212,7 +212,7 @@ def fuzz(config_system, config_program, config_run, log_level=0):
             print "End of fuzzing"
             t_fuzz_stopped.set()
         if 'fuzz_time' in config:
-            if time.time() - starting_time > config['fuzz_time']:
+            if time.time() - starting_time > config['fuzz_time'] * 60:
                 print 'Fuzzing time reached'
                 t_fuzz_stopped.set()
             else:

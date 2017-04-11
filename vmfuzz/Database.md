@@ -76,9 +76,8 @@ For radamsa:
         'fuzzers': "radamsa",
         'stats': {'unix_time': unix_time,
                   'cycles_done': cycles_done,
-                  'paths_total': paths_total,
-                  'unique_crashes': unique_crashes,
-                  'execs_per_min': execs_per_min
+                  'runs_total': runs_total,
+                  'number_crashes': number_crashes,
                  }
 }
 ```
