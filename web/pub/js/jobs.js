@@ -740,7 +740,7 @@ function runStop() {
 function runExploitable() {
 	var run_id = $('#run_select').val();
 	$.ajax({
-		type: 'GET',
+		type: 'POST',
 		url: '/run_exploitable/' + run_id, 
 		success: function(data) {
 			data = JSON.parse(data);

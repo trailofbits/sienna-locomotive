@@ -40,7 +40,7 @@ def send_status(config, status):
     """
 
     url = 'http://%s:5000/_set_status/%s/%s/%s' % (WEBAPP_IP, config['_run_id'], config['_worker_id'], status)
-    requests.get(url)
+    requests.post(url)
     
 def send_stats(config, data):
     """
@@ -66,7 +66,7 @@ def send_targets(config, targets):
 
 def send_classification(config, data):
     """
-    Send the targets to the database
+    Send the results of !exploitable to the database
     Args:
         config (dict): the user configuration
         data (dict): data to be sent

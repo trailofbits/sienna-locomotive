@@ -4,6 +4,7 @@ from werkzeug.utils import secure_filename
 from flask_mongoengine import MongoEngine
 from celery.result import AsyncResult
 from celery import Celery, signals
+from datetime import datetime
 import shutil
 import json
 import time
@@ -22,24 +23,26 @@ import vmfuzz
 INITIALIZATION
 '''
 
-WEBAPP_IP = '10.0.42.6'
+with open('config.json') as f:
+    contents = f.read()
+    WEB_CONFIG = json.loads(contents)
 
-app = Flask('alternative_web')
+app = Flask('web')
 
 app.config['MONGODB_SETTINGS'] = {
     'db': 'fuzzdb',
-    'host': WEBAPP_IP,
+    'host': WEB_CONFIG['MONGO_IP'],
     'port': 27017
 }
 db = MongoEngine(app)
 
-app.config['CELERY_BROKER_URL'] = 'redis://'+WEBAPP_IP+':6379/0'
-app.config['CELERY_RESULT_BACKEND'] = 'redis://'+WEBAPP_IP+':6379/0'
+app.config['CELERY_BROKER_URL'] = 'redis://'+WEB_CONFIG['REDIS_IP']+':6379/0'
+app.config['CELERY_RESULT_BACKEND'] = 'redis://'+WEB_CONFIG['REDIS_IP']+':6379/0'
 celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
 celery.conf.update(app.config)
 
 # input_crashes from the web app's view
-PATH_SHARED_INPUT_CRASHES = 'F:\winafl3'
+PATH_SHARED_INPUT_CRASHES = WEB_CONFIG['PATH_SHARED']
 
 
 '''
@@ -148,6 +151,8 @@ class Run(db.Document):
             'winafl_default_timeout',
             'winafl_last_path_timeout',
             'winafl_fuzzing_iteration',
+            'start_time',
+            'end_time',
             'program']
 
     user_all = [
@@ -170,6 +175,8 @@ class Run(db.Document):
     # webapp
     input_dir = db.StringField()
     crash_dir = db.StringField()
+    start_time = db.DateTimeField()
+    end_time = db.DateTimeField()
     # radamsa
     radamsa_number_files_to_create = db.IntField()
     # winafl
@@ -192,27 +199,61 @@ WEB ENDPOINTS
 # MISC
 
 def error(msg):
+    """
+    Wrap a string in a JSON error for the front end
+    Args:
+        msg (str): error message
+    Returns:
+        str: stringified JSON error message
+    """
     return json.dumps({'error': True, 'message': msg})
 
 def mkdir_ifne(path):
+    """
+    Creates a directory if it does not exist
+    Args:
+        path (str): path of dir to be created
+    """
     if not os.path.exists(path):
         print "Make dir "+str(path)
         os.mkdir(path)
 
 @app.route('/')
 def root():
+    """
+    Web root, index.html
+    Args:
+        arg (type): description
+    Returns:
+        file: contents of index.html
+    """
     return send_from_directory('pub', 'index.html')
 
+# TODO: Integrate this into index.html
 @app.route('/client')
 def client():
     return send_from_directory('pub', 'client.html')
 
 @app.route('/js/<path:path>')
 def send_js(path):
+    """
+    Sends Javascript files from pub/js/
+    Args:
+        path (str): path to JS file in pub/js/
+    Returns:
+        file: JS file, if found
+    """
     return send_from_directory('pub/js', path)
 
 @app.route('/css/<path:path>')
 def send_css(path):
+    """
+    Sends CSS files from pub/css/
+    Args:
+        path (str): path to CSS file in pub/css/
+    Returns:
+        file: CSS file, if found
+    """
     return send_from_directory('pub/css', path)
 
 def is_hex(target):
@@ -222,6 +263,13 @@ def is_hex(target):
 
 @app.route('/sys_add', methods=['POST'])
 def sys_add():
+    """
+    Adds a system config
+    Args:
+        yaml (str): config in yaml format
+    Returns:
+        json: id of the created system
+    """
     config_str = request.form['yaml']
     config = yaml.load(config_str)
     # print config
@@ -248,6 +296,11 @@ def sys_add():
 
 @app.route('/sys_list')
 def sys_list():
+    """
+    List available system configs
+    Returns:
+        json: list of systems
+    """
     objs = System.objects()
     if len(objs) < 1:
         return json.dumps([])
@@ -262,6 +315,13 @@ def sys_list():
 
 @app.route('/sys_delete', methods=['POST'])
 def sys_delete():
+    """
+    Deletes a system config
+    Args:
+        system_id (str): database id of the system object
+    Returns:
+        json: success message
+    """
     # TODO: Delete all programs, runs associated
     system_id = request.form['system_id']
     system = System.objects(id=system_id)
@@ -272,6 +332,14 @@ def sys_delete():
 
 @app.route('/sys_edit', methods=['POST'])
 def sys_edit():
+    """
+    Edit a system config
+    Args:
+        system_id (str): database id of the system object
+        yaml (str): updated yaml config for the system
+    Returns:
+        json: success message
+    """
     system_id = request.form['system_id']
 
     system = System.objects(id=system_id)
@@ -288,6 +356,13 @@ def sys_edit():
 
 @app.route('/prog_add_gui', methods=['POST'])
 def prog_add_gui():
+    """
+    Adds a program (GUI) config
+    Args:
+        yaml (str): yaml config of the program object
+    Returns:
+        json: id of the created program
+    """
     config_str = request.form['yaml']
     config = yaml.load(config_str)
     # print config
@@ -314,6 +389,13 @@ def prog_add_gui():
 
 @app.route('/prog_add_cmd', methods=['POST'])
 def prog_add_cmd():
+    """
+    Adds a program (CMD) config
+    Args:
+        yaml (str): yaml config of the program object
+    Returns:
+        json: id of the created program
+    """
     config_str = request.form['yaml']
     config = yaml.load(config_str)
     # print config
@@ -348,6 +430,13 @@ def prog_add_cmd():
 
 @app.route('/prog_list/<system_id>')
 def prog_list(system_id):
+    """
+    List of program configs per system
+    Args:
+        system_id (str): id of the system object
+    Returns:
+        json: list of programs (cmd and gui)
+    """
     programs_gui = [prog.to_mongo().to_dict() for prog in ProgramAutoIT.objects(system=system_id)]
     # print programs_gui
     for prog in programs_gui:
@@ -371,6 +460,14 @@ def prog_list(system_id):
 
 @app.route('/prog_delete', methods=['POST'])
 def prog_delete():
+    """
+    Delete a program config
+    Args:
+        program_id (str): id of the program object
+    Returns:
+        json: success message
+    """
+    # TODO: delete all child runs
     program_id = request.form['program_id']
     program = Program.objects(id=program_id)
     if len(program) != 1:
@@ -396,13 +493,20 @@ def prog_edit():
 
 @app.route('/run_add', methods=['POST'])
 def run_add():
+    """
+    Add a run config
+    Args:
+        name (str): name of the run
+    Returns:
+        json: object id of the created run config
+    """
     config_str = request.form['yaml']
     config = yaml.load(config_str)
     print config
     # print config
 
     if 'name' not in config:
-        config['name'] = 'run_'+str(time.strftime("%Y-%m-%d-%H:%M"))
+        config['name'] = 'run_%s' % hex(int(time.time()))[2:]
 
     missing = []
     for key in Run.user_all:
@@ -468,6 +572,13 @@ def run_add():
 
 @app.route('/run_list/<program_id>')
 def run_list(program_id):
+    """
+    List runs associated with program config
+    Args:
+        program_id (str): id of the program config
+    Returns:
+        json: list of runs
+    """
     print "Program id " + str(program_id)
     runs = [run.to_mongo().to_dict() for run in Run.objects(program=program_id)]
     for run in runs:
@@ -481,6 +592,14 @@ def run_list(program_id):
 # upload seed file
 @app.route('/run_files_add', methods=['POST'])
 def run_files_add():
+    """
+    Associate files from the corpus with a run
+    Args:
+        run_id (str): object id of the run
+        files (list of str): list of files to be added
+    Returns:
+        json: list of files associated with run
+    """
     # copy file to input directory
     run_id = request.json['run_id']
     # print request.json['files']
@@ -513,6 +632,14 @@ def run_files_add():
 # upload seed file
 @app.route('/run_files_remove', methods=['POST'])
 def run_files_remove():
+    """
+    Remove file from run
+    Args:
+        run_id (str): object if of the run
+        files (list of str): list of files to be removed 
+    Returns:
+        json: list of files associated with run
+    """
     # copy file to input directory
     run_id = request.json['run_id']
     # print request.json['files']
@@ -542,14 +669,23 @@ def run_files_remove():
     return json.dumps(flist)
 
 # Add all files in the corpora dir that end with the targeted extension
-@app.route('/run_default_corpus/<run_id>', methods=['GET'])
+# run_default_corpus
+@app.route('/run_files_all_add/<run_id>', methods=['POST'])
 def run_default_corpus(run_id):
+    """
+    Adds all files to the run, from the corpus, with matching extension
+    Args:
+        run_id (str): run object id
+    Returns:
+        json: list of files associated with run
+    """
     run = Run.objects(id=run_id)[0]
     prog = run['program']
 
     corpus_dir = os.path.join(PATH_SHARED_INPUT_CRASHES, 'corpora')
-    fnames = [f for f in os.listdir(corpus_dir) if os.path.isfile(os.path.join(corpus_dir, f)) \
-                                           and f.endswith(prog['file_format'])]
+    fnames = [secure_filename(f) for f in os.listdir(corpus_dir)]
+    fnames = [f for f in fnames if os.path.isfile(os.path.join(corpus_dir, f))]
+    fnames = [f for f  in fnames if f.endswith(prog['file_format'])]
 
     input_path = os.path.join(PATH_SHARED_INPUT_CRASHES, run.input_dir)
     
@@ -566,6 +702,13 @@ def run_default_corpus(run_id):
 
 @app.route('/run_files_list/<run_id>')
 def run_files_list(run_id):
+    """
+    Lists files associated with run
+    Args:
+        run_id (str): run object id
+    Returns:
+        json: list of files associated with run
+    """
     run = Run.objects(id=run_id)
     if len(run) != 1:
         return error('Run with id not found: %s' % run_id)
@@ -577,6 +720,13 @@ def run_files_list(run_id):
 
 @app.route('/run_start/<run_id>', methods=['POST'])
 def run_start(run_id):
+    """
+    Executes a run on workers
+    Args:
+        run_id (str): run object id
+    Returns:
+        json: run object id
+    """
     print "Run id:"+str(run_id)
     runs = Run.objects(id=run_id)
     if len(runs) != 1:
@@ -585,7 +735,9 @@ def run_start(run_id):
     run = runs[0].to_mongo().to_dict()
     run['_id'] = str(run['_id'])
     run['program'] = str(run['program'])
-    # print run
+    
+    # TODO: fail if already started
+    print run['start_time']
 
     progs = Program.objects(id=run['program'])
     print "Program id "+str(run['program'])
@@ -601,14 +753,14 @@ def run_start(run_id):
     sys['_id'] = str(sys['_id'])
     # print sys
 
-    sys['webapp_ip'] = WEBAPP_IP 
+    sys['webapp_ip'] = config['WEBAPP_IP'] 
 
     if 'number_workers' in run:
         number_workers = max(0,run['number_workers'])
     else:
         number_workers = 1
 
-    print "Number of workersr: " + str(number_workers)
+    print "Number of workers: " + str(number_workers)
 
     run_to_update = runs[0]
 
@@ -619,6 +771,7 @@ def run_start(run_id):
         run_to_update.stats.append([])
 
     run_to_update.status = 'STARTING'
+    run_to_update.start_time = datetime.now()
     run_to_update.save()
     # print task.id
     return json.dumps({'run_id': run['_id']})
@@ -627,16 +780,33 @@ def run_start(run_id):
 
 @app.route('/run_stop/<run_id>', methods=['POST'])
 def run_stop(run_id):
+    """
+    Stops a run
+    Args:
+        run_id (str): run object id
+    Returns:
+        json: run object id
+    """
     runs = Run.objects(id=run_id)
     if len(runs) != 1:
         return error('No run found with id: %s' % run_id)
+
     run_to_update = runs[0] 
     run_to_update['status'] = 'STOPPING'
+    run_to_update.end_time = datetime.now()
     run_to_update.save()
-    return ""
 
-@app.route('/_run_remove/<run_id>', methods=['GET'])
-def run_remove(run_id):
+    return json.dumps({'run_id': str(run_to_update['_id'])})
+
+@app.route('/run_delete/<run_id>', methods=['POST'])
+def run_delete(run_id):
+    """
+    Delete a run
+    Args:
+        run_id (str): run object id
+    Returns:
+        json: success message
+    """
     runs = Run.objects(id=run_id)
     if len(runs) != 1:
         return error('No run found with id: %s' % run_id)
@@ -645,12 +815,17 @@ def run_remove(run_id):
     # print task.id
     return json.dumps({'success': True, 'message': 'Successfully deleted %s' % run_id})
 
-
-
-# Launch !exploitable on the crash_dir on a previosu run
+# Launch !exploitable on the crash_dir on a previous run
 # Create a temporary run sent to celery, but do not save this run.
-@app.route('/run_exploitable/<run_id>', methods=['GET'])
+@app.route('/run_exploitable/<run_id>', methods=['POST'])
 def run_exploitable(run_id):
+    """
+    Runs !exploitable on all crashes associated with a run
+    Args:
+        run_id (str): run object id
+    Returns:
+        json: run_id
+    """
     print "Run !exploitable on id:"+str(run_id)
     runs = Run.objects(id=run_id)
     if len(runs) != 1:
@@ -659,6 +834,8 @@ def run_exploitable(run_id):
     run = runs[0].to_mongo().to_dict()
     run['_id'] = str(run['_id'])
     run['program'] = str(run['program'])
+
+    # TODO: verify end time and status
 
     progs = Program.objects(id=run['program'])
     prog = progs[0].to_mongo().to_dict()
@@ -671,7 +848,7 @@ def run_exploitable(run_id):
 
     sys['_id'] = str(sys['_id'])
 
-    sys['webapp_ip'] = WEBAPP_IP 
+    sys['webapp_ip'] = WEB_CONFIG['WEBAPP_IP'] 
 
     run['run_type'] = 'exploitable'
 
@@ -680,6 +857,13 @@ def run_exploitable(run_id):
     return json.dumps({'run_id': run['_id']})
 
 def run_get_system(run):
+    """
+    Utility function for getting a run's system
+    Args:
+        run (object): run database object
+    Returns:
+        object: system database object
+    """
     prog = run['program']
     sys = prog['system']
     return sys
@@ -688,12 +872,25 @@ def run_get_system(run):
 
 @app.route('/corpus_files_list')
 def corpus_files_list():
+    """
+    List files in corpus
+    Returns:
+        json: list of files
+    """
     corpus_dir = os.path.join(PATH_SHARED_INPUT_CRASHES, 'corpora')
     flist = os.listdir(corpus_dir)
     return json.dumps(flist)
 
 @app.route('/corpora', methods=['GET', 'POST'])
 def corpora():
+    """
+    Corpus upload page. GET displays page.
+    POST uploads a file.
+    Args:
+        file (file): uploaded file
+    Returns:
+        page: upload page or webroot
+    """
     if request.method == 'POST':
         if 'file' not in request.files:
             return '<pre>Error: no file found</pre>'
@@ -714,6 +911,13 @@ TASKS
 
 @celery.task
 def task_run_start(sys, prog, run):
+    """
+    Executes vmfuzz on a set of configs
+    Args:
+         sys (dict): system config
+         prog (dict): program config
+         run (dict): run confg
+    """
     vmfuzz.fuzz(sys, prog, run)
 
 '''
@@ -732,7 +936,7 @@ def _get_status(run_id):
 
     return json.dumps({'status': run['status']})
 
-@app.route('/_set_status/<run_id>/<worker_id>/<status>', methods=['POST','GET'])
+@app.route('/_set_status/<run_id>/<worker_id>/<status>', methods=['POST'])
 def _set_status(run_id, worker_id, status):
     runs = Run.objects(id=ObjectId(run_id))
     if len(runs) != 1:
@@ -901,4 +1105,14 @@ def remove_classification(program_id):
 MAIN
 '''
 if __name__ == '__main__':
-    app.run(debug=True, host=WEBAPP_IP)
+    app.run(debug=True, host=WEB_CONFIG['WEBAPP_IP'])
+
+
+
+    """
+    Description
+    Args:
+        arg (type): description
+    Returns:
+        type: description
+    """
