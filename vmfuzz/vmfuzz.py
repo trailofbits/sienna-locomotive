@@ -109,6 +109,10 @@ def init(config_system, config_program, config_run, log_level):
     if config_program['using_autoit']:
         autoit_lib.init_autoit(config_program)
 
+    path_input_crashes = config_system['path_input_crashes']
+    config_run['input_dir'] = os.path.join(path_input_crashes, config_run['input_dir'])
+    config_run['crash_dir'] = os.path.join(path_input_crashes, config_run['crash_dir'])
+
     if config_run['run_type'] in ['all', 'radamsa', 'winafl', 'winafl_run_targets',
                                   'winafl_get_targets', 'winafl_get_targets_recon_mode']:
         if "winafl" in config_system['fuzzers']:

@@ -1,10 +1,14 @@
 from flask import Flask, request, g, escape, send_from_directory, redirect
 from mongoengine.queryset import NotUniqueError
-from werkzeug.utils import secure_filename
 from flask_mongoengine import MongoEngine
+
+from werkzeug.utils import secure_filename
+
 from celery.result import AsyncResult
 from celery import Celery, signals
+
 from datetime import datetime
+
 import shutil
 import json
 import time
@@ -14,6 +18,7 @@ import os
 import re
 
 from bson.objectid import ObjectId
+from bson import json_util
 
 
 sys.path.append(os.path.join('..','vmfuzz'))
@@ -525,7 +530,6 @@ def run_add():
     if len(prog) != 1:
         return error('Invalid program id: %s' % config['program'])
     sys = prog[0]['system']
-    path_input_crashes = sys['path_input_crashes']
 
     # create input dir
     input_dir = 'input_%s' % hex(int(time.time()))[2:] 
@@ -538,13 +542,10 @@ def run_add():
     mkdir_ifne(web_input_dir)
     mkdir_ifne(web_crash_dir)
 
-    vm_input_dir = os.path.join(path_input_crashes, input_dir)
-    vm_crash_dir = os.path.join(path_input_crashes, crash_dir)
-
     if 'input_dir' not in config:
-        config['input_dir'] = vm_input_dir
+        config['input_dir'] = input_dir
     if 'crash_dir' not in config:
-        config['crash_dir'] = vm_crash_dir
+        config['crash_dir'] = crash_dir
 
     if 'hours' in config and 'mins' in config:
         timeout = config['mins'] + config['hours'] * 60
@@ -584,10 +585,17 @@ def run_list(program_id):
     for run in runs:
         run['_id'] = str(run['_id'])
         run['program'] = str(run['program'])
+
+        if 'start_time' in run:
+            run['start_time'] = time.mktime(run['start_time'].timetuple())
+
+        if 'end_time' in run:
+            run['end_time'] = time.mktime(run['end_time'].timetuple())
+            
 	print "Run id "+str(run['_id'])
 
     run_info = {'order': Run.required, 'runs': runs}
-    return json.dumps(run_info)
+    return json.dumps(run_info, default=json_util.default)
 
 # upload seed file
 @app.route('/run_files_add', methods=['POST'])
@@ -609,7 +617,7 @@ def run_files_add():
     if len(run) != 1:
         return error('Run with id not found: %s' % run_id)
 
-    input_path = os.path.join(PATH_SHARED_INPUT_CRASHES, os.path.basename(run[0].input_dir))
+    input_path = os.path.join(PATH_SHARED_INPUT_CRASHES, run[0].input_dir)
 
     not_found = []
     for fname in fnames:
@@ -687,7 +695,7 @@ def run_default_corpus(run_id):
     fnames = [f for f in fnames if os.path.isfile(os.path.join(corpus_dir, f))]
     fnames = [f for f  in fnames if f.endswith(prog['file_format'])]
 
-    input_path = os.path.join(PATH_SHARED_INPUT_CRASHES, run.input_dir)
+    input_path = os.path.join(PATH_SHARED_INPUT_CRASHES, run[0].input_dir)
     
     for fname in fnames:
         corpus_dir = os.path.join(PATH_SHARED_INPUT_CRASHES, 'corpora')
@@ -737,7 +745,7 @@ def run_start(run_id):
     run['program'] = str(run['program'])
     
     # TODO: fail if already started
-    print run['start_time']
+    # print run['start_time']
 
     progs = Program.objects(id=run['program'])
     print "Program id "+str(run['program'])
@@ -753,7 +761,7 @@ def run_start(run_id):
     sys['_id'] = str(sys['_id'])
     # print sys
 
-    sys['webapp_ip'] = config['WEBAPP_IP'] 
+    sys['webapp_ip'] = WEB_CONFIG['WEBAPP_IP'] 
 
     if 'number_workers' in run:
         number_workers = max(0,run['number_workers'])
@@ -796,7 +804,24 @@ def run_stop(run_id):
     run_to_update.end_time = datetime.now()
     run_to_update.save()
 
-    return json.dumps({'run_id': str(run_to_update['_id'])})
+    print dir(run_to_update)
+
+    return json.dumps({'run_id': str(run_to_update['id'])})
+
+@app.route('/run_edit', methods=['POST'])
+def run_edit():
+    run_id = request.form['run_id']
+
+    run = Run.objects(id=run_id)
+    if len(run) != 1:
+        return error('Run with id not found: %s' % run_id)
+
+    config_str = request.form['yaml']
+    config = yaml.load(config_str)
+
+    # TODO: check config against allowed variables
+    run[0].modify(**config)
+    return json.dumps({'success': True, 'message': 'Successfully edited %s' % run_id})
 
 @app.route('/run_delete/<run_id>', methods=['POST'])
 def run_delete(run_id):
