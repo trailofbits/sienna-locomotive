@@ -28,9 +28,9 @@ import vmfuzz
 INITIALIZATION
 '''
 
-with open('config.json') as f:
+with open('config.yaml') as f:
     contents = f.read()
-    WEB_CONFIG = json.loads(contents)
+    WEB_CONFIG = yaml.load(contents)
 
 app = Flask('web')
 
@@ -591,7 +591,7 @@ def run_list(program_id):
 
         if 'end_time' in run:
             run['end_time'] = time.mktime(run['end_time'].timetuple())
-            
+
 	print "Run id "+str(run['_id'])
 
     run_info = {'order': Run.required, 'runs': runs}
@@ -740,13 +740,13 @@ def run_start(run_id):
     if len(runs) != 1:
         return error('No run found with id: %s' % run_id)
 
+    if run[0].start_time != None:
+        return error('Cannot start run as it has already started!')
+
     run = runs[0].to_mongo().to_dict()
     run['_id'] = str(run['_id'])
     run['program'] = str(run['program'])
     
-    # TODO: fail if already started
-    # print run['start_time']
-
     progs = Program.objects(id=run['program'])
     print "Program id "+str(run['program'])
     prog = progs[0].to_mongo().to_dict()
@@ -784,8 +784,6 @@ def run_start(run_id):
     # print task.id
     return json.dumps({'run_id': run['_id']})
 
-
-
 @app.route('/run_stop/<run_id>', methods=['POST'])
 def run_stop(run_id):
     """
@@ -798,6 +796,9 @@ def run_stop(run_id):
     runs = Run.objects(id=run_id)
     if len(runs) != 1:
         return error('No run found with id: %s' % run_id)
+
+    if run[0].stop_time != None:
+        return error('Cannot stop run as it has already stopped!')
 
     run_to_update = runs[0] 
     run_to_update['status'] = 'STOPPING'
@@ -812,9 +813,13 @@ def run_stop(run_id):
 def run_edit():
     run_id = request.form['run_id']
 
+
     run = Run.objects(id=run_id)
     if len(run) != 1:
         return error('Run with id not found: %s' % run_id)
+
+    if run[0].start_time != None:
+        return error('Cannot edit a run once it has started!')
 
     config_str = request.form['yaml']
     config = yaml.load(config_str)
@@ -835,6 +840,10 @@ def run_delete(run_id):
     runs = Run.objects(id=run_id)
     if len(runs) != 1:
         return error('No run found with id: %s' % run_id)
+
+    if run[0].start_time != None and run[0].stop_time == None:
+        return error('Cannot delete a run while it is running!')
+
     run_to_remove = runs[0] 
     run_to_remove.delete()
     # print task.id

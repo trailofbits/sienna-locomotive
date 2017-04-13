@@ -3,6 +3,11 @@
 **      
 */
 
+/*
+** GLOBAL
+*/
+
+window.ui_data = {}
 
 /*
 ** SYSTEM
@@ -23,7 +28,7 @@ function systemList(empty_list=false) {
             var systems = data['systems'];
 
             // save the order for use in systemSelect
-            $('#system_div').data('order', order);
+            ui_data['system_order'] = order;
 
             // store current and empty
             var selected = $('#system_select').val();
@@ -86,7 +91,7 @@ function systemSelect() {
         return;
     }
 
-    var order = $('#system_div').data('order');
+    var order = ui_data['system_order'];
     displayConfig(system, 'system', order, []);
     programList();
 }
@@ -130,19 +135,52 @@ function systemEdit(yaml) {
 }
 
 function systemInit() {
+    $('#system_select').change(systemSelect);
+
     $("#system_add_btn").on('click', function() {
-        systemAdd();    
+        $('.modal_content').hide();
+        $('.sys_modal').hide();
+        $('.sys_add').show();
+        $('#modal_div').show();
     });
 
-    $("#system_edit_btn").on('click', function() {
-        systemEdit();
+    $('#system_details_btn').on('click', function() {
+        $('.modal_content').hide();
+        $('.sys_modal').hide();
+        $('.sys_info').show();
+        $('#modal_div').show();
+    });
+
+    $("#system_save_btn").on('click', function() {
+        if($('#system_edit_yaml').is(':visible')) {
+            systemEdit();
+        } else if($('#system_add_yaml').is(':visible')){
+            systemAdd();    
+        }
+        $('#modal_div').hide();
+    });
+
+    $('#system_cancel_btn').on('click', function() {
+        $('#modal_div').hide();
+        $('.modal_content').hide();
+    });
+
+    $('#system_edit_btn').on('click', function() {
+        $('.modal_content').hide();
+        $('.sys_modal').hide();
+        $('.sys_edit').show();
     });
 
     $("#system_delete_btn").on('click', function() {
-        systemDelete();
-    });
+        var msg = 'Delete the system, and all of the programs, runs, and crashes that belong to it.\n';
+        msg += 'Are you sure?'
 
-    $('#system_select').change(systemSelect);
+        if(confirm(msg)) {
+            systemDelete();
+            $('#modal_div').hide();
+            $('.modal_content').hide();
+        }
+    });
 
     systemList();
 }
@@ -171,8 +209,8 @@ function programList(empty_list=false) {
             var programs = data['programs'];
 
             // save the order for use in programSelect
-            $('#program_div').data('order_gui', order_gui);
-            $('#program_div').data('order_cmd', order_cmd);
+            ui_data['program_order_gui'] = order_gui;
+            ui_data['program_order_cmd'] = order_cmd;
 
             // store current and empty
             var selected = $('#program_select').val();
@@ -282,7 +320,8 @@ function programSelect() {
         return;
     }
 
-    var order = $('#program_div').data('order_'+type);
+    var order = ui_data['program_order_'+type];
+
     displayConfig(program, 'program', order, ['system']);
     runList();
 }
@@ -326,6 +365,51 @@ function programEdit(yaml) {
 }
 
 function programInit() {
+    $('#program_select').change(programSelect);
+
+    $("#program_add_btn").on('click', function() {
+        $('.modal_content').hide();
+        $('.prog_modal').hide();
+        $('.prog_add').show();
+        $('#modal_div').show();
+    });
+
+    $('#program_details_btn').on('click', function() {
+        $('.modal_content').hide();
+        $('.prog_modal').hide();
+        $('.prog_info').show();
+        $('#modal_div').show();
+    });
+
+    $("#program_save_btn").on('click', function() {
+        if($('#program_edit_yaml').is(':visible')) {
+            programEdit();
+        }
+        $('#modal_div').hide();
+    });
+
+    $('#program_cancel_btn').on('click', function() {
+        $('#modal_div').hide();
+        $('.modal_content').hide();
+    });
+
+    $('#program_edit_btn').on('click', function() {
+        $('.modal_content').hide();
+        $('.prog_modal').hide();
+        $('.prog_edit').show();
+    });
+
+    $("#program_delete_btn").on('click', function() {
+        var msg = 'Delete the program, and all of the runs and crashes that belong to it.\n';
+        msg += 'Are you sure?'
+
+        if(confirm(msg)) {
+            programDelete();
+            $('#modal_div').hide();
+            $('.modal_content').hide();
+        }
+    });
+
     $("#program_add_gui_btn").on('click', function() {
         programAddGUI();    
     });
@@ -333,16 +417,6 @@ function programInit() {
     $("#program_add_cmd_btn").on('click', function() {
         programAddCMD();    
     });
-
-    $("#program_edit_btn").on('click', function() {
-        programEdit();
-    });
-
-    $("#program_delete_btn").on('click', function() {
-        programDelete();
-    });
-
-    $('#program_select').change(programSelect);
 
     // programList();
 }
@@ -370,7 +444,7 @@ function runList(empty_list=false) {
             var runs = data['runs'];
 
             // save the order for use in runSelect
-            $('#run_div').data('order', order);
+            ui_data['run_order'] = order;
 
             // store current and empty
             var selected = $('#run_select').val();
@@ -424,7 +498,7 @@ function initLastRun(empty_list=false) {
             var runs = data['runs'];
 
             // save the order for use in runSelect
-            $('#run_div').data('order', order);
+            ui_data['run_order'] = order;
 
             $('#run_select').empty();
 
@@ -467,7 +541,7 @@ function runSelect() {
         return;
     }
 
-    var order = $('#run_div').data('order');
+    var order = ui_data['run_order'];
     displayConfig(run, 'run', order, ['program']);
     runFilesList();
     corpusFilesList();
@@ -779,9 +853,54 @@ function runStats() {
 
 
 function runInit() {
+    $('#run_select').change(runSelect);
+
     $("#run_add_btn").on('click', function() {
-        runAdd();   
+        $('.modal_content').hide();
+        $('.run_modal').hide();
+        $('.run_add').show();
+        $('#modal_div').show();
     });
+
+    $('#run_details_btn').on('click', function() {
+        $('.modal_content').hide();
+        $('.run_modal').hide();
+        $('.run_info').show();
+        $('#modal_div').show();
+    });
+
+    $("#run_save_btn").on('click', function() {
+        if($('#run_edit_yaml').is(':visible')) {
+            runEdit();
+        } else if($('#run_add_yaml').is(':visible')){
+            runAdd();    
+        }
+        $('#modal_div').hide();
+    });
+
+    $('#run_cancel_btn').on('click', function() {
+        $('#modal_div').hide();
+        $('.modal_content').hide();
+    });
+
+    $('#run_edit_btn').on('click', function() {
+        $('.modal_content').hide();
+        $('.run_modal').hide();
+        $('.run_edit').show();
+    });
+
+    $("#run_delete_btn").on('click', function() {
+        var msg = 'Delete the run and all crashes that belong to it.\n';
+        msg += 'Are you sure?'
+
+        if(confirm(msg)) {
+            runDelete();
+            $('#modal_div').hide();
+            $('.modal_content').hide();
+        }
+    });
+
+    //
 
     $("#run_start_btn").on('click', function() {
         runStart(); 
@@ -791,31 +910,9 @@ function runInit() {
         runStop();  
     });
 
-    $("#run_create_btn").on('click', function() {
-        runCreate();    
-    });
-
-    $("#run_detail_btn").on('click', function() {
-        runDetail();    
-    });
-
-    $("#run_exploitable_btn").on('click', function() {
-        runExploitable();   
-    });
-
-    $("#run_stats_btn").on('click', function() {
-        runStats(); 
-    });
-
-    $("#run_edit_btn").on('click', function() {
-        runEdit();
-    });
-
-    $("#run_delete_btn").on('click', function() {
-        runDelete();
-    });
-
-    $('#run_select').change(runSelect);
+    // $("#run_exploitable_btn").on('click', function() {
+    //     runExploitable();   
+    // });
     
     $('#run_file_add_btn').on('click', function() {
         runFilesAdd();
@@ -907,6 +1004,18 @@ function handleError(data) {
     $('#error_div').show();
 }
 
+function modalInit() {
+    $('#modal_div').hide();
+    
+    $('#modal_div').on('click', function() { 
+        $('#modal_div').hide(); 
+    });
+
+    $('.modal_content').on('click', function(e) {
+        e.stopPropagation();
+    });
+}
+
 $(document).ready(function() {
     $('#error_div').hide();
     
@@ -917,6 +1026,7 @@ $(document).ready(function() {
     systemInit();
     programInit();
     runInit();
+    modalInit();
 });
 
 /* OLD */
