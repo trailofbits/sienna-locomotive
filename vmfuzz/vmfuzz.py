@@ -100,6 +100,10 @@ def init(config_system, config_program, config_run, log_level):
     parsing_config.check_program_config(config_program)
     parsing_config.check_run_config(config_run)
 
+    path_input_crashes = config_system['path_input_crashes']
+    config_run['input_dir'] = os.path.join(path_input_crashes, config_run['input_dir'])
+    config_run['crash_dir'] = os.path.join(path_input_crashes, config_run['crash_dir'])
+
     config = dict(config_program.items() + config_run.items())
     config['_program_id'] = config_program['_id']
     config['_run_id'] = config_run['_id']
@@ -108,10 +112,6 @@ def init(config_system, config_program, config_run, log_level):
 
     if config_program['using_autoit']:
         autoit_lib.init_autoit(config_program)
-
-    path_input_crashes = config_system['path_input_crashes']
-    config_run['input_dir'] = os.path.join(path_input_crashes, config_run['input_dir'])
-    config_run['crash_dir'] = os.path.join(path_input_crashes, config_run['crash_dir'])
 
     if config_run['run_type'] in ['all', 'radamsa', 'winafl', 'winafl_run_targets',
                                   'winafl_get_targets', 'winafl_get_targets_recon_mode']:
