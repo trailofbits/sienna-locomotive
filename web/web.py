@@ -9,6 +9,7 @@ from celery import Celery, signals
 
 from datetime import datetime
 
+import random
 import shutil
 import json
 import time
@@ -327,11 +328,16 @@ def sys_delete():
     Returns:
         json: success message
     """
+    
     # TODO: Delete all programs, runs associated
+
     system_id = request.form['system_id']
+    if len(system_id) not in [12, 24] or not is_hex(system_id):
+        return error('System id invalid: %s' % system_id)
+
     system = System.objects(id=system_id)
     if len(system) != 1:
-        return error('System with id not found: %s' % system_id)
+        return error('System id invalid: %s' % system_id)
     system[0].delete()
     return json.dumps({'success': True, 'message': 'Successfully deleted %s' % system_id})
 
@@ -346,6 +352,8 @@ def sys_edit():
         json: success message
     """
     system_id = request.form['system_id']
+    if len(system_id) not in [12, 24] or not is_hex(system_id):
+        return error('System id invalid: %s' % system_id)
 
     system = System.objects(id=system_id)
     if len(system) != 1:
@@ -442,6 +450,9 @@ def prog_list(system_id):
     Returns:
         json: list of programs (cmd and gui)
     """
+    if len(system_id) not in [12, 24] or not is_hex(system_id):
+        return error('System id invalid: %s' % system_id)
+
     programs_gui = [prog.to_mongo().to_dict() for prog in ProgramAutoIT.objects(system=system_id)]
     # print programs_gui
     for prog in programs_gui:
@@ -474,6 +485,10 @@ def prog_delete():
     """
     # TODO: delete all child runs
     program_id = request.form['program_id']
+
+    if len(program_id) not in [12, 24] or not is_hex(program_id):
+        return error('Program id invalid: %s' % program_id)
+
     program = Program.objects(id=program_id)
     if len(program) != 1:
         return error('Program with id not found: %s' % program_id)
@@ -483,6 +498,9 @@ def prog_delete():
 @app.route('/prog_edit', methods=['POST'])
 def prog_edit():
     program_id = request.form['program_id']
+
+    if len(program_id) not in [12, 24] or not is_hex(program_id):
+        return error('Program id invalid: %s' % program_id)
 
     program = Program.objects(id=program_id)
     if len(program) != 1:
@@ -526,9 +544,13 @@ def run_add():
         return error('Unsupported run type: %s' % ' '.join(config['run_type']))
 
     # get system path_input_crashes
-    prog = Program.objects(id=config['program'])
+    program_id = config['program']
+    if len(program_id) not in [12, 24] or not is_hex(program_id):
+        return error('Program id invalid: %s' % program_id)
+
+    prog = Program.objects(id=program_id)
     if len(prog) != 1:
-        return error('Invalid program id: %s' % config['program'])
+        return error('Program id invalid: %s' % config['program'])
     sys = prog[0]['system']
 
     # create input dir
@@ -546,6 +568,9 @@ def run_add():
         config['input_dir'] = input_dir
     if 'crash_dir' not in config:
         config['crash_dir'] = crash_dir
+
+    if 'number_workers' not in config:
+        config['number_workers'] = 1
 
     if 'hours' in config and 'mins' in config:
         timeout = config['mins'] + config['hours'] * 60
@@ -580,6 +605,9 @@ def run_list(program_id):
     Returns:
         json: list of runs
     """
+    if len(program_id) not in [12, 24] or not is_hex(program_id):
+        return error('Program id invalid: %s' % program_id)
+
     print "Program id " + str(program_id)
     runs = [run.to_mongo().to_dict() for run in Run.objects(program=program_id)]
     for run in runs:
@@ -610,8 +638,12 @@ def run_files_add():
     """
     # copy file to input directory
     run_id = request.json['run_id']
+
     # print request.json['files']
     fnames = [secure_filename(fname) for fname in request.json['files']]
+
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
 
     run = Run.objects(id=run_id)
     if len(run) != 1:
@@ -653,6 +685,9 @@ def run_files_remove():
     # print request.json['files']
     fnames = [secure_filename(fname) for fname in request.json['files']]
 
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
+
     run = Run.objects(id=run_id)
     if len(run) != 1:
         return error('Run with id not found: %s' % run_id)
@@ -687,6 +722,9 @@ def run_default_corpus(run_id):
     Returns:
         json: list of files associated with run
     """
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
+
     run = Run.objects(id=run_id)[0]
     prog = run['program']
 
@@ -717,6 +755,9 @@ def run_files_list(run_id):
     Returns:
         json: list of files associated with run
     """
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
+
     run = Run.objects(id=run_id)
     if len(run) != 1:
         return error('Run with id not found: %s' % run_id)
@@ -735,12 +776,15 @@ def run_start(run_id):
     Returns:
         json: run object id
     """
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
+
     print "Run id:"+str(run_id)
     runs = Run.objects(id=run_id)
     if len(runs) != 1:
         return error('No run found with id: %s' % run_id)
 
-    if run[0].start_time != None:
+    if runs[0].start_time != None:
         return error('Cannot start run as it has already started!')
 
     run = runs[0].to_mongo().to_dict()
@@ -748,8 +792,20 @@ def run_start(run_id):
     run['program'] = str(run['program'])
     
     progs = Program.objects(id=run['program'])
-    print "Program id "+str(run['program'])
     prog = progs[0].to_mongo().to_dict()
+
+    input_path = os.path.join(PATH_SHARED_INPUT_CRASHES, run['input_dir'])
+    ext = prog['file_format']
+    flist = os.listdir(input_path)
+    flist = [ea for ea in flist if ea.endswith(ext)]
+    if len(flist) < 1:
+        return error('Please add files to run ending with extension %s' % ext)
+
+    random.shuffle(flist)
+    selected_fname = os.path.join(input_path, flist[0])
+    seed_fname = os.path.join(input_path, 'seed%s' % ext)
+    if selected_fname != seed_fname:
+        shutil.copy2(selected_fname, seed_fname)
 
     prog['_id'] = str(prog['_id'])
     prog['system'] = str(prog['system'])
@@ -764,8 +820,9 @@ def run_start(run_id):
     sys['webapp_ip'] = WEB_CONFIG['WEBAPP_IP'] 
 
     if 'number_workers' in run:
-        number_workers = max(0,run['number_workers'])
+        number_workers = max(1,run['number_workers'])
     else:
+        run['number_workers'] = 1
         number_workers = 1
 
     print "Number of workers: " + str(number_workers)
@@ -793,11 +850,14 @@ def run_stop(run_id):
     Returns:
         json: run object id
     """
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
+
     runs = Run.objects(id=run_id)
     if len(runs) != 1:
         return error('No run found with id: %s' % run_id)
 
-    if run[0].stop_time != None:
+    if runs[0].end_time != None:
         return error('Cannot stop run as it has already stopped!')
 
     run_to_update = runs[0] 
@@ -813,6 +873,8 @@ def run_stop(run_id):
 def run_edit():
     run_id = request.form['run_id']
 
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
 
     run = Run.objects(id=run_id)
     if len(run) != 1:
@@ -837,15 +899,21 @@ def run_delete(run_id):
     Returns:
         json: success message
     """
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
+
     runs = Run.objects(id=run_id)
     if len(runs) != 1:
         return error('No run found with id: %s' % run_id)
 
-    if run[0].start_time != None and run[0].stop_time == None:
+    if runs[0].start_time != None and runs[0].end_time == None:
         return error('Cannot delete a run while it is running!')
 
     run_to_remove = runs[0] 
     run_to_remove.delete()
+
+    # TODO: delete directories?
+
     # print task.id
     return json.dumps({'success': True, 'message': 'Successfully deleted %s' % run_id})
 
@@ -860,6 +928,9 @@ def run_exploitable(run_id):
     Returns:
         json: run_id
     """
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
+
     print "Run !exploitable on id:"+str(run_id)
     runs = Run.objects(id=run_id)
     if len(runs) != 1:
@@ -939,6 +1010,93 @@ def corpora():
         return redirect('/')
     return send_from_directory('pub', 'corpora.html')
 
+# STAT(U)S
+
+@app.route('/run_active_list')
+def run_active_list():
+    """
+    List active runs 
+    Returns:
+        json: list of active runs
+    """
+    runs = Run.objects(start_time__ne='', status='RUNNING')
+    runs = [run.to_mongo().to_dict() for run in runs]
+    for run in runs:
+        run['_id'] = str(run['_id'])
+        run['program'] = str(run['program'])
+
+        if 'start_time' in run:
+            run['start_time'] = time.mktime(run['start_time'].timetuple())
+
+        if 'end_time' in run:
+            run['end_time'] = time.mktime(run['end_time'].timetuple())
+
+    run_info = {'order': Run.required, 'runs': runs}
+    return json.dumps(run_info, default=json_util.default)
+
+@app.route('/run_complete_list')
+def run_complete_list():
+    """
+    List completed runs 
+    Returns:
+        json: list of completed runs
+    """
+    runs = Run.objects(start_time__ne='', end_time__ne='')
+    runs = [run.to_mongo().to_dict() for run in runs]
+    for run in runs:
+        run['_id'] = str(run['_id'])
+        run['program'] = str(run['program'])
+
+        if 'start_time' in run:
+            run['start_time'] = time.mktime(run['start_time'].timetuple())
+
+        if 'end_time' in run:
+            run['end_time'] = time.mktime(run['end_time'].timetuple())
+
+    run_info = {'order': Run.required, 'runs': runs}
+    return json.dumps(run_info, default=json_util.default)
+
+@app.route('/run_status_workers/<run_id>', methods=['GET'])
+def run_status_workers(run_id):
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
+
+    runs = Run.objects(id=run_id)
+    run = runs[0]
+    return json.dumps(run.workers)
+
+@app.route('/run_stats_worker/<run_id>/<worker_id>', methods=['GET'])
+def run_stats_worker(run_id, worker_id):
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
+
+    runs = Run.objects(id=run_id)
+    if len(runs) != 1:
+        return error('Run not found with id: %s' % run_id)
+
+    run = runs[0] 
+    if worker_id.isdigit():
+        worker_id = int(worker_id)
+    else:
+        worker_id = 0
+
+    if worker_id < run.number_workers and worker_id >= 0:
+        return json.dumps(run.stats[worker_id])
+    else:
+        return error("Invalid worker_id")
+
+@app.route('/run_stats_all/<run_id>', methods=['GET'])
+def run_stats_all(run_id):
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
+
+    runs = Run.objects(id=run_id)
+    run = runs[0]
+    stats = []
+    for s in run.stats:
+        stats.append(s)
+    return json.dumps(stats)
+
 '''
 TASKS
 '''
@@ -960,8 +1118,11 @@ COMMUNICATION
 
 @app.route('/_get_status/<run_id>')
 def _get_status(run_id):
-    if re.match('^[0-9a-fA-F]{24}$', run_id) is None:
-        return error('Invalid run id: %s' % run_id)
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
+    
+    # if re.match('^[0-9a-fA-F]{24}$', run_id) is None:
+    #     return error('Invalid run id: %s' % run_id)
         
     runs = Run.objects(id=run_id)
     if len(runs) != 1:
@@ -972,15 +1133,18 @@ def _get_status(run_id):
 
 @app.route('/_set_status/<run_id>/<worker_id>/<status>', methods=['POST'])
 def _set_status(run_id, worker_id, status):
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
+
     runs = Run.objects(id=ObjectId(run_id))
     if len(runs) != 1:
         return error('No run found with id: %s' % run_id)
     
+    # TODO: add module / offset status
     if status not in ['STARTED', 'ERROR', 'STOPPED']:
         return error('Invalid status: %s' % status)    
 
     run = runs[0]
-#    print (run.workers)
     if worker_id.isdigit():
         worker_id = int(worker_id)
     else:
@@ -1001,28 +1165,28 @@ def _set_status(run_id, worker_id, status):
 # debug function
 @app.route('/_get_status_worker/<run_id>/<worker_id>', methods=['GET'])
 def get_status_worker(run_id, worker_id):
+
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
+
     runs = Run.objects(id=run_id)
     run = runs[0]
+
     if worker_id.isdigit():
         worker_id = int(worker_id)
     else:
         worker_id = 0
+
     if worker_id < run.number_workers and worker_id >= 0:
         return json.dumps(run.workers[worker_id])
     else:
-        return "Error: invalid worker_id: "+str(worker_id)
-
-# debug function
-@app.route('/_get_status_all_workers/<run_id>', methods=['GET'])
-def get_status_all_workers(run_id):
-    runs = Run.objects(id=run_id)
-    run = runs[0]
-    return json.dumps(run.workers)
-
-
+        return error("Invalid worker_id: "+str(worker_id))
 
 @app.route('/_set_stats/<run_id>/<worker_id>', methods=['POST'])
 def set_stats(run_id, worker_id):
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
+
     runs = Run.objects(id=run_id)
     run = runs[0] 
     content = request.get_json()
@@ -1030,42 +1194,20 @@ def set_stats(run_id, worker_id):
         worker_id = int(worker_id)
     else:
         worker_id = 0
+
     if worker_id < run.number_workers and worker_id >= 0:
         stats = content['stats']
         run.stats[worker_id] = run.stats[worker_id] + stats
         run.save()
-    return "" 
-
-
-
-# debug function
-@app.route('/_get_stats_worker/<run_id>/<worker_id>', methods=['GET'])
-def get_stats_worker(run_id, worker_id):
-    runs = Run.objects(id=run_id)
-    run = runs[0] 
-    if worker_id.isdigit():
-        worker_id = int(worker_id)
-    else:
-        worker_id = 0
-
-    if worker_id < run.number_workers and worker_id >= 0:
-        return json.dumps(run.stats[worker_id])
-    else:
-        return "Error: invalid worker_id"
-
-# debug function
-@app.route('/_get_stats_all_workers/<run_id>', methods=['GET'])
-def get_stats_all_workers(run_id):
-    runs = Run.objects(id=run_id)
-    run = runs[0]
-    stats = []
-    for s in run.stats:
-        stats = stats + s
-    return json.dumps(stats)
+        # print run.stats
+    return json.dumps({'success': True, 'message': 'Successfully set stats.'})
 
 #debug function
 @app.route('/_remove_stats/<run_id>/<worker_id>', methods=['GET'])
 def remove_stats(run_id, worker_id):
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
+
     runs = Run.objects(id=run_id)
     run = runs[0] 
     if worker_id.isdigit():
@@ -1080,58 +1222,78 @@ def remove_stats(run_id, worker_id):
 #debug function
 @app.route('/_remove_all_stats/<run_id>', methods=['GET'])
 def remove_all_stats(run_id):
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
+
     runs = Run.objects(id=run_id)
     run = runs[0] 
     run.stats = []
     run.save()
     return json.dumps(run.stats)
 
-
 @app.route('/_set_targets/<program_id>', methods=['POST'])
 def set_targets(program_id):
+    if len(program_id) not in [12, 24] or not is_hex(program_id):
+        return error('Program id invalid: %s' % program_id)
+
     program = Program.objects(id=program_id)[0]
     content = request.get_json()
     targets = content['targets']
     program.targets = targets
     program.save()
-    return "" 
+    return json.dumps({'success': True, 'message': 'Successfully set targets.'})
 
 # Debug function
 @app.route('/_get_targets/<program_id>', methods=['GET'])
 def get_targets(program_id):
+    if len(program_id) not in [12, 24] or not is_hex(program_id):
+        return error('Program id invalid: %s' % program_id)
+
     program = Program.objects(id=program_id)[0]
     return json.dumps(program.targets)
 
 # Debug function
 @app.route('/_remove_targets/<program_id>', methods=['GET'])
 def remove_targets(program_id):
+    if len(program_id) not in [12, 24] or not is_hex(program_id):
+        return error('Program id invalid: %s' % program_id)
+
     program = Program.objects(id=program_id)[0]
     program.targets = []
     program.save()
-    return "" 
+    json.dumps({'success': True, 'message': 'Successfully removed targets.'})
 
 @app.route('/_set_classification/<program_id>', methods=['POST'])
 def set_classification(program_id):
+    if len(program_id) not in [12, 24] or not is_hex(program_id):
+        return error('Program id invalid: %s' % program_id)
+
     program = Program.objects(id=program_id)[0]
     content = request.get_json()
     classification = content['crash_classified']
     program.crashes_classified.append(classification)
     program.save()
-    return "" 
+    return json.dumps({'success': True, 'message': 'Successfully set classification.'})
 
 # Debug function
 @app.route('/_get_classification/<program_id>', methods=['GET'])
 def get_classification(program_id):
+    if len(program_id) not in [12, 24] or not is_hex(program_id):
+        return error('Program id invalid: %s' % program_id)
+
     program = Program.objects(id=program_id)[0]
     return json.dumps(program.crashes_classified)
 
 # Debug function
 @app.route('/_remove_classification/<program_id>', methods=['GET'])
 def remove_classification(program_id):
+    if len(program_id) not in [12, 24] or not is_hex(program_id):
+        return error('Program id invalid: %s' % program_id)
+
     program = Program.objects(id=program_id)[0]
     program.crashes_classified = []
     program.save()
-    return "" 
+    return json.dumps({'success': True, 'message': 'Successfully removed classification.'})
 
 
 

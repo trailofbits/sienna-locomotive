@@ -29,6 +29,11 @@ textarea {
     display: inline-block;
 }
 
+#control_div {
+    width: 350px;
+    display: inline-block;
+}
+
 #modal_div {
     display: none;
     position: fixed;
@@ -46,4 +51,17 @@ textarea {
 
 #run_info_div {
     display: inline-block;
+}
+
+#vis_div {
+    display: inline-block;
+    vertical-align: top;
+    height: 100%;
+    top: 0;
+}
+
+#vis_svg {
+    width: 900px;
+    height: 400px;
+    background-color: #EEE;
 }

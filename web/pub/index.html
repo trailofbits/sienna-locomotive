@@ -1,52 +1,64 @@
 <html>
 	<head>
 		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
-		<script type='text/javascript' src='/js/jobs.js'></script>
+		<script src="https://d3js.org/d3.v4.min.js"></script>
+		<script type='text/javascript' src='/js/shared.js'></script>
+		<script type='text/javascript' src='/js/system.js'></script>
+		<script type='text/javascript' src='/js/program.js'></script>
+		<script type='text/javascript' src='/js/run.js'></script>
+		<script type='text/javascript' src='/js/vis.js'></script>
 		<link rel="stylesheet" type="text/css" href="/css/index.css">
 	</head>
 	<body>
+
 		<div id='error_div'>
 			<span id='error_span' style='background-color: red;'></span>
 			<br/>
 			<button id='error_dismiss_btn'>Dismiss</button>
 		</div>
-		<!-- SYSTEM -->
-		<div id='system_div' class='column'>
-			<h1>Systems</h1>
-			<select id='system_select'>
-				<option value='--'>--</option>
-			</select>
-			<br/>
-			<br/>
-			<button id='system_details_btn'>More Info</button>
-			<button id='system_add_btn'>Add System</button>
-		</div>
-		<!-- PROGRAM -->
-		<div id='program_div' class='column'>
-			<h1>Programs</h1>
-			<select id='program_select'>
-				<option value='--'>--</option>
-			</select>
-			<br/>
-			<br/>
-			<button id='program_details_btn'>More Info</button>
-			<button id='program_add_btn'>Add Program</button>
+		<div id='control_div'>
+			<!-- SYSTEM -->
+			<div id='system_div' class='column'>
+				<h1>Systems</h1>
+				<select id='system_select'>
+					<option value='--'>--</option>
+				</select>
+				<br/>
+				<br/>
+				<button id='system_details_btn'>More Info</button>
+				<button id='system_add_btn'>Add System</button>
+			</div>
+			<!-- PROGRAM -->
+			<div id='program_div' class='column'>
+				<h1>Programs</h1>
+				<select id='program_select'>
+					<option value='--'>--</option>
+				</select>
+				<br/>
+				<br/>
+				<button id='program_details_btn'>More Info</button>
+				<button id='program_add_btn'>Add Program</button>
+			</div>
+
+			<!-- RUN -->
+			<div id='run_div' class='column'>
+				<h1>Runs</h1>
+				<select id='run_select'>
+					<option value='--'>--</option>
+				</select>
+				<br/>
+				<br/>
+				<button id='run_start_btn'>Start Run</button>
+				<button id='run_stop_btn'>Stop Run</button>
+				<br/>
+				<br/>
+				<button id='run_details_btn'>More Info</button>
+				<button id='run_add_btn'>Add Run</button>
+			</div>
 		</div>
 
-		<!-- RUN -->
-		<div id='run_div' class='column'>
-			<h1>Runs</h1>
-			<select id='run_select'>
-				<option value='--'>--</option>
-			</select>
-			<br/>
-			<br/>
-			<button id='run_start_btn'>Start Run</button>
-			<button id='run_stop_btn'>Stop Run</button>
-			<br/>
-			<br/>
-			<button id='run_details_btn'>More Info</button>
-			<button id='run_add_btn'>Add Run</button>
+		<div id='vis_div'>
+			<svg id='vis_svg'></svg>
 		</div>
 
 		<div id='modal_div'>
