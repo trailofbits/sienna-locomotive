@@ -71,7 +71,7 @@ function systemAdd() {
     });
 }
 
-function systemSelect() {
+function systemSelect(list=true) {
     var option = $('#system_select').children(':selected');
     var system = option.data('system');
 
@@ -82,7 +82,8 @@ function systemSelect() {
 
     var order = ui_data['system_order'];
     displayConfig(system, 'system', order, []);
-    programList();
+    if(list)
+        programList();
 }
 
 function systemDelete() {

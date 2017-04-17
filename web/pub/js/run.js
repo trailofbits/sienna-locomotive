@@ -2,14 +2,15 @@
 ** RUN
 */
 
-function runList(empty_list=false) {
-    var program_id = $('#program_select').val();
-    if(program_id == '--')
+function runList(empty_list=false, programId, selectId) {
+    if(programId == undefined)
+        programId = $('#program_select').val();
+    if(programId == '--')
         return;
 
     $.ajax({
         type: 'GET',
-        url: '/run_list/' + program_id,
+        url: '/run_list/' + programId,
         success: function(data) {
             data = JSON.parse(data);
             if('error' in data) {
@@ -50,6 +51,11 @@ function runList(empty_list=false) {
                 $('#run_select').val(selected);
             } else {
                 emptyRun();
+            }
+
+            if(selectId != undefined) {
+                $('#run_select').val(selectId);
+                runSelect();
             }
         }
     });
@@ -235,6 +241,7 @@ function runStart() {
                 return;
             } 
             console.log(data['run_id']);
+            runStats(data['run_id'])
         }
     });
 }

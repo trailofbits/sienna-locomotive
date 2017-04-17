@@ -18,10 +18,16 @@ function visReady() {
     vis.line = d3.line()
         .x(function(d) { return vis.x(d.date); })
         .y(function(d) { return vis.y(d.execs); });
+
+    activeRuns();
+    completeRuns();
+    setInterval(function() {
+        activeRuns();
+        completeRuns();
+    }, 3000);
 }
 
 function visualizeStats() {
-    console.log('vis');
     // unix_time
     // execs_per_sec
     // paths_total
@@ -155,7 +161,15 @@ function runStatsSuccess(data) {
 function runStatusSuccess(statuses, stats) {
     for(var idx in statuses) {
         var status = statuses[idx];
-        var stats = stats[idx];
+        if(stats === undefined) {
+            var stats = {
+                'execs': 0,
+                'crashes': 0,
+                'paths': 0
+            };
+        } else {
+            var stats = stats[idx];
+        }
 
         var workerDiv = $('<div></div>');
         workerDiv.addClass('worker_div');
@@ -191,6 +205,103 @@ function runStatusSuccess(statuses, stats) {
     }
 }
 
+function initShowLink(sysId, progId, runId) {
+    return function() {
+        $('#system_select').val(sysId);
+        systemSelect(false);
+
+        programList(true, sysId, progId);
+
+        runList(true, progId, runId);
+    }
+}
+
+function displayRuns(type, data) {
+    var runs = data['runs'];
+    $('#'+type+'_runs_div').empty();
+
+    for(var idx in runs) {
+        var run = runs[idx];
+        var name = run['name'];
+        var start = new Date(parseInt(run['start_time']) * 1000);
+        var end = new Date(parseInt(run['end_time']) * 1000);
+
+        var runDiv = $('<div></div>');
+        runDiv.addClass('run_'+type+'_div');
+        runDiv.addClass('row');
+
+        var nameSpan = $('<span></span>');
+        nameSpan.addClass('column');
+        nameSpan.addClass('_25');
+        nameSpan.text(name);
+
+        var startSpan = $('<span></span>');
+        startSpan.addClass('column');
+        startSpan.addClass('_25');
+        startSpan.text(start.toString().split(' ').splice(1, 4).join(' '));
+
+        if(type != 'active') {
+            var endSpan = $('<span></span>');
+            endSpan.addClass('column');
+            endSpan.addClass('_25');
+            endSpan.text(end.toString().split(' ').splice(1, 4).join(' '));
+        }
+
+        var showSpan = $('<span></span>');
+        showSpan.addClass('column');
+        showSpan.addClass('_25');
+        var showLink = $('<a></a>');
+        showLink.attr('href', '#');
+
+        var sysId = run['system'];
+        var progId = run['program'];
+        var runId = run['_id'];
+        showLink.on('click', initShowLink(sysId, progId, runId));
+        
+        showLink.text('Show');
+        showSpan.append(showLink);
+
+        runDiv.append(nameSpan);
+        runDiv.append(startSpan);
+        runDiv.append(endSpan);
+        runDiv.append(showSpan);
+
+        $('#'+type+'_runs_div').append(runDiv);
+    }
+}
+
+function activeRuns() {
+    $.ajax({
+        type: 'GET',
+        url: '/run_active_list', 
+        success: function(data) {
+            data = JSON.parse(data);
+            if('error' in data) {
+                handleError(data);
+                return;
+            } 
+
+            displayRuns('active', data);
+        }
+    });    
+}
+
+function completeRuns() {
+    $.ajax({
+        type: 'GET',
+        url: '/run_complete_list', 
+        success: function(data) {
+            data = JSON.parse(data);
+            if('error' in data) {
+                handleError(data);
+                return;
+            } 
+
+            displayRuns('finished', data);
+        }
+    });    
+}
+
 function runStats(runId) {
     var checkId = $('#run_select').val();
     
@@ -202,12 +313,14 @@ function runStats(runId) {
     if(runId != checkId)
         return;
 
+    if(runId == '--')
+        return;
+
     $.ajax({
         type: 'GET',
         url: '/run_stats_all/' + runId, 
         success: function(data) {
             data = JSON.parse(data);
-            datas = data;
             if('error' in data) {
                 handleError(data);
                 return;
@@ -218,7 +331,7 @@ function runStats(runId) {
         }
     });
 
-    // setTimeout(function() {
-    //     runStats(runId);
-    // }, 3000);
+    setTimeout(function() {
+        runStats(runId);
+    }, 3000);
 }

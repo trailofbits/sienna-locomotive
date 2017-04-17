@@ -2,14 +2,16 @@
 ** PROGRAM
 */
 
-function programList(empty_list=false) {
-    var system_id = $('#system_select').val();
-    if(system_id == '--')
+function programList(empty_list=false, systemId, selectId) {
+    if(systemId == undefined)
+        systemId = $('#system_select').val();
+
+    if(systemId == '--')
         return;
 
     $.ajax({
         type: 'GET',
-        url: '/prog_list/' + system_id,
+        url: '/prog_list/' + systemId,
         success: function(data) {
             data = JSON.parse(data);
             if('error' in data) {
@@ -71,6 +73,10 @@ function programList(empty_list=false) {
                 emptyProgram();
             }
 
+            if(selectId != undefined) {
+                $('#program_select').val(selectId);
+                programSelect(false);
+            }
         }
     });
 }
@@ -78,11 +84,11 @@ function programList(empty_list=false) {
 function programAddGUI() {
     var yaml = $("#program_add_yaml").val();
     
-    var system_id = $('#system_select').val();
+    var systemId = $('#system_select').val();
     yaml += '\nsystem:\n';
-    yaml += ' ' + system_id;
+    yaml += ' ' + systemId;
     
-    if(system_id == '--') {
+    if(systemId == '--') {
         handleError({'message': 'Please select a system.'});
         return;
     }
@@ -107,11 +113,11 @@ function programAddGUI() {
 function programAddCMD() {
     var yaml = $("#program_add_yaml").val();
     
-    var system_id = $('#system_select').val();
+    var systemId = $('#system_select').val();
     yaml += '\nsystem:\n';
-    yaml += ' ' + system_id;
+    yaml += ' ' + systemId;
 
-    if(system_id == '--') {
+    if(systemId == '--') {
         handleError({'message': 'Please select a system.'});
         return;
     }
@@ -133,7 +139,7 @@ function programAddCMD() {
     });
 }
 
-function programSelect() {
+function programSelect(list=true) {
     var option = $('#program_select').children(':selected');
     var program = option.data('program');
     var type = option.data('type');
@@ -146,7 +152,8 @@ function programSelect() {
     var order = ui_data['program_order_'+type];
 
     displayConfig(program, 'program', order, ['system']);
-    runList();
+    if(list)
+        runList();
 }
 
 function programDelete() {

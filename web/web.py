@@ -1020,14 +1020,15 @@ def run_active_list():
         json: list of active runs
     """
     runs = Run.objects(start_time__ne='', status='RUNNING')
-    runs = []
+    min_runs = []
     for run in runs:
-        run = run.to_mongo().to_dict()
         min_run = {}
+        min_run['system'] = str(run['program']['system'].id)
+        min_run['program'] = str(run['program'].id)
+
+        run = run.to_mongo().to_dict()
         min_run['name'] = run['name']
         min_run['_id'] = str(run['_id'])
-        min_run['system'] = str(run['program']['system'])
-        min_run['program'] = str(run['program'])
 
         if 'start_time' in run:
             min_run['start_time'] = time.mktime(run['start_time'].timetuple())
@@ -1035,9 +1036,9 @@ def run_active_list():
         if 'end_time' in run:
             continue
 
-        runs.append(min_run)
+        min_runs.append(min_run)
 
-    run_info = {'runs': runs}
+    run_info = {'runs': min_runs}
     return json.dumps(run_info, default=json_util.default)
 
 @app.route('/run_complete_list')
@@ -1047,25 +1048,26 @@ def run_complete_list():
     Returns:
         json: list of completed runs
     """
-    runs = Run.objects(start_time__ne='', end_time__ne='')
-    runs = []
+    runs = Run.objects(start_time__ne='', status='FINISHED')
+    min_runs = []
     for run in runs:
-        run = run.to_mongo().to_dict()
         min_run = {}
+        min_run['system'] = str(run['program']['system'].id)
+        min_run['program'] = str(run['program'].id)
+
+        run = run.to_mongo().to_dict()
         min_run['name'] = run['name']
         min_run['_id'] = str(run['_id'])
-        min_run['system'] = str(run['program']['system'])
-        min_run['program'] = str(run['program'])
 
         if 'start_time' in run:
             min_run['start_time'] = time.mktime(run['start_time'].timetuple())
 
         if 'end_time' in run:
-            run['end_time'] = time.mktime(run['end_time'].timetuple())
+            min_run['end_time'] = time.mktime(run['end_time'].timetuple())
 
-        runs.append(min_run)
+        min_runs.append(min_run)
 
-    run_info = {'runs': runs}
+    run_info = {'runs': min_runs}
     return json.dumps(run_info, default=json_util.default)
 
 @app.route('/run_status_workers/<run_id>', methods=['GET'])
@@ -1168,7 +1170,7 @@ def _set_status(run_id, worker_id, status):
         run.status = 'FINISHED'
         run.end_time = datetime.now()
 
-    if all([ea ['RUNNING', 'ERROR'] for ea in run.workers]):
+    if all([ea in ['RUNNING', 'ERROR'] for ea in run.workers]):
         run.status = 'RUNNING'
     
     run.save()
