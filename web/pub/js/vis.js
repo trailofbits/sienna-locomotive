@@ -6,7 +6,8 @@ function visReady() {
     vis.width = parseInt(vis.svg.style("width")) - vis.margin.left - vis.margin.right,
     vis.height = parseInt(vis.svg.style("height")) - vis.margin.top - vis.margin.bottom,
     vis.g = vis.svg.append("g")
-        .attr("transform", "translate(" + vis.margin.left + "," + vis.margin.top + ")");
+        .attr("transform", "translate(" + vis.margin.left + "," + vis.margin.top + ")")
+        .attr('id', 'vis_g');
 
     vis.x = d3.scaleTime()
         .rangeRound([0, vis.width]);
@@ -28,13 +29,15 @@ function visualizeStats() {
     vis.x.domain(d3.extent(vis.data, function(d) { return d.date; }));
     vis.y.domain(d3.extent(vis.data, function(d) { return d.execs_per_sec; }));
 
-    vis.g.append("g")
+    vis.axisBottom = vis.g.append("g");
+    vis.axisBottom
       .attr("transform", "translate(0," + vis.height + ")")
       .call(d3.axisBottom(vis.x))
     .select(".domain")
       .remove();
 
-    vis.g.append("g")
+    vis.axisLeft = vis.g.append("g");
+    vis.axisLeft
       .call(d3.axisLeft(vis.y))
     .append("text")
       .attr("fill", "#000")
@@ -44,30 +47,38 @@ function visualizeStats() {
       .attr("text-anchor", "end")
       .text("execs / second");
 
-    vis.g.append("path")
-      .data([vis.data])
+    vis.path = vis.g.append("path");
+    vis.path
       .attr("fill", "none")
       .attr("stroke", "steelblue")
       .attr("stroke-linejoin", "round")
       .attr("stroke-linecap", "round")
       .attr("stroke-width", 1.5)
-      .attr("d", vis.line);
+      .attr("d", vis.line(vis.data));
 
 }
 
 function updateVisualize() {
     console.log('update');
-    // vis.x.domain(d3.extent(vis.data, function(d) { return d.date; }));
-    // vis.y.domain(d3.extent(vis.data, function(d) { return d.execs_per_sec; }));
+    vis.x.domain(d3.extent(vis.data, function(d) { return d.date; }));
+    vis.y.domain(d3.extent(vis.data, function(d) { return d.execs_per_sec; }));
 
-    // vis.g.select("path")
-    //   .data([vis.data])
-    //   .attr("fill", "none")
-    //   .attr("stroke", "steelblue")
-    //   .attr("stroke-linejoin", "round")
-    //   .attr("stroke-linecap", "round")
-    //   .attr("stroke-width", 1.5)
-    //   .attr("d", vis.line);
+    vis.axisLeft
+        .transition()
+        .duration(750)
+        .call(d3.axisLeft(vis.y));
+
+    vis.axisBottom
+        .transition()
+        .select(".domain")
+            .remove()
+        .duration(750)
+        .call(d3.axisBottom(vis.x));
+
+    vis.path
+        .transition()
+        .duration(750)
+        .attr('d', vis.line(vis.data));
 }
 
 function runStats(runId) {
@@ -91,6 +102,18 @@ function runStats(runId) {
                 return;
             } 
 
+            var empty = true;
+            for(var idx in data) {
+                if(data[idx].length > 0) {
+                    empty = false;
+                    break;
+                }
+            }
+
+            if(empty)
+                return;
+
+
             for(var widx in data) {
                 var worker_stats = data[widx];
                 for(sidx in worker_stats) {
@@ -113,7 +136,7 @@ function runStats(runId) {
         }
     });
 
-    // setTimeout(function() {
-    //     runStats(runId);
-    // }, 3000);
+    setTimeout(function() {
+        runStats(runId);
+    }, 3000);
 }
