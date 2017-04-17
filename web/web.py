@@ -832,7 +832,7 @@ def run_start(run_id):
     for worker_id in xrange(number_workers):
         run['_worker_id'] = worker_id
         task = task_run_start.apply_async(args=[sys, prog, run])
-        run_to_update.workers.append('STARTED')
+        run_to_update.workers.append('STARTING')
         run_to_update.stats.append([])
 
     run_to_update.status = 'STARTING'
@@ -1020,18 +1020,24 @@ def run_active_list():
         json: list of active runs
     """
     runs = Run.objects(start_time__ne='', status='RUNNING')
-    runs = [run.to_mongo().to_dict() for run in runs]
+    runs = []
     for run in runs:
-        run['_id'] = str(run['_id'])
-        run['program'] = str(run['program'])
+        run = run.to_mongo().to_dict()
+        min_run = {}
+        min_run['name'] = run['name']
+        min_run['_id'] = str(run['_id'])
+        min_run['system'] = str(run['program']['system'])
+        min_run['program'] = str(run['program'])
 
         if 'start_time' in run:
-            run['start_time'] = time.mktime(run['start_time'].timetuple())
+            min_run['start_time'] = time.mktime(run['start_time'].timetuple())
 
         if 'end_time' in run:
-            run['end_time'] = time.mktime(run['end_time'].timetuple())
+            continue
 
-    run_info = {'order': Run.required, 'runs': runs}
+        runs.append(min_run)
+
+    run_info = {'runs': runs}
     return json.dumps(run_info, default=json_util.default)
 
 @app.route('/run_complete_list')
@@ -1042,18 +1048,24 @@ def run_complete_list():
         json: list of completed runs
     """
     runs = Run.objects(start_time__ne='', end_time__ne='')
-    runs = [run.to_mongo().to_dict() for run in runs]
+    runs = []
     for run in runs:
-        run['_id'] = str(run['_id'])
-        run['program'] = str(run['program'])
+        run = run.to_mongo().to_dict()
+        min_run = {}
+        min_run['name'] = run['name']
+        min_run['_id'] = str(run['_id'])
+        min_run['system'] = str(run['program']['system'])
+        min_run['program'] = str(run['program'])
 
         if 'start_time' in run:
-            run['start_time'] = time.mktime(run['start_time'].timetuple())
+            min_run['start_time'] = time.mktime(run['start_time'].timetuple())
 
         if 'end_time' in run:
             run['end_time'] = time.mktime(run['end_time'].timetuple())
 
-    run_info = {'order': Run.required, 'runs': runs}
+        runs.append(min_run)
+
+    run_info = {'runs': runs}
     return json.dumps(run_info, default=json_util.default)
 
 @app.route('/run_status_workers/<run_id>', methods=['GET'])
@@ -1095,7 +1107,7 @@ def run_stats_all(run_id):
     stats = []
     for s in run.stats:
         stats.append(s)
-    return json.dumps(stats)
+    return json.dumps({'stats': stats, 'status': run.workers})
 
 '''
 TASKS
@@ -1141,7 +1153,7 @@ def _set_status(run_id, worker_id, status):
         return error('No run found with id: %s' % run_id)
     
     # TODO: add module / offset status
-    if status not in ['STARTED', 'ERROR', 'STOPPED']:
+    if status not in ['RUNNING', 'ERROR', 'FINISHED']:
         return error('Invalid status: %s' % status)    
 
     run = runs[0]
@@ -1152,10 +1164,11 @@ def _set_status(run_id, worker_id, status):
     if worker_id < run.number_workers and worker_id >= 0:
         run.workers[worker_id] = status
 
-    if all([ea == 'STOPPED' for ea in run.workers]):
-        run.status = 'STOPPED'
+    if all([ea in ['FINISHED', 'ERROR'] for ea in run.workers]):
+        run.status = 'FINISHED'
+        run.end_time = datetime.now()
 
-    if all([ea == 'STARTED' for ea in run.workers]):
+    if all([ea ['RUNNING', 'ERROR'] for ea in run.workers]):
         run.status = 'RUNNING'
     
     run.save()

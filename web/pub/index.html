@@ -18,7 +18,7 @@
 		</div>
 		<div id='control_div'>
 			<!-- SYSTEM -->
-			<div id='system_div' class='column'>
+			<div id='system_div' class='control'>
 				<h1>Systems</h1>
 				<select id='system_select'>
 					<option value='--'>--</option>
@@ -29,7 +29,7 @@
 				<button id='system_add_btn'>Add System</button>
 			</div>
 			<!-- PROGRAM -->
-			<div id='program_div' class='column'>
+			<div id='program_div' class='control'>
 				<h1>Programs</h1>
 				<select id='program_select'>
 					<option value='--'>--</option>
@@ -41,7 +41,7 @@
 			</div>
 
 			<!-- RUN -->
-			<div id='run_div' class='column'>
+			<div id='run_div' class='control'>
 				<h1>Runs</h1>
 				<select id='run_select'>
 					<option value='--'>--</option>
@@ -57,8 +57,21 @@
 			</div>
 		</div>
 
-		<div id='vis_div'>
+		<div id='stats_div'>
+			<h1>Active Runs</h1>
+			<div id='active_runs_div'>
+			</div>
+
+			<h1>Finished Runs</h1>
+			<div id='finished_runs_div'>
+			</div>
+			
+			<h1>Cummulative Executions per Second</h1>
 			<svg id='vis_svg'></svg>
+
+			<h1>Worker Stats</h1>
+			<div id='worker_stats_div'>
+			</div>
 		</div>
 
 		<div id='modal_div'>

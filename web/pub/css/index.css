@@ -15,7 +15,7 @@ textarea {
 	margin-left: 20px;
 }
 
-.column {
+.control {
 	height: auto;
 	min-width: 300px;
     margin-right: 5px;
@@ -27,6 +27,22 @@ textarea {
     margin: 10% 30%;
     padding: 20px;
     display: inline-block;
+}
+
+.row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.column {
+    flex-basis: 100%;
+    margin-right: 10px;
+}
+
+._25 {
+    flex: 2.5;
 }
 
 #control_div {
@@ -53,7 +69,7 @@ textarea {
     display: inline-block;
 }
 
-#vis_div {
+#stats_div {
     display: inline-block;
     vertical-align: top;
     height: 100%;
