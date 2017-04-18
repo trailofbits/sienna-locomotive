@@ -1,20 +1,23 @@
-from werkzeug.utils import secure_filename
-from data_model import *
+import os
 import shutil
-import random
-from flask import Blueprint
-from bson import json_util
-from flask import request
-from web_utils import *
 import json
 import time
 import yaml
-import os
+
+from datetime import datetime
+from mongoengine.queryset import NotUniqueError
+from bson import json_util
+from flask import Blueprint
+from flask import request
+from werkzeug.utils import secure_filename
+
+from data_model import Run, Program, System
+from web_utils import *
 
 run_endpoints = Blueprint('run_endpoints', __name__)
 
-with open('config.yaml') as f:
-    contents = f.read()
+with open('config.yaml') as config_file:
+    contents = config_file.read()
     WEB_CONFIG = yaml.load(contents)
 
 # input_crashes from the web app's view
@@ -31,8 +34,6 @@ def run_add():
     """
     config_str = request.form['yaml']
     config = yaml.load(config_str)
-    print config
-    # print config
 
     if 'name' not in config:
         config['name'] = 'run_%s' % hex(int(time.time()))[2:]
@@ -40,12 +41,11 @@ def run_add():
     missing = []
     for key in Run.user_all:
         if key not in config:
-            missing.append(key)    
+            missing.append(key)
 
     if len(missing) != 0:
         return error('Missing required fields: %s' % ' '.join(missing))
 
-    print config['run_type']
     if config['run_type'] not in ['all', 'exploitable']:
         return error('Unsupported run type: %s' % ' '.join(config['run_type']))
 
@@ -57,21 +57,21 @@ def run_add():
     prog = Program.objects(id=program_id)
     if len(prog) != 1:
         return error('Program id invalid: %s' % config['program'])
-    sys = prog[0]['system']
 
     # create input dir
-    input_dir = 'input_%s' % hex(int(time.time()))[2:] 
+    input_dir = 'input_%s' % hex(int(time.time()))[2:]
     # create output dir
     crash_dir = 'crash_%s' % hex(int(time.time()))[2:]
-    
+
     web_input_dir = os.path.join(PATH_SHARED_INPUT_CRASHES, input_dir)
     web_crash_dir = os.path.join(PATH_SHARED_INPUT_CRASHES, crash_dir)
-    
+
     mkdir_ifne(web_input_dir)
     mkdir_ifne(web_crash_dir)
 
     if 'input_dir' not in config:
         config['input_dir'] = input_dir
+
     if 'crash_dir' not in config:
         config['crash_dir'] = crash_dir
 
@@ -80,18 +80,14 @@ def run_add():
 
     if 'hours' in config and 'mins' in config:
         timeout = config['mins'] + config['hours'] * 60
-        if timeout>0:
+        if timeout > 0:
             config['fuzz_time'] = timeout
         config.pop('hours')
         config.pop('mins')
-    else:
-        print 'no fuzz time'
 
-    print config
-#    for key in config:
-#        if key not in Run.required_all:
-#       print key
-#           config.pop(key, None)
+    # for key in config:
+        # if key not in Run.required_all:
+            # config.pop(key, None)
 
     try:
         print config
@@ -182,7 +178,7 @@ def run_files_remove():
     Remove file from run
     Args:
         run_id (str): object if of the run
-        files (list of str): list of files to be removed 
+        files (list of str): list of files to be removed
     Returns:
         json: list of files associated with run
     """
@@ -240,7 +236,7 @@ def run_default_corpus(run_id):
     fnames = [f for f  in fnames if f.endswith(prog['file_format'])]
 
     input_path = os.path.join(PATH_SHARED_INPUT_CRASHES, run[0].input_dir)
-    
+
     for fname in fnames:
         corpus_dir = os.path.join(PATH_SHARED_INPUT_CRASHES, 'corpora')
         corpus_file = os.path.join(corpus_dir, fname)
@@ -250,7 +246,6 @@ def run_default_corpus(run_id):
     flist = os.listdir(input_path)
 
     return json.dumps(flist)
-
 
 @run_endpoints.route('/run_files_list/<run_id>')
 def run_files_list(run_id):
@@ -273,81 +268,6 @@ def run_files_list(run_id):
 
     return json.dumps(flist)
 
-@run_endpoints.route('/run_start/<run_id>', methods=['POST'])
-def run_start(run_id):
-    """
-    Executes a run on workers
-    Args:
-        run_id (str): run object id
-    Returns:
-        json: run object id
-    """
-    if len(run_id) not in [12, 24] or not is_hex(run_id):
-        return error('Run id invalid: %s' % run_id)
-
-    print "Run id:"+str(run_id)
-    runs = Run.objects(id=run_id)
-    if len(runs) != 1:
-        return error('No run found with id: %s' % run_id)
-
-    if runs[0].start_time != None:
-        return error('Cannot start run as it has already started!')
-
-    run = runs[0].to_mongo().to_dict()
-    run['_id'] = str(run['_id'])
-    run['program'] = str(run['program'])
-    
-    progs = Program.objects(id=run['program'])
-    prog = progs[0].to_mongo().to_dict()
-
-    input_path = os.path.join(PATH_SHARED_INPUT_CRASHES, run['input_dir'])
-    ext = prog['file_format']
-    flist = os.listdir(input_path)
-    flist = [ea for ea in flist if ea.endswith(ext)]
-    if len(flist) < 1:
-        return error('Please add files to run ending with extension %s' % ext)
-
-    random.shuffle(flist)
-    selected_fname = os.path.join(input_path, flist[0])
-    seed_fname = os.path.join(input_path, 'seed%s' % ext)
-    if selected_fname != seed_fname:
-        shutil.copy2(selected_fname, seed_fname)
-
-    prog['_id'] = str(prog['_id'])
-    prog['system'] = str(prog['system'])
-    # print prog
-
-    syss = System.objects(id=prog['system'])
-    sys = syss[0].to_mongo().to_dict()
-
-    sys['_id'] = str(sys['_id'])
-    # print sys
-
-    sys['webapp_ip'] = WEB_CONFIG['WEBAPP_IP'] 
-
-    if 'number_workers' in run:
-        number_workers = max(1,run['number_workers'])
-    else:
-        run['number_workers'] = 1
-        number_workers = 1
-
-    print "Number of workers: " + str(number_workers)
-
-    run_to_update = runs[0]
-
-    for worker_id in xrange(number_workers):
-        run['_worker_id'] = worker_id
-        task = task_run_start.apply_async(args=[sys, prog, run])
-        run_to_update.workers.append('STARTING')
-        run_to_update.errors.append('')
-        run_to_update.stats.append([])
-
-    run_to_update.status = 'STARTING'
-    run_to_update.start_time = datetime.now()
-    run_to_update.save()
-    # print task.id
-    return json.dumps({'run_id': run['_id']})
-
 @run_endpoints.route('/run_stop/<run_id>', methods=['POST'])
 def run_stop(run_id):
     """
@@ -367,7 +287,7 @@ def run_stop(run_id):
     if runs[0].end_time != None:
         return error('Cannot stop run as it has already stopped!')
 
-    run_to_update = runs[0] 
+    run_to_update = runs[0]
     run_to_update['status'] = 'STOPPING'
     run_to_update.end_time = datetime.now()
     run_to_update.save()
@@ -378,6 +298,13 @@ def run_stop(run_id):
 
 @run_endpoints.route('/run_edit', methods=['POST'])
 def run_edit():
+    """
+    Edit a run
+    Args:
+        run_id (str): run object id
+    Returns:
+        json: success message
+    """
     run_id = request.form['run_id']
 
     if len(run_id) not in [12, 24] or not is_hex(run_id):
@@ -413,10 +340,10 @@ def run_delete(run_id):
     if len(runs) != 1:
         return error('No run found with id: %s' % run_id)
 
-    if runs[0].start_time != None and runs[0].end_time == None:
+    if runs[0].start_time != None and runs[0].end_time is None:
         return error('Cannot delete a run while it is running!')
 
-    run_to_remove = runs[0] 
+    run_to_remove = runs[0]
     run_to_remove.delete()
 
     # TODO: delete directories?
@@ -424,54 +351,10 @@ def run_delete(run_id):
     # print task.id
     return json.dumps({'success': True, 'message': 'Successfully deleted %s' % run_id})
 
-# Launch !exploitable on the crash_dir on a previous run
-# Create a temporary run sent to celery, but do not save this run.
-@run_endpoints.route('/run_exploitable/<run_id>', methods=['POST'])
-def run_exploitable(run_id):
-    """
-    Runs !exploitable on all crashes associated with a run
-    Args:
-        run_id (str): run object id
-    Returns:
-        json: run_id
-    """
-    if len(run_id) not in [12, 24] or not is_hex(run_id):
-        return error('Run id invalid: %s' % run_id)
-
-    print "Run !exploitable on id:"+str(run_id)
-    runs = Run.objects(id=run_id)
-    if len(runs) != 1:
-        return error('No run found with id: %s' % run_id)
-
-    run = runs[0].to_mongo().to_dict()
-    run['_id'] = str(run['_id'])
-    run['program'] = str(run['program'])
-
-    # TODO: verify end time and status
-
-    progs = Program.objects(id=run['program'])
-    prog = progs[0].to_mongo().to_dict()
-
-    prog['_id'] = str(prog['_id'])
-    prog['system'] = str(prog['system'])
-
-    syss = System.objects(id=prog['system'])
-    sys = syss[0].to_mongo().to_dict()
-
-    sys['_id'] = str(sys['_id'])
-
-    sys['webapp_ip'] = WEB_CONFIG['WEBAPP_IP'] 
-
-    run['run_type'] = 'exploitable'
-
-    task = task_run_start.apply_async(args=[sys, prog, run])
-    
-    return json.dumps({'run_id': run['_id']})
-
 @run_endpoints.route('/run_active_list')
 def run_active_list():
     """
-    List active runs 
+    List active runs
     Returns:
         json: list of active runs
     """
@@ -500,7 +383,7 @@ def run_active_list():
 @run_endpoints.route('/run_complete_list')
 def run_complete_list():
     """
-    List completed runs 
+    List completed runs
     Returns:
         json: list of completed runs
     """
@@ -544,7 +427,7 @@ def run_stats_worker(run_id, worker_id):
     if len(runs) != 1:
         return error('Run not found with id: %s' % run_id)
 
-    run = runs[0] 
+    run = runs[0]
     if worker_id.isdigit():
         worker_id = int(worker_id)
     else:
@@ -563,6 +446,6 @@ def run_stats_all(run_id):
     runs = Run.objects(id=run_id)
     run = runs[0]
     stats = []
-    for s in run.stats:
-        stats.append(s)
+    for stat in run.stats:
+        stats.append(stat)
     return json.dumps({'stats': stats, 'status': run.workers})

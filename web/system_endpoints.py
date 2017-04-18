@@ -1,9 +1,11 @@
+import json
+import yaml
+
 from mongoengine.queryset import NotUniqueError
 from data_model import System
 from flask import Blueprint
 from flask import request
-import yaml
-import json
+from web_utils import error, is_hex
 
 system_endpoints = Blueprint('system_endpoints', __name__)
 
@@ -23,7 +25,7 @@ def sys_add():
     missing = []
     for key in System.required:
         if key not in config:
-            missing.append(key)    
+            missing.append(key)
 
     if len(missing) != 0:
         return error('Missing required fields: %s' % ' '.join(missing))
@@ -68,7 +70,7 @@ def sys_delete():
     Returns:
         json: success message
     """
-    
+
     # TODO: Delete all programs, runs associated
 
     system_id = request.form['system_id']

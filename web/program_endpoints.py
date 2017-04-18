@@ -1,10 +1,11 @@
+import json
+import yaml
+
 from mongoengine.queryset import NotUniqueError
-from data_model import *
+from data_model import System, Program, ProgramCMD, ProgramAutoIT
 from flask import Blueprint
 from flask import request
-from web_utils import *
-import yaml
-import json
+from web_utils import error, is_hex
 
 program_endpoints = Blueprint('program_endpoints', __name__)
 
@@ -24,7 +25,7 @@ def prog_add_gui():
     missing = []
     for key in ProgramAutoIT.required:
         if key not in config:
-            missing.append(key)    
+            missing.append(key)
 
     if len(missing) != 0:
         return error('Missing required fields: %s' % ' '.join(missing))
@@ -57,7 +58,7 @@ def prog_add_cmd():
     missing = []
     for key in ProgramCMD.required:
         if key not in config:
-            missing.append(key)    
+            missing.append(key)
 
     if len(missing) != 0:
         return error('Missing required fields: %s' % ' '.join(missing))
@@ -107,8 +108,8 @@ def prog_list(system_id):
         prog['system'] = str(prog['system'])
 
     program_info = {
-        'order_gui': ProgramAutoIT.required, 
-        'order_cmd': ProgramCMD.required, 
+        'order_gui': ProgramAutoIT.required,
+        'order_cmd': ProgramCMD.required,
         # 'programs_gui': programs_gui,
         # 'programs_cmd': programs_cmd,
         'programs': programs_gui + programs_cmd,

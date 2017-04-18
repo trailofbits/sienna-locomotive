@@ -10,15 +10,15 @@ db = MongoEngine()
 class System(db.Document):
     required = [
         'name',
-        'path_vmfuzz', 
+        'path_vmfuzz',
         'path_input_crashes',
-        'path_winafl', 
-        'path_dynamorio', 
-        'path_windbg', 
-        'path_radamsa', 
-        'path_autoit', 
-        'path_winafl_working_dir', 
-        'path_autoit_working_dir', 
+        'path_winafl',
+        'path_dynamorio',
+        'path_windbg',
+        'path_radamsa',
+        'path_autoit',
+        'path_winafl_working_dir',
+        'path_autoit_working_dir',
         'path_radamsa_working_dir',
         'fuzzers']
 
@@ -41,13 +41,13 @@ class Program(db.Document):
     meta = {'allow_inheritance': True}
 
     required = [
-            'name',
-            'arch',
-            'using_autoit',
-            'path_program',
-            'program_name',
-            'file_format',
-            'system']    
+        'name',
+        'arch',
+        'using_autoit',
+        'path_program',
+        'program_name',
+        'file_format',
+        'system']
 
     # Required
     name = db.StringField(unique=True)
@@ -64,30 +64,30 @@ class Program(db.Document):
 
 class ProgramAutoIT(Program):
     required = [
-            'name',
-            'arch',
-            'using_autoit', # true
-            'path_program',
-            'program_name',
-            'file_format',
-            'system',
-            'path_autoit_script']
+        'name',
+        'arch',
+        'using_autoit', # true
+        'path_program',
+        'program_name',
+        'file_format',
+        'system',
+        'path_autoit_script']
 
     # With Autoit
     path_autoit_script = db.StringField()
 
 class ProgramCMD(Program):
     required = [
-            'name',
-            'arch',
-            'using_autoit', # false
-            'path_program',
-            'program_name',
-            'file_format',
-            'system',
-            'auto_close',
-            'running_time',
-            'parameters',]
+        'name',
+        'arch',
+        'using_autoit', # false
+        'path_program',
+        'program_name',
+        'file_format',
+        'system',
+        'auto_close',
+        'running_time',
+        'parameters',]
 
     # Without Autoit
     auto_close = db.BooleanField()
@@ -98,31 +98,31 @@ class ProgramCMD(Program):
 
 class Run(db.Document):
     required = [
-            'name',
-            'input_dir',
-            'crash_dir',
-            'winafl_targets',
-            'fuzz_time',
-            'run_type',
-            'radamsa_number_files_to_create',
-            'winafl_default_timeout',
-            'winafl_last_path_timeout',
-            'winafl_fuzzing_iteration',
-            'start_time',
-            'end_time',
-            'program']
+        'name',
+        'input_dir',
+        'crash_dir',
+        'winafl_targets',
+        'fuzz_time',
+        'run_type',
+        'radamsa_number_files_to_create',
+        'winafl_default_timeout',
+        'winafl_last_path_timeout',
+        'winafl_fuzzing_iteration',
+        'start_time',
+        'end_time',
+        'program']
 
     user_all = [
-            'name',
-            'run_type',
-            'program']
+        'name',
+        'run_type',
+        'program']
 
     required_all = [
-            'name',
-            'run_type',
-            'input_dir',
-            'crash_dir',
-            'program']
+        'name',
+        'run_type',
+        'input_dir',
+        'crash_dir',
+        'program']
 
     # all
     name = db.StringField(unique=True)
@@ -145,6 +145,6 @@ class Run(db.Document):
     status = db.StringField()
     workers = db.ListField(db.StringField())
     number_workers = db.IntField()
-    errors = db.ListField(db.StringField)
+    errors = db.ListField(db.StringField())
     # stats
     stats = db.ListField(db.ListField(db.DictField()))

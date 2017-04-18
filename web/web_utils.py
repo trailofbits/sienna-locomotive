@@ -2,8 +2,15 @@ import os
 import json
 
 def is_hex(target):
+    '''
+    Check if a string is hex.
+    Args:
+        target (str): target string
+    Returns:
+        bool: True if all characters are hex characters
+    '''
     return all(ch in 'ABCDEFabcdef0123456789' for ch in target)
-    
+
 def error(msg):
     """
     Wrap a string in a JSON error for the front end

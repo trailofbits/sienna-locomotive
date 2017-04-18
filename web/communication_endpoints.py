@@ -1,16 +1,14 @@
 '''
 COMMUNICATION
 '''
-from bson.objectid import ObjectId
+import json
+
 from datetime import datetime
-from data_model import *
+from bson.objectid import ObjectId
+from data_model import Run, Program
 from flask import Blueprint
 from flask import request
-from web_utils import *
-import json
-import time
-import re
-import os
+from web_utils import is_hex, error
 
 communication_endpoints = Blueprint('communication_endpoints', __name__)
 
@@ -18,10 +16,7 @@ communication_endpoints = Blueprint('communication_endpoints', __name__)
 def _get_status(run_id):
     if len(run_id) not in [12, 24] or not is_hex(run_id):
         return error('Run id invalid: %s' % run_id)
-    
-    # if re.match('^[0-9a-fA-F]{24}$', run_id) is None:
-    #     return error('Invalid run id: %s' % run_id)
-        
+
     runs = Run.objects(id=run_id)
     if len(runs) != 1:
         return error('No run found with id: %s' % run_id)
@@ -37,10 +32,10 @@ def _set_status(run_id, worker_id, status):
     runs = Run.objects(id=ObjectId(run_id))
     if len(runs) != 1:
         return error('No run found with id: %s' % run_id)
-    
+
     # TODO: add module / offset status
     if status not in ['RUNNING', 'ERROR', 'FINISHED']:
-        return error('Invalid status: %s' % status)    
+        return error('Invalid status: %s' % status)
 
     run = runs[0]
     if worker_id.isdigit():
@@ -56,7 +51,7 @@ def _set_status(run_id, worker_id, status):
 
     if all([ea in ['RUNNING', 'ERROR'] for ea in run.workers]):
         run.status = 'RUNNING'
-    
+
     run.save()
 
     return json.dumps({'status': run['status']})
@@ -67,7 +62,7 @@ def set_error(run_id, worker_id):
         return error('Run id invalid: %s' % run_id)
 
     runs = Run.objects(id=run_id)
-    run = runs[0] 
+    run = runs[0]
     content = request.get_json()
 
     if worker_id.isdigit():
@@ -109,7 +104,7 @@ def set_stats(run_id, worker_id):
         return error('Run id invalid: %s' % run_id)
 
     runs = Run.objects(id=run_id)
-    run = runs[0] 
+    run = runs[0]
     content = request.get_json()
     if worker_id.isdigit():
         worker_id = int(worker_id)
@@ -130,7 +125,7 @@ def remove_stats(run_id, worker_id):
         return error('Run id invalid: %s' % run_id)
 
     runs = Run.objects(id=run_id)
-    run = runs[0] 
+    run = runs[0]
     if worker_id.isdigit():
         worker_id = int(worker_id)
     else:
@@ -147,7 +142,7 @@ def remove_all_stats(run_id):
         return error('Run id invalid: %s' % run_id)
 
     runs = Run.objects(id=run_id)
-    run = runs[0] 
+    run = runs[0]
     run.stats = []
     run.save()
     return json.dumps(run.stats)
