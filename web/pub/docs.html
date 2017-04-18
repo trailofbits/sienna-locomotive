@@ -1,0 +1,161 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title></title>
+  <style type="text/css">code{white-space: pre;}</style>
+  <style type="text/css">
+div.sourceCode { overflow-x: auto; }
+table.sourceCode, tr.sourceCode, td.lineNumbers, td.sourceCode {
+  margin: 0; padding: 0; vertical-align: baseline; border: none; }
+table.sourceCode { width: 100%; line-height: 100%; }
+td.lineNumbers { text-align: right; padding-right: 4px; padding-left: 4px; color: #aaaaaa; border-right: 1px solid #aaaaaa; }
+td.sourceCode { padding-left: 5px; }
+code > span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code > span.dt { color: #902000; } /* DataType */
+code > span.dv { color: #40a070; } /* DecVal */
+code > span.bn { color: #40a070; } /* BaseN */
+code > span.fl { color: #40a070; } /* Float */
+code > span.ch { color: #4070a0; } /* Char */
+code > span.st { color: #4070a0; } /* String */
+code > span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code > span.ot { color: #007020; } /* Other */
+code > span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code > span.fu { color: #06287e; } /* Function */
+code > span.er { color: #ff0000; font-weight: bold; } /* Error */
+code > span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+code > span.cn { color: #880000; } /* Constant */
+code > span.sc { color: #4070a0; } /* SpecialChar */
+code > span.vs { color: #4070a0; } /* VerbatimString */
+code > span.ss { color: #bb6688; } /* SpecialString */
+code > span.im { } /* Import */
+code > span.va { color: #19177c; } /* Variable */
+code > span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code > span.op { color: #666666; } /* Operator */
+code > span.bu { } /* BuiltIn */
+code > span.ex { } /* Extension */
+code > span.pp { color: #bc7a00; } /* Preprocessor */
+code > span.at { color: #7d9029; } /* Attribute */
+code > span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code > span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code > span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+  </style>
+</head>
+<body>
+<h1 id="yaml-configuration">YAML Configuration</h1>
+<h2 id="system-configuration">System Configuration</h2>
+<p>The system configuration specifies the paths of required files and folder used in fuzzing. This should be created once for the base VM that is to be cloned when fuzzing.</p>
+<div class="sourceCode"><pre class="sourceCode yaml"><code class="sourceCode yaml">  <span class="co"># name of system config</span>
+  <span class="fu">name:</span>
+    System Name
+  <span class="co"># path to autoit executable</span>
+  <span class="fu">path_autoit:</span>
+    <span class="fu">C:</span>\Program Files (x86)\AutoIt3\
+  <span class="co"># path to windbg Debuggers directory</span>
+  <span class="fu">path_windbg:</span>
+    <span class="fu">C:</span>\Program Files (x86)\Windows Kits\10\Debuggers\
+  <span class="co"># path to radamsa</span>
+  <span class="fu">path_radamsa:</span>
+    <span class="fu">C:</span>\cigwin64\bin\
+  <span class="co"># path to dynamorio</span>
+  <span class="fu">path_dynamorio:</span>
+    <span class="fu">C:</span>\Users\uname\fuzzing\dynamorio\
+  <span class="co"># path to winafl </span>
+  <span class="fu">path_winafl:</span>
+    <span class="fu">C:</span>\Users\uname\fuzzing\winafl-master\
+  <span class="co"># path to vmfuzz</span>
+  <span class="fu">path_vmfuzz:</span>
+    <span class="fu">C:</span>\Users\uname\fuzzing\vmfuzz\
+  <span class="co"># list of available fuzzers</span>
+  <span class="fu">fuzzers:</span>
+    <span class="kw">-</span> winafl
+    <span class="kw">-</span> radamsa
+  <span class="co"># path used to create tmp files for the autoit lib system</span>
+  <span class="fu">path_autoit_working_dir:</span>
+    <span class="fu">C:</span>\Users\uname\fuzzing\working\autoit\
+  <span class="co"># path to the radamsa working directory</span>
+  <span class="fu">path_radamsa_working_dir:</span>
+    <span class="fu">C:</span>\Users\uname\fuzzing\working\radamsa\
+  <span class="co"># path to the winafl working directory</span>
+  <span class="fu">path_winafl_working_dir:</span>
+    <span class="fu">C:</span>\Users\uname\fuzzing\working\winafl\</code></pre></div>
+<h2 id="program-configuration">Program Configuration</h2>
+<p>The program configuration tells the fuzzer how to execute the program. There are some options that are required for command line applications, and some that are required for GUI applications (<code>using_autoit: yes</code>).</p>
+<div class="sourceCode"><pre class="sourceCode yaml"><code class="sourceCode yaml">  <span class="co"># name of program config</span>
+  <span class="fu">name:</span>
+    Program Name
+  <span class="co"># x86 or x64</span>
+  <span class="fu">arch:</span>
+    x64
+  <span class="co"># Fuzzing a GUI with AutoIT (yes / no)</span>
+  <span class="fu">using_autoit:</span>
+    no
+  <span class="co"># path to program  </span>
+  <span class="fu">path_program:</span> 
+    <span class="fu">C:</span>\Program Files\program\
+  <span class="co"># binary name </span>
+  <span class="fu">program_name:</span>
+    program.exe
+  <span class="co"># extension of file being fuzzed</span>
+  <span class="fu">file_format:</span>
+    .txt
+  
+  <span class="co">### Command Line Specific (using_autoit no)</span>
+
+  <span class="co"># Does the program close itself (yes / no)</span>
+  <span class="fu">auto_close:</span>
+    yes
+  <span class="co"># running time excepted</span>
+  <span class="fu">running_time:</span>
+    2
+  <span class="co"># arguments to the program</span>
+  <span class="fu">program_params:</span>
+    <span class="kw">-</span> -o
+    <span class="kw">-</span> &lt;FILE&gt; <span class="co"># replaced with the mutated file</span>
+  
+  <span class="co">### AutoIt Specific (using_autoit yes)</span>
+
+  <span class="co"># path to autoit script</span>
+  <span class="fu">path_autoit_script:</span>
+    <span class="fu">C:</span>\Users\uname\fuzzing\scripts\</code></pre></div>
+<h2 id="run-configuration">Run Configuration</h2>
+<p>The program configuration can be executed many times as <code>runs</code>. Most simply, you only need to provide the name of the run. You can optionally provide an amount of time to fuzz for and some parameters to tweak WinAFL and Radamsa.</p>
+<div class="sourceCode"><pre class="sourceCode yaml"><code class="sourceCode yaml">  <span class="co"># name of run config</span>
+  <span class="fu">name:</span>
+    Run Name
+  
+  <span class="co">### Optional </span>
+
+  <span class="co"># time (minutes) to fuzz for</span>
+  <span class="fu">fuzz_time:</span>
+    1440 <span class="co"># 24h</span>
+  
+  <span class="co">### Optional Winafl Configuration</span>
+
+  <span class="co"># timeout before changing targets (minutes)</span>
+  <span class="fu">winafl_last_path_timeout:</span>
+    45
+  <span class="co"># number of iterations before restarting the process</span>
+  <span class="fu">winafl_fuzzing_iteration:</span>
+    100000  
+  <span class="co"># nested list of targets</span>
+  <span class="fu">targets:</span>
+    <span class="kw">-</span>
+      <span class="kw">-</span> module.dll    <span class="co"># module of target function</span>
+      <span class="kw">-</span> offset        <span class="co"># offset of target function</span>
+      <span class="kw">-</span> module.dll    <span class="co"># coverage targets</span>
+      <span class="kw">-</span> program.exe
+  
+  <span class="co">### Optional Radamsa Configuration</span>
+
+  <span class="co"># number of files create at each radamsa round</span>
+  <span class="fu">radamsa_number_files_to_create:</span>
+    100
+  <span class="co"># seed pattern used by radamsa</span>
+  <span class="fu">seed_pattern:</span>
+    <span class="st">&quot;*.txt&quot;</span></code></pre></div>
+</body>
+</html>

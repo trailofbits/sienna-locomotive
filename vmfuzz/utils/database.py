@@ -74,3 +74,8 @@ def send_classification(config, data):
 
     url = 'http://%s:5000/_set_classification/%s' % (WEBAPP_IP, config['_program_id'])
     requests.post(url, json=data)
+
+def send_error(config, msg):
+    send_status(config, 'ERROR')
+    url = 'http://%s:5000/_set_error/%s/%s' % (WEBAPP_IP, config['_run_id'], config['_worker_id'])
+    requests.post(url, json={'msg': msg})

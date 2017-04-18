@@ -53,6 +53,7 @@ function visualizeStats() {
 
     vis.path = vis.g.append("path");
     vis.path
+      .attr('id', 'path_exec_line')
       .attr("fill", "none")
       .attr("stroke", "steelblue")
       .attr("stroke-linejoin", "round")

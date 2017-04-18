@@ -194,6 +194,7 @@ class Run(db.Document):
     status = db.StringField()
     workers = db.ListField(db.StringField())
     number_workers = db.IntField()
+    errors = db.ListField(db.StringField)
     # stats
     stats = db.ListField(db.ListField(db.DictField()))
 
@@ -234,6 +235,17 @@ def root():
         file: contents of index.html
     """
     return send_from_directory('pub', 'index.html')
+
+@app.route('/docs')
+def docs():
+    """
+    Web root, index.html
+    Args:
+        arg (type): description
+    Returns:
+        file: contents of index.html
+    """
+    return send_from_directory('pub', 'docs.html')
 
 # TODO: Integrate this into index.html
 @app.route('/client')
@@ -833,6 +845,7 @@ def run_start(run_id):
         run['_worker_id'] = worker_id
         task = task_run_start.apply_async(args=[sys, prog, run])
         run_to_update.workers.append('STARTING')
+        run_to_update.errors.append('')
         run_to_update.stats.append([])
 
     run_to_update.status = 'STARTING'
@@ -1176,6 +1189,28 @@ def _set_status(run_id, worker_id, status):
     run.save()
 
     return json.dumps({'status': run['status']})
+
+@app.route('/_set_error/<run_id>/<worker_id>', methods=['POST'])
+def set_error(run_id, worker_id):
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
+
+    runs = Run.objects(id=run_id)
+    run = runs[0] 
+    content = request.get_json()
+
+    if worker_id.isdigit():
+        worker_id = int(worker_id)
+    else:
+        worker_id = 0
+
+    if worker_id < run.number_workers and worker_id >= 0:
+        msg = content['msg']
+        run.errors[worker_id] = msg
+        run.save()
+
+        # print run.stats
+    return json.dumps({'success': True, 'message': 'Successfully set error.'})
 
 # debug function
 @app.route('/_get_status_worker/<run_id>/<worker_id>', methods=['GET'])
