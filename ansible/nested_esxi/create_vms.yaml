@@ -1,0 +1,22 @@
+---
+- hosts: localhost
+  connection: local
+  vars:
+    - ipesxi: 192.168.0.214
+    - ipvcenter: 192.168.0.227
+    - rootpassword: ?3qsfk.~3%4dbRUJ-d^8
+  tasks:
+    - vsphere_guest:
+            vcenter_hostname: '{{ ipvcenter }}'
+            username: administrator@vsphere.local
+            password: '{{ rootpassword }}'
+            guest: '{{ template }}_{{ run_uid }}_{{ item }}'
+            from_template: yes
+            power_on_after_clone: yes
+            template_src: '{{ template }}'
+            validate_certs: no
+            esxi:
+                datacenter: Datacenter
+                hostname: '{{ ipesxi }}'
+      with_sequence: start=0 count='{{ number_worker }}'
+

@@ -1,0 +1,8 @@
+---
+- vars:
+  - script: ./start_vms.sh
+  hosts: 127.0.0.1
+  connection: local
+  tasks:
+    - name: Execute the script
+      command: sh {{ script }} {{ template }} {{ run_uid }} {{ number_worker }} 

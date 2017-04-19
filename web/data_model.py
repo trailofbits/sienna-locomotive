@@ -47,7 +47,8 @@ class Program(db.Document):
         'path_program',
         'program_name',
         'file_format',
-        'system']
+        'system',
+        'vmtemplate']
 
     # Required
     name = db.StringField(unique=True)
@@ -58,6 +59,7 @@ class Program(db.Document):
     seed_pattern = db.StringField()
     file_format = db.StringField()
     system = db.ReferenceField(System)
+    vmtemplate = db.StringField()
 
     targets = db.ListField(db.DictField())
     crashes_classified = db.ListField(db.DictField())
@@ -71,6 +73,7 @@ class ProgramAutoIT(Program):
         'program_name',
         'file_format',
         'system',
+        'vmtemplate',
         'path_autoit_script']
 
     # With Autoit
@@ -85,6 +88,7 @@ class ProgramCMD(Program):
         'program_name',
         'file_format',
         'system',
+        'vmtemplate',
         'auto_close',
         'running_time',
         'parameters',]
@@ -110,7 +114,8 @@ class Run(db.Document):
         'winafl_fuzzing_iteration',
         'start_time',
         'end_time',
-        'program']
+        'program',
+        'number_workers']
 
     user_all = [
         'name',

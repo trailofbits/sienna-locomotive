@@ -14,6 +14,8 @@ from werkzeug.utils import secure_filename
 from data_model import Run, Program, System
 from web_utils import *
 
+import ansible_command
+
 run_endpoints = Blueprint('run_endpoints', __name__)
 
 with open('config.yaml') as config_file:
@@ -89,10 +91,15 @@ def run_add():
         # if key not in Run.required_all:
             # config.pop(key, None)
 
+
+
     try:
         print config
         run = Run(**config)
         run.save()
+        if 'vmtemplate' in prog:
+            ansible_command.command_vms(WEB_CONFIG['ANSIBLE_START_VM'], prog['vmtemplate'], run['_id'], run['number_workers'])
+
     except NotUniqueError:
         return error('Name already in use: %s' % config['name'])
 
@@ -122,7 +129,7 @@ def run_list(program_id):
         if 'end_time' in run:
             run['end_time'] = time.mktime(run['end_time'].timetuple())
 
-    print "Run id "+str(run['_id'])
+    print "Run id "+str(runs[0]['_id'])
 
     run_info = {'order': Run.required, 'runs': runs}
     return json.dumps(run_info, default=json_util.default)
@@ -293,6 +300,17 @@ def run_stop(run_id):
     run_to_update.save()
 
     print dir(run_to_update)
+
+    program_id = run['program']
+    if len(program_id) not in [12, 24] or not is_hex(program_id):
+        return error('Program id invalid: %s' % program_id)
+
+    prog = Program.objects(id=program_id)
+    if len(prog) != 1:
+        return error('Program id invalid: %s' % config['program'])
+
+    if 'vmtemplate' in prog:
+        ansible_command.command_vms(WEB_CONFIG['ANSIBLE_STOP_VM'], prog['vmtemplate'], run['_id'], run['number_workers'])
 
     return json.dumps({'run_id': str(run_to_update['id'])})
 
