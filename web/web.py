@@ -264,6 +264,14 @@ def run_start(run_id):
     run_to_update.status = 'STARTING'
     run_to_update.start_time = datetime.now()
     run_to_update.save()
+
+    if 'ANSIBLE_START_VM' in WEB_CONFIG and 'vmtemplate' in prog:
+        ansible_command.command_vms(
+            WEB_CONFIG['ANSIBLE_START_VM'], 
+            prog['vmtemplate'], 
+            run['id'], 
+            run['number_workers'])
+
     # print task.id
     return json.dumps({'run_id': run['_id']})
 

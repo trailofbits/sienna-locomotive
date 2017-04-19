@@ -97,8 +97,6 @@ def run_add():
         run.save()
 
         prog = run['program']
-        ansible_command.command_vms(WEB_CONFIG['ANSIBLE_START_VM'], prog['vmtemplate'], str(run['id']), run['number_workers'])
-
     except NotUniqueError:
         return error('Name already in use: %s' % config['name'])
 
@@ -302,7 +300,11 @@ def run_stop(run_id):
 
     prog = run_to_update['program']
 
-    ansible_command.command_vms(WEB_CONFIG['ANSIBLE_STOP_VM'], prog['vmtemplate'], str(run_to_update['id']), run_to_update['number_workers'])
+    if 'ANSIBLE_STOP_VM' in WEB_CONFIG:
+        ansible_command.command_vms(
+            WEB_CONFIG['ANSIBLE_STOP_VM'], prog['vmtemplate'], 
+            str(run_to_update['id']), 
+            run_to_update['number_workers'])
 
     return json.dumps({'run_id': str(run_to_update['id'])})
 
