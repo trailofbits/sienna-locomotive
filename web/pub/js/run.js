@@ -2,7 +2,7 @@
 ** RUN
 */
 
-function runList(empty_list=false, programId, selectId) {
+function runList(empty_list=false, programId, selectId, showRun=false) {
     if(programId == undefined)
         programId = $('#program_select').val();
     if(programId == '--')
@@ -56,6 +56,9 @@ function runList(empty_list=false, programId, selectId) {
             if(selectId != undefined) {
                 $('#run_select').val(selectId);
                 runSelect();
+                if(showRun) {
+                    $('#run_details_btn').trigger('click');
+                }
             }
         }
     });
@@ -105,7 +108,7 @@ function runAdd() {
                 return;
             } 
             var runId = data['run_id'];
-            runList(true);
+            runList(true, undefined, runId, true);
         }
     });
 }
@@ -161,6 +164,12 @@ function runFilesList() {
             } 
             
             $('#run_files_select').empty();
+
+            if(data.length < 1) {
+                $('#run_files_header').css('color', 'red');
+            } else {
+                $('#run_files_header').css('color', 'black');
+            }
 
             for(var idx in data) {
                 var file = data[idx];
