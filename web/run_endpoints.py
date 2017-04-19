@@ -91,8 +91,6 @@ def run_add():
         # if key not in Run.required_all:
             # config.pop(key, None)
 
-
-
     try:
         print config
         run = Run(**config)

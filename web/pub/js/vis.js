@@ -143,11 +143,15 @@ function runStatsSuccess(data) {
         var stat = stats[idx];
         recent[stat.worker] = stat;
         total.date = stat.date;
-        total.execs = recent.reduce(function(a, b) { 
-            return a.execs + b.execs; }, {'execs': 0});
+        total.execs = 0;
+        for(var idx in recent) {
+            total.execs += recent[idx].execs;
+        }
         totals.push(total);
     }
 
+    window.recent = recent;
+    window.tots = totals;
     vis.data = totals;
 
     if($('svg').children().children().length == 0) {
@@ -160,16 +164,17 @@ function runStatsSuccess(data) {
 }
 
 function runStatusSuccess(statuses, stats) {
+    $('#worker_stats_div').empty();
     for(var idx in statuses) {
         var status = statuses[idx];
         if(stats === undefined) {
-            var stats = {
+            var stat = {
                 'execs': 0,
                 'crashes': 0,
                 'paths': 0
             };
         } else {
-            var stats = stats[idx];
+            var stat = stats[idx];
         }
 
         var workerDiv = $('<div></div>');
@@ -184,24 +189,23 @@ function runStatusSuccess(statuses, stats) {
         var execsSpan = $('<span></span>');
         execsSpan.addClass('column');
         execsSpan.addClass('_25');
-        execsSpan.text(stats.execs + ' execs/s');
+        execsSpan.text(stat.execs + ' execs/s');
 
         var pathsSpan = $('<span></span>');
         pathsSpan.addClass('column');
         pathsSpan.addClass('_25');
-        pathsSpan.text(stats.paths + ' paths');
+        pathsSpan.text(stat.paths + ' paths');
 
         var crashesSpan = $('<span></span>');
         crashesSpan.addClass('column');
         crashesSpan.addClass('_25');
-        crashesSpan.text(stats.crashes + ' crashes');
+        crashesSpan.text(stat.crashes + ' crashes');
 
         workerDiv.append(statusSpan);
         workerDiv.append(execsSpan);
         workerDiv.append(pathsSpan);
         workerDiv.append(crashesSpan);
 
-        $('#worker_stats_div').empty();
         $('#worker_stats_div').append(workerDiv);
     }
 }
