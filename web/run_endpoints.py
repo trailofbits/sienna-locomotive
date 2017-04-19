@@ -97,8 +97,9 @@ def run_add():
         print config
         run = Run(**config)
         run.save()
-        if 'vmtemplate' in prog:
-            ansible_command.command_vms(WEB_CONFIG['ANSIBLE_START_VM'], prog['vmtemplate'], run['_id'], run['number_workers'])
+
+        prog = run['program']
+        ansible_command.command_vms(WEB_CONFIG['ANSIBLE_START_VM'], prog['vmtemplate'], str(run['id']), run['number_workers'])
 
     except NotUniqueError:
         return error('Name already in use: %s' % config['name'])
@@ -301,16 +302,9 @@ def run_stop(run_id):
 
     print dir(run_to_update)
 
-    program_id = run['program']
-    if len(program_id) not in [12, 24] or not is_hex(program_id):
-        return error('Program id invalid: %s' % program_id)
+    prog = run_to_update['program']
 
-    prog = Program.objects(id=program_id)
-    if len(prog) != 1:
-        return error('Program id invalid: %s' % config['program'])
-
-    if 'vmtemplate' in prog:
-        ansible_command.command_vms(WEB_CONFIG['ANSIBLE_STOP_VM'], prog['vmtemplate'], run['_id'], run['number_workers'])
+    ansible_command.command_vms(WEB_CONFIG['ANSIBLE_STOP_VM'], prog['vmtemplate'], str(run_to_update['id']), run_to_update['number_workers'])
 
     return json.dumps({'run_id': str(run_to_update['id'])})
 

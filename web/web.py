@@ -19,7 +19,6 @@ from web_utils import error, is_hex
 
 sys.path.append(os.path.join('..', 'vmfuzz'))
 import vmfuzz
-import ansible_command
 
 '''
 INITIALIZATION
@@ -220,10 +219,6 @@ def run_start(run_id):
     progs = Program.objects(id=run['program'])
     prog = progs[0].to_mongo().to_dict()
 
-
-    if 'vmtemplate' in prog:
-        ansible_command.command_vms(WEB_CONFIG['ANSIBLE_START_VM'], prog['vmtemplate'], run['_id'], run['number_workers'])
-
     input_path = os.path.join(PATH_SHARED_INPUT_CRASHES, run['input_dir'])
     ext = prog['file_format']
     flist = os.listdir(input_path)
@@ -259,6 +254,7 @@ def run_start(run_id):
     run_to_update = runs[0]
 
     for worker_id in xrange(number_workers):
+        print "launch "+str(worker_id)
         run['_worker_id'] = worker_id
         task = task_run_start.apply_async(args=[system, prog, run])
         run_to_update.workers.append('STARTING')

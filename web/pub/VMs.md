@@ -10,7 +10,7 @@ VMs can be deployed in:
 
 A VM template containing `vmfuzz` and the targeted program has to be provided. Please refer to the [vmfuzz installation guidelines](../vmfuzz/Install.md).
 
-- On virtualbox, a VM is a template.
+- On virtualbox, a VM is a template. Create a snapshot of the VM called `startup` (when the VM is poweroff)
 - On vmware, a VM can be converted to a template using vcenter.
 
 
