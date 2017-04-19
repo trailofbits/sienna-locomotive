@@ -390,37 +390,28 @@ def generate_target(config_winafl):
     return ret
 
 
-def generate_stats(config_winafl, line):
+def generate_stats(fuzzer_stats, config_winafl):
     """
     Generate the data to be sent to the webapp
 
     Args:
+        fuzzer_stats (dict): The fuzzer_stats dict
         config_winafl (dict): The winafl configuration
-        line (string): line to be parsed
     Returns:
         dict: data to be sent to the webapp
     """
     target = generate_target(config_winafl)
-    if line.startswith("#"):
-        return {}
-    unix_time, cycles_done, cur_path, paths_total,\
-        pending_total, pending_favs, map_size,\
-        unique_crashes, unique_hangs, max_depth,\
-        execs_per_sec = line.split(', ')
     data = {
         'fuzzers': "winafl",
-        'target': target,
-        'stats': {'unix_time': unix_time,
-                  'cycles_done': cycles_done,
-                  'cur_path': cur_path,
-                  'paths_total': paths_total,
-                  'pending_total': pending_total,
-                  'pending_favs': pending_favs,
-                  'map_size': map_size,
-                  'unique_crashes': unique_crashes,
-                  'unique_hangs': unique_hangs,
-                  'max_depth': max_depth,
-                  'execs_per_sec': execs_per_sec
+        'stats': {'last_update': fuzzer_stats['last_update'],
+                  'execs_done': fuzzer_stats['execs_done'],
+                  'execs_per_sec': fuzzer_stats['execs_per_sec'],
+                  'paths_total': fuzzer_stats['paths_total'],
+                  'unique_crashes': fuzzer_stats['unique_crashes'],
+                  'unique_hangs': fuzzer_stats['unique_hangs'],
+                  'last_crash': fuzzer_stats['last_crash'],
+                  'execs_done': fuzzer_stats['execs_done'],
+                  'target': target
                  }
     }
     return data
@@ -440,32 +431,26 @@ def check_running_time(config_winafl):
             return True
     return False
 
-def winafl_send_stats(config, config_winafl, f_plot_data):
+def winafl_send_stats(config, config_winafl, fuzzer_stats, last_update):
     """
     Send the stats to the webapp
     Args:
         config (dict): The user configuration
         config_winafl (dict): The winafl configuration
-        f_plot_data (file): The fuzzer_stats file
+        fuzzer_stats (dict): The fuzzer_stats dict
+        last_update (int): The last timesamp
     Note:
         The data is sent as a dict {'stats' : stats}
 
     """
 
     # curr_pos is used to avoid reading the whole plot_data file
-    curr_pos = f_plot_data.tell()
-    line = f_plot_data.readline()
-    all_data = []
-    while line:
-        data = generate_stats(config_winafl, line)
-        if data:
-            all_data.append(data)
-        line = f_plot_data.readline()
-    if all_data:
-        data_send = {'stats': all_data}
+    data = generate_stats(fuzzer_stats, config_winafl)
+    new_update = data['stats']['last_update']
+    if new_update > last_update:
+        data_send = {'stats': data}
         database.send_stats(config, data_send)
-    else:
-        f_plot_data.seek(curr_pos)
+    return new_update
 
 def process_winafl(config, config_winafl, winafl_proc):
     """
@@ -493,7 +478,7 @@ def process_winafl(config, config_winafl, winafl_proc):
     fuzzer_stats = winafl_stats.get_stat(out_dir)
     if fuzzer_stats:
         iteration = 0
-        f_plot_data = open(os.path.join(out_dir, "plot_data"))
+        last_update = fuzzer_stats['last_update']
         while True:
             time.sleep(10)
 
@@ -502,15 +487,10 @@ def process_winafl(config, config_winafl, winafl_proc):
                 kill_all(config)
                 return 3
 
-            # Send stat to the web app
-            # TODO JF add better procedure to check if recon
-            if "recon" not in out_dir:
-                winafl_send_stats(config, config_winafl, f_plot_data)
 
             # If the process has stopeed
             if winafl_proc.poll() is not None:
                 logging.debug("process stoped?")
-                f_plot_data.close()
                 return 0
 
             # In case of crash or hangs
@@ -522,8 +502,13 @@ def process_winafl(config, config_winafl, winafl_proc):
             if not fuzzer_stats:
                 logging.debug("No fuzzer_stats file found " + out_dir +
                               " after " + str(iteration) + " iterations")
-                f_plot_data.close()
                 return 0
+
+            # Send stat to the web app
+            # TODO JF add better procedure to check if recon
+            if "recon" not in out_dir:
+                last_update = winafl_send_stats(config, config_winafl, fuzzer_stats, last_update)
+
 
             last_path_sec = winafl_stats.get_last_path_sec(fuzzer_stats)
 
@@ -535,10 +520,8 @@ def process_winafl(config, config_winafl, winafl_proc):
             iteration = iteration + 1  # TODO JF sensible to overflow
 
         if iteration == 0:
-            f_plot_data.close()
             return 1
         else:
-            f_plot_data.close()
             return 2
     else:
         logging.debug(

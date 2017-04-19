@@ -113,7 +113,7 @@ def set_stats(run_id, worker_id):
 
     if worker_id < run.number_workers and worker_id >= 0:
         stats = content['stats']
-        run.stats[worker_id] = run.stats[worker_id] + stats
+        run.stats[worker_id] = run.stats[worker_id] + [stats]
         run.save()
         # print run.stats
     return json.dumps({'success': True, 'message': 'Successfully set stats.'})

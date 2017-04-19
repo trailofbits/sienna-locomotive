@@ -22,13 +22,16 @@ Please create `startup.bat` in the `shell:startup` directory of Windows of the t
 ```batch
 X: 
 cd X:\path_to_sienna_locomotive\web
-celery -A web.celery worker
+celery -A web.celery worker -n worker%RANDOM%@%h
 ```
 
 ``X:`` is used if the script in not in the C: directory
 
 
-A first start of Windows can be needed to allow the launch of the script at the startup.
+` -n worker%RANDOM%@%h `is used to set a random hostname to the worker
+
+
+A first start of the VM is needed to allow the launch of the script at the startup.
 
 
 

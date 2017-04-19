@@ -102,7 +102,7 @@ function runStatsSuccess(data) {
     for(var widx in data) {
         var worker_stats = data[widx];
         for(sidx in worker_stats) {
-            var unix = worker_stats[sidx]['stats'].unix_time;
+            var unix = worker_stats[sidx]['stats'].last_update;
             var execs = parseInt(worker_stats[sidx]['stats'].execs_per_sec);
             var paths = worker_stats[sidx]['stats'].paths_total;
             var crashes = worker_stats[sidx]['stats'].unique_crashes;
