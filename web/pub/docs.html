@@ -120,7 +120,18 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 
   <span class="co"># path to autoit script</span>
   <span class="fu">path_autoit_script:</span>
-    <span class="fu">C:</span>\Users\uname\fuzzing\scripts\</code></pre></div>
+    <span class="fu">C:</span>\Users\uname\fuzzing\scripts\
+
+
+ <span class="co">### Ansible </span>
+
+ <span class="co"># base name of template vm</span>
+ <span class="co">#  Note: in VirtualBox you must clone the VM</span>
+ <span class="co">#  with names </span>
+ <span class="co">#  &lt;vmtemplate&gt;_0, &lt;vmtemplate&gt;_1, ..., &lt;vmtemplate&gt;_n</span>
+ <span class="co">#  where n is the number_workers (in run config) minus 1</span>
+ <span class="fu">vmtemplate:</span>
+    Name of VM</code></pre></div>
 <h2 id="run-configuration">Run Configuration</h2>
 <p>The program configuration can be executed many times as <code>runs</code>. Most simply, you only need to provide the name of the run. You can optionally provide an amount of time to fuzz for and some parameters to tweak WinAFL and Radamsa.</p>
 <div class="sourceCode"><pre class="sourceCode yaml"><code class="sourceCode yaml">  <span class="co"># name of run config</span>
@@ -132,6 +143,8 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
   <span class="co"># time (minutes) to fuzz for</span>
   <span class="fu">fuzz_time:</span>
     1440 <span class="co"># 24h</span>
+  <span class="fu">number_workers:</span>
+    2    <span class="co"># number of VMs that are running or are to be started with Ansible</span>
   
   <span class="co">### Optional Winafl Configuration</span>
 

@@ -83,6 +83,17 @@ The program configuration tells the fuzzer how to execute the program. There are
   # path to autoit script
   path_autoit_script:
     C:\Users\uname\fuzzing\scripts\
+
+
+ ### Ansible 
+
+ # base name of template vm
+ #  Note: in VirtualBox you must clone the VM
+ #  with names 
+ #  <vmtemplate>_0, <vmtemplate>_1, ..., <vmtemplate>_n
+ #  where n is the number_workers (in run config) minus 1
+ vmtemplate:
+    Name of VM
 ```
 
 ## Run Configuration
@@ -99,6 +110,8 @@ The program configuration can be executed many times as `runs`. Most simply, you
   # time (minutes) to fuzz for
   fuzz_time:
     1440 # 24h
+  number_workers:
+    2    # number of VMs that are running or are to be started with Ansible
   
   ### Optional Winafl Configuration
 
