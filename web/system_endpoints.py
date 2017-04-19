@@ -19,7 +19,11 @@ def sys_add():
         json: id of the created system
     """
     config_str = request.form['yaml']
-    config = yaml.load(config_str)
+    try:
+        config = yaml.load(config_str)
+    except yaml.scanner.ScannerError, e:
+        return error('YAML load failed with message: \n' + str(e))
+
     # print config
 
     missing = []
@@ -102,7 +106,10 @@ def sys_edit():
         return error('System with id not found: %s' % system_id)
 
     config_str = request.form['yaml']
-    config = yaml.load(config_str)
+    try:
+        config = yaml.load(config_str)
+    except yaml.scanner.ScannerError, e:
+        return error('YAML load failed with message: \n' + str(e))
 
     system[0].modify(**config)
     return json.dumps({'success': True, 'message': 'Successfully edited %s' % system_id})

@@ -19,7 +19,10 @@ def prog_add_gui():
         json: id of the created program
     """
     config_str = request.form['yaml']
-    config = yaml.load(config_str)
+    try:
+        config = yaml.load(config_str)
+    except yaml.scanner.ScannerError, e:
+        return error('YAML load failed with message: \n' + str(e))
     # print config
 
     missing = []
@@ -52,7 +55,10 @@ def prog_add_cmd():
         json: id of the created program
     """
     config_str = request.form['yaml']
-    config = yaml.load(config_str)
+    try:
+        config = yaml.load(config_str)
+    except yaml.scanner.ScannerError, e:
+        return error('YAML load failed with message: \n' + str(e))
     # print config
 
     missing = []
@@ -149,7 +155,10 @@ def prog_edit():
         return error('Program with id not found: %s' % program_id)
 
     config_str = request.form['yaml']
-    config = yaml.load(config_str)
+    try:
+        config = yaml.load(config_str)
+    except yaml.scanner.ScannerError, e:
+        return error('YAML load failed with message: \n' + str(e))
 
     program[0].modify(**config)
     return json.dumps({'success': True, 'message': 'Successfully edited %s' % program_id})

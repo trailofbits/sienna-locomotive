@@ -35,7 +35,10 @@ def run_add():
         json: object id of the created run config
     """
     config_str = request.form['yaml']
-    config = yaml.load(config_str)
+    try:
+        config = yaml.load(config_str)
+    except yaml.scanner.ScannerError, e:
+        return error('YAML load failed with message: \n' + str(e))
 
     if 'name' not in config:
         config['name'] = 'run_%s' % hex(int(time.time()))[2:]
@@ -330,7 +333,10 @@ def run_edit():
         return error('Cannot edit a run once it has started!')
 
     config_str = request.form['yaml']
-    config = yaml.load(config_str)
+    try:
+        config = yaml.load(config_str)
+    except yaml.scanner.ScannerError, e:
+        return error('YAML load failed with message: \n' + str(e))
 
     # TODO: check config against allowed variables
     run[0].modify(**config)
