@@ -3,10 +3,11 @@
 
 import subprocess
 import os
-import logging
+import utils.logs as logging
 import exploitability.crash_detection as crash_detection
 
 AUTOIT_BIN = ""
+
 
 def init(config_system):
     """
@@ -19,9 +20,10 @@ def init(config_system):
     global AUTOIT_BIN
     AUTOIT_BIN = os.path.join(config_system['path_autoit'], "AutoIt3.exe")
 
+
 def run(autoit_script, parameters):
     """
-    Run autoit scrit 
+    Run autoit script
 
     Args:
         autoit_script (string): path to the script
@@ -32,6 +34,7 @@ def run(autoit_script, parameters):
     cmd = [AUTOIT_BIN, autoit_script] + parameters
     logging.debug("Run autoit: "+str(cmd))
     subprocess.Popen(cmd, stdout=subprocess.PIPE)
+
 
 def run_and_wait(autoit_script, parameters):
     """
@@ -44,6 +47,7 @@ def run_and_wait(autoit_script, parameters):
     cmd = [AUTOIT_BIN, autoit_script] + parameters
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
     proc.wait()
+
 
 def run_and_check(autoit_script, parameters):
     """
@@ -67,5 +71,3 @@ def run_and_check(autoit_script, parameters):
     if ret_code != 0:
         return True
     return False
-
-

@@ -26,6 +26,7 @@ def compute_md5(file_name, block_size=2**20):
     f_desc.close()
     return md5.hexdigest()
 
+
 def create_dir(directory):
     """
     Create the directory if it does not exist
@@ -35,6 +36,7 @@ def create_dir(directory):
     """
     if not os.path.exists(directory):
         os.makedirs(directory)
+
 
 def move_dir(dir_src, dir_dst):
     """
@@ -49,7 +51,9 @@ def move_dir(dir_src, dir_dst):
     shutil.rmtree(dir_dst, ignore_errors=True, onerror=None)
     shutil.copytree(dir_src, dir_dst)
 
-def move_generated_inputs(path_src, path_dst, file_format, pattern_src="", pattern_dst=""):
+
+def move_generated_inputs(path_src, path_dst, file_format,
+                          pattern_src="", pattern_dst=""):
     """
     Move inputs files
 
@@ -90,6 +94,16 @@ def move_generated_inputs(path_src, path_dst, file_format, pattern_src="", patte
             shutil.copy(src, dst)
     return dst_md5
 
-def generate_parameters(parameters, fuzz_file):
-    return [fuzz_file if x == "<FILE>" else x for x in parameters]
 
+def generate_parameters(parameters, fuzz_file):
+    """
+    Generate the parameters
+
+    Args:
+        parameters (string list): list of parameters
+        fuzz_file (string)
+    Returns:
+        string list: new list parameters where <FILE> has been replaced
+        by fuzz_file
+    """
+    return [fuzz_file if x == "<FILE>" else x for x in parameters]

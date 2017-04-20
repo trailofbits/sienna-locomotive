@@ -2,4 +2,3 @@
 
 RADAMSA_BIN = ""
 WORKING_DIRECTORY = ""
-

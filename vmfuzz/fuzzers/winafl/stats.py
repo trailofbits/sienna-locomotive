@@ -2,9 +2,10 @@
 
 import datetime
 import os
-import logging
 
 import fuzzers.winafl.winafl_constants as winafl_constants
+import utils.logs as logging
+
 
 def parsing_stat(file_name):
     """
@@ -29,6 +30,7 @@ def parsing_stat(file_name):
     fuzzer_stats = dict(fuzzer_stats)
     return fuzzer_stats
 
+
 def get_stat(out_dir):
     """
     Return the winafl stat
@@ -41,6 +43,7 @@ def get_stat(out_dir):
         If the fuzzer_stats does not exist, returns an empty dict
     """
     return parsing_stat(os.path.join(out_dir, "fuzzer_stats"))
+
 
 def get_duration(fuzzer_stats):
     """
@@ -57,6 +60,7 @@ def get_duration(fuzzer_stats):
     start_time = datetime.datetime(1601, 1, 1) + \
         datetime.timedelta(0, start_time)
     return (now - start_time).total_seconds()
+
 
 def get_last_crash_sec(fuzzer_stats):
     """
@@ -116,6 +120,7 @@ def get_number_paths(fuzzer_stats):
     """
     return int(fuzzer_stats['paths_found'])
 
+
 def get_execs_sec_paths(fuzzer_stats):
     """
     Returns the number of executions per sec
@@ -128,7 +133,6 @@ def get_execs_sec_paths(fuzzer_stats):
     return float(fuzzer_stats['execs_per_sec'])
 
 
-
 def get_number_paths_from_config(config_winafl):
     """
     Returns the number of paths found
@@ -139,11 +143,14 @@ def get_number_paths_from_config(config_winafl):
         int: The number of paths
     """
     path_fuzzer_stats = os.path.join(
-        winafl_constants.WINAFL_WORKING_DIR, config_winafl['out_dir'], "fuzzer_stats")
+        winafl_constants.WINAFL_WORKING_DIR,
+        config_winafl['out_dir'],
+        "fuzzer_stats")
     fuzzer_stats = parsing_stat(path_fuzzer_stats)
     if not fuzzer_stats:
         return 0
     return get_number_paths(fuzzer_stats)
+
 
 def get_execs_sec_from_config(config_winafl):
     """
@@ -155,7 +162,9 @@ def get_execs_sec_from_config(config_winafl):
         int: The number of paths
     """
     path_fuzzer_stats = os.path.join(
-        winafl_constants.WINAFL_WORKING_DIR, config_winafl['out_dir'], "fuzzer_stats")
+        winafl_constants.WINAFL_WORKING_DIR,
+        config_winafl['out_dir'],
+        "fuzzer_stats")
     fuzzer_stats = parsing_stat(path_fuzzer_stats)
     if not fuzzer_stats:
         return 0
@@ -172,4 +181,3 @@ def get_number_crashes(fuzzer_stats):
         int: The number of crashes
     """
     return int(fuzzer_stats['uniq_crashes'])
-

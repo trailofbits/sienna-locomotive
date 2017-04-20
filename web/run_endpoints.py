@@ -14,8 +14,6 @@ from werkzeug.utils import secure_filename
 from data_model import Run, Program, System
 from web_utils import *
 
-import ansible_command
-
 run_endpoints = Blueprint('run_endpoints', __name__)
 
 with open('config.yaml') as config_file:
@@ -300,14 +298,6 @@ def run_stop(run_id):
     run_to_update.save()
 
     print dir(run_to_update)
-
-    prog = run_to_update['program']
-
-    if 'ANSIBLE_STOP_VM' in WEB_CONFIG:
-        ansible_command.command_vms(
-            WEB_CONFIG['ANSIBLE_STOP_VM'], prog['vmtemplate'], 
-            str(run_to_update['id']), 
-            run_to_update['number_workers'])
 
     return json.dumps({'run_id': str(run_to_update['id'])})
 

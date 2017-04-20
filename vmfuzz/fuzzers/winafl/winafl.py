@@ -6,7 +6,6 @@ import time
 import os
 import threading
 import shutil
-import logging
 
 import fuzzers.winafl.compute_offset as compute_offset
 import fuzzers.winafl.winafl_constants as winafl_constants
@@ -16,6 +15,7 @@ import autoit.autoit_lib as autoit_lib
 import utils.file_manipulation as file_manipulation
 import utils.run_process as run_process
 import utils.database as database
+import utils.logs as logging
 
 
 def init(config_system):
@@ -228,8 +228,7 @@ def generate_winafl_cmd(config_winafl, running_cmd):
                                config_winafl['nargs'],
                                '-fuzz_iterations',
                                config_winafl['fuzz_iterations'],
-                               '--'
-                              ]
+                               '--']
     running_cmd = ["@@" if config_winafl['file']
                    in x else x for x in running_cmd]
     return winafl_cmd + running_cmd
@@ -279,9 +278,6 @@ def run_winafl_without_autoit(config_winafl, running_cmd):
         Check every 10 secondes for 1 min if the process is running
     """
 
-    ## Need winafl.dll in the wokring directory (x86 or x64)
-    #move_winafl_dll(config_winafl)
-
     cmd = generate_winafl_cmd(config_winafl, running_cmd)
     logging.debug("Winafl working dir; " + config_winafl['working_dir'])
     cmd_drrun = generate_drrun_cmd(config_winafl, running_cmd)
@@ -290,8 +286,9 @@ def run_winafl_without_autoit(config_winafl, running_cmd):
     logging.debug("winafl cmd: " + pp_cmd(cmd))
 
     config_winafl['winafl_starting_time'] = time.time()
-    proc = subprocess.Popen(pp_cmd(
-        cmd), creationflags=subprocess.CREATE_NEW_CONSOLE, cwd=config_winafl['working_dir'])
+    proc = subprocess.Popen(pp_cmd(cmd),
+                            creationflags=subprocess.CREATE_NEW_CONSOLE,
+                            cwd=config_winafl['working_dir'])
 
     # let winafl runs for one min
     for _ in range(0, 6):
@@ -323,7 +320,8 @@ def launch_autoit(path_autoit_script, fuzz_file, stop):
                     return
 
 
-def run_winafl_autoit(config_winafl, path_autoit_script, program_name, running_cmd, fuzz_file):
+def run_winafl_autoit(config_winafl, path_autoit_script,
+                      program_name, running_cmd, fuzz_file):
     """
     Run winafl
 
@@ -342,20 +340,18 @@ def run_winafl_autoit(config_winafl, path_autoit_script, program_name, running_c
         Check every 10 secondes for 1 min if the process is running
     """
 
-    ## Need winafl.dll in the wokring directory (x86 or x64)
-    #move_winafl_dll(config_winafl)
-
     cmd_drrun = generate_drrun_cmd(config_winafl, running_cmd)
     logging.debug("drrun cmd: " + pp_cmd(cmd_drrun))
     cmd = generate_winafl_cmd(config_winafl, running_cmd)
     logging.debug("winafl cmd: " + pp_cmd(cmd))
 
     config_winafl['winafl_starting_time'] = time.time()
-    proc = subprocess.Popen(pp_cmd(
-        cmd), creationflags=subprocess.CREATE_NEW_CONSOLE, cwd=config_winafl['working_dir'])
+    proc = subprocess.Popen(pp_cmd(cmd),
+                            creationflags=subprocess.CREATE_NEW_CONSOLE,
+                            cwd=config_winafl['working_dir'])
 
-    path_autoit_script = autoit_lib.get_autoit_path(
-        path_autoit_script, "winafl")
+    path_autoit_script = autoit_lib.get_autoit_path(path_autoit_script,
+                                                    "winafl")
 
     t_autoit_stop = threading.Event()
     t_autoit = threading.Thread(target=launch_autoit, args=(
@@ -385,8 +381,7 @@ def generate_target(config_winafl):
 
     ret = {'cov_modules': config_winafl['cov_modules'],
            'offset': config_winafl['offset'],
-           'module': config_winafl['module']
-          }
+           'module': config_winafl['module']}
     return ret
 
 
@@ -410,11 +405,10 @@ def generate_stats(fuzzer_stats, config_winafl):
                   'unique_crashes': fuzzer_stats['unique_crashes'],
                   'unique_hangs': fuzzer_stats['unique_hangs'],
                   'last_crash': fuzzer_stats['last_crash'],
-                  'execs_done': fuzzer_stats['execs_done'],
-                  'target': target
-                 }
+                  'target': target}
     }
     return data
+
 
 def check_running_time(config_winafl):
     """
@@ -430,6 +424,7 @@ def check_running_time(config_winafl):
         if diff_time > config_winafl['winafl_max_time']:
             return True
     return False
+
 
 def winafl_send_stats(config, config_winafl, fuzzer_stats, last_update):
     """
@@ -452,6 +447,7 @@ def winafl_send_stats(config, config_winafl, fuzzer_stats, last_update):
         database.send_stats(config, data_send)
     return new_update
 
+
 def process_winafl(config, config_winafl, winafl_proc):
     """
     Loop until winafl does not found new paths. Send stats to the webapp
@@ -468,7 +464,8 @@ def process_winafl(config, config_winafl, winafl_proc):
             - 1: One winafl iteration
             - 2: At least two winafl iteration
 
-        Every last_path_timeout, it checks if a new path was disccovered recently
+        Every last_path_timeout,\
+        it checks if a new path was disccovered recently
 
     """
     out_dir = os.path.join(
@@ -486,7 +483,6 @@ def process_winafl(config, config_winafl, winafl_proc):
             if check_running_time(config_winafl):
                 kill_all(config)
                 return 3
-
 
             # If the process has stopeed
             if winafl_proc.poll() is not None:
@@ -507,8 +503,10 @@ def process_winafl(config, config_winafl, winafl_proc):
             # Send stat to the web app
             # TODO JF add better procedure to check if recon
             if "recon" not in out_dir:
-                last_update = winafl_send_stats(config, config_winafl, fuzzer_stats, last_update)
-
+                last_update = winafl_send_stats(config,
+                                                config_winafl,
+                                                fuzzer_stats,
+                                                last_update)
 
             last_path_sec = winafl_stats.get_last_path_sec(fuzzer_stats)
 
@@ -662,8 +660,10 @@ def generate_running_cmd(config):
     parameters = file_manipulation.generate_parameters(
         config['parameters'], "seed" + config['file_format'])
 
-    running_cmd = ['"' + os.path.join(config['path_program'],
-                                      config["program_name"]) + '"'] + parameters
+    cmd = ['"' +
+           os.path.join(config['path_program'], config["program_name"]) +
+           '"']
+    running_cmd = cmd + parameters
     return running_cmd
 
 
@@ -740,15 +740,15 @@ def run_winafl(config, config_winafl, running_cmd, path_file_to_fuzz):
         Without, is it given added to the running command
     """
     if config['using_autoit']:
-        (ret, t_autoit_stop, winafl_proc) = run_winafl_autoit(config_winafl,
-                                                              config[
-                                                                  'path_autoit_script'],
-                                                              config[
-                                                                  'program_name'],
-                                                              running_cmd,
-                                                              path_file_to_fuzz)
+        ret_winafl_autoit = run_winafl_autoit(config_winafl,
+                                              config['path_autoit_script'],
+                                              config['program_name'],
+                                              running_cmd,
+                                              path_file_to_fuzz)
+        (ret, t_autoit_stop, winafl_proc) = ret_winafl_autoit
     else:
-        (ret, winafl_proc) = run_winafl_without_autoit(config_winafl, running_cmd)
+        (ret, winafl_proc) = run_winafl_without_autoit(config_winafl,
+                                                       running_cmd)
     logging.debug("Return value " + str(ret))
     if ret == 1:
         logging.debug("Winafl started")

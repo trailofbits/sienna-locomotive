@@ -1,11 +1,10 @@
 """ Module used to perform quick winafl testing """
 import os
-import logging
 import yaml
 import fuzzers.winafl.winafl as winafl
 import fuzzers.winafl.winafl_constants as winafl_constants
 import fuzzers.winafl.stats as winafl_stats
-
+import utils.logs as logging
 
 
 def get_targets(path_file):
@@ -21,7 +20,8 @@ def get_targets(path_file):
         0x0,module1
         0x1,module2
     """
-    input_file = open(os.path.join(winafl_constants.WINAFL_WORKING_DIR, path_file), "r")
+    input_file = open(os.path.join(winafl_constants.WINAFL_WORKING_DIR,
+                                   path_file), "r")
     targets = yaml.load(input_file)
     input_file.close()
     return targets['targets']
@@ -39,8 +39,10 @@ def save_targets(targets, path_file):
         0x0,module1
         0x1,module2
     """
-    output_file = open(os.path.join(winafl_constants.WINAFL_WORKING_DIR, path_file), "w")
-    targets = {'targets' : targets}
+    output_file = open(os.path.join(winafl_constants.WINAFL_WORKING_DIR,
+                                    path_file),
+                       "w")
+    targets = {'targets': targets}
     yaml.dump(targets, output_file)
     output_file.close()
 
@@ -97,7 +99,8 @@ def launch_recon(config, t_fuzz_stopped):
             target['type'] = 'PATHS_RECON'
             target['execs_sec_recon'] = execs_sec
             target['number_paths_recon'] = number_paths
-            logging.info("Interesting target " + str(number_paths)+ " "+str(execs_sec))
+            logging.info("Interesting target " + str(number_paths) +
+                         " " + str(execs_sec))
             interesting_targets.append(target)
         else:
             logging.debug("Unknown return value")

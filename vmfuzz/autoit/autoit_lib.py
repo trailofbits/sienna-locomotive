@@ -13,7 +13,8 @@ def set_lib(autoit_script, name_lib):
     Args:
         autoit_script (string): path to the autoit script
         name_lib (string) name of the libary
-    Move the autoit script to the working directory and copy the targeted libary inside
+    Move the autoit script to the working directory and \
+    copy the targeted libary inside
     See https://www.autoitscript.com/autoit3/docs/keywords/include.htm
     for different solutions to include user-defined libraries
     """

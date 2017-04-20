@@ -2,6 +2,7 @@
 COMMUNICATION
 '''
 import json
+import yaml
 
 from datetime import datetime
 from bson.objectid import ObjectId
@@ -10,7 +11,13 @@ from flask import Blueprint
 from flask import request
 from web_utils import is_hex, error
 
+import ansible_command
+
 communication_endpoints = Blueprint('communication_endpoints', __name__)
+
+with open('config.yaml') as config_file:
+    contents = config_file.read()
+    WEB_CONFIG = yaml.load(contents)
 
 @communication_endpoints.route('/_get_status/<run_id>')
 def _get_status(run_id):
@@ -48,6 +55,13 @@ def _set_status(run_id, worker_id, status):
     if all([ea in ['FINISHED', 'ERROR'] for ea in run.workers]):
         run.status = 'FINISHED'
         run.end_time = datetime.now()
+
+        if 'ANSIBLE_STOP_VM' in WEB_CONFIG:
+            prog = run['program']
+            ansible_command.command_vms(
+                WEB_CONFIG['ANSIBLE_STOP_VM'], prog['vmtemplate'], 
+                str(run['id']), 
+                run['number_workers'])
 
     if all([ea in ['RUNNING', 'ERROR'] for ea in run.workers]):
         run.status = 'RUNNING'

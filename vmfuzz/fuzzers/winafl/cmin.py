@@ -1,14 +1,15 @@
-""" Module handling the corpus minimization """
+""" Module handling the corpus minimization
+    Not working with gui application """
 
-import logging
 import os
 import sys
 import shutil
 import threading
 import fuzzers.winafl.winafl_constants as winafl_constants
 import fuzzers.winafl.winafl as winafl
-import autoit.autoit as autoit
 import autoit.autoit_lib as autoit_lib
+import utils.logs as logging
+
 
 def generate_cmin_cmd(config_winafl, running_cmd):
     """
@@ -53,8 +54,7 @@ def generate_cmin_cmd(config_winafl, running_cmd):
                            config_winafl['offset'],
                            '-nargs',
                            config_winafl['nargs'],
-                           '--'
-                          ]
+                           '--']
     running_cmd = ["@@" if config_winafl['file']
                    in x else x for x in running_cmd]
     return cmin_cmd + running_cmd
@@ -78,7 +78,8 @@ def run_cmin_without_autoit(config_winafl, running_cmd):
     os.chdir(prev_dir)
 
 
-def run_cmin_autoit(config_winafl, path_autoit_script, program_name, running_cmd, fuzz_file):
+def run_cmin_autoit(config_winafl, path_autoit_script,
+                    program_name, running_cmd, fuzz_file):
     """
     Run cmin
 
@@ -131,8 +132,7 @@ def generate_config_cmin(config):
                    "offset": "",
                    "working_dir":  winafl_constants.WINAFL_WORKING_DIR,
                    "nargs": "5",
-                   "arch": config['arch'],
-                  }
+                   "arch": config['arch']}
 
     return config_cmin
 

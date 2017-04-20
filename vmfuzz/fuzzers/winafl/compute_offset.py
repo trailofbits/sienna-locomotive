@@ -5,11 +5,11 @@ import subprocess
 import os
 from threading import Thread
 import time
-import logging
 
 import autoit.autoit as autoit
 import autoit.autoit_lib as autoit_lib
 import utils.run_process as run_process
+import utils.logs as logging
 
 WINDBG_PATH32 = ""
 WINDBG_PATH64 = ""
@@ -18,6 +18,7 @@ WINDBG_SCRIPT = r""
 
 # cdb.exe: user mode debuger with command line interface
 DEBUG = "cdb.exe"
+
 
 def init(config_system):
     """
@@ -33,18 +34,33 @@ def init(config_system):
 
     autoit.init(config_system)
 
-    WINDBG_PATH32 = os.path.join(config_system['path_windbg'], 'x86')
-    WINDBG_PATH64 = os.path.join(config_system['path_windbg'], 'x64')
+    WINDBG_PATH32 = os.path.join(config_system['path_windbg'],
+                                 'x86')
+    WINDBG_PATH64 = os.path.join(config_system['path_windbg'],
+                                 'x64')
     WINDBG_SCRIPT = os.path.join(
-        config_system['path_vmfuzz'], r"fuzzers\winafl\compute_offset_windbg.py")
-    ## replace needed because windbg interprete \\ as \
+        config_system['path_vmfuzz'],
+        r"fuzzers\winafl\compute_offset_windbg.py")
+
+    # Replace needed because windbg interprete \\ as \
     WINDBG_SCRIPT = WINDBG_SCRIPT.replace("\\", "\\\\")
 
+
 def parse_line_result_script(line):
+    """
+    Parse a resulft of the wingdb script
+
+    Agrgs:
+        line (string): line to be parse
+    Returns:
+        (string, string, int, string, string, string, string):
+        func_name, mod, off, depth, filename, coverage, uniq_id
+    """
     line = line.rstrip().split("#")
     func_name, mod, off, depth, filename, coverage, uniq_id = line[2], line[
         4], line[6], int(line[8]), line[10], line[12], line[14]
     return func_name, mod, off, depth, filename, coverage, uniq_id
+
 
 def winafl_proposition(res):
     """
@@ -58,17 +74,19 @@ def winafl_proposition(res):
         one target = (module, offset, module_cov1, module_cov2, ..)
     """
     # ((mod, off), [mod_cod] )
-    res = [ ((x[1], x[2]),list(set(x[5].split('%')))) for x in res]
+    res = [((x[1], x[2]), list(set(x[5].split('%')))) for x in res]
     res_dict = {}
     # use a dict on mod,off to remove dupplicate
     # merge mod_cov if they share the same (mod,off)
-    for (k,v) in res:
+    for (k, v) in res:
         if k in res_dict:
             res_dict[k] = list(set(res_dict[k] + v))
         else:
             res_dict[k] = v
     # transform to a list of dict
-    res = [{'module': mod, 'offset': off, 'cov_modules':cov_mod} for ((mod,off), cov_mod) in res_dict.iteritems()]
+    res = [{'module': mod, 'offset': off, 'cov_modules': cov_mod}
+           for ((mod, off), cov_mod)
+           in res_dict.iteritems()]
     return res
 
 
@@ -110,7 +128,7 @@ def make_windbg_cmd(arch, module, function, fuzz_file):
         string: the command
     """
 
-    ## replace needed because windbg interprete \\ as \
+    # Replace needed because windbg interprete \\ as \
     fuzz_file = fuzz_file.replace("\\", "\\\\")
     script = WINDBG_SCRIPT
     cmd = r'bp ' + module + '!' + function + r' "!py ' + \
@@ -131,7 +149,8 @@ def run(arch, path_program, program_name, parameters, fuzz_file):
     Returns:
         list of triplets: (function, module, offset, depth)
     Note:
-        fuzz_file needs to be provided, even if its already in the parameters list
+        fuzz_file needs to be provided,\
+        even if its already in the parameters list
     """
     windbg_cmd = ".load winext/pykd.pyd;"
     windbg_cmd = windbg_cmd + \

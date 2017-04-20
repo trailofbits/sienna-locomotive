@@ -4,12 +4,12 @@ import subprocess
 import time
 import shutil
 import uuid
-import logging
 import autoit.autoit as autoit
 import autoit.autoit_lib as autoit_lib
 import utils.run_process as run_process
 import utils.file_manipulation as file_manipulation
 import utils.database as database
+import utils.logs as logging
 import fuzzers.radamsa.radamsa_constants as radamsa_constants
 
 
@@ -71,7 +71,8 @@ def fuzz_files(pattern_in, name_out, format_file, number_files_to_create):
     if radamsa_constants.WORKING_DIRECTORY != "":
         prev_dir = os.getcwd()
         os.chdir(radamsa_constants.WORKING_DIRECTORY)
-    cmd = [radamsa_constants.RADAMSA_BIN, "-o", name_out + "-%n" + format_file, "-n",
+    cmd = [radamsa_constants.RADAMSA_BIN, "-o",
+           name_out + "-%n" + format_file, "-n",
            str(number_files_to_create), pattern_in]
     subprocess.call(cmd)
     # restore previous directory
@@ -97,8 +98,7 @@ def generate_stats(cycles_done, runs_total, number_crashes):
         'stats': {'unix_time': unix_time,
                   'cycles_done': cycles_done,
                   'runs_total': runs_total,
-                  'number_crashes': number_crashes,
-                 }
+                  'number_crashes': number_crashes}
     }
     return data
 
@@ -124,7 +124,8 @@ def launch_fuzzing(config, t_fuzz_stopped):
         else:
             seed_pattern = "*" + config['file_format']
         new_files = fuzz_files(seed_pattern, "fuzz",
-                               config['file_format'], config['radamsa_number_files_to_create'])
+                               config['file_format'],
+                               config['radamsa_number_files_to_create'])
         for new_file in new_files:
             if t_fuzz_stopped.is_set():
                 break
@@ -142,8 +143,11 @@ def launch_fuzzing(config, t_fuzz_stopped):
                 path_autoit_script = autoit_lib.get_autoit_path(
                     config['path_autoit_script'], "")
 
-                crashed = autoit.run_and_check(path_autoit_script, [os.path.join(
-                    radamsa_constants.WORKING_DIRECTORY, new_file)])
+                file_path = os.path.join(radamsa_constants.WORKING_DIRECTORY,
+                                         new_file)
+
+                crashed = autoit.run_and_check(path_autoit_script,
+                                               [file_path])
             else:
                 crashed = run_process.run(config['path_program'],
                                           config['program_name'],
@@ -153,7 +157,8 @@ def launch_fuzzing(config, t_fuzz_stopped):
             if crashed:
                 logging.info("Crash detected")
                 new_name = "crash-" + str(uuid.uuid4()) + config['file_format']
-                src = os.path.join(radamsa_constants.WORKING_DIRECTORY, new_file)
+                src = os.path.join(radamsa_constants.WORKING_DIRECTORY,
+                                   new_file)
                 dst = os.path.join(config['crash_dir'], new_name)
                 shutil.copyfile(src, dst)
                 crashes.append(new_name)

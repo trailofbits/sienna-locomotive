@@ -2,7 +2,8 @@
     Pykd script use to retrieve the caller of the current instruction
     Note:
         !py compute_offset_windbg.py Function File Arch
-        Where Function is the I/O targeted function, File the input file, and Arch x86 or x64
+        Where Function is the I/O targeted function,\
+        File the input file, and Arch x86 or x64
 """
 import sys
 import uuid
@@ -10,8 +11,14 @@ import pykd
 
 SIZE_INT = 4
 
-#modules not to be explored
-IGNORED_MODULES = ["kernel32.dll","KERNELBASE.dll","MSVCR100.dll","msvcrt.dll","COMDLG32.dll","USER32.dll","ntdll.dll"]
+# modules not to be explored
+IGNORED_MODULES = ["kernel32.dll",
+                   "KERNELBASE.dll",
+                   "MSVCR100.dll",
+                   "msvcrt.dll",
+                   "COMDLG32.dll",
+                   "USER32.dll",
+                   "ntdll.dll"]
 
 # keeping results in hastabl
 # avoid several calls to dgbCommand
@@ -111,9 +118,10 @@ def get_module_name(module):
     module_res = pykd.dbgCommand("lmv m " + module)
     module_res = module_res.split("\n")
     # remove no information lines
-    module_res = filter(lambda x : ':' in x, module_res)
+    module_res = filter(lambda x: ':' in x, module_res)
     # split ' xxx : YYY' to (xxx,yyu)
-    module_res = [(x[:x.find(':')].lstrip(),x[x.find(':')+1:].lstrip()) for x in module_res]
+    module_res = [(x[:x.find(':')].lstrip(), x[x.find(':')+1:].lstrip())
+                  for x in module_res]
     module_dict = dict(module_res)
     if 'Image path' in module_dict:
         if '\\' in module_dict['Image path']:
@@ -127,15 +135,7 @@ def get_module_name(module):
             return name
         return module_dict['OriginalFilename']
     print "Module name not found? "+str(module_dict)
-#    real_module = [x for x in module_res if "OriginalFilename" in x and (
-#        ".exe" in x or ".dll" in x)]
-#    if real_module == []:
-#        real_modult()
-#= [x for x in module_res if "Image path" in x]
-#    if len(real_module) != 0:
-#        module = real_module[0].split(' ')[-1]
-#        if "\\" in module:
-#            module = module[len(module) - module[::-1].index("\\"):]
+
 
 def get_offset(targeted_call):
     """
@@ -177,6 +177,7 @@ def get_offset(targeted_call):
     MODULE_OFF_FOUND[targeted_call] = (module, computed_off)
     return (module, computed_off)
 
+
 func_name = sys.argv[1]
 filename = get_filename(func_name, sys.argv[3])
 print "## Func " + func_name
@@ -203,8 +204,10 @@ if filename.endswith(sys.argv[2]):
                 coverage.add(mod)
             if coverage:
                 print "FOUND: #func #" + func_name + "# mod #" + mod + \
-                      "# off #" + hex(off).rstrip("L") + "# depth #" + str(i) + \
-                    "# filename #" + filename + "# coverage #"+'%'.join(coverage)+ "# uuid #" + uniq_id 
+                      "# off #" + hex(off).rstrip("L") + "# depth #" + \
+                      str(i) + "# filename #" + filename + \
+                      "# coverage #" + '%'.join(coverage) + "# uuid #" + \
+                      uniq_id
         except:
             print "##Error in offset computing"
 else:

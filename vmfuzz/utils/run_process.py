@@ -5,6 +5,7 @@ import os
 
 import exploitability.crash_detection as crash_detection
 
+
 def kill_process(process):
     """
     Kill a processus
@@ -15,6 +16,7 @@ def kill_process(process):
     cmd_kill = "Taskkill /IM "+process+" /F"
     proc = subprocess.Popen(cmd_kill, stdout=subprocess.PIPE)
     proc.wait()
+
 
 def kill_process_after_timeout(process, timeout):
     """
@@ -59,5 +61,3 @@ def run(path_program, program_name, parameters, auto_close, running_time):
             return True
         kill_process(program_name)
         return False
-
-

@@ -1,6 +1,6 @@
 """ Module handling the parsing of the configuration files """
-import logging
 import yaml
+import utils.logs as logging
 
 
 def parse_config(config_file):
@@ -18,7 +18,8 @@ def parse_config(config_file):
     return config
 
 
-def parse_all_configs(config_system_file, config_program_file, config_run_file):
+def parse_all_configs(config_system_file,
+                      config_program_file, config_run_file):
     """
     Parse the configurations files
 
@@ -48,11 +49,14 @@ def check_run_config(run_config):
         exit()
 
     if run_config['run_type'] not in ['all', 'radamsa', 'winafl',
-                                      'winafl_run_targets', 'winafl_get_targets',
+                                      'winafl_run_targets',
+                                      'winafl_get_targets',
                                       'winafl_get_targets_recon_mode',
-                                      'winafl_cmin_targets', 'exploitable']:
+                                      'winafl_cmin_targets',
+                                      'exploitable']:
         logging.error(
-            "bad run configuration file: unknown run_type of run: " + run_config['run_type'])
+            "bad run configuration file: unknown run_type of run: " +
+            run_config['run_type'])
         exit()
 
     if 'input_dir' not in run_config:
@@ -60,8 +64,10 @@ def check_run_config(run_config):
             "bad run configuration file: missing input_dir field")
         exit()
 
-    if run_config['run_type'] in ['all', 'radamsa', 'winafl' 'winafl_run_targets',
-                                  'winafl_get_targets', 'winafl_get_targets_recon_mode',
+    if run_config['run_type'] in ['all', 'radamsa',
+                                  'winafl', 'winafl_run_targets',
+                                  'winafl_get_targets',
+                                  'winafl_get_targets_recon_mode',
                                   'exploitable']:
 
         if 'crash_dir' not in run_config:
@@ -77,7 +83,8 @@ def check_run_config(run_config):
             run_config['radamsa_number_files_to_create'] = 100
 
     if run_config['run_type'] in ['all', 'winafl', 'winafl_run_targets',
-                                  'winafl_get_targets', 'winafl_get_targets_recon_mode']:
+                                  'winafl_get_targets',
+                                  'winafl_get_targets_recon_mode']:
         if 'winafl_default_timeout' not in run_config:
             logging.info(
                 "no winafl_default_timeout field; using default (40000)")
@@ -104,13 +111,14 @@ def check_program_config(config):
     Args:
         program_config (dict): The program configuration
     """
-    ## Check configuration file
+    # Check configuration file
     if 'arch' not in config:
         logging.error("Bad configuration file: missing arch field")
         exit()
     if config['arch'] != 'x86' and config['arch'] != 'x64':
         logging.error(
-            "Bad configuration file: bad architecture (only x86 and x64 supported)")
+            "Bad configuration file: \
+            bad architecture (only x86 and x64 supported)")
         exit()
     # Check for using_autoit field
     if 'using_autoit' not in config:
@@ -189,15 +197,18 @@ def check_system_config(system_config):
 
     if 'path_autoit_working_dir' not in system_config:
         logging.error(
-            "Bad system configuration file: missing path_autoit_working_dir field")
+            "Bad system configuration file: \
+            missing path_autoit_working_dir field")
         exit()
 
     if 'path_winafl_working_dir' not in system_config:
         logging.error(
-            "bad system configuration file: missing path_winafl_working_dir field")
+            "bad system configuration file: \
+            missing path_winafl_working_dir field")
         exit()
 
     if 'path_radamsa_working_dir' not in system_config:
         logging.error(
-            "bad system configuration file: missing path_radamsa_working_dir field")
+            "bad system configuration file: \
+            missing path_radamsa_working_dir field")
         exit()
