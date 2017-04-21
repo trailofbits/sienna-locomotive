@@ -376,6 +376,7 @@ def run_active_list():
         run = run.to_mongo().to_dict()
         min_run['name'] = run['name']
         min_run['_id'] = str(run['_id'])
+        min_run['status'] = run['status']
 
         if 'start_time' in run:
             min_run['start_time'] = time.mktime(run['start_time'].timetuple())
@@ -405,6 +406,7 @@ def run_complete_list():
         run = run.to_mongo().to_dict()
         min_run['name'] = run['name']
         min_run['_id'] = str(run['_id'])
+        min_run['status'] = run['status']
 
         if 'start_time' in run:
             min_run['start_time'] = time.mktime(run['start_time'].timetuple())

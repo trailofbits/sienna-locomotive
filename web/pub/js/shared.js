@@ -33,7 +33,6 @@ function corpusFilesList() {
 }
 
 function displayConfig(config, prefix, order, skip) {
-    console.log(order);
     var id_prefix = '#' + prefix;
     var yaml = '';
 
@@ -63,7 +62,6 @@ function displayConfig(config, prefix, order, skip) {
             content.text(value);
             $(id_prefix+'_info_div').append(content);
         } else if(typeof(value) == 'object' && Array.isArray(value)) {
-            console.log(value);
             yaml += key + ':\n';
 
             for(var idx in value) {
@@ -83,6 +81,7 @@ function emptyRun() {
     $('#run_info_div').empty();
     $('#run_edit_yaml').val('');
     $('#run_files_select').empty();
+    $('#run_stats').hide();
 }
 
 function emptyProgram() {
@@ -121,7 +120,8 @@ function modalInit() {
 
 $(document).ready(function() {
     $('#error_div').hide();
-    
+    $('#run_stats').hide();
+
     $('#error_dismiss_btn').on('click', function() {
         $('#error_div').hide();
     });

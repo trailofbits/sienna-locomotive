@@ -66,11 +66,25 @@
 			<div id='finished_runs_div'>
 			</div>
 			
-			<h1>Cummulative Executions per Second</h1>
-			<svg id='vis_svg'></svg>
+			<div id='run_stats'>
+				<h1>Cummulative Executions per Second</h1>
+				<svg id='vis_svg'></svg>
 
-			<h1>Worker Stats</h1>
-			<div id='worker_stats_div'>
+				<h1>Worker Stats</h1>
+				<div id='worker_stats_div'>
+				</div>
+
+				<h1>Run Stats</h1>
+				<div id='run_stats_div'>
+					<div id='run_div' class='row'>
+						<span id='run_status_span' class='column _20'></span>
+						<span id='run_rate_span' class='column _20'></span>
+						<span id='run_execs_span' class='column _20'></span>
+						<!-- <span id='run_runtime_span' class='column _20'></span> -->
+						<span id='run_crashes_span' class='column _20'></span>
+						<span id='dummy_for_alignment' class='column _20'></span>
+					</div>
+				</div
 			</div>
 		</div>
 

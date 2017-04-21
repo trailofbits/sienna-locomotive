@@ -17,7 +17,7 @@ function visReady() {
 
     vis.line = d3.line()
         .x(function(d) { return vis.x(d.date); })
-        .y(function(d) { return vis.y(d.execs); });
+        .y(function(d) { return vis.y(d.execRate); });
 
     activeRuns();
     completeRuns();
@@ -33,7 +33,7 @@ function visualizeStats() {
     // paths_total
     // unique_crashes
     vis.x.domain(d3.extent(vis.data, function(d) { return d.date; }));
-    vis.y.domain(d3.extent(vis.data, function(d) { return d.execs; }));
+    vis.y.domain(d3.extent(vis.data, function(d) { return d.execRate; }));
 
     vis.axisBottom = vis.g.append("g");
     vis.axisBottom
@@ -53,7 +53,6 @@ function visualizeStats() {
 
     vis.path = vis.g.append("path");
     vis.path
-      .attr('id', 'path_exec_line')
       .attr("fill", "none")
       .attr("stroke", "steelblue")
       .attr("stroke-linejoin", "round")
@@ -65,7 +64,7 @@ function visualizeStats() {
 
 function updateVisualize() {
     vis.x.domain(d3.extent(vis.data, function(d) { return d.date; }));
-    vis.y.domain(d3.extent(vis.data, function(d) { return d.execs; }));
+    vis.y.domain(d3.extent(vis.data, function(d) { return d.execRate; }));
 
     vis.axisLeft
         .transition()
@@ -103,21 +102,28 @@ function runStatsSuccess(data) {
         var worker_stats = data[widx];
         for(sidx in worker_stats) {
             var unix = worker_stats[sidx]['stats'].last_update;
-            var execs = parseInt(worker_stats[sidx]['stats'].execs_per_sec);
+            var execRate = parseInt(worker_stats[sidx]['stats'].execs_per_sec);
             var paths = worker_stats[sidx]['stats'].paths_total;
-            var crashes = worker_stats[sidx]['stats'].unique_crashes;
+            var crashes = parseInt(worker_stats[sidx]['stats'].unique_crashes);
+            var execsTotal = parseInt(worker_stats[sidx]['stats'].execs_done);
 
             var stat = {}
+            stat.execsTotal = execsTotal;
             stat.date = new Date(unix*1000);
-            stat.execs = execs;
+            stat.execRate = execRate;
             stat.paths = paths;
             stat.crashes = crashes;
             stat.worker = widx;
+
+            if(worker_stats[sidx]['fuzzers'] == 'winafl') {
+                stat.hangs = parseInt(worker_stats[sidx]['stats'].unique_hangs);
+            }
+
             stats.push(stat);
         }
 
         recent.push({
-            'execs': 0, 
+            'execRate': 0, 
             'paths': 0,
             'crashes':0,
             'date': undefined,
@@ -143,15 +149,13 @@ function runStatsSuccess(data) {
         var stat = stats[idx];
         recent[stat.worker] = stat;
         total.date = stat.date;
-        total.execs = 0;
+        total.execRate = 0;
         for(var idx in recent) {
-            total.execs += recent[idx].execs;
+            total.execRate += recent[idx].execRate;
         }
         totals.push(total);
     }
 
-    window.recent = recent;
-    window.tots = totals;
     vis.data = totals;
 
     if($('svg').children().children().length == 0) {
@@ -163,13 +167,80 @@ function runStatsSuccess(data) {
     return recent;
 }
 
+function buildWorkerStats(status, stat) {
+    // TODO: reuse existing rows
+    var colWidth = '_25';
+
+    if('hangs' in stat) {
+        colWidth = '_20';
+    }
+
+    var workerDiv = $('<div></div>');
+    workerDiv.addClass('worker_div');
+    workerDiv.addClass('row');
+
+    var statusSpan = $('<span></span>');
+    statusSpan.addClass('column ' + colWidth);
+    statusSpan.text(status);
+
+    var execsSpan = $('<span></span>');
+    execsSpan.addClass('column ' + colWidth);
+    execsSpan.text(stat.execRate + ' execs/s');
+
+    var pathsSpan = $('<span></span>');
+    pathsSpan.addClass('column ' + colWidth);
+    pathsSpan.text(stat.paths + ' paths');
+
+    var crashesSpan = $('<span></span>');
+    crashesSpan.addClass('column ' + colWidth);
+    crashesSpan.text(stat.crashes + ' crashes');
+
+    workerDiv.append(statusSpan);
+    workerDiv.append(execsSpan);
+    workerDiv.append(pathsSpan);
+    workerDiv.append(crashesSpan);
+
+    if('hangs' in stat) {
+        var hangsSpan = $('<span></span>');
+        hangsSpan.addClass('column ' + colWidth);
+        hangsSpan.text(stat.hangs + ' hangs');
+        workerDiv.append(hangsSpan);
+    }
+
+    $('#worker_stats_div').append(workerDiv);
+}
+
+function buildRunStats(stats) {
+    // status
+    // total execs
+    // average exec speed
+    var execs = 0;
+    var crashes = 0;
+    var totalRate = 0;
+
+    for(var idx in stats) {
+        var stat = stats[idx];
+        totalRate += stat.execRate;
+        execs += stat.execsTotal;
+        crashes += stat.crashes;
+        if('hangs' in stat)
+            crashes += stat.hangs;
+    }
+
+    $('#run_rate_span').text(totalRate + ' execs/s');
+    $('#run_execs_span').text(execs.toLocaleString() + ' execs');
+    $('#run_crashes_span').text(crashes + ' potential crashes');
+}
+
 function runStatusSuccess(statuses, stats) {
+    // TODO: hide stats until we have something
     $('#worker_stats_div').empty();
     for(var idx in statuses) {
         var status = statuses[idx];
         if(stats === undefined) {
             var stat = {
                 'execs': 0,
+                'execRate': 0,
                 'crashes': 0,
                 'paths': 0
             };
@@ -177,40 +248,12 @@ function runStatusSuccess(statuses, stats) {
             var stat = stats[idx];
         }
 
-        var workerDiv = $('<div></div>');
-        workerDiv.addClass('worker_div');
-        workerDiv.addClass('row');
-
-        var statusSpan = $('<span></span>');
-        statusSpan.addClass('column');
-        statusSpan.addClass('_25');
-        statusSpan.text(status);
-
-        var execsSpan = $('<span></span>');
-        execsSpan.addClass('column');
-        execsSpan.addClass('_25');
-        execsSpan.text(stat.execs + ' execs/s');
-
-        var pathsSpan = $('<span></span>');
-        pathsSpan.addClass('column');
-        pathsSpan.addClass('_25');
-        pathsSpan.text(stat.paths + ' paths');
-
-        var crashesSpan = $('<span></span>');
-        crashesSpan.addClass('column');
-        crashesSpan.addClass('_25');
-        crashesSpan.text(stat.crashes + ' crashes');
-
-        workerDiv.append(statusSpan);
-        workerDiv.append(execsSpan);
-        workerDiv.append(pathsSpan);
-        workerDiv.append(crashesSpan);
-
-        $('#worker_stats_div').append(workerDiv);
+        buildWorkerStats(status, stat);
     }
+    buildRunStats(stats);
 }
 
-function initShowLink(sysId, progId, runId) {
+function initShowLink(sysId, progId, runId, info) {
     return function() {
         $('#system_select').val(sysId);
         systemSelect(false);
@@ -218,6 +261,9 @@ function initShowLink(sysId, progId, runId) {
         programList(true, sysId, progId);
 
         runList(true, progId, runId);
+
+        $('#run_status_span').text(info['status']);
+        // $('#run_runtime_span').text(info['run_time']);
     }
 }
 
@@ -230,38 +276,46 @@ function displayRuns(type, data) {
         var name = run['name'];
         var start = new Date(parseInt(run['start_time']) * 1000);
         var end = new Date(parseInt(run['end_time']) * 1000);
+        var status = run['status'];
 
         var runDiv = $('<div></div>');
         runDiv.addClass('run_'+type+'_div');
         runDiv.addClass('row');
 
         var nameSpan = $('<span></span>');
-        nameSpan.addClass('column');
-        nameSpan.addClass('_25');
+        nameSpan.addClass('column _25');
         nameSpan.text(name);
 
         var startSpan = $('<span></span>');
-        startSpan.addClass('column');
-        startSpan.addClass('_25');
+        startSpan.addClass('column _25');
         startSpan.text(start.toString().split(' ').splice(1, 4).join(' '));
 
+
+        var now = new Date();
+        var diff = now - start;
+        var hours = parseInt((diff / 1000) / 3600)
+        var minutes = parseInt((diff / 1000) / 60) - 60 * hours;
+        var runTime = hours+'h:'+minutes+'m';
+
+        var endSpan = $('<span></span>');
+        endSpan.addClass('column _25');
+
         if(type != 'active') {
-            var endSpan = $('<span></span>');
-            endSpan.addClass('column');
-            endSpan.addClass('_25');
             endSpan.text(end.toString().split(' ').splice(1, 4).join(' '));
+        } else {
+            endSpan.text(runTime);
         }
 
         var showSpan = $('<span></span>');
-        showSpan.addClass('column');
-        showSpan.addClass('_25');
+        showSpan.addClass('column _25');
         var showLink = $('<a></a>');
         showLink.attr('href', '#');
 
         var sysId = run['system'];
         var progId = run['program'];
         var runId = run['_id'];
-        showLink.on('click', initShowLink(sysId, progId, runId));
+        var info = { 'status': status, 'run_time': runTime };
+        showLink.on('click', initShowLink(sysId, progId, runId, info));
         
         showLink.text('Show');
         showSpan.append(showLink);
@@ -333,6 +387,12 @@ function runStats(runId) {
 
             var recentStats = runStatsSuccess(data['stats']);
             runStatusSuccess(data['status'], recentStats);
+            
+            var statsDiv = $('#run_stats');
+            if(statsDiv.is(':hidden')) {
+                statsDiv.show();
+            }
+
         }
     });
 

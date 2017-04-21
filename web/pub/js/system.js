@@ -64,7 +64,6 @@ function systemAdd() {
                 return;
             } 
             var systemId = data['system_id'];
-            console.log(systemId);
             // TODO: have sys_add return system_list so we don't make two requests
             systemList(true);
         }

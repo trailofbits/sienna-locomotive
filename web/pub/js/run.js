@@ -5,7 +5,7 @@
 function runList(empty_list=false, programId, selectId, showRun=false) {
     if(programId == undefined)
         programId = $('#program_select').val();
-    if(programId == '--')
+    if(programId == '--') 
         return;
 
     $.ajax({
@@ -200,8 +200,6 @@ function runFilesAdd() {
                 return;
             } 
             var runId = data['run_id'];
-            console.log(runId);
-
             runFilesList();
         }
     });
@@ -225,8 +223,6 @@ function runFilesRemove() {
                 return;
             } 
             var runId = data['run_id'];
-            console.log(runId);
-
             runFilesList();
         }
     });
@@ -249,7 +245,6 @@ function runStart() {
                 handleError(data);
                 return;
             } 
-            console.log(data['run_id']);
             runStats(data['run_id'])
         }
     });
