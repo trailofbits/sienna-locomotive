@@ -2,7 +2,6 @@
 import os
 import subprocess
 import time
-import shutil
 import uuid
 import autoit.autoit as autoit
 import autoit.autoit_lib as autoit_lib
@@ -70,14 +69,14 @@ def fuzz_files(pattern_in, name_out, format_file, number_files_to_create):
     # so we change the current directory
     if radamsa_constants.WORKING_DIRECTORY != "":
         prev_dir = os.getcwd()
-        os.chdir(radamsa_constants.WORKING_DIRECTORY)
+        file_manipulation.chdir(radamsa_constants.WORKING_DIRECTORY)
     cmd = [radamsa_constants.RADAMSA_BIN, "-o",
            name_out + "-%n" + format_file, "-n",
            str(number_files_to_create), pattern_in]
     subprocess.call(cmd)
     # restore previous directory
     if radamsa_constants.WORKING_DIRECTORY != "":
-        os.chdir(prev_dir)
+        file_manipulation.chdir(prev_dir)
     range_files = range(1, 1 + number_files_to_create)
     return [name_out + "-" + str(x) + format_file for x in range_files]
 
@@ -160,7 +159,7 @@ def launch_fuzzing(config, t_fuzz_stopped):
                 src = os.path.join(radamsa_constants.WORKING_DIRECTORY,
                                    new_file)
                 dst = os.path.join(config['crash_dir'], new_name)
-                shutil.copyfile(src, dst)
+                file_manipulation.copy_file(src, dst)
                 crashes.append(new_name)
 
             cycles_done += 1

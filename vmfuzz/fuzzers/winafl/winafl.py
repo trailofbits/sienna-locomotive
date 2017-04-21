@@ -5,7 +5,6 @@ import subprocess
 import time
 import os
 import threading
-import shutil
 
 import fuzzers.winafl.compute_offset as compute_offset
 import fuzzers.winafl.winafl_constants as winafl_constants
@@ -25,8 +24,6 @@ def init(config_system):
     Args:
         config_system (dict): The system configuration
     """
-    winafl_constants.WINAFL_PATH_CMIN = os.path.join(
-        config_system['path_winafl'], "winafl-cmin.py")
     winafl_constants.WINAFL_PATH32 = os.path.join(
         config_system['path_winafl'], "bin32")
     winafl_constants.WINAFL_PATH64 = os.path.join(
@@ -104,8 +101,8 @@ def move_winafl_dll(config):
         logging.error("Architecture not supported " + config['arch'])
         exit(0)
     dst = winafl_constants.WINAFL_WORKING_DIR
-    shutil.copy(src_dll, dst)
-    shutil.copy(src_showmap, dst)
+    file_manipulation.copy_file(src_dll, dst)
+    file_manipulation.copy_file(src_showmap, dst)
 
 
 def init_directories(config):
@@ -135,7 +132,7 @@ def init_directories(config):
         src = os.path.join(config['input_dir'], "seed" + config['file_format'])
         dst = os.path.join(winafl_constants.WINAFL_WORKING_DIR,
                            in_dir_seed, "seed" + config['file_format'])
-        shutil.copy(src, dst)
+        file_manipulation.copy_file(src, dst)
 
 
 def generate_drrun_cmd(config, running_cmd):

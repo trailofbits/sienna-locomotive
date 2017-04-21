@@ -95,8 +95,8 @@ def send_error(config, msg):
         config (dict): the user configuration
         data (dict): data to be sent
     """
-    send_status(config, 'ERROR')
     url = 'http://%s:5000/_set_error/%s/%s' % (WEBAPP_IP,
                                                config['_run_id'],
                                                config['_worker_id'])
     requests.post(url, json={'msg': msg})
+    send_status(config, 'ERROR')

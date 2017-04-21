@@ -79,3 +79,4 @@ def error(buf):
     """
     logging.error(buf)
     database.send_error(CONFIG, buf)
+    exit(0)

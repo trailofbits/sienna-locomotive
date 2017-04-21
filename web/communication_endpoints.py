@@ -63,7 +63,7 @@ def _set_status(run_id, worker_id, status):
                 str(run['id']), 
                 run['number_workers'])
 
-    if all([ea in ['RUNNING', 'ERROR'] for ea in run.workers]):
+    elif all([ea in ['RUNNING', 'ERROR'] for ea in run.workers]):
         run.status = 'RUNNING'
 
     run.save()
@@ -158,6 +158,8 @@ def remove_all_stats(run_id):
     runs = Run.objects(id=run_id)
     run = runs[0]
     run.stats = []
+    for worker_id in xrange(run['number_workers']):
+        run.stats.append([])
     run.save()
     return json.dumps(run.stats)
 

@@ -2,7 +2,6 @@
 
 WINAFL_PATH32 = ""
 WINAFL_PATH64 = ""
-WINAFL_PATH_CMIN = ""
 WINAFL_BIN = r"afl-fuzz.exe"
 WINAFL_DLL = r"winafl.dll"
 WINAFL_SHOWMAP = r"afl-showmap.exe"

@@ -4,6 +4,32 @@ import shutil
 import hashlib
 import re
 import uuid
+import utils.logs as logging
+
+
+def chdir(dst):
+    """
+    Change the working directory
+    Args:
+        dst (string): new working directory
+    """
+    try:
+        os.chdir(dst)
+    except OSError:
+        logging.error('Impossible to change the current working dir to ' + dst)
+
+def copy_file(src, dst):
+    """
+    Copy a file
+
+    Args:
+        src (string); file to be copied
+        dst (string): destination
+    """
+    try:
+        shutil.copy(src, dst)
+    except (IOError, OSError):
+        logging.error("Error while copying " + src + "to " + dst)
 
 
 def compute_md5(file_name, block_size=2**20):
@@ -34,8 +60,11 @@ def create_dir(directory):
     Args:
         directory (string): dir to create
     """
-    if not os.path.exists(directory):
-        os.makedirs(directory)
+    try:
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+    except OSError:
+        logging.error('Error while creating ' + directory)
 
 
 def move_dir(dir_src, dir_dst):
@@ -48,8 +77,11 @@ def move_dir(dir_src, dir_dst):
     Note:
         If the destination existed, it is erased
     """
-    shutil.rmtree(dir_dst, ignore_errors=True, onerror=None)
-    shutil.copytree(dir_src, dir_dst)
+    try:
+        shutil.rmtree(dir_dst, ignore_errors=True, onerror=None)
+        shutil.copytree(dir_src, dir_dst)
+    except (IOError, OSError):
+        logging.error("Error while moving " + dir_src + "to " + dir_dst)
 
 
 def move_generated_inputs(path_src, path_dst, file_format,
@@ -91,7 +123,7 @@ def move_generated_inputs(path_src, path_dst, file_format,
             dst_filename = str(uuid.uuid4()) + file_format
             src = os.path.join(path_src, src_file)
             dst = os.path.join(path_dst, dst_filename)
-            shutil.copy(src, dst)
+            copy_file(src, dst)
     return dst_md5
 
 

@@ -1,6 +1,7 @@
 """ Module handling autoit libaries system """
 import os
-import shutil
+
+import utils.file_manipulation as file_manipulation
 
 AUTOIT_LIB_DIRECTORY = ""
 AUTOIT_WORKING_DIRECTORY = ""
@@ -20,14 +21,13 @@ def set_lib(autoit_script, name_lib):
     """
     new_dir = os.path.join(AUTOIT_WORKING_DIRECTORY, name_lib)
     autoit_name = os.path.basename(autoit_script)
-    if not os.path.exists(new_dir):
-        os.makedirs(new_dir)
+    file_manipulation.create_dir(new_dir)
     src = autoit_script
     dst = os.path.join(new_dir, autoit_name)
-    shutil.copy(src, dst)
+    file_manipulation.copy_file(src, dst)
     src = os.path.join(AUTOIT_LIB_DIRECTORY, name_lib, "libfuzz.au3")
     dst = os.path.join(new_dir, "libfuzz.au3")
-    shutil.copy(src, dst)
+    file_manipulation.copy_file(src, dst)
 
 
 def get_autoit_path(autoit_script, name_lib):

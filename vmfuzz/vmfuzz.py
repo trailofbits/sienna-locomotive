@@ -7,11 +7,11 @@ import time
 import fuzzers.radamsa.radamsa as radamsa
 import fuzzers.winafl.winafl as winafl
 import fuzzers.winafl.recon as winafl_recon
-import fuzzers.winafl.cmin as winafl_cmin
 import autoit.autoit as autoit
 import autoit.autoit_lib as autoit_lib
 import utils.parsing_config as parsing_config
 import utils.database as database
+import utils.file_manipulation as file_manipulation
 import utils.logs as logging
 import exploitability.exploitable as exploitable
 
@@ -51,10 +51,7 @@ def user_check(config):
                               'winafl_run_targets',
                               'winafl_get_targets',
                               'winafl_get_targets_recon_mode']:
-        if not os.path.exists(config['crash_dir']):
-            logging.info('Crash_dir created')
-            os.makedirs(config['crash_dir'])
-
+        file_manipulation.create_dir(config['crash_dir'])
 
 def init(config_system, config_program, config_run, log_level):
     """
@@ -67,8 +64,11 @@ def init(config_system, config_program, config_run, log_level):
         The user configuration is the program and run configuration merged
     """
 
-    # use of the config_run instead as the user config
-    logging.init_log(config_run, log_level)
+    # Use of a special config for the init, as it used before all the checks
+    config_init = dict(config_program.items() + config_run.items())
+    config_init['_program_id'] = config_program['_id']
+    config_init['_run_id'] = config_run['_id']
+    logging.init_log(config_init, log_level)
 
     parsing_config.check_system_config(config_system)
     parsing_config.check_program_config(config_program)
@@ -80,6 +80,7 @@ def init(config_system, config_program, config_run, log_level):
     config_run['crash_dir'] = os.path.join(path_input_crashes,
                                            config_run['crash_dir'])
 
+    # Merge config_run and config_program
     config = dict(config_program.items() + config_run.items())
     config['_program_id'] = config_program['_id']
     config['_run_id'] = config_run['_id']
@@ -149,9 +150,6 @@ def launch_fuzz(config, t_fuzz_stopped):
                                        config['targets'],
                                        t_fuzz_stopped)
 
-    elif config['run_type'] == 'winafl_cmin_targets':
-        winafl_cmin.cmin_on_targets(config, config['targets'])
-
     elif config['run_type'] == 'winafl_get_targets':
         logging.error('Not yet implemented')
     elif config['run_type'] == 'winafl_get_targets_recon_mode':
@@ -170,6 +168,20 @@ def launch_fuzz(config, t_fuzz_stopped):
     return
 
 
+def launch_fuzz_wrapper(config, t_fuzz_stopped):
+    """
+    Wrapper of launch_fuzz
+    Args:
+        config (dict): user configuration
+        t_fuzz_stopped (threading.Event): Event use to stop the fuzzing
+    Note:
+        Catch all exception of launch_fuzz and report them to the webapp
+    """
+    try:
+        launch_fuzz(config, t_fuzz_stopped)
+    except Exception as e:
+        logging.error('PLEASE REPORT BUG: '+str(e))
+
 def fuzz(config_system, config_program, config_run, log_level=0):
     """
     Run winafl from the web app
@@ -186,7 +198,7 @@ def fuzz(config_system, config_program, config_run, log_level=0):
 
     t_fuzz_stopped = threading.Event()
 
-    t_fuzz = threading.Thread(target=launch_fuzz, args=(
+    t_fuzz = threading.Thread(target=launch_fuzz_wrapper, args=(
         config, t_fuzz_stopped,))
     t_fuzz.daemon = True
     t_fuzz.start()
