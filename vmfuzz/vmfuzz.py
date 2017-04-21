@@ -207,7 +207,11 @@ def fuzz(config_system, config_program, config_run, log_level=0):
           str(config['_run_id']) +
           "/" + str(config['_worker_id']))
 
-    database.send_status(config, 'RUNNING')
+    # TODO JF: to be changed to a more cleaner way to deal with !exploitable
+    if config['run_type'] != 'exploitable':
+        database.send_status(config, 'RUNNING')
+    else:
+        database.send_exploitable_status(config, 'RUNNING')
 
     starting_time = time.time()
     while not t_fuzz_stopped.is_set():
@@ -226,7 +230,11 @@ def fuzz(config_system, config_program, config_run, log_level=0):
                 print str(time.time() - starting_time)
 
     winafl.kill_all(config)
-    database.send_status(config, 'FINISHED')
+    # TODO JF: to be changed to a more cleaner way to deal with !exploitable
+    if config['run_type'] != 'exploitable':
+        database.send_status(config, 'FINISHED')
+    else:
+        database.send_exploitable_status(config, 'FINISHED')
     return
 
 

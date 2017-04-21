@@ -35,7 +35,7 @@ def ask_status(config):
 
 def send_status(config, status):
     """
-    Ask the statut to the database
+    Send the statut to the database
     Args:
         config (dict): the user configuration
         status (string): the status to be sent
@@ -45,6 +45,21 @@ def send_status(config, status):
                                                    config['_run_id'],
                                                    config['_worker_id'],
                                                    status)
+    requests.post(url)
+
+
+def send_exploitable_status(config, status):
+    """
+    Send the statut to the database
+    Args:
+        config (dict): the user configuration
+        status (string): the status to be sent
+    """
+
+    url = 'http://%s:5000/_set_status_exploitable/%s/%s/%s' % (WEBAPP_IP,
+                                                               config['_run_id'],
+                                                               config['_worker_id'],
+                                                               status)
     requests.post(url)
 
 
