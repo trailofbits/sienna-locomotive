@@ -31,6 +31,43 @@ def _get_status(run_id):
 
     return json.dumps({'status': run['status']})
 
+@communication_endpoints.route('/_set_status_exploitable/<run_id>/<worker_id>/<status>', methods=['POST'])
+def _set_status_exploitable(run_id, worker_id, status):
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
+
+    runs = Run.objects(id=ObjectId(run_id))
+    if len(runs) != 1:
+        return error('No run found with id: %s' % run_id)
+
+    if status not in ['RUNNING', 'ERROR', 'FINISHED']:
+        return error('Invalid status: %s' % status)
+
+    run = runs[0]
+    if worker_id.isdigit():
+        worker_id = int(worker_id)
+    else:
+        worker_id = 0
+    if worker_id < run.number_workers and worker_id >= 0:
+        run.crash_workers[worker_id] = status
+
+    if all([ea in ['FINISHED', 'ERROR'] for ea in run.workers]):
+        run.status = 'FINISHED'
+
+        if 'ANSIBLE_STOP_VM' in WEB_CONFIG:
+            prog = run['program']
+            ansible_command.command_vms(
+                WEB_CONFIG['ANSIBLE_STOP_VM'], prog['vmtemplate'], 
+                str(run['id']), 
+                run['number_workers'])
+
+    elif all([ea in ['RUNNING', 'ERROR'] for ea in run.workers]):
+        run.status = 'TRIAGE'
+
+    run.save()
+
+    return json.dumps({'status': run['status']})
+
 @communication_endpoints.route('/_set_status/<run_id>/<worker_id>/<status>', methods=['POST'])
 def _set_status(run_id, worker_id, status):
     if len(run_id) not in [12, 24] or not is_hex(run_id):
@@ -195,35 +232,40 @@ def remove_targets(program_id):
     program.save()
     json.dumps({'success': True, 'message': 'Successfully removed targets.'})
 
-@communication_endpoints.route('/_set_classification/<program_id>', methods=['POST'])
-def set_classification(program_id):
-    if len(program_id) not in [12, 24] or not is_hex(program_id):
-        return error('Program id invalid: %s' % program_id)
+@communication_endpoints.route('/_set_classification/<run_id>', methods=['POST'])
+def set_classification(run_id):
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
 
-    program = Program.objects(id=program_id)[0]
+    run = Run.objects(id=run_id)[0]
+    print run
     content = request.get_json()
-    classification = content['crash_classified']
-    program.crashes_classified.append(classification)
-    program.save()
+    crash = content['crash_classified']
+    if 'crash_classifications' not in run:
+        run['crash_classifications'] = {}
+
+    run.crash_classifications[crash['crash_file']] = crash['classification']
+    run.save()
     return json.dumps({'success': True, 'message': 'Successfully set classification.'})
 
 # Debug function
-@communication_endpoints.route('/_get_classification/<program_id>', methods=['GET'])
-def get_classification(program_id):
-    if len(program_id) not in [12, 24] or not is_hex(program_id):
-        return error('Program id invalid: %s' % program_id)
+@communication_endpoints.route('/_get_classification/<run_id>', methods=['GET'])
+def get_classification(run_id):
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Program id invalid: %s' % run_id)
 
-    program = Program.objects(id=program_id)[0]
-    return json.dumps(program.crashes_classified)
+    run = Run.objects(id=run_id)
+    return json.dumps(run.crash_classifications)
 
 # Debug function
-@communication_endpoints.route('/_remove_classification/<program_id>', methods=['GET'])
-def remove_classification(program_id):
-    if len(program_id) not in [12, 24] or not is_hex(program_id):
-        return error('Program id invalid: %s' % program_id)
+@communication_endpoints.route('/_remove_classification/<run_id>', methods=['GET'])
+def remove_classification(run_id):
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
 
-    program = Program.objects(id=program_id)[0]
-    program.crashes_classified = []
-    program.save()
+    run = Run.objects(id=run_id)[0]
+    run.update(unset__crash_classifications=1)
+    run.status = 'FINISHED'
+    run.save()
     return json.dumps({'success': True, 'message': 'Successfully removed classification.'})
 

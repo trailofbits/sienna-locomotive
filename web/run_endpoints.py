@@ -132,6 +132,34 @@ def run_list(program_id):
     run_info = {'order': Run.required, 'runs': runs}
     return json.dumps(run_info, default=json_util.default)
 
+@run_endpoints.route('/run_list_crashes/<run_id>')
+def run_list_crashes(run_id):
+    """
+    List crashes belonging to a run
+    Args:
+        run_id (str): object id of the run
+    Returns:
+        json: list of files associated with run
+    """
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
+
+    run = Run.objects(id=run_id)
+    if len(run) != 1:
+        return error('Run with id not found: %s' % run_id)
+
+    crash_path = os.path.join(PATH_SHARED_INPUT_CRASHES, run[0].crash_dir)
+    flist = os.listdir(crash_path)
+
+    crashes = sorted([ea for ea in flist if '-C.' in ea])
+    hangs = sorted([ea for ea in flist if '-H.' in ea])
+
+    classifications = {}
+    if 'crash_classifications' in run:
+        classifications = run['crash_classifications']
+
+    return json.dumps({'crashes': crashes+hangs, 'classifications': classifications})
+
 # upload seed file
 @run_endpoints.route('/run_files_add', methods=['POST'])
 def run_files_add():
@@ -329,6 +357,13 @@ def run_edit():
         return error('YAML load failed with message: \n' + str(e))
 
     # TODO: check config against allowed variables
+    invalid = ['input_dir', 'crash_dir', 'start_time', 'end_time', 'number_workers', 'run_type']
+    for key in invalid:
+        if key in config and key in run:
+            config[key] = run[key]
+        elif key in config:
+            config.pop(key)
+
     run[0].modify(**config)
     return json.dumps({'success': True, 'message': 'Successfully edited %s' % run_id})
 
@@ -366,7 +401,7 @@ def run_active_list():
     Returns:
         json: list of active runs
     """
-    runs = Run.objects(start_time__ne='', status='RUNNING')
+    runs = Run.objects.filter(start_time__ne='', status='RUNNING')
     min_runs = []
     for run in runs:
         min_run = {}
@@ -396,7 +431,7 @@ def run_complete_list():
     Returns:
         json: list of completed runs
     """
-    runs = Run.objects(start_time__ne='', status='FINISHED')
+    runs = Run.objects(start_time__ne='', status__in=['FINISHED', 'ERROR', 'TRIAGE'])
     min_runs = []
     for run in runs:
         min_run = {}

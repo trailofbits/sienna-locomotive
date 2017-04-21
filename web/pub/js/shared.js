@@ -121,6 +121,7 @@ function modalInit() {
 $(document).ready(function() {
     $('#error_div').hide();
     $('#run_stats').hide();
+    $('#crash_div').hide();
 
     $('#error_dismiss_btn').on('click', function() {
         $('#error_div').hide();

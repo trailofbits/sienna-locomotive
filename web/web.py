@@ -151,8 +151,8 @@ TASKS AND TASK ENDPOINTS
 
 # Launch !exploitable on the crash_dir on a previous run
 # Create a temporary run sent to celery, but do not save this run.
-@app.route('/run_exploitable/<run_id>', methods=['POST'])
-def run_exploitable(run_id):
+@app.route('/run_triage/<run_id>', methods=['POST'])
+def run_triage(run_id):
     """
     Runs !exploitable on all crashes associated with a run
     Args:
@@ -188,8 +188,25 @@ def run_exploitable(run_id):
     system['webapp_ip'] = WEB_CONFIG['WEBAPP_IP']
 
     run['run_type'] = 'exploitable'
+    run['_worker_id'] = 0
+
+    run_to_update = runs[0]
+    if 'crash_workers' in run_to_update or run_to_update.status != 'FINISHED':
+        return error('Triage already ran.')
+
+    run_to_update.crash_workers = ['STARTING']
+    run_to_update.crash_errors = ['']
+    run_to_update.status = 'TRIAGE'
+    run_to_update.save()
 
     task = task_run_start.apply_async(args=[system, prog, run])
+
+    if 'ANSIBLE_START_VM' in WEB_CONFIG and 'vmtemplate' in prog:
+        ansible_command.command_vms(
+            WEB_CONFIG['ANSIBLE_START_VM'], 
+            prog['vmtemplate'], 
+            run['_id'], 
+            1)
 
     return json.dumps({'run_id': run['_id']})
 

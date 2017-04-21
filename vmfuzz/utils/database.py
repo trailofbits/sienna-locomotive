@@ -98,7 +98,7 @@ def send_classification(config, data):
     """
 
     url = 'http://%s:5000/_set_classification/%s' % (WEBAPP_IP,
-                                                     config['_program_id'])
+                                                     config['_run_id'])
 
     requests.post(url, json=data)
 

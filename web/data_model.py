@@ -62,7 +62,6 @@ class Program(db.Document):
     vmtemplate = db.StringField()
 
     targets = db.ListField(db.DictField())
-    crashes_classified = db.ListField(db.DictField())
 
 class ProgramAutoIT(Program):
     required = [
@@ -153,3 +152,6 @@ class Run(db.Document):
     errors = db.ListField(db.StringField())
     # stats
     stats = db.ListField(db.ListField(db.DictField()))
+    crash_classifications = db.DictField()
+    crash_workers = db.ListField(db.StringField())
+    crash_errors = db.ListField(db.StringField())

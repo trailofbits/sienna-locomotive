@@ -41,6 +41,10 @@ textarea {
     margin-right: 10px;
 }
 
+._5 {
+    flex: 5.0;
+}
+
 ._25 {
     flex: 2.5;
 }

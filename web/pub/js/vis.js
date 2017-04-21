@@ -25,6 +25,8 @@ function visReady() {
         activeRuns();
         completeRuns();
     }, 3000);
+
+    $('#triage_btn').on('click', triageCrashes);
 }
 
 function visualizeStats() {
@@ -253,7 +255,69 @@ function runStatusSuccess(statuses, stats) {
     buildRunStats(stats);
 }
 
-function initShowLink(sysId, progId, runId, info) {
+function triageCrashes() {
+    var runId = $('#run_select').val();
+    if(runId == '--') {
+        handleError({'message':'Please make a selection.'});
+        return;
+    }
+
+    $.ajax({
+        type: 'POST',
+        url: '/run_triage/' + runId, 
+        success: function(data) {
+            data = JSON.parse(data);
+            if('error' in data) {
+                handleError(data);
+                return;
+            } 
+        }
+    });
+}
+
+function getCrashes(runId) {
+    $.ajax({
+        type: 'GET',
+        url: '/run_list_crashes/' + runId, 
+        success: function(data) {
+            data = JSON.parse(data);
+            if('error' in data) {
+                handleError(data);
+                return;
+            } 
+
+            $('#crash_div').children('.row').remove();
+
+            var crashes = data['crashes'];
+            var classifications = data['classifications']
+            for(var idx in crashes) {
+                var crash = crashes[idx];
+
+                var crashRow = $('<div></div>');
+                crashRow.addClass('row');
+
+                var nameSpan = $('<span></span>');
+                nameSpan.addClass('column _5');
+                nameSpan.text(crash);
+
+                var classfSpan = $('<span></span>');
+                classfSpan.addClass('column _5');
+                if(crash in classifications) {
+                    var classf = classifications[crash];
+                    classfSpan.text(classf);
+                }
+
+                crashRow.append(nameSpan);
+                crashRow.append(classfSpan);
+                $('#crash_div').append(crashRow);
+            }
+
+            $('#crash_div').show();
+        }
+    });   
+}
+
+function initShowLink(type, sysId, progId, runId, info) {
     return function() {
         $('#system_select').val(sysId);
         systemSelect(false);
@@ -263,6 +327,11 @@ function initShowLink(sysId, progId, runId, info) {
         runList(true, progId, runId);
 
         $('#run_status_span').text(info['status']);
+        $('#crash_div').hide();
+
+        if(type === 'finished') {
+            getCrashes(runId);
+        }
         // $('#run_runtime_span').text(info['run_time']);
     }
 }
@@ -290,7 +359,6 @@ function displayRuns(type, data) {
         startSpan.addClass('column _25');
         startSpan.text(start.toString().split(' ').splice(1, 4).join(' '));
 
-
         var now = new Date();
         var diff = now - start;
         var hours = parseInt((diff / 1000) / 3600)
@@ -315,7 +383,7 @@ function displayRuns(type, data) {
         var progId = run['program'];
         var runId = run['_id'];
         var info = { 'status': status, 'run_time': runTime };
-        showLink.on('click', initShowLink(sysId, progId, runId, info));
+        showLink.on('click', initShowLink(type, sysId, progId, runId, info));
         
         showLink.text('Show');
         showSpan.append(showLink);
@@ -330,6 +398,9 @@ function displayRuns(type, data) {
 }
 
 function activeRuns() {
+    if(document.hidden)
+        return;
+
     $.ajax({
         type: 'GET',
         url: '/run_active_list', 
@@ -346,6 +417,9 @@ function activeRuns() {
 }
 
 function completeRuns() {
+    if(document.hidden)
+        return;
+
     $.ajax({
         type: 'GET',
         url: '/run_complete_list', 
@@ -375,26 +449,28 @@ function runStats(runId) {
     if(runId == '--')
         return;
 
-    $.ajax({
-        type: 'GET',
-        url: '/run_stats_all/' + runId, 
-        success: function(data) {
-            data = JSON.parse(data);
-            if('error' in data) {
-                handleError(data);
-                return;
-            } 
+    if(!document.hidden) {
+        $.ajax({
+            type: 'GET',
+            url: '/run_stats_all/' + runId, 
+            success: function(data) {
+                data = JSON.parse(data);
+                if('error' in data) {
+                    handleError(data);
+                    return;
+                } 
 
-            var recentStats = runStatsSuccess(data['stats']);
-            runStatusSuccess(data['status'], recentStats);
-            
-            var statsDiv = $('#run_stats');
-            if(statsDiv.is(':hidden')) {
-                statsDiv.show();
+                var recentStats = runStatsSuccess(data['stats']);
+                runStatusSuccess(data['status'], recentStats);
+                
+                var statsDiv = $('#run_stats');
+                if(statsDiv.is(':hidden')) {
+                    statsDiv.show();
+                }
+
             }
-
-        }
-    });
+        });
+    }
 
     setTimeout(function() {
         runStats(runId);
