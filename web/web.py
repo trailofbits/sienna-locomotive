@@ -191,7 +191,7 @@ def run_triage(run_id):
     run['_worker_id'] = 0
 
     run_to_update = runs[0]
-    if 'crash_workers' in run_to_update or run_to_update.status != 'FINISHED':
+    if ('crash_workers' in run_to_update and len(run_to_update['crash_workers']) > 0) or run_to_update.status != 'FINISHED':
         return error('Triage already ran.')
 
     run_to_update.crash_workers = ['STARTING']

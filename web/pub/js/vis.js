@@ -289,9 +289,9 @@ function getCrashes(runId) {
             $('#crash_div').children('.row').remove();
 
             var crashes = data['crashes'];
-            var classifications = data['classifications']
+            classifications = data['classifications']
             for(var idx in crashes) {
-                var crash = crashes[idx];
+                crash = crashes[idx];
 
                 var crashRow = $('<div></div>');
                 crashRow.addClass('row');
@@ -302,8 +302,9 @@ function getCrashes(runId) {
 
                 var classfSpan = $('<span></span>');
                 classfSpan.addClass('column _5');
-                if(crash in classifications) {
-                    var classf = classifications[crash];
+                crashKey = crash.replace('.', '_');
+                if(crashKey in classifications) {
+                    var classf = classifications[crashKey];
                     classfSpan.text(classf);
                 }
 

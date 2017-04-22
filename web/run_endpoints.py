@@ -155,8 +155,8 @@ def run_list_crashes(run_id):
     hangs = sorted([ea for ea in flist if '-H.' in ea])
 
     classifications = {}
-    if 'crash_classifications' in run:
-        classifications = run['crash_classifications']
+    if 'crash_classifications' in run[0]:
+        classifications = run[0]['crash_classifications']
 
     return json.dumps({'crashes': crashes+hangs, 'classifications': classifications})
 

@@ -244,7 +244,7 @@ def set_classification(run_id):
     if 'crash_classifications' not in run:
         run['crash_classifications'] = {}
 
-    run.crash_classifications[crash['crash_file']] = crash['classification']
+    run.crash_classifications[crash['crash_file'].replace('.', '_')] = crash['classification']
     run.save()
     return json.dumps({'success': True, 'message': 'Successfully set classification.'})
 
@@ -264,7 +264,7 @@ def remove_classification(run_id):
         return error('Run id invalid: %s' % run_id)
 
     run = Run.objects(id=run_id)[0]
-    run.update(unset__crash_classifications=1)
+    run.update(unset__crash_classifications=1, unset__crash_workers=1)
     run.status = 'FINISHED'
     run.save()
     return json.dumps({'success': True, 'message': 'Successfully removed classification.'})
