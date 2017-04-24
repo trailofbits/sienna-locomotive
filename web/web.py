@@ -21,9 +21,7 @@ sys.path.append(os.path.join('..', 'vmfuzz'))
 import vmfuzz
 import ansible_command
 
-'''
-INITIALIZATION
-'''
+# INITIALIZATION
 
 with open('config.yaml') as f:
     contents = f.read()
@@ -53,11 +51,7 @@ app.register_blueprint(communication_endpoints)
 
 db.init_app(app)
 
-'''
-WEB ENDPOINTS
-'''
-
-# MISC
+# WEB ENDPOINTS
 
 @app.route('/')
 def root():
@@ -145,10 +139,6 @@ def corpora():
         return redirect('/')
     return send_from_directory('pub', 'corpora.html')
 
-'''
-TASKS AND TASK ENDPOINTS
-'''
-
 # Launch !exploitable on the crash_dir on a previous run
 # Create a temporary run sent to celery, but do not save this run.
 @app.route('/run_triage/<run_id>', methods=['POST'])
@@ -203,9 +193,9 @@ def run_triage(run_id):
 
     if 'ANSIBLE_START_VM' in WEB_CONFIG and 'vmtemplate' in prog:
         ansible_command.command_vms(
-            WEB_CONFIG['ANSIBLE_START_VM'], 
-            prog['vmtemplate'], 
-            run['_id'], 
+            WEB_CONFIG['ANSIBLE_START_VM'],
+            prog['vmtemplate'],
+            run['_id'],
             1)
 
     return json.dumps({'run_id': run['_id']})
@@ -286,13 +276,15 @@ def run_start(run_id):
 
     if 'ANSIBLE_START_VM' in WEB_CONFIG and 'vmtemplate' in prog:
         ansible_command.command_vms(
-            WEB_CONFIG['ANSIBLE_START_VM'], 
-            prog['vmtemplate'], 
-            run['_id'], 
+            WEB_CONFIG['ANSIBLE_START_VM'],
+            prog['vmtemplate'],
+            run['_id'],
             run['number_workers'])
 
     # print task.id
     return json.dumps({'run_id': run['_id']})
+
+# TASKS
 
 @celery.task
 def task_run_start(system, program, run):
@@ -305,9 +297,7 @@ def task_run_start(system, program, run):
     """
     vmfuzz.fuzz(system, program, run)
 
-'''
-MAIN
-'''
+# MAIN
 
 if __name__ == '__main__':
     app.run(debug=True, host=WEB_CONFIG['WEBAPP_IP'])
