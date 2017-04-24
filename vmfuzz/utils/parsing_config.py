@@ -41,7 +41,7 @@ def check_run_config(run_config):
     Check the run configuration
 
     Args:
-        config (dict): The run configuration
+        run_config (dict): The run configuration
     """
     if 'run_type' not in run_config:
         logging.error(
@@ -104,7 +104,7 @@ def check_run_config(run_config):
             exit()
 
 
-def check_program_config(config):
+def check_program_config(program_config):
     """
     Check the program configuration
 
@@ -112,47 +112,48 @@ def check_program_config(config):
         program_config (dict): The program configuration
     """
     # Check configuration file
-    if 'arch' not in config:
+    if 'arch' not in program_config:
         logging.error("Bad configuration file: missing arch field")
         exit()
-    if config['arch'] != 'x86' and config['arch'] != 'x64':
+    if program_config['arch'] != 'x86' and program_config['arch'] != 'x64':
         logging.error(
             "Bad configuration file: \
             bad architecture (only x86 and x64 supported)")
         exit()
     # Check for using_autoit field
-    if 'using_autoit' not in config:
+    if 'using_autoit' not in program_config:
         logging.error("Bad configuration file: missing using_autoit field")
         exit()
 
     # If the path to the program and its name are present
-    if 'path_program' not in config or 'program_name' not in config:
+    if 'path_program' not in program_config or\
+       'program_name' not in program_config:
         logging.error(
-            "Bad configuration file: missing program name or path")
+            "Bad program_configuration file: missing program name or path")
         exit()
 
     # Check for file_format field
-    if 'file_format' not in config:
+    if 'file_format' not in program_config:
         logging.error("Bad configuration file: missing format_file")
         exit()
 
     # If program does not have parameters
-    if 'parameters' not in config:
-        config['parameters'] = []
+    if 'parameters' not in program_config:
+        program_config['parameters'] = []
 
     # If autoit is used
-    if config['using_autoit']:
-        if 'path_autoit_script' not in config:
+    if program_config['using_autoit']:
+        if 'path_autoit_script' not in program_config:
             logging.error(
                 "Bad configuration file: missing path_autoit_script field")
             exit()
     # If autoit not used
     else:
-        if 'auto_close' not in config:
+        if 'auto_close' not in program_config:
             logging.error("Bad configuration file: missing auto_close field")
             exit()
         # The running_time
-        if 'running_time' not in config:
+        if 'running_time' not in program_config:
             logging.error(
                 "Bad configuration file: missing running_time field")
             exit()

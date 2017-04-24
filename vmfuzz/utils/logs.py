@@ -12,12 +12,19 @@ def init_log(config, log_level):
     Initialize the logging
 
     Args:
+        config (dict): logging configuration
         log_level(int): the logging level
     Note:
-        0 = Debug \n
-        1 = Info \n
-        2 = Warning \n
-        3 = Error
+        Log levels:\n
+        - 0 = Debug
+        - 1 = Info
+        - 2 = Warning
+        - 3 = Error
+
+        The logging config needs the fields:\n
+        - '_run_id'
+        - '_worker_id'
+        - 'webapp_ip'
     """
 
     global CONFIG

@@ -23,7 +23,7 @@ def post_data(url, data):
 
     Args:
         url (string): url
-        data (): data to be sent
+        data (data): data to be sent
     Note:
         If an error occured, wait 5 secs and try\
         again to send the data
@@ -35,9 +35,11 @@ def post_data(url, data):
         time.sleep(5)
         post_data(url, data)
 
+
 def ask_status(config):
     """
     Ask the statut to the database
+
     Args:
         config (dict): the user configuration
     Returns:
@@ -56,6 +58,7 @@ def ask_status(config):
 def send_status(config, status):
     """
     Send the statut to the database
+
     Args:
         config (dict): the user configuration
         status (string): the status to be sent
@@ -71,6 +74,7 @@ def send_status(config, status):
 def send_exploitable_status(config, status):
     """
     Send the statut to the database
+
     Args:
         config (dict): the user configuration
         status (string): the status to be sent
@@ -86,6 +90,7 @@ def send_exploitable_status(config, status):
 def send_stats(config, data):
     """
     Send the stats to the database
+
     Args:
         config (dict): the user configuration
         data (dict): data to be sent
@@ -100,9 +105,10 @@ def send_stats(config, data):
 def send_targets(config, targets):
     """
     Send the targets to the database
+
     Args:
         config (dict): the user configuration
-        data (dict): data to be sent
+        targets (list of target): targets to be sent
     """
 
     url = 'http://%s:5000/_set_targets/%s' % (WEBAPP_IP, config['_program_id'])
@@ -112,6 +118,7 @@ def send_targets(config, targets):
 def send_classification(config, data):
     """
     Send the results of !exploitable to the database
+
     Args:
         config (dict): the user configuration
         data (dict): data to be sent
@@ -126,9 +133,10 @@ def send_classification(config, data):
 def send_error(config, msg):
     """
     Send the results of !exploitable to the database
+
     Args:
         config (dict): the user configuration
-        data (dict): data to be sent
+        msg (string): msg to be sent
     """
     url = 'http://%s:5000/_set_error/%s/%s' % (WEBAPP_IP,
                                                config['_run_id'],

@@ -55,7 +55,7 @@ def get_in_dir(config):
     Args:
         config (dict): the user configuration
     Returns:
-        string; the input directory
+        string: the input directory
     Notes:
         in_program_name
     """
@@ -69,7 +69,7 @@ def get_in_dir_seed(config):
     Args:
         config (dict): the user configuration
     Returns:
-        string; the input directory
+        string: the input directory
     Notes:
         in_program_name_seed
     """
@@ -268,7 +268,7 @@ def run_winafl_without_autoit(config_winafl, running_cmd):
 
     Args:
         config_winafl (dict): winafl configuration
-        running_cmd (list string)
+        running_cmd (list string): the running command
     Returns:
         (int, proc): 0 if error, 1 if success and the winafl process
     Note:
@@ -370,6 +370,7 @@ def run_winafl_autoit(config_winafl, path_autoit_script,
 def generate_target(config_winafl):
     """
     Generate a target from a config
+
     Args:
         config_winafl (dict): The winafl configuration
     Returns:
@@ -410,6 +411,7 @@ def generate_stats(fuzzer_stats, config_winafl):
 def check_running_time(config_winafl):
     """
     Check the running time of the winafl process
+
     Args:
         config_winafl (dict): The winafl configuration
     Returns:
@@ -426,6 +428,7 @@ def check_running_time(config_winafl):
 def winafl_send_stats(config, config_winafl, fuzzer_stats, last_update):
     """
     Send the stats to the webapp
+
     Args:
         config (dict): The user configuration
         config_winafl (dict): The winafl configuration
@@ -546,21 +549,6 @@ def move_generated_inputs(config_winafl, file_format):
         os.path.join(in_dir, "queue"), dst_dir, "-generated-" + file_format)
 
 
-def move_crashes(config_winafl, file_format):
-    """
-    Move crashes
-
-    Args:
-        config_winafl (dict): the winafl configuration
-        file_format (string) the file format
-    """
-    dst_dir = os.path.join(config_winafl['crash_dir'])
-    in_dir = os.path.join(
-        winafl_constants.WINAFL_WORKING_DIR, config_winafl['out_dir'])
-    file_manipulation.move_generated_inputs(
-        os.path.join(in_dir, "crashes"), dst_dir, "-crash" + file_format)
-
-
 def generate_config_winafl(config):
     """
     Generate winafl configuration
@@ -583,13 +571,14 @@ def generate_config_winafl(config):
 
     seed_winafl_name = "seed" + config['file_format']
 
+    fuzz_iterations = str(config['winafl_fuzzing_iteration'])
     config_winafl = {'in_dir': in_dir,
                      'out_dir_ori': out_dir,
                      "timeout": timeout,
                      "file": seed_winafl_name,
                      "module": "",
                      "offset": "",
-                     "fuzz_iterations": str(config['winafl_fuzzing_iteration']),
+                     "fuzz_iterations": fuzz_iterations,
                      "working_dir":  winafl_constants.WINAFL_WORKING_DIR,
                      "nargs": "5",
                      "arch": config['arch'],
@@ -648,11 +637,11 @@ def generate_running_cmd(config):
     Args:
         config (dict): The user configuration
     Returns:
-        The running command (string)
+        (string): The running command
     Note:
-        The running command does not contains the input file.
-        If you are using autoit, it is given to the autoit script
-        If not, you need to add it in the running command
+        The running command does not contains the input file.\n
+        - If you are using autoit, it is given to the autoit script
+        - If not, you need to add it in the running command
     """
     parameters = file_manipulation.generate_parameters(
         config['parameters'], "seed" + config['file_format'])
@@ -669,7 +658,7 @@ def generate_path_file_to_fuzz(config_winafl):
     Generate the path to the file to fuzz
 
     Args:
-        The winafl configuration as a dict
+        config_winafl (dict) : the winafl configuration
     Returns:
         The path
     """
@@ -686,9 +675,7 @@ def update_target_on_winafl_config(config_winafl, target):
         The winafl configuration as a dict
         target (string list): the target (offset,module)
     Returns:
-        The winafl configuration updated
-    Note:
-        one target = (module, offset, module_cov1, module_cov2, ..)
+        (dict): The winafl configuration updated
     """
 
     mod = target['module']
@@ -721,6 +708,7 @@ def kill_all(config):
 def run_winafl(config, config_winafl, running_cmd, path_file_to_fuzz):
     """
     Run winafl
+
     Args:
         config_winafl (dict): user configuration
         config_winafl (dict): winafl configuration
@@ -758,6 +746,7 @@ def run_winafl(config, config_winafl, running_cmd, path_file_to_fuzz):
 def launch_fuzzing(config):
     """
     Automated winafl launching
+
     Args:
         config (dict): The user configuration
     Note:

@@ -86,6 +86,9 @@ def generate_stats(cycles_done, runs_total, number_crashes):
     Generate the data to be sent to the webapp
 
     Args:
+        cycles_done (int): number of cycles done
+        runs_total (int): number of executions
+        number_crashes (int): number of crashes found
     Returns:
         dict: data to be sent to the webapp
     """

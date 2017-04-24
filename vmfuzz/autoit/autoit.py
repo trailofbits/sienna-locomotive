@@ -58,7 +58,8 @@ def run_and_check(autoit_script, parameters):
         parameters (string list): parameters of the script
     Returns:
         bool: True if crash detected, False otherwise
-    To detect crashes:
+    Note:
+        To detect crashes:\n
         - Check if WerFault.exe process if running
         - If not, check the return value of the autoit script (0: no error)
     """

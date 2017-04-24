@@ -50,7 +50,7 @@ def parse_line_result_script(line):
     """
     Parse a resulft of the wingdb script
 
-    Agrgs:
+    Args:
         line (string): line to be parse
     Returns:
         (string, string, int, string, string, string, string):
@@ -70,8 +70,6 @@ def winafl_proposition(res):
         res : resultats to sorted
     Returns:
         (string list) list: list of targets
-    Note:
-        one target = (module, offset, module_cov1, module_cov2, ..)
     """
     # ((mod, off), [mod_cod] )
     res = [((x[1], x[2]), list(set(x[5].split('%')))) for x in res]
@@ -90,30 +88,6 @@ def winafl_proposition(res):
     return res
 
 
-def print_resultats(res):
-    """
-    Print resultats (sorted by modules) (debug function)
-
-    Args:
-        res (list): resultats to print
-    """
-    sorted_res = sorted(res, key=lambda x: (x[5], x[3]))
-    for func, mod, off, depth, filename, uniq_id in sorted_res:
-        print "Func " + func + " found in module " + mod +\
-              " at off " + off + " (depth " + str(depth) + ") (" +\
-              filename + ") " + uniq_id
-
-
-def filter_resultats_by_filename(res, txt):
-    """
-    Print resultats (sorted by modules) (debug function)
-
-    Args:
-        res (list): resultats to print
-    """
-    return [x for x in res if txt in x[4]]
-
-
 def make_windbg_cmd(arch, module, function, fuzz_file):
     """
     Create a windbg cmd:
@@ -124,6 +98,7 @@ def make_windbg_cmd(arch, module, function, fuzz_file):
         arch (string): architecture of the program (x86 or x64)
         module (string): targeted module
         function (string): targeted function
+        fuzz_file (string): path to the input to be passed as argument
     Returns:
         string: the command
     """
@@ -214,7 +189,7 @@ def run_autoit(arch, autoit_script, path_program, program_name, fuzz_file):
         autoit_script (string): path the to script
         path_program (string): path the to the program
         program_name (string): name of the program
-        parameters (string list): parameters of the script
+        fuzz_file (string): path to the input to be passed as argument
     Returns:
         list of triplets: (function, module, offset, depth)
     """

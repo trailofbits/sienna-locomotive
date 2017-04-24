@@ -10,6 +10,7 @@ import utils.logs as logging
 def chdir(dst):
     """
     Change the working directory
+
     Args:
         dst (string): new working directory
     """
@@ -17,6 +18,7 @@ def chdir(dst):
         os.chdir(dst)
     except OSError:
         logging.error('Impossible to change the current working dir to ' + dst)
+
 
 def copy_file(src, dst):
     """
@@ -73,7 +75,7 @@ def move_dir(dir_src, dir_dst):
 
     Args:
         dir_src (strng): source dir
-        dir_dst (string: destination dir
+        dir_dst (string): destination dir
     Note:
         If the destination existed, it is erased
     """

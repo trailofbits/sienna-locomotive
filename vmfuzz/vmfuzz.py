@@ -39,12 +39,12 @@ def init_system(config_system):
         winafl.init(config_system)
 
 
-def user_check(config):
+def init_crash_dir(config):
     """
-    Check user information
+    Init the crash directory if it does not exist
 
-    Note:
-        TODO JF: To be improved
+    Args:
+        config (dict): the user configuration
     """
 
     if config['run_type'] in ['all', 'radamsa', 'winafl',
@@ -53,15 +53,21 @@ def user_check(config):
                               'winafl_get_targets_recon_mode']:
         file_manipulation.create_dir(config['crash_dir'])
 
+
 def init(config_system, config_program, config_run, log_level):
     """
     Initialize Vmfuzz
 
+    Args:
+        config_system (dict): system configuration
+        config_program (dict): program configuration
+        config_run (dict): run configuration
         log_level (int): Logging level: 0 debug 1 info, 2 warning, 3 error
     Returns:
         (dict,dict): the user and system configuration dict
-    Notes:
-        The user configuration is the program and run configuration merged
+    Note:
+        The user configuration is the program and run configuration merged\
+        into the so-called user configuration
     """
 
     # Use of a special config for the init, as it used before all the checks
@@ -99,7 +105,7 @@ def init(config_system, config_program, config_run, log_level):
         if "radamsa" in config_system['fuzzers']:
             radamsa.init_directories(config)
 
-    user_check(config)
+    init_crash_dir(config)
 
     return (config, config_system)
 
@@ -107,6 +113,7 @@ def init(config_system, config_program, config_run, log_level):
 def launch_fuzz(config, t_fuzz_stopped):
     """
     Launch the fuzzing
+
     Args:
         config (dict): user configuration
         t_fuzz_stopped (threading.Event): Event use to stop the fuzzing
@@ -171,25 +178,30 @@ def launch_fuzz(config, t_fuzz_stopped):
 def launch_fuzz_wrapper(config, t_fuzz_stopped):
     """
     Wrapper of launch_fuzz
+
     Args:
         config (dict): user configuration
         t_fuzz_stopped (threading.Event): Event use to stop the fuzzing
     Note:
-        Catch all exception of launch_fuzz and report them to the webapp
+        Catch all exceptions of launch_fuzz and report them to the webapp
     """
     try:
         launch_fuzz(config, t_fuzz_stopped)
     except Exception as e:
         logging.error('PLEASE REPORT BUG: '+str(e))
 
+
 def fuzz(config_system, config_program, config_run, log_level=0):
     """
     Run winafl from the web app
+
     Args:
         config_system (dict): system configuration
         program_system (dict): program configuration
         config_run (dict): run configuration
-        log_level (int): (optional) Logging level:\
+        log_level (int): (optional)
+    Note:
+        Logging level:\
         0 debug (default), 1 info, 2 warning, 3 error
     """
     print "Start vmfuzz"
@@ -248,7 +260,7 @@ def main(config_system_file, config_program_file, config_run_file, log_level):
         config_run_file (string): the run configuration file
         log_level (int): Logging level: 0 debug 1 info, 2 warning, 3 error
     Note:
-        Launch winafl and radamsa
+        Launch winafl and radamsa.\n
         Use the recon mode for winafl
     """
 

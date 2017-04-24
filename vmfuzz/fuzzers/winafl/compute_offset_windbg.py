@@ -2,8 +2,10 @@
     Pykd script use to retrieve the caller of the current instruction
     Note:
         !py compute_offset_windbg.py Function File Arch
-        Where Function is the I/O targeted function,\
-        File the input file, and Arch x86 or x64
+        Where:
+        - Function is the I/O targeted function,
+        - File the input file,
+        - Arch x86 or x64
 """
 import sys
 import uuid
@@ -29,7 +31,8 @@ MODULE_OFF_FOUND = {}
 
 def clean_val(val):
     """
-    windbg can print 64 bits address  as XXXXX`XXXXX, so we remove the `
+    windbg can print 64 bits address  as XXXXX`XXXXX, so we remove the char `
+
     Args:
         val (string): value to clean
     Returns:
@@ -41,10 +44,11 @@ def clean_val(val):
 def get_filename(func_name, arch):
     """
     Retrieve the filename used
+
     Args:
         func_name (string): name of the I/O function
     Returns:
-    The filename open by the I/O function
+        (string): The filename open by the I/O function
     """
 
     if arch == "x86":
@@ -53,7 +57,7 @@ def get_filename(func_name, arch):
         param = "(@rcx)"
     else:
         print "Error arch not supported: " + arch
-        return
+        return ""
 
     if func_name == "CreateFileW":
         file_name = pykd.dbgCommand(
@@ -70,29 +74,31 @@ def get_filename(func_name, arch):
 
 def get_targeted_call(line):
     """
-    Retrive a call, based on the call stack
+    Retrieve a call, based on the call stack
+
     Args:
         depth (int): depth of the call stack
     Returns:
-        address targeted
+        (string): address targeted
 
-    Algo:
-    - retrieve the call stack with kn depth
-        example of output
-        0:000> kn 2
-         # ChildEBP RetAddr
-         00 001df9cc 77d80ad8 ntdll!LdrpDoDebuggerBreak+0x2c
-         01 001dfb2c 77d65f6f ntdll!LdrpInitializeProcess+0x11aa
-    - retrieve the address of thelast "next return adresse"
-        In the previous example, it is 77d65f6f
-    - use of "ub" (backward dissass) to retrieve the destination of the call
-        0:000> ub 77d65f6f L2
-        ntdll!_LdrpInitialize+0x70:
-        77d65f67 ff7508          push    dword ptr [ebp+8]
-        77d65f6a e854130000      call    ntdll!LdrpInitializeProcess (77d672c3)
-    - use of L2 (two lines), to avoid errors in the backward dissas
-    - return the call
-        in the example it is 77d672c3
+    Note:
+        Algo:\n
+        - retrieve the call stack with kn dept:
+            example of output:\n
+                0:000> kn 2\n
+                # ChildEBP RetAddr\n
+                00 001df9cc 77d80ad8 ntdll!LdrpDoDebuggerBreak+0x2c\n
+                01 001dfb2c 77d65f6f ntdll!LdrpInitializeProcess+0x11aa"
+        - retrieve the address of thelast "next return adresse"
+            In the previous example, it is 77d65f6f
+        - use of "ub" (backward dissass) to retrieve the destination of the call
+                0:000> ub 77d65f6f L2\n
+                ntdll!_LdrpInitialize+0x70:\n
+                77d65f67 ff7508          push    dword ptr [ebp+8]\n
+                77d65f6a e854130000      call    ntdll!LdrpInitializeProcess (77d672c3)
+        - use of L2 (two lines), to avoid errors in the backward dissas
+        - return the call
+            in the example it is 77d672c3
     """
     global TARGETED_CALLS_FOUND
     targeted_call = line.split(' ')[2]
@@ -115,6 +121,14 @@ def get_targeted_call(line):
 
 
 def get_module_name(module):
+    """
+    Get the module name
+
+    Args:
+        module (string): the address of the module
+    Returns:
+        (string): the module name
+    """
     module_res = pykd.dbgCommand("lmv m " + module)
     module_res = module_res.split("\n")
     # remove no information lines
@@ -140,19 +154,20 @@ def get_module_name(module):
 def get_offset(targeted_call):
     """
     Get the module and offset of an given address
+
     Args:
         call (string): targeted call
     Returns:
         couple (module,offset)
 
-    Details:
-    Use o "lm a", which returns details on the module containing the address
-    For example:
-        0:000> lm a 77d672c3
-        Browse full module list
-        start    end        module name
-        77d00000 77e42000   ntdll      (pdb symbols)
-    offset computed= address-start
+    Note:
+        Use o "lm a", which returns details on the module containing the address\n
+        For example:\n
+            0:000> lm a 77d672c3\n
+            Browse full module list\n
+            start    end        module name\n
+            77d00000 77e42000   ntdll      (pdb symbols)\n
+        offset computed= address-start
     """
     global MODULE_OFF_FOUND
     global MODULES_FOUND

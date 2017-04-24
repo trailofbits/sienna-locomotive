@@ -15,10 +15,6 @@ def get_targets(path_file):
         path_file (string): input file
     Returns:
         (int,string) list: targets
-    Note:
-        targets are read in plain text as :
-        0x0,module1
-        0x1,module2
     """
     input_file = open(os.path.join(winafl_constants.WINAFL_WORKING_DIR,
                                    path_file), "r")
