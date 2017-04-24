@@ -1,4 +1,5 @@
 """ Module handling the communication with the database """
+import time
 import requests
 
 WEBAPP_IP = ''
@@ -16,6 +17,24 @@ def init(config_system):
     WEBAPP_IP = config_system['webapp_ip']
 
 
+def post_data(url, data):
+    """
+    Post data
+
+    Args:
+        url (string): url
+        data (): data to be sent
+    Note:
+        If an error occured, wait 5 secs and try\
+        again to send the data
+    """
+    try:
+        requests.post(url, json=data)
+    except requests.exceptions.RequestException as error:
+        print error
+        time.sleep(5)
+        post_data(url, data)
+
 def ask_status(config):
     """
     Ask the statut to the database
@@ -29,7 +48,8 @@ def ask_status(config):
                             ':5000/_get_status/' +
                             config['_run_id'])
         return resp.json()['status']
-    except:
+    except requests.exceptions.RequestException as error:
+        print "Status received %s" % error
         return 'ERROR'
 
 
@@ -45,7 +65,7 @@ def send_status(config, status):
                                                    config['_run_id'],
                                                    config['_worker_id'],
                                                    status)
-    requests.post(url)
+    post_data(url, None)
 
 
 def send_exploitable_status(config, status):
@@ -60,7 +80,7 @@ def send_exploitable_status(config, status):
                                                                config['_run_id'],
                                                                config['_worker_id'],
                                                                status)
-    requests.post(url)
+    post_data(url, None)
 
 
 def send_stats(config, data):
@@ -74,7 +94,7 @@ def send_stats(config, data):
     url = 'http://%s:5000/_set_stats/%s/%s' % (WEBAPP_IP,
                                                config['_run_id'],
                                                config['_worker_id'])
-    requests.post(url, json=data)
+    post_data(url, data)
 
 
 def send_targets(config, targets):
@@ -86,7 +106,7 @@ def send_targets(config, targets):
     """
 
     url = 'http://%s:5000/_set_targets/%s' % (WEBAPP_IP, config['_program_id'])
-    requests.post(url, json={'targets': targets})
+    post_data(url, {'targets': targets})
 
 
 def send_classification(config, data):
@@ -100,7 +120,7 @@ def send_classification(config, data):
     url = 'http://%s:5000/_set_classification/%s' % (WEBAPP_IP,
                                                      config['_run_id'])
 
-    requests.post(url, json=data)
+    post_data(url, data)
 
 
 def send_error(config, msg):
@@ -113,5 +133,5 @@ def send_error(config, msg):
     url = 'http://%s:5000/_set_error/%s/%s' % (WEBAPP_IP,
                                                config['_run_id'],
                                                config['_worker_id'])
-    requests.post(url, json={'msg': msg})
+    post_data(url, {'msg': msg})
     send_status(config, 'ERROR')
