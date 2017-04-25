@@ -9,6 +9,7 @@ from mongoengine.queryset import NotUniqueError
 from bson import json_util
 from flask import Blueprint
 from flask import request
+from flask import send_from_directory
 from werkzeug.utils import secure_filename
 
 from data_model import Run, Program, System
@@ -22,6 +23,31 @@ with open('config.yaml') as config_file:
 
 # input_crashes from the web app's view
 PATH_SHARED_INPUT_CRASHES = WEB_CONFIG['PATH_SHARED']
+
+@run_endpoints.route('/run_crash_download/<run_id>/<crash_name>')
+def docs(run_id, crash_name):
+    """
+    Download a crash.
+    Args:
+        run_id (str): description
+        crash_name (str): description
+    Returns:
+        file: contents of index.html
+    """
+    if len(run_id) not in [12, 24] or not is_hex(run_id):
+        return error('Run id invalid: %s' % run_id)
+
+    run = Run.objects(id=run_id)
+    if len(run) != 1:
+        return error('Run with id not found: %s' % run_id)
+
+    crash_path = os.path.join(PATH_SHARED_INPUT_CRASHES, run[0].crash_dir)
+    flist = os.listdir(crash_path)
+
+    if crash_name not in flist:
+        return error('Crash not found with name: %s' % crash_name)
+
+    return send_from_directory(crash_path, crash_name)
 
 @run_endpoints.route('/run_add', methods=['POST'])
 def run_add():

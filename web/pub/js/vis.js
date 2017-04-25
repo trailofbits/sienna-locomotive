@@ -298,7 +298,10 @@ function getCrashes(runId) {
 
                 var nameSpan = $('<span></span>');
                 nameSpan.addClass('column _5');
-                nameSpan.text(crash);
+                var nameLink = $('<a></a>');
+                nameLink.text(crash);
+                nameLink.attr('href', '/run_crash_download/'+runId+'/'+crash);
+                nameSpan.append(nameLink);
 
                 var classfSpan = $('<span></span>');
                 classfSpan.addClass('column _5');
