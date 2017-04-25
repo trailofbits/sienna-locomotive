@@ -10,8 +10,21 @@ pip install redis
 
 You will also need to:
 
-* Create a shared directory
+* Create a shared directory between the web application and the VM template
 * Install mongodb (on your host)
 * Install redis (on your host)
 
-Configure the Mongo and Celery in `alternative_web.py` under the `INITIALIZATION` section. 
+Create a file `config.yaml` in the same directory as `web.py`.
+
+```
+WEBAPP_IP: 
+  "N.N.N.N"
+MONGO_IP: 
+  "N.N.N.N"
+REDIS_IP: 
+  "N.N.N.N"
+PATH_SHARED: # Shared directory from the web application's perspective
+  "/path/to/shared/folder/"
+```
+
+Execute `python web.py` and the application should be running.
