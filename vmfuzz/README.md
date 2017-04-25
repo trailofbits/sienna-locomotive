@@ -1,11 +1,5 @@
-VMFuzz
+VMFuzz (developper documentation)
 =====================================
-
-**Getting started**
-- First, install all the requirements: [Installation Guide](Install.md) 
-- Then you need two configuration files, one for the system, one for the program to fuzz: [Configuration Guide](Configuration.md)
-- If you need an Autoit script, follow the [How to create an autoit script](autoit_lib/)
-- Finnaly, vmfuzz can be launched following the [Minimal usage](Usage.md) example
 
 
 **All documentations**

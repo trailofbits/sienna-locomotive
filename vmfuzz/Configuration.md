@@ -1,7 +1,6 @@
-Configuration
+Configuration (dev document)
 =====================================
 
-The user and system configurations are based on yaml files.
 
 System configuration
 =====================

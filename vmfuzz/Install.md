@@ -1,8 +1,7 @@
 Windows Instalation
 ===================
 
-Please note that several path defined here are used in the configuration of vmfuzz ([Configuration Guide](yaml_config/))
-
+Tested on Windows 8.1
 
 **Python**
 --------
@@ -22,7 +21,7 @@ pip install requests
 - Autoit (https://www.autoitscript.com/site/autoit/downloads/):
     - direct link: https://www.autoitscript.com/cgi-bin/getfile.pl?autoit3/autoit-v3-setup.exe
 
-> **Note**: The path to AutoIt3.exe is asked during the vmfuzz configuration (`path_autoit_bin`).
+> **Note**: The path to AutoIt3.exe is asked during the system configuration (`path_autoit`).
 
 **windbg**
 - Windbg: https://developer.microsoft.com/en-us/windows/downloads/windows-10-sdk
@@ -43,7 +42,7 @@ pip install requests
         - the x64 version in `x64\winext`
 
 
-> **Note**: The path to the `Debuggers` folder is asked during the vmfuzz configuration (`path_windbg_dir`).
+> **Note**: The path to the `Debuggers` folder is asked during the system configuration (`path_windbg`).
 
 **Radamsa**
 
@@ -62,9 +61,9 @@ cd radamsa
 make
 make install 
 ```
-- `radamsa.exe` is present in `path\cygwin\home\monty\radamsa\bin`
+- `radamsa.exe` is present in `<path>\cygwin\home\<user>\radamsa\bin`
 
-> **Note**: The path to the radamsa.exe is asked during the vmfuzz configuration (`path_radamsa_bin`).
+> **Note**: The path to the radamsa.exe is asked during the system configuration (`path_radamsa`).
 
 
 **Winafl**
@@ -73,13 +72,13 @@ make install
 - Do not need to be complied or installed, binaries are present in `bin32` and `bin64` of the zip file
 - http://www.microsoft.com/download/en/details.aspx?displaylang=en&id=8279
      - Only Microsoft Visual C++ 2010 required 
-> **Note**: The path to dynamorio is asked during the vmfuzz configuration (`path_dynamorio`).
+> **Note**: The path to dynamorio is asked during the system configuration (`path_dynamorio`).
 
 - Winafl: https://github.com/ivanfratric/winafl
     - Direct link: https://github.com/ivanfratric/winafl/archive/master.zip  
 - Do not need to be complied or installed, Binaries are present in `bin32` and `bin64` of the zip file
  
-> **Note**: The path to winafl is asked during the vmfuzz configuration (`path_winafl`).
+> **Note**: The path to winafl is asked during the system configuration (`path_winafl`).
 
 
 > **Note devs**: please ensure that winafl was built with the right version of dynamorio
@@ -87,12 +86,20 @@ make install
 **VMfuzz**
 - Copy vmfuzz into the VM
 
-> **Note**: The path to vmfuzz is asked during the vmfuzz configuration (`path_vmfuzz`).
+> **Note**: The path to vmfuzz is asked during the system configuration (`path_vmfuzz`).
 
 
 **Microsoft Windows**
 
-Please remove the automatic updates of windows (otherwise the system could restart during fuzzing)
+- Disbable the automatic updates of Windows:
+    - Search "Windows Update Settings" in the windows starting menu.
+    - Click "Choose how updates get installed".
+    - Select "Never check for updates (not recommanded)".
+- Disable Windows Defender
+    - Search "gpedit.msc " in the windows starting menu.
+    - Browse "Computer Configuration > Administrative Templates > Windows Components > Windows Defender"
+    - Click "Turn off Windows Defender"
+    - Select "Enabled", then "Apply" and "Ok"
+- (Optional): Follow the [optimization advice](https://github.com/artemdinaburg/OptimizeVM).
 
-TODO: check how to keep the update but do not permit automatic restart
 
