@@ -6,11 +6,13 @@ import yaml
 
 from datetime import datetime
 from mongoengine.queryset import NotUniqueError
+from mongoengine.queryset import DoesNotExist
 from bson import json_util
 from flask import Blueprint
 from flask import request
 from flask import send_from_directory
 from werkzeug.utils import secure_filename
+
 
 from data_model import Run, Program, System
 from web_utils import *
@@ -460,22 +462,26 @@ def run_complete_list():
     runs = Run.objects(start_time__ne='', status__in=['FINISHED', 'ERROR', 'TRIAGE'])
     min_runs = []
     for run in runs:
-        min_run = {}
-        min_run['system'] = str(run['program']['system'].id)
-        min_run['program'] = str(run['program'].id)
+        try:
+            min_run = {}
+            min_run['system'] = str(run['program']['system'].id)
+            min_run['program'] = str(run['program'].id)
 
-        run = run.to_mongo().to_dict()
-        min_run['name'] = run['name']
-        min_run['_id'] = str(run['_id'])
-        min_run['status'] = run['status']
+            run = run.to_mongo().to_dict()
+            min_run['name'] = run['name']
+            min_run['_id'] = str(run['_id'])
+            min_run['status'] = run['status']
 
-        if 'start_time' in run:
-            min_run['start_time'] = time.mktime(run['start_time'].timetuple())
+            if 'start_time' in run:
+                min_run['start_time'] = time.mktime(run['start_time'].timetuple())
 
-        if 'end_time' in run:
-            min_run['end_time'] = time.mktime(run['end_time'].timetuple())
+            if 'end_time' in run:
+                min_run['end_time'] = time.mktime(run['end_time'].timetuple())
 
-        min_runs.append(min_run)
+            min_runs.append(min_run)
+        except DoesNotExist as e:
+            pass
+            
 
     run_info = {'runs': min_runs}
     return json.dumps(run_info, default=json_util.default)
