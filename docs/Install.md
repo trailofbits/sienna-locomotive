@@ -11,9 +11,12 @@ The system needs one *template VM* per target program.
 
 ## System VM Installation
 
-All the installers are present in the `VMfuzz_install.zip` file (SHA-256: 664118fc9a06d5da54cd64b2caedaf0b5a862a92233e8d8c0ccf71b8a28945a7, tested on Windows 8.1). 
+All the installers are present in the `VMfuzz_install.zip` file . 
+Please contact Trail of Bits to get the  `VMfuzz_install.zip` file.
 
 The virtual machine needs an Internet connection to install the dependencies.
+
+Tested on Windows 8.1.
 
 **Python**
 

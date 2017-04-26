@@ -36,6 +36,15 @@ Instead, you must, before the run, create several clones of the original VM, nam
 
 > **Note**: The basename of the templates (`<template_name>`) is asked during the program configuration (`vmtemplate`), 
 
+> **Note**: During the configuration of the webapp (`web/config.yaml`), you need to add:
+> ```yaml
+> ANSIBLE_START_VM:
+>    "../ansible/virtualbox/create_vms.yaml"
+> ANSIBLE_STOP_VM:
+>     "../ansible/virtualbox/stop_vms.yaml"
+> ``` 
+
+
 ## Building New Ansible Script
 
 The scripts are called with three parameters:

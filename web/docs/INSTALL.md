@@ -25,6 +25,11 @@ REDIS_IP:
   "N.N.N.N"
 PATH_SHARED: # Shared directory from the web application's perspective
   "/path/to/shared/folder/"
+ANSIBLE_START_VM: # See the Ansible guidelines
+   "path/to/create_vms.yaml"
+ANSIBLE_STOP_VM:
+    "path/to/stop_vms.yaml"
+
 ```
 
 Execute `python web.py` and the application should be running.

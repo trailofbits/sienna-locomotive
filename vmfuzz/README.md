@@ -1,21 +1,23 @@
-VMFuzz (developper documentation)
+VMFuzz (developer documentation)
 =====================================
 
+The vmfuzz documentation is only for developer purpose.
+
+The vmfuzz documentation is built as follow:
+
+```shell
+cd docs
+make html
+```
 
 **All documentations**
 -----------------------
-- [Installation Guide](Install.md)
-- [Minimal usage](Usage.md)
 - [Configuration Guide](Configuration.md)
-- [How to create an autoit script](autoit_lib/)
 - [Fuzzers available](fuzzers/README.md)
 - [Particular behaviors details](Behavior.md)
-- [Exploitatbility analysis](exploitability/) (to be dev)
-- [Database communication](Database.md) (to be dev)
-- [Modules tests](tests/README.md) 
+- [Exploitatbility analysis](exploitability/) 
+- [Database communication](Database.md) 
 
-**
-Tested on Win 7, fuzzing with radamsa.
 
 Programs tested:
 - Sumatra pdf (v.3.2.1): http://www.sumatrapdfreader.org/download-free-pdf-viewer.html
