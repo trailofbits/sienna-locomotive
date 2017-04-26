@@ -46,7 +46,7 @@ $window_handle = WinWaitActive("my program")
 self_close($window_handle, "program.exe")
 ```
 
-More examples can be found [here](../sample/auto_it_scripts).
+More examples can be found [here](../vmfuzz/sample/auto_it_scripts).
 
 How it works (developer)
 =======================
