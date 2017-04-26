@@ -53,6 +53,7 @@ def debug(buf):
         buf (string) : Message
     """
     logging.debug(buf)
+    print buf
 
 
 def info(buf):
@@ -63,6 +64,7 @@ def info(buf):
         buf (string) : Message
     """
     logging.info(buf)
+    print buf
 
 
 def warning(buf):
@@ -73,6 +75,7 @@ def warning(buf):
         buf (string) : Message
     """
     logging.warning(buf)
+    print buf
 
 
 def error(buf):
@@ -84,6 +87,7 @@ def error(buf):
     Note:
         Send the error to the webapp
     """
+    print buf
     logging.error(buf)
     database.send_error(CONFIG, buf)
     exit(0)

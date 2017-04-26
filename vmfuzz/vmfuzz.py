@@ -110,35 +110,40 @@ def init(config_system, config_program, config_run, log_level):
     return (config, config_system)
 
 
-def launch_fuzz(config, t_fuzz_stopped):
+def launch_fuzz(config, config_system, t_fuzz_stopped):
     """
     Launch the fuzzing
 
     Args:
-        config (dict): user configuration
+        config (dict): the user configuration
+        config_system (dict): the system configuration
         t_fuzz_stopped (threading.Event): Event use to stop the fuzzing
     """
     if config['run_type'] == 'all':
-        has_target = 'targets' in config
-        if has_target:
-            has_target = config['targets'] != []
-        if not has_target:
-            print "Not target, launch recon"
-            targets = winafl_recon.launch_recon(config, t_fuzz_stopped)
-            database.send_targets(config, targets)
-            winafl_recon.save_targets(
-                targets, config['program_name'] + "-targets.yaml")
-        else:
-            targets = config['targets']
-        if t_fuzz_stopped.is_set():
-            return
-        print "Launch winafl on "+str(len(targets))+" targets"
-        winafl_recon.winafl_on_targets(config, targets, t_fuzz_stopped)
-        logging.info("Winafl done, start radamsa")
-        if t_fuzz_stopped.is_set():
-            return
-        print 'End'
-#        radamsa.launch_fuzzing(config, t_fuzz_stopped)
+        if "winafl" in  config_system['fuzzers']:
+            has_target = 'targets' in config
+            if has_target:
+                has_target = config['targets'] != []
+            if not has_target:
+                print "Not target, launch recon"
+                targets = winafl_recon.launch_recon(config, t_fuzz_stopped)
+                database.send_targets(config, targets)
+                winafl_recon.save_targets(
+                    targets, config['program_name'] + "-targets.yaml")
+            else:
+                targets = config['targets']
+            if t_fuzz_stopped.is_set():
+                return
+            print "Launch winafl on "+str(len(targets))+" targets"
+            winafl_recon.winafl_on_targets(config, targets, t_fuzz_stopped)
+            if t_fuzz_stopped.is_set():
+                return
+            print 'Winaf end'
+            logging.info("Winafl done, start radamsa")
+        if "radamsa" in  config_system['fuzzers']:
+            print 'Radamsa start'
+            radamsa.launch_fuzzing(config, t_fuzz_stopped)
+            print 'Radamsa end'
 
     elif config['run_type'] == 'radamsa':
         radamsa.launch_fuzzing(config, t_fuzz_stopped)
@@ -175,18 +180,19 @@ def launch_fuzz(config, t_fuzz_stopped):
     return
 
 
-def launch_fuzz_wrapper(config, t_fuzz_stopped):
+def launch_fuzz_wrapper(config, config_system, t_fuzz_stopped):
     """
     Wrapper of launch_fuzz
 
     Args:
-        config (dict): user configuration
+        config (dict): the user configuration
+        config_system (dict): the system configuration
         t_fuzz_stopped (threading.Event): Event use to stop the fuzzing
     Note:
         Catch all exceptions of launch_fuzz and report them to the webapp
     """
     try:
-        launch_fuzz(config, t_fuzz_stopped)
+        launch_fuzz(config, config_system, t_fuzz_stopped)
     except Exception as e:
         logging.error('PLEASE REPORT BUG: '+str(e))
 
@@ -211,7 +217,7 @@ def fuzz(config_system, config_program, config_run, log_level=0):
     t_fuzz_stopped = threading.Event()
 
     t_fuzz = threading.Thread(target=launch_fuzz_wrapper, args=(
-        config, t_fuzz_stopped,))
+        config, config_system, t_fuzz_stopped,))
     t_fuzz.daemon = True
     t_fuzz.start()
 

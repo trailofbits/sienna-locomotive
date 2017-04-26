@@ -25,7 +25,7 @@ Func Close($window_handle, $prog)
     Exit($ret)
 EndFunc
 
-Func Self_close($proc)
+Func Self_close($window_handle)
     MsgBox(0,"", "Not yet implemented")
 EndFunc
 
@@ -33,10 +33,32 @@ Func Sleep_fuzz($sec)
     Sleep($sec)
 EndFunc
 
-Func Send_fuzz($cmd, $proc)
+Func Send_fuzz($keys, $window_handle)
     ; check that the windows is still active before sending the cmd  
     if(_check_alive($window_handle)) Then
-        Send($cmd)
+        Send($keys)
     EndIf
 EndFunc
+
+Func SendKeepActive_fuzz($keys, $window_handle)
+    ; check that the windows is still active before sending the cmd  
+    if(_check_alive($window_handle)) Then
+        SendKeepActive($keys)
+    EndIf
+EndFunc
+
+Func ControlSend_fuzz($title, $text, $controlid, $string, $window_handle)
+    ; check that the windows is still active before sending the cmd  
+    if(_check_alive($window_handle)) Then
+        ControlSend($title, $text, $controlid, $string)
+    EndIf
+EndFunc
+
+Func ControlCommand_fuzz($title, $text, $controlid, $command, $window_handle)
+    ; check that the windows is still active before sending the cmd  
+    if(_check_alive($window_handle)) Then
+        ControlCommand($title, $text, $controlid, $command)
+    EndIf
+EndFunc
+
 

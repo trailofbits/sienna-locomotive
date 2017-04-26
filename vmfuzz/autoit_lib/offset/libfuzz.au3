@@ -11,8 +11,8 @@ Func Close($window_handle, $prog)
     Exit(0)
 EndFunc
 
-Func Self_close($proc)
-    WinWaitClose($proc)
+Func Self_close($window_handle)
+    WinWaitClose($window_handle)
     Exit(0)
 EndFunc
 
@@ -24,10 +24,30 @@ Func Sleep_fuzz($sec)
     Endif
 EndFunc
 
-Func Send_fuzz($cmd, $proc)
-    WinSetOnTop($proc, "", $WINDOWS_ONTOP)
+Func Send_fuzz($keys, $window_handle)
+    WinSetOnTop($window_handle, "", $WINDOWS_ONTOP)
     Sleep(4000)
-    Send($cmd)
+    Send($keys)
     Sleep(4000)
 EndFunc
 
+Func SendKeepActive_fuzz($keys, $window_handle)
+    WinSetOnTop($window_handle, "", $WINDOWS_ONTOP)
+    Sleep(4000)
+    SendKeepActive($keys)
+    Sleep(4000)
+EndFunc
+
+Func ControlSend_fuzz($title, $text, $controlid, $string, $window_handle)
+    WinSetOnTop($window_handle, "", $WINDOWS_ONTOP)
+    Sleep(4000)
+    ControlSend($title, $text, $controlid, $string)
+    Sleep(4000)
+EndFunc
+
+Func ControlCommand_fuzz($title, $text, $controlid, $command, $window_handle)
+    WinSetOnTop($window_handle, "", $WINDOWS_ONTOP)
+    Sleep(4000)
+    ControlCommand($title, $text, $controlid, $command)
+    Sleep(4000)
+EndFunc

@@ -64,7 +64,10 @@ def run_and_check(autoit_script, parameters):
         - If not, check the return value of the autoit script (0: no error)
     """
     cmd = [AUTOIT_BIN, autoit_script] + parameters
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    print cmd
+    proc = subprocess.Popen(cmd, 
+                            stdout=subprocess.PIPE, 
+                            creationflags=subprocess.CREATE_NEW_CONSOLE)
     ret_code = proc.wait()
     print ret_code
     if crash_detection.check_wrfault():

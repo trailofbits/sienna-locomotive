@@ -2,7 +2,7 @@
 #include "libfuzz.au3"
 
 ; Run Easy RM to MP3
-Run_fuzz("C:\Program Files\Easy RM to MP3 Converter\RM2MP3Converter.exe")
+Run_fuzz("C:\Program Files (x86)\Easy RM to MP3 Converter\RM2MP3Converter.exe")
 
 $window_handle = WinWaitActive("Easy RM to MP3 Converter")
 

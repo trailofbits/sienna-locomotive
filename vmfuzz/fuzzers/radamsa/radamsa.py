@@ -165,6 +165,11 @@ def launch_fuzzing(config, t_fuzz_stopped):
                 file_manipulation.copy_file(src, dst)
                 crashes.append(new_name)
 
+            if config['using_autoit']:
+                run_process.kill_process("AutoIt3.exe")
+            run_process.kill_process(config['program_name'])
+            run_process.kill_process("WerFault.exe")
+
             cycles_done += 1
             runs_total += config['radamsa_number_files_to_create']
             data = generate_stats(cycles_done, runs_total, len(crashes))

@@ -2,7 +2,7 @@
 #include "libfuzz.au3"
 
 ; Run Winscp
-Run_fuzz("C:\Program Files\WinSCP\WinSCP.exe")
+Run_fuzz("C:\Program Files (x86)\WinSCP\WinSCP.exe")
 
 ; Wait for the Open windows
 ; Change Ouvrir to Open in us based windows

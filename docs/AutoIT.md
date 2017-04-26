@@ -1,27 +1,36 @@
 Writing AutoIT script
 ===============
 
-List of original autoit functions:
-https://www.autoitscript.com/autoit3/docs/functions.htm
+The script-based language  [AutoIT](https://www.autoitscript.com/site/autoit/) is used to automatize GUI interactions.
+
+VMfuzz needs AutoIt scripts to follow a set of rules.
+
 
 In the following:
 - ```$window_handle``` is the handle of the main window (which can be returned by ```WinWait```)
 - ```$prog_name``` is the program name
 
-**Wrappers**
-- ```run(cmd)``` ->  ```Run_fuzz(cmd) ```
-- ```Send(keys)``` -> ```Send_fuzz(keys,$window_handle)```
-- ```Sleep(time)``` -> ```Sleep_fuzz(time,$window_handle)```
-
 **Rules**
-- Must include ```"libfuzz.au3"```
+- The script must include ```"libfuzz.au3"```
 - The input file is passed through ```$CmdLine[1]```
 - The program is called using ```Run_fuzz()```
 - Call ```self_close($window_handle, $prog_name)``` at the end of the script for self closing application
 - Call ```close($window_handle, $prog_name)``` at the end of the script if the application does not close itself
 - Forbid side effects (two runs must be similar)
 
-**Script example** 
+Instead of using the original [AutoIT functions](https://www.autoitscript.com/autoit3/docs/functions.htm), use the following set of wrappers:
+
+**Wrappers**
+- ```run($cmd)``` ->  ```Run_fuzz($cmd) ```
+- ```Send($keys)``` -> ```Send_fuzz($keys, $window_handle)```
+- ```SendKeepActive($keys)``` -> ```SendKeepActive_fuzz($keys, $window_handle)```
+- ```ControlSend($title, $text, $controlid, $string)``` -> ```ControlSend_fuzz($title, $text, $controlid, $string, $window_handle)```
+- ```ControlCommand($title, $text, $controlid, $command)``` -> ```ControlCommand_fuzz($title, $text, $controlid, $command, $window_handle)```
+- ```Send($keys)``` -> ```Send_fuzz($keys, $window_handle)```
+- ```Sleep($time)``` -> ```Sleep_fuzz($time, $window_handle)```
+
+
+**Minimal Script Example** 
 
 ```
 #include <Constants.au3>
@@ -37,8 +46,10 @@ $window_handle = WinWaitActive("my program")
 self_close($window_handle, "program.exe")
 ```
 
-How it works
-============
+More examples can be found [here](../sample/auto_it_scripts).
+
+How it works (developer)
+=======================
 
 According to the type running, the proper ```libfuzz.au3``` is selected:
 
@@ -51,4 +62,4 @@ According to the type running, the proper ```libfuzz.au3``` is selected:
 The same user script is run, but the behavior is changed thanks to the library.
 Examples of changes:
 - ```Run_fuzz()``` launches the binary only on normal runs (and does nothing for the other runs)
-- Several sleep() are added, otherwise, the original script would be too fast for slow runs (such as under windbg)
+- Several call to sleep() are added; otherwise the original script would be too fast for slow runs (such as under windbg)

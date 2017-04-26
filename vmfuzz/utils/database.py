@@ -53,7 +53,9 @@ def ask_status(config):
     except requests.exceptions.RequestException as error:
         print "Status received %s" % error
         return 'ERROR'
-
+    except KeyError as error:
+        print "Key error: %s %s" % (error.message, error.args)
+        return 'ERROR'
 
 def send_status(config, status):
     """
