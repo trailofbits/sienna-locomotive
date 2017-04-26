@@ -174,3 +174,8 @@ def launch_fuzzing(config, t_fuzz_stopped):
             runs_total += config['radamsa_number_files_to_create']
             data = generate_stats(cycles_done, runs_total, len(crashes))
             database.send_stats(config, {'stats': data})
+        
+        if config['using_autoit']:
+            run_process.kill_process("AutoIt3.exe")
+        run_process.kill_process(config['program_name'])
+        run_process.kill_process("WerFault.exe")

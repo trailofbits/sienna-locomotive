@@ -246,8 +246,10 @@ def fuzz(config_system, config_program, config_run, log_level=0):
             else:
                 print str(config['fuzz_time'])
                 print str(time.time() - starting_time)
+    
+    if 'winafl' in config_system['fuzzers']:
+        winafl.kill_all(config)
 
-    winafl.kill_all(config)
     # TODO JF: to be changed to a more cleaner way to deal with !exploitable
     if config['run_type'] != 'exploitable':
         database.send_status(config, 'FINISHED')

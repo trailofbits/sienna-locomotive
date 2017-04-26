@@ -13,8 +13,9 @@ def kill_process(process):
     Args:
         process (string): name of the processus
     """
+    devnull = open(os.devnull, 'w')
     cmd_kill = "Taskkill /IM "+process+" /F"
-    proc = subprocess.Popen(cmd_kill)
+    proc = subprocess.Popen(cmd_kill, stdout=devnull, stderr=devnull)
     proc.wait()
 
 
