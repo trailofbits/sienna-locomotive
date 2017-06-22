@@ -380,7 +380,7 @@ def insn_hook(m):
     '''
     Hook every instruction and call the appropriate instruction handler.
     '''
-    sys_lookup = {
+    syscall_lookup = {
         SYS_READ: handle_read,
         SYS_OPEN: handle_open,
         SYS_CLOSE: handle_close
@@ -409,6 +409,8 @@ def insn_hook(m):
         if len(m.context['taint_mem']) > 0 or len(m.context['taint_reg']) > 0:
             print hex(cpu.RIP), insn.mnemonic, insn.op_str
 
+        insn_count += 1
+
     # @m.hook(0x4006f2)
     # def examine(state):
     #     cpu = state.cpu
@@ -434,14 +436,17 @@ def insn_hook(m):
         print state.cpu
         dump_taint(m, state)
 
+insn_count = 0
 def main():
     if len(sys.argv) < 3:
         print 'USAGE: python %s target_program taint_file' % sys.argv[0]
         sys.exit()
 
     path = sys.argv[1]
-    m.context['target_file'] = sys.argv[2]
+    file = sys.argv[2]
+
     m = Manticore(path)
+    m.context['target_file'] = file
 
     m.context['target_fd'] = -1
     m.context['taint_reg'] = set()
@@ -452,6 +457,7 @@ def main():
     insn_hook(m)
 
     m.run()
+    print insn_count
 
 if __name__ == '__main__':
     main()
