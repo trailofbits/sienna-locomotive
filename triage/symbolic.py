@@ -69,7 +69,7 @@ def handle_read(m, state):
         @m.hook(pc_next)
         def check_count(state):
             cpu = state.cpu
-            count = cpu.RAX
+            count = int(cpu.RAX)
             symbolic_buffer = state.new_symbolic_buffer(count)
             state.cpu.write_bytes(buf, symbolic_buffer)
 
