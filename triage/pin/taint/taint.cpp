@@ -1,5 +1,6 @@
 #include "pin.H"
 #include <sys/syscall.h>
+#include <signal.h>
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -240,6 +241,14 @@ VOID SyscallExit(THREADID thread_id, CONTEXT *ctx, SYSCALL_STANDARD std, void *v
     }
 }
 
+BOOL HandleSignal(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
+    *out << "S E G F A U L T " << std::endl;
+    std::set<LEVEL_BASE::REG>::iterator it;
+    for(it = tainted_regs.begin(); it != tainted_regs.end(); it++) {
+        *out << REG_StringShort(*it) << " has taint" << std::endl;
+    }
+    return true;
+}
 
 int main(int argc, char *argv[]) {
     PIN_Init(argc, argv);
@@ -257,6 +266,7 @@ int main(int argc, char *argv[]) {
     PIN_AddSyscallEntryFunction(SyscallEntry, 0);
     PIN_AddSyscallExitFunction(SyscallExit, 0);
     PIN_AddThreadStartFunction(ThreadStart, 0);
+    PIN_InterceptSignal(SIGSEGV, HandleSignal, 0);
     PIN_AddFiniFunction(Fini, 0);
 
     // Start the program, never returns
