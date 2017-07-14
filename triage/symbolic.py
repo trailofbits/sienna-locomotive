@@ -23,10 +23,9 @@ def gather_trace(prog, params):
         with open('trace.txt', 'a') as f:
             f.write(str(pc) + '\n')
 
+    m.verbosity = 2
+    m.concrete_data = 'magic\n' + ('\n\n\n\nd\n' * 24) + ('\n' * 16) + ((('w\n' * 10) + 's\n') * (280)) + 's\n' + 'd\n' + 'q\n'
     m.run()
-
-    # Print number of instructions recorded
-    print "%d instructions are recorded" % len(trace)
 
 def handle_open(m, state):
     '''
@@ -107,7 +106,7 @@ def gather_taint(prog, params, trace, target):
 
     @m.hook(None)
     def follow_trace(state):
-        if not state.cpu.PC <= trace:
+        if state.cpu.PC < 0x10000000 and not state.cpu.PC <= trace:
             state.abandon()
 
         cpu = state.cpu
@@ -119,16 +118,22 @@ def gather_taint(prog, params, trace, target):
             if cpu.RAX in syscall_lookup:
                 syscall_lookup[cpu.RAX](m, state)
 
+    m.verbosity = 2
     m.run()
 
 def main():
-    prog = 'a.out'
-    params = []
+    if len(sys.argv) < 2:
+        print 'USAGE: %s /path/to/program' % sys.argv[0]
+        return
+    prog = sys.argv[1]
+    params = ['A']
 
-    # gather_trace(prog, params)
-    with open('trace.txt', 'r') as f:
+    gather_trace(prog, params)
+    sys.exit()
+    
+    with open('/home/taxicat/work/pin-3.2-81205-gcc-linux/out.txt', 'r') as f:
         c = f.read()
-    trace = set([int(ea) for ea in c.split('\n')[:-1]])
+    trace = set([int(ea) for ea in c.split('\n')[:-3]])
     target = 0x4006f9
 
     gather_taint(prog, params, trace, target)

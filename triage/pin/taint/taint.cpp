@@ -4,10 +4,11 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <list>
 #include <set>
 #include <map>
 
-#define DEBUG
+// #define DEBUG
 
 UINT64 threadCount = 0; 
 
@@ -23,12 +24,15 @@ std::map<UINT64, string> FDLookup;
 std::set<ADDRINT> tainted_addrs;
 std::set<LEVEL_BASE::REG> tainted_regs;
 
+#define RECORD_COUNT 5
+std::list<ADDRINT> last_addrs;
+std::list<ADDRINT> last_calls;
+
 std::ostream *out = &cerr;
 
 VOID Fini(INT32 code, VOID *v)
 {
     *out <<  "===============================================" << endl;
-    *out << tainted_addrs.size() << ", " << tainted_regs.size() << std::endl;
 }
 
 VOID ThreadStart(THREADID threadIndex, CONTEXT *ctxt, INT32 flags, VOID *v) {
@@ -56,17 +60,11 @@ bool reg_is_tainted(LEVEL_BASE::REG reg) {
 
 VOID reg_taint(LEVEL_BASE::REG reg) {
     REG fullReg = REG_FullRegName(reg);
-#ifdef DEBUG
-    *out << "TAINTING: " << REG_StringShort(fullReg) << std::endl;
-#endif
     tainted_regs.insert(fullReg);
 }
 
 VOID reg_untaint(LEVEL_BASE::REG reg) {
     REG fullReg = REG_FullRegName(reg);
-#ifdef DEBUG
-    *out << "UNTAINTING: " << REG_StringShort(fullReg) << std::endl;
-#endif
     std::set<LEVEL_BASE::REG>::iterator it = tainted_regs.find(fullReg);
     if(it != tainted_regs.end()) {
         tainted_regs.erase(it);
@@ -88,22 +86,13 @@ VOID mem_taint_reg(REG reg, ADDRINT mem,  UINT32 size) {
     }
 
     if(tainted) {
-#ifdef DEBUG
-        *out << std::hex << mem << " - " << mem+size << " is tainted" << std::endl;
-#endif
         reg_taint(reg);
     } else {
-#ifdef DEBUG
-        *out << std::hex << mem << " - " << mem+size << " is not tainted" << std::endl;
-#endif
         reg_untaint(reg);
     }
 }
 
 VOID mem_untaint(ADDRINT mem, UINT32 size) {
-#ifdef DEBUG
-    *out << "UNTAINTING: " << std::hex << mem << " - " << mem+size << std::endl;
-#endif
 
     for(UINT32 i=0; i<size; i++) {
         std::set<ADDRINT>::iterator it = tainted_addrs.find(mem+i);   
@@ -114,30 +103,47 @@ VOID mem_untaint(ADDRINT mem, UINT32 size) {
 }
 
 VOID mem_taint(ADDRINT mem, UINT32 size) {
-#ifdef DEBUG
-    *out << "TAINTING: " << std::hex << mem << " - " << mem+size << std::endl;
-#endif
 
     for(UINT32 i=0; i<size; i++) {
         tainted_addrs.insert(mem+i);
     }
 }
 
+VOID record(INS ins) {
+    last_addrs.push_back(INS_Address(ins));
+    while(last_addrs.size() > RECORD_COUNT) {
+        last_addrs.pop_front();
+    }
+}
+
+VOID record_call(ADDRINT target, ADDRINT loc) {
+    last_calls.push_back(target);
+    while(last_calls.size() > RECORD_COUNT) {
+        last_calls.pop_front();
+    }
+}
+
+VOID handle_specific(INS ins) {
+    if(INS_IsCall(ins) && INS_IsDirectBranchOrCall(ins)) {
+        INS_InsertCall(ins, 
+            IPOINT_BEFORE, 
+            (AFUNPTR)record_call, 
+            IARG_ADDRINT, INS_DirectBranchOrCallTargetAddress(ins),
+            IARG_ADDRINT, INS_Address(ins),
+            IARG_END);
+    } 
+}
+
 VOID Insn(INS ins, VOID *v) {
-#ifdef DEBUG
-    *out << std::endl;
-    *out << INS_Disassemble(ins) << std::endl;        
-#endif
+
+    record(ins);
+    handle_specific(ins);
 
     if(INS_OperandCount(ins) < 2) {
         return;
     }
 
     if(INS_MemoryOperandIsRead(ins, 0) && INS_OperandIsReg(ins, 0)){
-#ifdef DEBUG
-        *out << "MEM READ" << std::endl;
-        *out << "**** **** W" << std::endl;
-#endif
         for(uint32_t i=0; i<INS_MaxNumWRegs(ins); i++) {
             INS_InsertCall(
                 ins, IPOINT_BEFORE, (AFUNPTR)mem_taint_reg,
@@ -147,10 +153,6 @@ VOID Insn(INS ins, VOID *v) {
                 IARG_END);
         }
     } else if(INS_MemoryOperandIsWritten(ins, 0)) {
-#ifdef DEBUG
-        *out << "MEM WRIT" << std::endl;
-        *out << "**** **** R" << std::endl;
-#endif
         bool tainted = false;
         for(uint32_t i=0; i<INS_MaxNumRRegs(ins); i++) {
             // *out << REG_StringShort(INS_RegR(ins, i)) << std::endl;
@@ -171,19 +173,12 @@ VOID Insn(INS ins, VOID *v) {
                 IARG_END);
         }
     } else if(INS_OperandIsReg(ins, 0)) {
-#ifdef DEBUG
-        *out << "REG REG" << std::endl;
-        *out << "**** **** R" << std::endl;
-#endif
         bool tainted = false;
         for(uint32_t i=0; i<INS_MaxNumRRegs(ins); i++) {
             // *out << REG_StringShort(INS_RegR(ins, i)) << std::endl;
             tainted |= reg_is_tainted(INS_RegR(ins, i));
         }
 
-#ifdef DEBUG
-        *out << "**** **** W" << std::endl;
-#endif
         for(uint32_t i=0; i<INS_MaxNumWRegs(ins); i++) {
             // *out << REG_StringShort(INS_RegW(ins, i)) << std::endl;
             if(tainted) {
@@ -234,19 +229,34 @@ VOID SyscallExit(THREADID thread_id, CONTEXT *ctx, SYSCALL_STANDARD std, void *v
         unsigned long byteCount = PIN_GetSyscallReturn(ctx, std);
         mem_taint(start, byteCount);
 
-#ifdef DEBUG
-        *out << "READCNT 0x" << std::hex << byteCount << std::endl;
-#endif
         saveRetRead = false;
     }
 }
 
 BOOL HandleSignal(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
+    ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
     *out << "S E G F A U L T " << std::endl;
-    std::set<LEVEL_BASE::REG>::iterator it;
-    for(it = tainted_regs.begin(); it != tainted_regs.end(); it++) {
-        *out << REG_StringShort(*it) << " has taint" << std::endl;
+    *out << "AT: " << std::hex << ip << std::endl << std::endl;
+
+    std::set<LEVEL_BASE::REG>::iterator sit;
+    for(sit=tainted_regs.begin(); sit != tainted_regs.end(); sit++) {
+        *out << REG_StringShort(*sit) << " has taint" << std::endl;
     }
+    *out << std::endl;
+
+    *out << "LAST " << RECORD_COUNT << " ADDRESSES: " << std::endl;
+    std::list<ADDRINT>::iterator lit;
+    for(lit=last_addrs.begin(); lit != last_addrs.end(); lit++) {
+        *out << *lit << std::endl;
+    }
+    *out << std::endl;
+
+    *out << "LAST " << RECORD_COUNT << " CALLS: " << std::endl;
+    for(lit=last_calls.begin(); lit != last_calls.end(); lit++) {
+        *out << *lit << std::endl;
+    }
+    *out << std::endl;
+
     return true;
 }
 
@@ -265,6 +275,7 @@ int main(int argc, char *argv[]) {
     INS_AddInstrumentFunction(Insn, 0);
     PIN_AddSyscallEntryFunction(SyscallEntry, 0);
     PIN_AddSyscallExitFunction(SyscallExit, 0);
+
     PIN_AddThreadStartFunction(ThreadStart, 0);
     PIN_InterceptSignal(SIGSEGV, HandleSignal, 0);
     PIN_AddFiniFunction(Fini, 0);
