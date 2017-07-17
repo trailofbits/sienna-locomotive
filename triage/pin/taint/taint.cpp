@@ -28,6 +28,11 @@ std::set<LEVEL_BASE::REG> tainted_regs;
 std::list<ADDRINT> last_addrs;
 std::list<ADDRINT> last_calls;
 
+std::map<VOID *, SIZE> allocd;
+std::map<VOID *, SIZE> freed;
+std::set<VOID *> alloc_set;
+std::set<VOID *> free_set;
+
 std::ostream *out = &cerr;
 
 VOID Fini(INT32 code, VOID *v)
@@ -175,12 +180,10 @@ VOID Insn(INS ins, VOID *v) {
     } else if(INS_OperandIsReg(ins, 0)) {
         bool tainted = false;
         for(uint32_t i=0; i<INS_MaxNumRRegs(ins); i++) {
-            // *out << REG_StringShort(INS_RegR(ins, i)) << std::endl;
             tainted |= reg_is_tainted(INS_RegR(ins, i));
         }
 
         for(uint32_t i=0; i<INS_MaxNumWRegs(ins); i++) {
-            // *out << REG_StringShort(INS_RegW(ins, i)) << std::endl;
             if(tainted) {
                 reg_taint(INS_RegW(ins, i));
             } else {
@@ -260,9 +263,114 @@ BOOL HandleSignal(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const 
     return true;
 }
 
+VOID track_free(VOID *addr) {
+    if(freed.find(addr) != freed.end()) {
+        *out << "OMG DOUBLE FREE" << std::endl;
+        return;
+    }
+
+    if(allocd.find(addr) == allocd.end()) {
+        *out << "OMG FREEING UNALLOCD MEM WUT" << std::endl;
+        return;
+    }
+
+    SIZE size = allocd[addr];
+    allocd.erase(addr);
+
+    freed[addr] = size;
+
+    for(int i=0; i<size; i++) {
+        uint8_t *calc = (uint8_t *)addr + size;
+        alloc_set.insert(calc);
+        
+        if(alloc_set.find(calc) != alloc_set.end()) {
+            alloc_set.erase(calc);
+        }
+    }
+}
+
+VOID free_before(ADDRINT retIp, ADDRINT address) {
+    *out << "FREE CALLED: " << reinterpret_cast<void*>(address) << std::endl;
+    track_free(reinterpret_cast<void*>(address));
+}
+
+VOID track_allocation(VOID *addr, SIZE size) {
+    allocd[addr] = size;
+
+    if(freed.find(addr) != freed.end()) {
+        freed.erase(addr);
+    }
+
+    for(int i=0; i<size; i++) {
+        uint8_t *calc = (uint8_t *)addr + size;
+        alloc_set.insert(calc);
+        
+        if(free_set.find(calc) != free_set.end()) {
+            free_set.erase(calc);
+        }
+    }
+    // TODO: 
+        // Add out of bounds for +/- 16 (or alignment) on addr
+        // Check OOB on accesses
+}
+
+void *malloc_hook(CONTEXT * ctxt, AFUNPTR pf_malloc, size_t size) {
+  void *res;
+  PIN_CallApplicationFunction(
+    ctxt, 
+    PIN_ThreadId(),
+    CALLINGSTD_DEFAULT, 
+    pf_malloc,
+    NULL,
+    PIN_PARG(void *), &res, 
+    PIN_PARG(size_t), size, 
+    PIN_PARG_END());
+  
+  *out << "MALLOC CALLED: " << res << ", " << size << std::endl;
+  track_allocation(res, size);
+  return res;  
+}
+
+VOID Image(IMG img, VOID *v)
+{
+    RTN mallocRtn = RTN_FindByName(img, "malloc");  
+    if (RTN_Valid(mallocRtn)) {
+        PROTO protoMalloc = PROTO_Allocate(
+            PIN_PARG(void *), 
+            CALLINGSTD_DEFAULT,
+            "malloc", 
+            PIN_PARG(size_t), 
+            PIN_PARG_END());
+
+        RTN_ReplaceSignature(
+            mallocRtn,
+            AFUNPTR(malloc_hook),
+            IARG_PROTOTYPE, protoMalloc,
+            IARG_CONST_CONTEXT,
+            IARG_ORIG_FUNCPTR,
+            IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
+            IARG_END);
+      }
+
+    RTN freeRtn = RTN_FindByName(img, "free"); 
+    if (RTN_Valid(freeRtn))
+    {
+        RTN_Open(freeRtn);
+        RTN_InsertCall(
+            freeRtn, 
+            IPOINT_BEFORE, 
+            (AFUNPTR)free_before,
+            IARG_RETURN_IP, 
+            IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
+            IARG_END);
+        RTN_Close(freeRtn);
+    }
+
+}
+
 int main(int argc, char *argv[]) {
     PIN_Init(argc, argv);
-
+    
     FDLookup[0] = "__STDIN";
     FDLookup[1] = "__STDOUT";
     FDLookup[2] = "__STDERR";
@@ -272,6 +380,8 @@ int main(int argc, char *argv[]) {
         out = new std::ofstream(fileName.c_str());
     }
 
+    PIN_InitSymbols();
+    IMG_AddInstrumentFunction(Image, 0);
     INS_AddInstrumentFunction(Insn, 0);
     PIN_AddSyscallEntryFunction(SyscallEntry, 0);
     PIN_AddSyscallExitFunction(SyscallExit, 0);
