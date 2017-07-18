@@ -35,14 +35,7 @@ std::set<VOID *> free_set;
 
 std::ostream *out = &cerr;
 
-VOID Fini(INT32 code, VOID *v)
-{
-    *out <<  "===============================================" << endl;
-}
-
-VOID ThreadStart(THREADID threadIndex, CONTEXT *ctxt, INT32 flags, VOID *v) {
-    threadCount++;
-}
+/*** TAINT ***/
 
 VOID propagate_taint(CONTEXT *ctx) {
     return;
@@ -113,6 +106,8 @@ VOID mem_taint(ADDRINT mem, UINT32 size) {
         tainted_addrs.insert(mem+i);
     }
 }
+
+/*** INSTRUCTION ***/
 
 VOID record(INS ins) {
     last_addrs.push_back(INS_Address(ins));
@@ -193,6 +188,8 @@ VOID Insn(INS ins, VOID *v) {
     }
 }
 
+/*** SYSCALL ***/
+
 void handle_read(CONTEXT *ctx, SYSCALL_STANDARD std) {
     ADDRINT fd = static_cast<UINT64>((PIN_GetSyscallArgument(ctx, std, 0)));
     start = static_cast<UINT64>((PIN_GetSyscallArgument(ctx, std, 1)));
@@ -236,32 +233,7 @@ VOID SyscallExit(THREADID thread_id, CONTEXT *ctx, SYSCALL_STANDARD std, void *v
     }
 }
 
-BOOL HandleSignal(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
-    ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
-    *out << "S E G F A U L T " << std::endl;
-    *out << "AT: " << std::hex << ip << std::endl << std::endl;
-
-    std::set<LEVEL_BASE::REG>::iterator sit;
-    for(sit=tainted_regs.begin(); sit != tainted_regs.end(); sit++) {
-        *out << REG_StringShort(*sit) << " has taint" << std::endl;
-    }
-    *out << std::endl;
-
-    *out << "LAST " << RECORD_COUNT << " ADDRESSES: " << std::endl;
-    std::list<ADDRINT>::iterator lit;
-    for(lit=last_addrs.begin(); lit != last_addrs.end(); lit++) {
-        *out << *lit << std::endl;
-    }
-    *out << std::endl;
-
-    *out << "LAST " << RECORD_COUNT << " CALLS: " << std::endl;
-    for(lit=last_calls.begin(); lit != last_calls.end(); lit++) {
-        *out << *lit << std::endl;
-    }
-    *out << std::endl;
-
-    return true;
-}
+/*** FUNCTION HOOKS ***/
 
 VOID track_free(VOID *addr) {
     if(freed.find(addr) != freed.end()) {
@@ -366,6 +338,46 @@ VOID Image(IMG img, VOID *v)
         RTN_Close(freeRtn);
     }
 
+}
+
+/*** CRASH ANALYSIS ***/
+
+BOOL HandleSignal(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
+    ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
+    *out << "S E G F A U L T " << std::endl;
+    *out << "AT: " << std::hex << ip << std::endl << std::endl;
+
+    std::set<LEVEL_BASE::REG>::iterator sit;
+    for(sit=tainted_regs.begin(); sit != tainted_regs.end(); sit++) {
+        *out << REG_StringShort(*sit) << " has taint" << std::endl;
+    }
+    *out << std::endl;
+
+    *out << "LAST " << RECORD_COUNT << " ADDRESSES: " << std::endl;
+    std::list<ADDRINT>::iterator lit;
+    for(lit=last_addrs.begin(); lit != last_addrs.end(); lit++) {
+        *out << *lit << std::endl;
+    }
+    *out << std::endl;
+
+    *out << "LAST " << RECORD_COUNT << " CALLS: " << std::endl;
+    for(lit=last_calls.begin(); lit != last_calls.end(); lit++) {
+        *out << *lit << std::endl;
+    }
+    *out << std::endl;
+
+    return true;
+}
+
+/*** MAIN ***/
+
+VOID Fini(INT32 code, VOID *v)
+{
+    *out <<  "===============================================" << endl;
+}
+
+VOID ThreadStart(THREADID threadIndex, CONTEXT *ctxt, INT32 flags, VOID *v) {
+    threadCount++;
 }
 
 int main(int argc, char *argv[]) {
