@@ -3,8 +3,26 @@ section .data
     author_len  equ $-author
     arg_err     db 'error: invalid test number',0x0a
     arg_len     equ $-arg_err
+    ; GEN USAGE
     use_err     db 'USAGE: ./test TEST_NUMBER',0x0a
+                db '0	read_null_nt',0x0a
+                db '1	read_nt',0x0a
+                db '2	read_null_t',0x0a
+                db '3	read_t',0x0a
+                db '4	write_null_nt',0x0a
+                db '5	write_nt',0x0a
+                db '6	write_null_t',0x0a
+                db '7	write_t',0x0a
+                db '8	jump_indirect_nt',0x0a
+                db '9	jump_indirect_t',0x0a
+                db '10	call_indirect_nt',0x0a
+                db '11	call_indirect_t',0x0a
+                db '12	double_free_nt',0x0a
+                db '13	use_after_free_t',0x0a
+                db '14	xor_clear_nt',0x0a
+                db '15	stack_ptr_ret_t',0x0a
     use_len     equ $-use_err
+    ; END USAGE
     tmpfile     db '/tmp/crash_scratch',0x00
     tmplen      equ $-tmpfile
     null_data   db 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0  ; 16
@@ -13,12 +31,10 @@ section .data
     aaaa_len    equ $-aaaa_data
 
 section .text
-; global _start 
-extern printf
-extern open
 extern malloc
 extern free
 
+; GEN MAIN
 global main
 main:
 ;   args:
@@ -31,21 +47,47 @@ main:
     mov     rax, rsi
     call    parse_args
     cmp     rax, 0
-    je      test_indirect
-    cmp     rax, 1
     je      test_read_null_nt
+    cmp     rax, 1
+    je      test_read_nt
     cmp     rax, 2
     je      test_read_null_t
     cmp     rax, 3
     je      test_read_t
+    cmp     rax, 4
+    je      test_write_null_nt
+    cmp     rax, 5
+    je      test_write_nt
+    cmp     rax, 6
+    je      test_write_null_t
+    cmp     rax, 7
+    je      test_write_t
+    cmp     rax, 8
+    je      test_jump_indirect_nt
+    cmp     rax, 9
+    je      test_jump_indirect_t
+    cmp     rax, 10
+    je      test_call_indirect_nt
+    cmp     rax, 11
+    je      test_call_indirect_t
+    cmp     rax, 12
+    je      test_double_free_nt
+    cmp     rax, 13
+    je      test_use_after_free_t
+    cmp     rax, 14
+    je      test_xor_clear_nt
+    cmp     rax, 15
+    je      test_stack_ptr_ret_t
     xor     rax, rax
+    call    show_usage
 main_finish:
+    mov     rax, 2
     call    exit
-test_indirect:
-    call    indirect
-    jmp     main_finish
 test_read_null_nt:
     call    read_null_nt
+    jmp     main_finish
+test_read_nt:
+    call    read_nt
     jmp     main_finish
 test_read_null_t:
     call    read_null_t
@@ -53,133 +95,315 @@ test_read_null_t:
 test_read_t:
     call    read_t
     jmp     main_finish
+test_write_null_nt:
+    call    write_null_nt
+    jmp     main_finish
+test_write_nt:
+    call    write_nt
+    jmp     main_finish
+test_write_null_t:
+    call    write_null_t
+    jmp     main_finish
+test_write_t:
+    call    write_t
+    jmp     main_finish
+test_jump_indirect_nt:
+    call    jump_indirect_nt
+    jmp     main_finish
+test_jump_indirect_t:
+    call    jump_indirect_t
+    jmp     main_finish
+test_call_indirect_nt:
+    call    call_indirect_nt
+    jmp     main_finish
+test_call_indirect_t:
+    call    call_indirect_t
+    jmp     main_finish
+test_double_free_nt:
+    call    double_free_nt
+    jmp     main_finish
+test_use_after_free_t:
+    call    use_after_free_t
+    jmp     main_finish
+test_xor_clear_nt:
+    call    xor_clear_nt
+    jmp     main_finish
+test_stack_ptr_ret_t:
+    call    stack_ptr_ret_t
+    jmp     main_finish
+; END MAIN
 
-global pret_test
-prep_test:
-;   args:   
-;       rdi, filename
-;       rsi, data to write
-;       rdx, data length
-;   rets:
-;       none
-    push    rbp
-    mov     rbp, rsp
-    push    rsi
-    push    rdx
-    mov     rax, 2          ; open
-    mov     rdi, tmpfile    ; file
-    mov     rsi, 1102o      ; O_CREAT | O_TRUNC | O_WRONLY
-    mov     rdx, 664o       ; persimmons
-    syscall
-    pop     rdx             ; data len
-    pop     rdi             ; data
-    push    rax             ; fd
-    mov     rax, rdi
-    mov     rcx, rdx
-    pop     rdx
-    push    rdx             ; fd
-    call    write_fd
-    pop     rdi             ; fd
-    mov     rax, 3
-    syscall
-    mov     rsp, rbp
-    pop     rbp
-    ret
-
-read_file_8:
-;   args:   none
-;   rets:   rax, 8 bytes read
-    push    rbp
-    mov     rbp, rsp
-    ; open
-    mov     rax, 2          ; open
-    mov     rdi, tmpfile    ; file
-    mov     rsi, 0          ; O_RDONLY
-    mov     rdx, 0          ; persimmons
-    syscall
-    push    rax             ; fd
-    ; read
-    mov     rdi, rax        ; fd
-    xor     rax, rax        ; read
-    sub     rsp, 8          
-    mov     rsi, rsp        ; buf
-    mov     rdx, 8          ; size
-    syscall
-    pop     rax             ; data
-    ; close
-    pop     rdi             ; fd
-    push    rax
-    mov     rax, 3          ; close
-    syscall
-    pop     rax
-    mov     rsp, rbp
-    pop     rbp
-    ret
+;;;;;;;;;;;;;
+;   TESTS   ;
+;;;;;;;;;;;;;
 
 global read_null_nt
 read_null_nt:
 ;   args:   none
 ;   rets:   none
+    push    rbp
+    mov     rbp, rsp
     xor     rax, rax
     mov     rbx, [rax]
+    mov     rsp, rbp
+    pop     rbp
+    ret
 
 global read_nt
 read_nt:
 ;   args:   none
 ;   rets:   none
+    push    rbp
+    mov     rbp, rsp
     mov     rax, 0x4141414141414141
     mov     rbx, [rax]
+    mov     rsp, rbp
+    pop     rbp
+    ret
 
 global read_null_t
 read_null_t:
 ;   args:   none
 ;   rets:   none
+    push    rbp
+    mov     rbp, rsp
     mov     rdi, tmpfile
     mov     rsi, null_data
     mov     rdx, null_len
     call    prep_test
     call    read_file_8
-    ; xor     rax, rax
     mov     rbx, [rax]
+    mov     rsp, rbp
+    pop     rbp
+    ret
 
 global read_t
 read_t:
 ;   args:   none
 ;   rets:   none
+    push    rbp
+    mov     rbp, rsp
     mov     rdi, tmpfile
     mov     rsi, aaaa_data
     mov     rdx, aaaa_len
     call    prep_test
     call    read_file_8
     mov     rbx, [rax]
+    mov     rsp, rbp
+    pop     rbp
+    ret
 
-global read_null_nt
+global write_null_nt
 write_null_nt:
 ;   args:   none
 ;   rets:   none
+    push    rbp
+    mov     rbp, rsp
     xor     rax, rax
     mov     [rax], rbx
+    mov     rsp, rbp
+    pop     rbp
+    ret
 
+global write_nt
 write_nt:
 ;   args:   none
 ;   rets:   none
+    push    rbp
+    mov     rbp, rsp
     mov     rax, 0x4141414141414141
     mov     [rax], rbx
+    mov     rsp, rbp
+    pop     rbp
+    ret
 
-
+global write_null_t
 write_null_t:
 ;   args:   none
 ;   rets:   none
-    call    read_8
-    xor     rax, rax
+    push    rbp
+    mov     rbp, rsp
+    mov     rdi, tmpfile
+    mov     rsi, null_data
+    mov     rdx, null_len
+    call    prep_test
+    call    read_file_8
     mov     [rax], rbx
+    mov     rsp, rbp
+    pop     rbp
+    ret
 
+global write_t
 write_t:
 ;   args:   none
 ;   rets:   none
-    call    read_8
+    push    rbp
+    mov     rbp, rsp
+    mov     rdi, tmpfile
+    mov     rsi, aaaa_data
+    mov     rdx, aaaa_len
+    call    prep_test
+    call    read_file_8
     mov     [rax], rbx
+    mov     rsp, rbp
+    pop     rbp
+    ret
 
+global jump_indirect_nt
+jump_indirect_nt:
+;   args:   none
+;   rets:   none
+    push    rbp
+    mov     rbp, rsp
+    mov     rax, 0x4141414141414141
+    jmp     rax
+    mov     rsp, rbp
+    pop     rbp
+    ret
+
+global jump_indirect_t
+jump_indirect_t:
+;   args:   none
+;   rets:   none
+    push    rbp
+    mov     rbp, rsp
+    mov     rsi, aaaa_data
+    mov     rdx, aaaa_len
+    call    prep_test
+    call    read_file_8
+    jmp     rax
+    mov     rsp, rbp
+    pop     rbp
+    ret
+
+global call_indirect_nt
+call_indirect_nt:
+;   args:   none
+;   rets:   none
+    push    rbp
+    mov     rbp, rsp
+    mov     rax, 0x4141414141414141
+    call    rax
+    mov     rsp, rbp
+    pop     rbp
+    ret
+
+global call_indirect_t
+call_indirect_t:
+;   args:   none
+;   rets:   none
+    push    rbp
+    mov     rbp, rsp
+    mov     rsi, aaaa_data
+    mov     rdx, aaaa_len
+    call    prep_test
+    call    read_file_8
+    call    rax
+    mov     rsp, rbp
+    pop     rbp
+    ret
+
+global double_free_nt
+double_free_nt:
+;   args:   none
+;   rets:   none
+    push    rbp
+    mov     rbp, rsp
+    push    rbp
+    mov     rbp, rsp
+    mov     rsi, aaaa_data
+    mov     rdx, aaaa_len
+    call    prep_test
+    call    read_file_8
+    push    rax
+    mov     rdi, 8
+    call    malloc
+    pop     rbx
+    mov     [rax], rbx
+    push    rax
+    mov     rdi, rax
+    call    free
+    pop     rdi
+    call    free
+    mov     rsp, rbp
+    pop     rbp
+    ret
+
+global use_after_free_t
+use_after_free_t:
+;   args:   none
+;   rets:   none
+    push    rbp
+    mov     rbp, rsp
+    push    rbp
+    mov     rbp, rsp
+    mov     rsi, aaaa_data
+    mov     rdx, aaaa_len
+    call    prep_test
+    call    read_file_8
+    push    rax
+    mov     rdi, 8
+    call    malloc
+    pop     rbx
+    mov     [rax], rbx
+    push    rax
+    mov     rdi, rax
+    call    free
+    pop     rdi
+    mov     rax, [rdi]
+    mov     rsp, rbp
+    pop     rbp
+    ret
+
+global xor_clear_nt
+xor_clear_nt:
+;   args:   none
+;   rets:   none
+    push    rbp
+    mov     rbp, rsp
+    mov     rdi, tmpfile
+    mov     rsi, aaaa_data
+    mov     rdx, aaaa_len
+    call    prep_test
+    call    read_file_8
+    xor     rax, rax        ; this will still be tainted on a naive system
+    mov     [rax], rbx
+    mov     rsp, rbp
+    pop     rbp
+    ret
+
+global stack_ptr_ret_t
+stack_ptr_ret_t:
+;   args:   none
+;   rets:   none
+    push    rbp
+    mov     rbp, rsp
+    mov     rdi, tmpfile
+    mov     rsi, null_data
+    mov     rdx, null_len
+    call    prep_test
+    call    read_file_8
+    mov     rsp, rbp
+    pop     rbp
+    mov     rsp, rax
+    ret
+
+; global template
+; template:
+; ;   args:   none
+; ;   rets:   none
+;     push    rbp
+;     mov     rbp, rsp
+
+;     mov     rsp, rbp
+;     pop     rbp
+;     ret
+
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;   UTILITY FUNCTIONS   ;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+
+global parse_args
 parse_args:
 ;   args:
 ;       rcx, argc
@@ -212,9 +436,7 @@ parse_args_finish:
     pop     rbp
     ret
 invalid_use:
-    mov     rax, use_err
-    mov     rcx, use_len
-    call    write
+    call    show_usage
     mov     rax, 1
     call    exit
 invalid_arg:
@@ -224,15 +446,82 @@ invalid_arg:
     mov     rax, 1
     call    exit
 
-indirect:
-;   args:   none
-;   rets:   none
+global prep_test
+prep_test:
+;   args:   
+;       rdi, filename
+;       rsi, data to write
+;       rdx, data length
+;   rets:
+;       none
     push    rbp
     mov     rbp, rsp
-    lea     rcx, [rel exit]
-    jmp     rcx
+    push    rsi
+    push    rdx
+    mov     rax, 2          ; open
+    mov     rdi, tmpfile    ; file
+    mov     rsi, 1102o      ; O_CREAT | O_TRUNC | O_WRONLY
+    mov     rdx, 664o       ; persimmons
+    syscall
+    pop     rdx             ; data len
+    pop     rdi             ; data
+    push    rax             ; fd
+    mov     rax, rdi
+    mov     rcx, rdx
+    pop     rdx
+    push    rdx             ; fd
+    call    write_fd
+    pop     rdi             ; fd
+    mov     rax, 3
+    syscall
+    mov     rsp, rbp
+    pop     rbp
+    ret
 
-read_8:     
+global show_usage
+show_usage:
+    push    rbp
+    mov     rbp, rsp
+    mov     rax, use_err
+    mov     rcx, use_len
+    call    write
+    mov     rsp, rbp
+    pop     rbp
+    ret    
+
+global read_file_8
+read_file_8:
+;   args:   none
+;   rets:   rax, 8 bytes read
+    push    rbp
+    mov     rbp, rsp
+    ; open
+    mov     rax, 2          ; open
+    mov     rdi, tmpfile    ; file
+    mov     rsi, 0          ; O_RDONLY
+    mov     rdx, 0          ; persimmons
+    syscall
+    push    rax             ; fd
+    ; read
+    mov     rdi, rax        ; fd
+    xor     rax, rax        ; read
+    sub     rsp, 8          
+    mov     rsi, rsp        ; buf
+    mov     rdx, 8          ; size
+    syscall
+    pop     rax             ; data
+    ; close
+    pop     rdi             ; fd
+    push    rax
+    mov     rax, 3          ; close
+    syscall
+    pop     rax
+    mov     rsp, rbp
+    pop     rbp
+    ret
+
+global read_8
+read_8:
 ;   args:   none
 ;   rets:   rax, 8 bytes read in
     push    rbp
@@ -248,7 +537,8 @@ read_8:
     pop     rbp
     ret
 
-write_8:    
+global write_8
+write_8:
 ;   args:   rax, 8 bytes to write
 ;   rets:   none
     push    rbp
@@ -261,7 +551,8 @@ write_8:
     pop     rbp
     ret    
 
-write:    
+global write
+write:
 ;   args:   
 ;       rax, bytes to write
 ;       rcx, length
@@ -274,7 +565,8 @@ write:
     pop     rbp
     ret    
 
-write_fd:    
+global write_fd
+write_fd:
 ;   args:   
 ;       rax, bytes to write
 ;       rcx, length
@@ -291,22 +583,7 @@ write_fd:
     pop     rbp
     ret    
 
-write_stdin:    
-;   args:   
-;       rax, bytes to write
-;       rcx, length
-;   rets:   none
-    push    rbp
-    mov     rbp, rsp
-    mov     rsi, rax
-    mov     rdx, rcx
-    mov     rdi, 0      ; stdout
-    mov     rax, 1      ; write
-    syscall
-    mov     rsp, rbp
-    pop     rbp
-    ret  
-
+global exit
 exit:
 ;   args:   rax, exit code
 ;   rets:   none
