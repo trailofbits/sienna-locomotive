@@ -8,7 +8,7 @@
 #include <set>
 #include <map>
 
-// #define DEBUG
+#define DEBUG
 
 UINT64 threadCount = 0; 
 
@@ -44,25 +44,21 @@ VOID propagate_taint(CONTEXT *ctx) {
 bool reg_is_tainted(LEVEL_BASE::REG reg) {
     REG fullReg = REG_FullRegName(reg);
     bool tainted = tainted_regs.find(fullReg) != tainted_regs.end();
-    
-#ifdef DEBUG
-    if(tainted) {
-        *out << REG_StringShort(fullReg) << " is tainted" << std::endl;
-    } else {
-        *out << REG_StringShort(fullReg) << " is not tainted" << std::endl;
-    }
-#endif
 
     return tainted;
 }
 
-VOID reg_taint(LEVEL_BASE::REG reg) {
+VOID reg_taint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg) {
+    *out << std::hex << ip << ": " << *ptr_disas << std::endl;
     REG fullReg = REG_FullRegName(reg);
+    *out << "REG TAINT: " << REG_StringShort(reg) << std::endl;
     tainted_regs.insert(fullReg);
 }
 
-VOID reg_untaint(LEVEL_BASE::REG reg) {
+VOID reg_untaint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg) {
+    *out << std::hex << ip << ": " << *ptr_disas << std::endl;
     REG fullReg = REG_FullRegName(reg);
+    *out << "REG UNTAINT: " << REG_StringShort(reg) << std::endl;
     std::set<LEVEL_BASE::REG>::iterator it = tainted_regs.find(fullReg);
     if(it != tainted_regs.end()) {
         tainted_regs.erase(it);
@@ -74,7 +70,35 @@ bool mem_is_tainted(ADDRINT mem) {
     return tainted;
 }
 
-VOID mem_taint_reg(REG reg, ADDRINT mem,  UINT32 size) {
+VOID mem_untaint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT32 size) {
+    *out << std::hex << ip << ": " << *ptr_disas << std::endl;
+
+    *out << "TAINTED REGS:" << std::endl;
+    std::set<LEVEL_BASE::REG>::iterator sit;
+    for(sit=tainted_regs.begin(); sit != tainted_regs.end(); sit++) {
+        *out << REG_StringShort(*sit) << std::endl;
+    }
+    
+    for(UINT32 i=0; i<size; i++) {
+        std::set<ADDRINT>::iterator it = tainted_addrs.find(mem+i);   
+        *out << "MEM UNTAINT: " << mem+i << std::endl;
+        if(it != tainted_addrs.end()) {
+            tainted_addrs.erase(it);
+        }
+    }
+}
+
+VOID mem_taint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT32 size) {
+    *out << std::hex << ip << ": " << *ptr_disas << std::endl;
+    for(UINT32 i=0; i<size; i++) {
+        *out << "MEM TAINT: " << mem+i << std::endl;
+        tainted_addrs.insert(mem+i);
+    }
+}
+
+VOID mem_taint_reg(ADDRINT ip, std::string *ptr_disas, REG reg, ADDRINT mem,  UINT32 size) {
+    *out << std::hex << ip << ": " << *ptr_disas << std::endl;
+
     bool tainted = false;
     for(UINT32 i=0; i<size; i++) {
         if(mem_is_tainted(mem+i)) {
@@ -84,26 +108,56 @@ VOID mem_taint_reg(REG reg, ADDRINT mem,  UINT32 size) {
     }
 
     if(tainted) {
-        reg_taint(reg);
+        *out << "REGm TAINT: " << REG_StringShort(reg) << std::endl;
+        REG fullReg = REG_FullRegName(reg);
+        tainted_regs.insert(fullReg);
+
+        *out << "TAINTED REGS:" << std::endl;
+        std::set<LEVEL_BASE::REG>::iterator sit;
+        for(sit=tainted_regs.begin(); sit != tainted_regs.end(); sit++) {
+            *out << REG_StringShort(*sit) << std::endl;
+        }
+        
     } else {
-        reg_untaint(reg);
-    }
-}
-
-VOID mem_untaint(ADDRINT mem, UINT32 size) {
-
-    for(UINT32 i=0; i<size; i++) {
-        std::set<ADDRINT>::iterator it = tainted_addrs.find(mem+i);   
-        if(it != tainted_addrs.end()) {
-            tainted_addrs.erase(it);
+        *out << "REGm UNTAINT: " << REG_StringShort(reg) << std::endl;
+        REG fullReg = REG_FullRegName(reg);
+        std::set<LEVEL_BASE::REG>::iterator it = tainted_regs.find(fullReg);
+        if(it != tainted_regs.end()) {
+            tainted_regs.erase(it);
         }
     }
 }
 
-VOID mem_taint(ADDRINT mem, UINT32 size) {
+VOID regs_taint_mem(ADDRINT ip, std::string *ptr_disas, std::list<LEVEL_BASE::REG> *ptr_regs, ADDRINT mem, UINT32 size) {
+    std::list<LEVEL_BASE::REG>::iterator it;
+    bool tainted = false;
 
-    for(UINT32 i=0; i<size; i++) {
-        tainted_addrs.insert(mem+i);
+    for(it = ptr_regs->begin(); it != ptr_regs->end(); it++) {
+        tainted |= reg_is_tainted(*it);
+    }
+
+    if(tainted) {
+        mem_taint(ip, ptr_disas, mem, size);
+    } else {
+        mem_untaint(ip, ptr_disas, mem, size);
+    }
+}
+
+VOID regs_taint_regs(ADDRINT ip, std::string *ptr_disas, 
+        std::list<LEVEL_BASE::REG> *ptr_regs_r, std::list<LEVEL_BASE::REG> *ptr_regs_w) {
+    std::list<LEVEL_BASE::REG>::iterator it;
+    bool tainted = false;
+
+    for(it = ptr_regs_r->begin(); it != ptr_regs_r->end(); it++) {
+        tainted |= reg_is_tainted(*it);
+    }
+
+    for(it=ptr_regs_w->begin(); it != ptr_regs_w->end(); it++) {
+        if(tainted) {
+            reg_taint(ip, ptr_disas, *it);
+        } else {
+            reg_untaint(ip, ptr_disas, *it);
+        }
     }
 }
 
@@ -135,11 +189,21 @@ VOID handle_specific(INS ins) {
 }
 
 VOID Insn(INS ins, VOID *v) {
-
+    // pass address, disassembled insn to all insert calls
     record(ins);
     handle_specific(ins);
+    string disas = INS_Disassemble(ins);
+    *out << "x " << disas << std::endl;
+    /*
+        Special cases
+            xor reg, reg -> clear taint
+            indirect branches and calls
+            push
+            pop
+    */
 
     if(INS_OperandCount(ins) < 2) {
+        *out << "5: " << disas << std::endl;
         return;
     }
 
@@ -147,44 +211,56 @@ VOID Insn(INS ins, VOID *v) {
         for(uint32_t i=0; i<INS_MaxNumWRegs(ins); i++) {
             INS_InsertCall(
                 ins, IPOINT_BEFORE, (AFUNPTR)mem_taint_reg,
+                IARG_INST_PTR,
+                IARG_PTR, new std::string(INS_Disassemble(ins)),
                 IARG_UINT32, INS_RegW(ins, i),
                 IARG_MEMORYOP_EA, 0,
                 IARG_UINT32, (UINT32)INS_MemoryReadSize(ins),
                 IARG_END);
         }
     } else if(INS_MemoryOperandIsWritten(ins, 0)) {
-        bool tainted = false;
-        for(uint32_t i=0; i<INS_MaxNumRRegs(ins); i++) {
-            // *out << REG_StringShort(INS_RegR(ins, i)) << std::endl;
-            tainted |= reg_is_tainted(INS_RegR(ins, i));
+        *out << "xTAINTED REGS:" << std::endl;
+        std::set<LEVEL_BASE::REG>::iterator sit;
+        for(sit=tainted_regs.begin(); sit != tainted_regs.end(); sit++) {
+            *out << REG_StringShort(*sit) << std::endl;
         }
 
-        if(tainted) {
-            INS_InsertCall(
-                ins, IPOINT_BEFORE, (AFUNPTR)mem_taint,
-                IARG_MEMORYOP_EA, 0,
-                IARG_MEMORYWRITE_SIZE,
-                IARG_END);
-        } else {
-            INS_InsertCall(
-                ins, IPOINT_BEFORE, (AFUNPTR)mem_untaint,
-                IARG_MEMORYOP_EA, 0,
-                IARG_MEMORYWRITE_SIZE,
-                IARG_END);
-        }
-    } else if(INS_OperandIsReg(ins, 0)) {
-        bool tainted = false;
+        std::list<LEVEL_BASE::REG> *ptr_regs = new std::list<LEVEL_BASE::REG>();
+
         for(uint32_t i=0; i<INS_MaxNumRRegs(ins); i++) {
-            tainted |= reg_is_tainted(INS_RegR(ins, i));
+            ptr_regs->push_back(INS_RegR(ins, i));
+        }
+
+        INS_InsertCall(
+            ins, IPOINT_BEFORE, (AFUNPTR)regs_taint_mem,
+            IARG_INST_PTR,
+            IARG_PTR, new std::string(INS_Disassemble(ins)),
+            IARG_PTR, ptr_regs,
+            IARG_MEMORYOP_EA, 0,
+            IARG_MEMORYWRITE_SIZE,
+            IARG_END);
+
+    } else if(INS_OperandIsReg(ins, 0)) {
+        std::list<LEVEL_BASE::REG> *ptr_regs_r = new std::list<LEVEL_BASE::REG>();
+        std::list<LEVEL_BASE::REG> *ptr_regs_w = new std::list<LEVEL_BASE::REG>();
+
+        for(uint32_t i=0; i<INS_MaxNumRRegs(ins); i++) {
+            ptr_regs_r->push_back(INS_RegR(ins, i));
         }
 
         for(uint32_t i=0; i<INS_MaxNumWRegs(ins); i++) {
-            if(tainted) {
-                reg_taint(INS_RegW(ins, i));
-            } else {
-                reg_untaint(INS_RegW(ins, i));
-            }
+            ptr_regs_w->push_back(INS_RegW(ins, i));
         }
+
+        INS_InsertCall(
+            ins, IPOINT_BEFORE, (AFUNPTR)regs_taint_regs,
+            IARG_INST_PTR,
+            IARG_PTR, new std::string(INS_Disassemble(ins)),
+            IARG_PTR, ptr_regs_r,
+            IARG_PTR, ptr_regs_w,
+            IARG_END);
+    } else {
+        *out << "4: " << disas << std::endl;
     }
 }
 
@@ -206,6 +282,7 @@ void handle_read(CONTEXT *ctx, SYSCALL_STANDARD std) {
 
 void handle_open(CONTEXT *ctx, SYSCALL_STANDARD std) {
     fname = reinterpret_cast<char *>((PIN_GetSyscallArgument(ctx, std, 0)));
+    *out << "OPEN ENTRY: " << fname << std::endl;
     saveRetOpen = true;
 }
 
@@ -223,11 +300,15 @@ VOID SyscallEntry(THREADID thread_id, CONTEXT *ctx, SYSCALL_STANDARD std, void *
 VOID SyscallExit(THREADID thread_id, CONTEXT *ctx, SYSCALL_STANDARD std, void *v) {
     if (saveRetOpen){
         unsigned long fd = PIN_GetSyscallReturn(ctx, std);
+        *out << "OPEN EXIT: " << fname << " " << fd << std::endl;
         FDLookup[fd] = fname;
         saveRetOpen = false;
     } else if (saveRetRead) {
         unsigned long byteCount = PIN_GetSyscallReturn(ctx, std);
-        mem_taint(start, byteCount);
+        for(UINT32 i=0; i<byteCount; i++) {
+            *out << "MEM TAINT: " << start+i << std::endl;
+            tainted_addrs.insert(start+i);
+        }
 
         saveRetRead = false;
     }
@@ -348,8 +429,9 @@ BOOL HandleSignal(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const 
     *out << "AT: " << std::hex << ip << std::endl << std::endl;
 
     std::set<LEVEL_BASE::REG>::iterator sit;
+    *out << "TAINTED REGS:" << std::endl;
     for(sit=tainted_regs.begin(); sit != tainted_regs.end(); sit++) {
-        *out << REG_StringShort(*sit) << " has taint" << std::endl;
+        *out << REG_StringShort(*sit) << std::endl;
     }
     *out << std::endl;
 
@@ -380,6 +462,13 @@ VOID ThreadStart(THREADID threadIndex, CONTEXT *ctxt, INT32 flags, VOID *v) {
     threadCount++;
 }
 
+KNOB<string> KnobTaintFile(
+    KNOB_MODE_WRITEONCE,  
+    "pintool",
+    "f", 
+    "__STDIN", 
+    "File name of taint source.");
+
 int main(int argc, char *argv[]) {
     PIN_Init(argc, argv);
     
@@ -391,6 +480,11 @@ int main(int argc, char *argv[]) {
     if (!fileName.empty()) { 
         out = new std::ofstream(fileName.c_str());
     }
+
+    taintFile = KnobTaintFile.Value();
+    std::cout << "TAINT FILE" << std::endl;
+    std::cout << taintFile << std::endl;
+
 
     PIN_InitSymbols();
     IMG_AddInstrumentFunction(Image, 0);

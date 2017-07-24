@@ -1,3 +1,5 @@
+; syscall numbers: http://blog.rchapman.org/posts/Linux_System_Call_Table_for_x86_64/
+
 section .data
     author      db 'TACIXAT',0x0a
     author_len  equ $-author
