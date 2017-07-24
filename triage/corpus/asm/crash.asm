@@ -22,7 +22,8 @@ section .data
                 db '12	double_free_nt',0x0a
                 db '13	use_after_free_t',0x0a
                 db '14	xor_clear_nt',0x0a
-                db '15	stack_ptr_ret_t',0x0a
+                db '15	xor_t',0x0a
+                db '16	stack_ptr_ret_t',0x0a
     use_len     equ $-use_err
     ; END USAGE
     tmpfile     db '/tmp/crash_scratch',0x00
@@ -79,6 +80,8 @@ main:
     cmp     rax, 14
     je      test_xor_clear_nt
     cmp     rax, 15
+    je      test_xor_t
+    cmp     rax, 16
     je      test_stack_ptr_ret_t
     xor     rax, rax
     call    show_usage
@@ -129,6 +132,9 @@ test_use_after_free_t:
     jmp     main_finish
 test_xor_clear_nt:
     call    xor_clear_nt
+    jmp     main_finish
+test_xor_t:
+    call    xor_t
     jmp     main_finish
 test_stack_ptr_ret_t:
     call    stack_ptr_ret_t
@@ -369,6 +375,23 @@ xor_clear_nt:
     call    prep_test
     call    read_file_8
     xor     rax, rax        ; this will still be tainted on a naive system
+    mov     [rax], rbx
+    mov     rsp, rbp
+    pop     rbp
+    ret
+
+global xor_t
+xor_t:
+;   args:   none
+;   rets:   none
+    push    rbp
+    mov     rbp, rsp
+    mov     rdi, tmpfile
+    mov     rsi, aaaa_data
+    mov     rdx, aaaa_len
+    call    prep_test
+    call    read_file_8
+    xor     rax, rsp
     mov     [rax], rbx
     mov     rsp, rbp
     pop     rbp

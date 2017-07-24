@@ -177,7 +177,20 @@ VOID record_call(ADDRINT target, ADDRINT loc) {
     }
 }
 
-VOID handle_specific(INS ins) {
+BOOL handle_specific(INS ins) {
+    // handle xor a, a
+    if(INS_Opcode(ins) == 0x5e4) { 
+        if(INS_OperandIsReg(ins, 0) && INS_OperandIsReg(ins, 1) && INS_RegR(ins, 0) == INS_RegR(ins, 1)) {
+            INS_InsertCall(
+                ins, IPOINT_BEFORE, (AFUNPTR)reg_untaint,
+                IARG_INST_PTR,
+                IARG_PTR, new std::string(INS_Disassemble(ins)),
+                IARG_UINT32, INS_RegR(ins, 0),
+                IARG_END);
+            return true;
+        }
+    }
+
     if(INS_IsCall(ins) && INS_IsDirectBranchOrCall(ins)) {
         INS_InsertCall(ins, 
             IPOINT_BEFORE, 
@@ -185,22 +198,25 @@ VOID handle_specific(INS ins) {
             IARG_ADDRINT, INS_DirectBranchOrCallTargetAddress(ins),
             IARG_ADDRINT, INS_Address(ins),
             IARG_END);
+        return false;
     } 
+
+    return false;
 }
 
 VOID Insn(INS ins, VOID *v) {
     // pass address, disassembled insn to all insert calls
     record(ins);
-    handle_specific(ins);
+
     string disas = INS_Disassemble(ins);
-    *out << "x " << disas << std::endl;
     /*
         Special cases
             xor reg, reg -> clear taint
             indirect branches and calls
-            push
-            pop
     */
+    if(handle_specific(ins)) {
+        return;
+    }
 
     if(INS_OperandCount(ins) < 2) {
         *out << "5: " << disas << std::endl;
@@ -227,6 +243,8 @@ VOID Insn(INS ins, VOID *v) {
 
         std::list<LEVEL_BASE::REG> *ptr_regs = new std::list<LEVEL_BASE::REG>();
 
+        // mov qword ptr [rax], rbx
+        // if rax is tainted, should mem be tainted?
         for(uint32_t i=0; i<INS_MaxNumRRegs(ins); i++) {
             ptr_regs->push_back(INS_RegR(ins, i));
         }
