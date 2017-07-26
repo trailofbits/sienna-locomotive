@@ -72,3 +72,12 @@ SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
 
 # This section contains the build rules for all binaries that have special build rules.
 # See makefile.default.rules for the default build rules.
+
+$(OBJDIR)crash_data$(OBJ_SUFFIX): crash_data.cpp crash_data.h
+	$(CXX) $(TOOL_CXXFLAGS) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)taint$(OBJ_SUFFIX): taint.cpp
+	$(CXX) $(TOOL_CXXFLAGS) $(COMP_OBJ)$@ $<
+
+$(OBJDIR)taint$(PINTOOL_SUFFIX): $(OBJDIR)crash_data$(OBJ_SUFFIX) $(OBJDIR)taint$(OBJ_SUFFIX) crash_data.h
+	$(LINKER) $(TOOL_LDFLAGS_NOOPT) $(LINK_EXE)$@ $(^:%.h=) $(TOOL_LPATHS) $(TOOL_LIBS)
