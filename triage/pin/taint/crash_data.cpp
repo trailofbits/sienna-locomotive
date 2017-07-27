@@ -58,43 +58,45 @@ VOID CrashData::mem_taint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT3
 }
 
 VOID CrashData::dump_info() {
-    *out << type << std::endl;
-    *out << "AT: " << std::hex << location << std::endl << std::endl;
+    *out << "{" << std::endl;
+    *out << "\t\"type\": \"" << type << "\"," << std::endl;
+    *out << "\t\"location\": 0x" << std::hex << location << "," << std::endl;
 
     std::set<LEVEL_BASE::REG>::iterator sit;
-    *out << "TAINTED REGS:" << std::endl;
+    *out << "\t\"tainted_regs\": [" << std::endl;
     for(sit=tainted_regs.begin(); sit != tainted_regs.end(); sit++) {
-        *out << REG_StringShort(*sit) << std::endl;
+        *out << "\t\t\"" << REG_StringShort(*sit) << "\"," << std::endl;
     }
-    *out << std::endl;
+    *out << "\t]," << std::endl;
 
-    *out << "TAINTED ADDRS:" << std::endl;
+    *out << "\t\"tainted_addrs\": [" << std::endl;
     std::set<ADDRINT>::iterator mit = tainted_addrs.begin();
     ADDRINT start = *mit;
     UINT64 size = 1;
     mit++;
     for( ; mit != tainted_addrs.end(); mit++) {
         if(*mit > (start+size)) {
-            *out << start << " 0x" << size << " bytes" << std::endl;
+            *out << "\t\t{ \"start\": 0x" << start << ", \"size\": 0x" << size << " }," << std::endl;
             start = *mit;
             size = 0;
         }
         size++;
     }
 
-    *out << start << " 0x" << size << " bytes" << std::endl;
-    *out << std::endl;
+    *out << "\t\t{\"start\": 0x" << start << ", \"size\": 0x" << size << " }," << std::endl;
+    *out << "\t]," << std::endl;
 
-    *out << "LAST " << RECORD_COUNT << " ADDRESSES: " << std::endl;
+    *out << "\t\"last_addrs\": [" << std::endl;
     std::list<ADDRINT>::iterator lit;
     for(lit=last_addrs.begin(); lit != last_addrs.end(); lit++) {
-        *out << *lit << std::endl;
+        *out << "\t\t0x" << *lit << "," << std::endl;
     }
-    *out << std::endl;
+    *out << "\t]," << std::endl;
 
-    *out << "LAST " << RECORD_COUNT << " CALLS: " << std::endl;
+    *out << "\t\"last_call\": [" << std::endl;
     for(lit=last_calls.begin(); lit != last_calls.end(); lit++) {
-        *out << *lit << std::endl;
+        *out << "\t\t0x" << *lit << "," << std::endl;
     }
-    *out << std::endl;
+    *out << "\t]," << std::endl;
+    *out << "}" << std::endl;
 }

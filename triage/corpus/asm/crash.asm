@@ -24,6 +24,12 @@ section .data
                 db '14	xor_clear_nt',0x0a
                 db '15	xor_t',0x0a
                 db '16	stack_ptr_ret_t',0x0a
+                db '17	div_zero',0x0a
+                db '18	stack_exhaustion',0x0a
+                db '19	break_point',0x0a
+                db '20	dep',0x0a
+                db '21	undefined_insn',0x0a
+                db '22	stack_exec',0x0a
     use_len     equ $-use_err
     ; END USAGE
     tmpfile     db '/tmp/crash_scratch',0x00
@@ -83,6 +89,18 @@ main:
     je      test_xor_t
     cmp     rax, 16
     je      test_stack_ptr_ret_t
+    cmp     rax, 17
+    je      test_div_zero
+    cmp     rax, 18
+    je      test_stack_exhaustion
+    cmp     rax, 19
+    je      test_break_point
+    cmp     rax, 20
+    je      test_dep
+    cmp     rax, 21
+    je      test_undefined_insn
+    cmp     rax, 22
+    je      test_stack_exec
     xor     rax, rax
     call    show_usage
 main_finish:
@@ -138,6 +156,24 @@ test_xor_t:
     jmp     main_finish
 test_stack_ptr_ret_t:
     call    stack_ptr_ret_t
+    jmp     main_finish
+test_div_zero:
+    call    div_zero
+    jmp     main_finish
+test_stack_exhaustion:
+    call    stack_exhaustion
+    jmp     main_finish
+test_break_point:
+    call    break_point
+    jmp     main_finish
+test_dep:
+    call    dep
+    jmp     main_finish
+test_undefined_insn:
+    call    undefined_insn
+    jmp     main_finish
+test_stack_exec:
+    call    stack_exec
     jmp     main_finish
 ; END MAIN
 
@@ -411,6 +447,94 @@ stack_ptr_ret_t:
     mov     rsp, rbp
     pop     rbp
     mov     rsp, rax
+    ret
+
+global div_zero
+div_zero:
+;   args:   none
+;   rets:   none
+    push    rbp
+    mov     rbp, rsp
+    mov     rax, 1000
+    xor     r8, r8
+    div     r8
+    mov     rsp, rbp
+    pop     rbp
+    ret
+
+global stack_exhaustion
+stack_exhaustion:
+;   args:   none
+;   rets:   none
+    push    rbp
+    mov     rbp, rsp
+    call    stack_exhaustion
+    mov     rsp, rbp
+    pop     rbp
+    ret
+
+global break_point
+break_point:
+;   args:   none
+;   rets:   none
+    push    rbp
+    mov     rbp, rsp
+    int     3
+    mov     rsp, rbp
+    pop     rbp
+    ret
+
+global dep
+dep:
+;   args:   none
+;   rets:   none
+    push    rbp
+    mov     rbp, rsp
+    mov     rax, 135    ; get persona
+    mov     rdi, -1
+    syscall
+    mov     rdi, rax
+    mov     rbx, 0x0400000
+    not     rbx
+    and     rdi, rbx    ; remove READ_IMPLIES_EXEC
+    mov     rax, 135    ; set persona
+    syscall
+    mov     rax, 9
+    xor     rdi, rdi    ; addr
+    mov     rsi, 4096   ; size
+    mov     rdx, 3      ; read | write
+    mov     r10, 0x22   ; anon | private
+    mov     r8, -1      ; fd
+    xor     r9, r9
+    syscall
+    mov     rbx, 0xcc
+    mov     [rax], rbx
+    call    rax
+    mov     rsp, rbp
+    pop     rbp
+    ret
+
+global undefined_insn
+undefined_insn:
+;   args:   none
+;   rets:   none
+    push    rbp
+    mov     rbp, rsp
+    ud2                 ; undefined
+    mov     rsp, rbp
+    pop     rbp
+    ret
+
+global stack_exec
+stack_exec:
+;   args:   none
+;   rets:   none
+    push    rbp
+    mov     rbp, rsp
+    push    0x41414141
+    call    rsp
+    mov     rsp, rbp
+    pop     rbp
     ret
 
 ; global template
