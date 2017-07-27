@@ -59,7 +59,7 @@ VOID CrashData::mem_taint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT3
 
 VOID CrashData::dump_info() {
     *out << "{" << std::endl;
-    *out << "\t\"type\": \"" << type << "\"," << std::endl;
+    *out << "\t\"signal\": \"" << signal << "\"," << std::endl;
     *out << "\t\"location\": 0x" << std::hex << location << "," << std::endl;
 
     std::set<LEVEL_BASE::REG>::iterator sit;
@@ -70,20 +70,22 @@ VOID CrashData::dump_info() {
     *out << "\t]," << std::endl;
 
     *out << "\t\"tainted_addrs\": [" << std::endl;
-    std::set<ADDRINT>::iterator mit = tainted_addrs.begin();
-    ADDRINT start = *mit;
-    UINT64 size = 1;
-    mit++;
-    for( ; mit != tainted_addrs.end(); mit++) {
-        if(*mit > (start+size)) {
-            *out << "\t\t{ \"start\": 0x" << start << ", \"size\": 0x" << size << " }," << std::endl;
-            start = *mit;
-            size = 0;
+    if(tainted_addrs.size() > 0) {
+        std::set<ADDRINT>::iterator mit = tainted_addrs.begin();
+        ADDRINT start = *mit;
+        UINT64 size = 1;
+        mit++;
+        for( ; mit != tainted_addrs.end(); mit++) {
+            if(*mit > (start+size)) {
+                *out << "\t\t{ \"start\": 0x" << start << ", \"size\": 0x" << size << " }," << std::endl;
+                start = *mit;
+                size = 0;
+            }
+            size++;
         }
-        size++;
-    }
 
-    *out << "\t\t{\"start\": 0x" << start << ", \"size\": 0x" << size << " }," << std::endl;
+        *out << "\t\t{\"start\": 0x" << start << ", \"size\": 0x" << size << " }," << std::endl;
+    }
     *out << "\t]," << std::endl;
 
     *out << "\t\"last_addrs\": [" << std::endl;

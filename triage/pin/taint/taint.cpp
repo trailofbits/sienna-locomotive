@@ -127,6 +127,10 @@ VOID record_call(ADDRINT target, ADDRINT loc) {
 }
 
 BOOL handle_specific(INS ins) {
+    // TODO: handle CMP (case 4:)
+
+    // TODO: handle push / pop
+
     // XOR
     if(INS_Opcode(ins) == 0x5e4) { 
         // handle xor a, a
@@ -179,6 +183,7 @@ VOID Insn(INS ins, VOID *v) {
     }
 
     if(INS_OperandCount(ins) < 2) {
+        // mostly nops and nots
         *out << "5: " << disas << std::endl;
         return;
     }
@@ -399,10 +404,55 @@ VOID Image(IMG img, VOID *v)
 
 /*** CRASH ANALYSIS ***/
 
-BOOL HandleSignal(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
+// SIGSEGV
+BOOL HandleSIGSEGV(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
     ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
 
-    crash_data.type = "segfault";
+    crash_data.signal = "SIGSEGV";
+    crash_data.location = ip;
+    crash_data.dump_info();
+
+    return true;
+}
+
+// SIGTRAP
+BOOL HandleSIGTRAP(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
+    ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
+    
+    crash_data.signal = "SIGTRAP";
+    crash_data.location = ip;
+    crash_data.dump_info();
+
+    return true;
+}
+
+// SIGABRT
+BOOL HandleSIGABRT(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
+    ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
+    
+    crash_data.signal = "SIGABRT";
+    crash_data.location = ip;
+    crash_data.dump_info();
+
+    return true;
+}
+
+// SIGILL
+BOOL HandleSIGILL(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
+    ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
+    
+    crash_data.signal = "SIGILL";
+    crash_data.location = ip;
+    crash_data.dump_info();
+
+    return true;
+}
+
+// SIGFPE 
+BOOL HandleSIGFPE(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
+    ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
+    
+    crash_data.signal = "SIGFPE";
     crash_data.location = ip;
     crash_data.dump_info();
 
@@ -419,6 +469,10 @@ VOID Fini(INT32 code, VOID *v)
 VOID ThreadStart(THREADID threadIndex, CONTEXT *ctxt, INT32 flags, VOID *v) {
     threadCount++;
 }
+
+// out file name
+
+// debug print
 
 KNOB<string> KnobTaintFile(
     KNOB_MODE_WRITEONCE,  
@@ -450,9 +504,14 @@ int main(int argc, char *argv[]) {
     INS_AddInstrumentFunction(Insn, 0);
     PIN_AddSyscallEntryFunction(SyscallEntry, 0);
     PIN_AddSyscallExitFunction(SyscallExit, 0);
+    
+    PIN_InterceptSignal(SIGSEGV, HandleSIGSEGV, 0);
+    PIN_InterceptSignal(SIGTRAP, HandleSIGTRAP, 0);
+    PIN_InterceptSignal(SIGABRT, HandleSIGABRT, 0);
+    PIN_InterceptSignal(SIGILL, HandleSIGILL, 0);
+    PIN_InterceptSignal(SIGFPE, HandleSIGFPE, 0);
 
     PIN_AddThreadStartFunction(ThreadStart, 0);
-    PIN_InterceptSignal(SIGSEGV, HandleSignal, 0);
     PIN_AddFiniFunction(Fini, 0);
 
     // Start the program, never returns

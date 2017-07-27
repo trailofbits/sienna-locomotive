@@ -5,7 +5,7 @@
 
 class CrashData {
 public:
-    string type;
+    string signal;
     ADDRINT location;
     std::set<ADDRINT> tainted_addrs;
     std::set<LEVEL_BASE::REG> tainted_regs;
