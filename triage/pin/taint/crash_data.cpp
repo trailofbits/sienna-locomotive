@@ -8,16 +8,20 @@ bool CrashData::reg_is_tainted(LEVEL_BASE::REG reg) {
 }
 
 VOID CrashData::reg_taint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg) {
-    *out << std::hex << ip << ": " << *ptr_disas << std::endl;
-    *out << "REG TAINT: " << REG_StringShort(reg) << std::endl;
+    if(debug) {
+        *out << std::hex << ip << ": " << *ptr_disas << std::endl;
+        *out << "REG TAINT: " << REG_StringShort(reg) << std::endl;
+    }
 
     REG fullReg = REG_FullRegName(reg);
     tainted_regs.insert(fullReg);
 }
 
 VOID CrashData::reg_untaint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg) {
-    *out << std::hex << ip << ": " << *ptr_disas << std::endl;
-    *out << "REG UNTAINT: " << REG_StringShort(reg) << std::endl;
+    if(debug) {
+        *out << std::hex << ip << ": " << *ptr_disas << std::endl;
+        *out << "REG UNTAINT: " << REG_StringShort(reg) << std::endl;
+    }
     
     REG fullReg = REG_FullRegName(reg);
     std::set<LEVEL_BASE::REG>::iterator it = tainted_regs.find(fullReg);
@@ -32,9 +36,11 @@ bool CrashData::mem_is_tainted(ADDRINT mem) {
 }
 
 VOID CrashData::mem_untaint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT32 size) {
-    *out << std::hex << ip << ": " << *ptr_disas << std::endl;
+    if(debug) {
+        *out << std::hex << ip << ": " << *ptr_disas << std::endl;
+        *out << "TAINTED REGS:" << std::endl;
+    }
 
-    *out << "TAINTED REGS:" << std::endl;
     std::set<LEVEL_BASE::REG>::iterator sit;
     for(sit=tainted_regs.begin(); sit != tainted_regs.end(); sit++) {
         *out << REG_StringShort(*sit) << std::endl;
@@ -42,7 +48,10 @@ VOID CrashData::mem_untaint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UIN
     
     for(UINT32 i=0; i<size; i++) {
         std::set<ADDRINT>::iterator it = tainted_addrs.find(mem+i);   
-        *out << "MEM UNTAINT: " << mem+i << std::endl;
+        if(debug) {
+            *out << "MEM UNTAINT: " << mem+i << std::endl;
+        }
+
         if(it != tainted_addrs.end()) {
             tainted_addrs.erase(it);
         }
@@ -50,9 +59,14 @@ VOID CrashData::mem_untaint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UIN
 }
 
 VOID CrashData::mem_taint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT32 size) {
-    *out << std::hex << ip << ": " << *ptr_disas << std::endl;
+    if(debug) {
+        *out << std::hex << ip << ": " << *ptr_disas << std::endl;
+    }
+
     for(UINT32 i=0; i<size; i++) {
-        *out << "MEM TAINT: " << mem+i << std::endl;
+        if(debug) {
+            *out << "MEM TAINT: " << mem+i << std::endl;
+        }
         tainted_addrs.insert(mem+i);
     }
 }

@@ -15,8 +15,9 @@ public:
     std::list<ADDRINT> last_calls;
 
     std::ostream *out;
+    bool debug;
 
-    CrashData() : out(&std::cout) { };
+    CrashData() : out(&std::cout), debug(false) { };
     bool reg_is_tainted(LEVEL_BASE::REG reg);
     VOID reg_taint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg);
     VOID reg_untaint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg);

@@ -10,33 +10,38 @@
 #include <set>
 #include <map>
 
-#define DEBUG
+CrashData crash_data;
+string fname = "";
 
-UINT64 threadCount = 0; 
-
+// syscall control
 bool saveRetOpen = false;
 bool saveRetRead = false;
+bool saveRetMmap = false;
 bool debug = false;
 
-string taintFile = "__STDIN";
-string fname = "";
+// mmap
+ADDRINT size;
+std::map<ADDRINT, ADDRINT> execd;
+
+// files
 ADDRINT start;
-
+string taintFile = "__STDIN";
 std::map<UINT64, string> FDLookup;
-CrashData crash_data;
 
+// malloc
 std::map<VOID *, SIZE> allocd;
 std::map<VOID *, SIZE> freed;
 std::set<VOID *> alloc_set;
 std::set<VOID *> free_set;
 
-std::ostream *out = &cerr;
+std::ostream *out = &cout;
 
 /*** TAINT ***/
 
 VOID mem_taint_reg(ADDRINT ip, std::string *ptr_disas, REG reg, ADDRINT mem,  UINT32 size) {
-    *out << std::hex << ip << ": " << *ptr_disas << std::endl;
-
+    if(debug) {
+        *out << std::hex << ip << ": " << *ptr_disas << std::endl;
+    }
     bool tainted = false;
     for(UINT32 i=0; i<size; i++) {
         if(crash_data.mem_is_tainted(mem+i)) {
@@ -46,18 +51,24 @@ VOID mem_taint_reg(ADDRINT ip, std::string *ptr_disas, REG reg, ADDRINT mem,  UI
     }
 
     if(tainted) {
-        *out << "REGm TAINT: " << REG_StringShort(reg) << std::endl;
+        if(debug) {
+            *out << "REGm TAINT: " << REG_StringShort(reg) << std::endl;
+        }
         REG fullReg = REG_FullRegName(reg);
         crash_data.tainted_regs.insert(fullReg);
 
-        *out << "TAINTED REGS:" << std::endl;
-        std::set<LEVEL_BASE::REG>::iterator sit;
-        for(sit=crash_data.tainted_regs.begin(); sit != crash_data.tainted_regs.end(); sit++) {
-            *out << REG_StringShort(*sit) << std::endl;
+        if(debug) {
+            *out << "TAINTED REGS:" << std::endl;
+            std::set<LEVEL_BASE::REG>::iterator sit;
+            for(sit=crash_data.tainted_regs.begin(); sit != crash_data.tainted_regs.end(); sit++) {
+                *out << REG_StringShort(*sit) << std::endl;
+            }
         }
         
     } else {
-        *out << "REGm UNTAINT: " << REG_StringShort(reg) << std::endl;
+        if(debug) {
+            *out << "REGm UNTAINT: " << REG_StringShort(reg) << std::endl;
+        }
         REG fullReg = REG_FullRegName(reg);
         std::set<LEVEL_BASE::REG>::iterator it = crash_data.tainted_regs.find(fullReg);
         if(it != crash_data.tainted_regs.end()) {
@@ -99,9 +110,32 @@ VOID regs_taint_regs(ADDRINT ip, std::string *ptr_disas,
     }
 }
 
-VOID handle_ret(ADDRINT ip, std::string *ptr_disas) {
-    if(crash_data.reg_is_tainted(REG_STACK_PTR)) {
+VOID handle_indirect(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg, ADDRINT regval) {
+    if(crash_data.reg_is_tainted(reg)) {
         crash_data.reg_taint(ip, ptr_disas, REG_INST_PTR);
+    }
+
+    if(reg != REG_STACK_PTR) {
+        bool mmapd = false;
+        PIN_LockClient();
+        bool invalid = IMG_FindByAddress(regval) == IMG_Invalid();
+        PIN_UnlockClient();
+        if(invalid) {
+            std::map<ADDRINT, ADDRINT>::iterator it;
+            for(it=execd.begin(); it != execd.end(); it++) {
+                ADDRINT mmap_start = it->first;
+                ADDRINT mmap_size = it->second;
+                ADDRINT mmap_end = mmap_start + mmap_size;
+                if(regval >= mmap_start && regval < mmap_end) {
+                    mmapd = true;
+                    break;
+                }
+            }
+
+            if(!mmapd) {
+                *out << "BRANCH TO A NON-IMAGE ADDRESS" << std::endl;
+            }
+        }
     }
 }
 
@@ -109,11 +143,10 @@ VOID wrap_reg_untaint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg) {
     crash_data.reg_untaint(ip, ptr_disas, reg);
 }
 
-
 /*** INSTRUCTION ***/
 
-VOID record(INS ins) {
-    crash_data.last_addrs.push_back(INS_Address(ins));
+VOID record(ADDRINT addr) {
+    crash_data.last_addrs.push_back(addr);
     while(crash_data.last_addrs.size() > RECORD_COUNT) {
         crash_data.last_addrs.pop_front();
     }
@@ -127,9 +160,40 @@ VOID record_call(ADDRINT target, ADDRINT loc) {
 }
 
 BOOL handle_specific(INS ins) {
-    // TODO: handle CMP (case 4:)
+    // OPCODE opcode = INS_Opcode(ins);
 
-    // TODO: handle push / pop
+    // indirect jump, indirect call
+    if(INS_IsIndirectBranchOrCall(ins)) {
+        *out << "INDIRECT: " << REG_StringShort(INS_RegR(ins, 0)) << std::endl;
+        INS_InsertCall(
+                ins, IPOINT_BEFORE, (AFUNPTR)handle_indirect,
+                IARG_INST_PTR,
+                IARG_PTR, new std::string(INS_Disassemble(ins)),
+                IARG_UINT32, INS_RegR(ins, 0),
+                IARG_REG_VALUE, INS_RegR(ins, 0),
+                IARG_END);
+        return false;
+    }
+
+    // POP
+    if(INS_Opcode(ins) == 0x249) {
+        for(uint32_t i=0; i<INS_MaxNumWRegs(ins); i++) {
+            // don't taint the stack pointer
+            if(INS_RegW(ins, i) == REG_STACK_PTR)
+                continue; 
+
+            INS_InsertCall(
+                ins, IPOINT_BEFORE, (AFUNPTR)mem_taint_reg,
+                IARG_INST_PTR,
+                IARG_PTR, new std::string(INS_Disassemble(ins)),
+                IARG_UINT32, INS_RegW(ins, i),
+                IARG_MEMORYOP_EA, 0,
+                IARG_UINT32, (UINT32)INS_MemoryReadSize(ins),
+                IARG_END);
+        }
+
+        return true;
+    }
 
     // XOR
     if(INS_Opcode(ins) == 0x5e4) { 
@@ -145,14 +209,6 @@ BOOL handle_specific(INS ins) {
         } 
 
         return false; 
-    }
-
-    if(INS_IsRet(ins)) {
-        INS_InsertCall(
-            ins, IPOINT_BEFORE, (AFUNPTR)handle_ret,
-            IARG_INST_PTR,
-            IARG_PTR, new std::string(INS_Disassemble(ins)),
-            IARG_END);
     }
 
     if(INS_IsCall(ins) && INS_IsDirectBranchOrCall(ins)) {
@@ -171,20 +227,29 @@ BOOL handle_specific(INS ins) {
 VOID Insn(INS ins, VOID *v) {
     // pass address, disassembled insn to all insert calls
     string disas = INS_Disassemble(ins);
+    if(debug) {
+        *out << "OPCODES: " << disas << " " << INS_Opcode(ins) << std::endl;
+    }
     /*
         Special cases
             xor reg, reg -> clear taint
             indirect branches and calls
     */
     
-    record(ins);
+    INS_InsertCall(ins, 
+        IPOINT_BEFORE, (AFUNPTR)record,
+        IARG_ADDRINT, INS_Address(ins),
+        IARG_END);
+    
     if(handle_specific(ins)) {
         return;
     }
 
     if(INS_OperandCount(ins) < 2) {
         // mostly nops and nots
-        *out << "5: " << disas << std::endl;
+        if(debug) {
+            *out << "5: " << disas << std::endl;
+        }
         return;
     }
 
@@ -200,10 +265,14 @@ VOID Insn(INS ins, VOID *v) {
                 IARG_END);
         }
     } else if(INS_MemoryOperandIsWritten(ins, 0)) {
-        *out << "xTAINTED REGS:" << std::endl;
+        if(debug) {
+            *out << "xTAINTED REGS:" << std::endl;
+        }
         std::set<LEVEL_BASE::REG>::iterator sit;
         for(sit=crash_data.tainted_regs.begin(); sit != crash_data.tainted_regs.end(); sit++) {
-            *out << REG_StringShort(*sit) << std::endl;
+            if(debug) {
+                *out << REG_StringShort(*sit) << std::endl;
+            }
         }
 
         std::list<LEVEL_BASE::REG> *ptr_regs = new std::list<LEVEL_BASE::REG>();
@@ -241,7 +310,9 @@ VOID Insn(INS ins, VOID *v) {
             IARG_PTR, ptr_regs_w,
             IARG_END);
     } else {
-        *out << "4: " << disas << std::endl;
+        if(debug) {
+            *out << "4: " << disas << std::endl;
+        }
     }
 }
 
@@ -254,7 +325,9 @@ void handle_read(CONTEXT *ctx, SYSCALL_STANDARD std) {
     if(FDLookup.find(fd) != FDLookup.end() && FDLookup[fd].find(taintFile) != string::npos) {
 #ifdef DEBUG
         ADDRINT size  = PIN_GetSyscallArgument(ctx, std, 2);
-        *out << "READ of " << FDLookup[fd] << " for size 0x" << std::hex << size << " to 0x" << start << std::endl;
+        if(debug) {
+            *out << "READ of " << FDLookup[fd] << " for size 0x" << std::hex << size << " to 0x" << start << std::endl;
+        }
 #endif
         saveRetRead = true;
     }
@@ -263,8 +336,22 @@ void handle_read(CONTEXT *ctx, SYSCALL_STANDARD std) {
 
 void handle_open(CONTEXT *ctx, SYSCALL_STANDARD std) {
     fname = reinterpret_cast<char *>((PIN_GetSyscallArgument(ctx, std, 0)));
-    *out << "OPEN ENTRY: " << fname << std::endl;
+    if(debug) {
+        *out << "OPEN ENTRY: " << fname << std::endl;
+    }
     saveRetOpen = true;
+}
+
+void handle_mmap(CONTEXT *ctx, SYSCALL_STANDARD std) {
+    ADDRINT prot = PIN_GetSyscallArgument(ctx, std, 2);
+    if(debug) {
+        *out << "MMAP ENTRY: " << std::hex << prot << std::endl;
+    }
+
+    if(prot & 0x4) {
+        size = PIN_GetSyscallArgument(ctx, std, 1);
+        saveRetMmap = true;
+    }
 }
 
 VOID SyscallEntry(THREADID thread_id, CONTEXT *ctx, SYSCALL_STANDARD std, void *v) {
@@ -275,23 +362,37 @@ VOID SyscallEntry(THREADID thread_id, CONTEXT *ctx, SYSCALL_STANDARD std, void *
         case __NR_open:
             handle_open(ctx, std);
             break;
+        case __NR_mmap:
+            handle_mmap(ctx, std);
+            break;
     }
 }
 
 VOID SyscallExit(THREADID thread_id, CONTEXT *ctx, SYSCALL_STANDARD std, void *v) {
     if (saveRetOpen){
-        unsigned long fd = PIN_GetSyscallReturn(ctx, std);
-        *out << "OPEN EXIT: " << fname << " " << fd << std::endl;
+        ADDRINT fd = PIN_GetSyscallReturn(ctx, std);
+        if(debug) {
+            *out << "OPEN EXIT: " << fname << " " << fd << std::endl;
+        }
         FDLookup[fd] = fname;
         saveRetOpen = false;
     } else if (saveRetRead) {
-        unsigned long byteCount = PIN_GetSyscallReturn(ctx, std);
+        ADDRINT byteCount = PIN_GetSyscallReturn(ctx, std);
         for(UINT32 i=0; i<byteCount; i++) {
-            *out << "MEM TAINT: " << start+i << std::endl;
+            if(debug) {
+                *out << "MEM TAINT: " << start+i << std::endl;
+            }
             crash_data.tainted_addrs.insert(start+i);
         }
 
         saveRetRead = false;
+    } else if(saveRetMmap) {
+        ADDRINT execAddr = PIN_GetSyscallReturn(ctx, std);
+        execd[execAddr] = size;
+        if(debug) {
+            *out << "MMAP EXEC MEM: " << std::hex << execAddr << " " << size << std::endl;
+        }
+        saveRetMmap = false;
     }
 }
 
@@ -299,12 +400,16 @@ VOID SyscallExit(THREADID thread_id, CONTEXT *ctx, SYSCALL_STANDARD std, void *v
 
 VOID track_free(VOID *addr) {
     if(freed.find(addr) != freed.end()) {
-        *out << "OMG DOUBLE FREE" << std::endl;
+        if(debug) {
+            *out << "OMG DOUBLE FREE" << std::endl;
+        }
         return;
     }
 
     if(allocd.find(addr) == allocd.end()) {
-        *out << "OMG FREEING UNALLOCD MEM WUT" << std::endl;
+        if(debug) {
+            *out << "OMG FREEING UNALLOCD MEM WUT" << std::endl;
+        }
         return;
     }
 
@@ -324,7 +429,9 @@ VOID track_free(VOID *addr) {
 }
 
 VOID free_before(ADDRINT retIp, ADDRINT address) {
-    *out << "FREE CALLED: " << reinterpret_cast<void*>(address) << std::endl;
+    if(debug) {
+        *out << "FREE CALLED: " << reinterpret_cast<void*>(address) << std::endl;
+    }
     track_free(reinterpret_cast<void*>(address));
 }
 
@@ -360,7 +467,9 @@ void *malloc_hook(CONTEXT * ctxt, AFUNPTR pf_malloc, size_t size) {
     PIN_PARG(size_t), size, 
     PIN_PARG_END());
   
-  *out << "MALLOC CALLED: " << res << ", " << size << std::endl;
+  if(debug) {
+      *out << "MALLOC CALLED: " << res << ", " << size << std::endl;
+  }
   track_allocation(res, size);
   return res;  
 }
@@ -406,6 +515,9 @@ VOID Image(IMG img, VOID *v)
 
 // SIGSEGV
 BOOL HandleSIGSEGV(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
+    if(true) {
+        *out << PIN_ExceptionToString(pExceptInfo) << std::endl;
+    }
     ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
 
     crash_data.signal = "SIGSEGV";
@@ -417,6 +529,9 @@ BOOL HandleSIGSEGV(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const
 
 // SIGTRAP
 BOOL HandleSIGTRAP(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
+    if(true) {
+        *out << PIN_ExceptionToString(pExceptInfo) << std::endl;
+    }
     ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
     
     crash_data.signal = "SIGTRAP";
@@ -428,6 +543,9 @@ BOOL HandleSIGTRAP(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const
 
 // SIGABRT
 BOOL HandleSIGABRT(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
+    if(true) {
+        *out << PIN_ExceptionToString(pExceptInfo) << std::endl;
+    }
     ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
     
     crash_data.signal = "SIGABRT";
@@ -439,6 +557,9 @@ BOOL HandleSIGABRT(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const
 
 // SIGILL
 BOOL HandleSIGILL(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
+    if(true) {
+        *out << PIN_ExceptionToString(pExceptInfo) << std::endl;
+    }
     ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
     
     crash_data.signal = "SIGILL";
@@ -450,6 +571,9 @@ BOOL HandleSIGILL(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const 
 
 // SIGFPE 
 BOOL HandleSIGFPE(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
+    if(true) {
+        *out << PIN_ExceptionToString(pExceptInfo) << std::endl;
+    }
     ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
     
     crash_data.signal = "SIGFPE";
@@ -461,25 +585,26 @@ BOOL HandleSIGFPE(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const 
 
 /*** MAIN ***/
 
-VOID Fini(INT32 code, VOID *v)
-{
-    *out <<  "===============================================" << endl;
-}
+KNOB<string> KnobOutputFile(
+    KNOB_MODE_WRITEONCE,  
+    "pintool",
+    "o", 
+    "", 
+    "File name of output file");
 
-VOID ThreadStart(THREADID threadIndex, CONTEXT *ctxt, INT32 flags, VOID *v) {
-    threadCount++;
-}
-
-// out file name
-
-// debug print
+KNOB<BOOL> KnobDebug(
+    KNOB_MODE_WRITEONCE,  
+    "pintool",
+    "d", 
+    "0", 
+    "Debug prints");
 
 KNOB<string> KnobTaintFile(
     KNOB_MODE_WRITEONCE,  
     "pintool",
     "f", 
     "__STDIN", 
-    "File name of taint source.");
+    "File name of taint source");
 
 int main(int argc, char *argv[]) {
     PIN_Init(argc, argv);
@@ -488,16 +613,16 @@ int main(int argc, char *argv[]) {
     FDLookup[1] = "__STDOUT";
     FDLookup[2] = "__STDERR";
 
-    string fileName = "out.txt";
+    string fileName = KnobOutputFile.Value();
     if (!fileName.empty()) { 
         out = new std::ofstream(fileName.c_str());
         crash_data.out = out;
     }
 
-    taintFile = KnobTaintFile.Value();
-    std::cout << "TAINT FILE" << std::endl;
-    std::cout << taintFile << std::endl;
+    debug = KnobDebug.Value();
+    crash_data.debug = debug;
 
+    taintFile = KnobTaintFile.Value();
 
     PIN_InitSymbols();
     IMG_AddInstrumentFunction(Image, 0);
@@ -510,9 +635,6 @@ int main(int argc, char *argv[]) {
     PIN_InterceptSignal(SIGABRT, HandleSIGABRT, 0);
     PIN_InterceptSignal(SIGILL, HandleSIGILL, 0);
     PIN_InterceptSignal(SIGFPE, HandleSIGFPE, 0);
-
-    PIN_AddThreadStartFunction(ThreadStart, 0);
-    PIN_AddFiniFunction(Fini, 0);
 
     // Start the program, never returns
     PIN_StartProgram();

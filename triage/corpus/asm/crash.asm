@@ -1,4 +1,5 @@
 ; syscall numbers: http://blog.rchapman.org/posts/Linux_System_Call_Table_for_x86_64/
+; section .note.GNU-stack noalloc noexec nowrite progbits
 
 section .data
     author      db 'TACIXAT',0x0a
@@ -23,7 +24,7 @@ section .data
                 db '13	use_after_free_t',0x0a
                 db '14	xor_clear_nt',0x0a
                 db '15	xor_t',0x0a
-                db '16	pop_nt',0x0a
+                db '16	pop_t',0x0a
                 db '17	stack_ptr_ret_t',0x0a
                 db '18	div_zero',0x0a
                 db '19	stack_exhaustion',0x0a
@@ -89,7 +90,7 @@ main:
     cmp     rax, 15
     je      test_xor_t
     cmp     rax, 16
-    je      test_pop_nt
+    je      test_pop_t
     cmp     rax, 17
     je      test_stack_ptr_ret_t
     cmp     rax, 18
@@ -157,8 +158,8 @@ test_xor_clear_nt:
 test_xor_t:
     call    xor_t
     jmp     main_finish
-test_pop_nt:
-    call    pop_nt
+test_pop_t:
+    call    pop_t
     jmp     main_finish
 test_stack_ptr_ret_t:
     call    stack_ptr_ret_t
@@ -439,8 +440,8 @@ xor_t:
     pop     rbp
     ret
 
-global pop_nt
-pop_nt:
+global pop_t
+pop_t:
 ;   args:   none
 ;   rets:   none
     push    rbp
