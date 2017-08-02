@@ -71,10 +71,71 @@ VOID CrashData::mem_taint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT3
     }
 }
 
+/*** CRASH ANALYSIS ***/
+
+BOOL CrashData::xed_at(xed_decoded_inst_t *xedd, ADDRINT ip) {
+#if defined(TARGET_IA32E)
+    static const xed_state_t dstate = {XED_MACHINE_MODE_LONG_64, XED_ADDRESS_WIDTH_64b};
+#else
+    static const xed_state_t dstate = {XED_MACHINE_MODE_LEGACY_32, XED_ADDRESS_WIDTH_32b};
+#endif
+    
+    xed_decoded_inst_zero_set_mode(xedd, &dstate);
+
+    const unsigned int max_inst_len = 15;
+
+    xed_error_enum_t xed_code = xed_decode(xedd, reinterpret_cast<UINT8*>(ip), max_inst_len);
+    BOOL xed_ok = (xed_code == XED_ERROR_NONE);
+    if (xed_ok) {
+        *out << std::hex << ip << " ";
+        char buf[2048];
+
+        // set the runtime adddress for disassembly 
+        xed_uint64_t runtime_address = static_cast<xed_uint64_t>(ip); 
+
+        xed_decoded_inst_dump_xed_format(xedd, buf, 2048, runtime_address);
+        *out << buf << std::endl;
+    } else {
+        return false;
+    }
+
+    return true;
+}
+
+VOID CrashData::examine() {
+    ADDRINT last_insn = last_addrs.back();
+    if(location != last_insn && hint != 0) {
+        bool contains_hint = false;
+
+        std::list<ADDRINT>::iterator it;
+        for(it = last_addrs.begin(); it != last_addrs.end(); it++) {
+            if(*it == hint) {
+                contains_hint = true;
+                break;
+            }
+        }
+
+        if(contains_hint) {
+            last_insn = hint;
+        }
+    }
+    
+    xed_decoded_inst_t xedd;
+    if(xed_at(&xedd, last_insn)) {
+        xed_iclass_enum_t insn_iclass = xed_decoded_inst_get_iclass(&xedd);
+        *out << "ICLASS " << xed_iclass_enum_t2str(insn_iclass) << std::endl;
+    } else {
+        *out << "UNABLE TO DECODE" << std::endl;
+    }
+}
+
+/* TODO: json or serialization library */
+
 VOID CrashData::dump_info() {
     *out << "{" << std::endl;
     *out << "\t\"signal\": \"" << signal << "\"," << std::endl;
     *out << "\t\"location\": 0x" << std::hex << location << "," << std::endl;
+    *out << "\t\"hint\": 0x" << std::hex << hint << "," << std::endl;
 
     std::set<LEVEL_BASE::REG>::iterator sit;
     *out << "\t\"tainted_regs\": [" << std::endl;

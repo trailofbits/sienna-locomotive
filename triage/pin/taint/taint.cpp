@@ -111,30 +111,41 @@ VOID regs_taint_regs(ADDRINT ip, std::string *ptr_disas,
 }
 
 VOID handle_indirect(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg, ADDRINT regval) {
+    bool mmapd = false;
+    ADDRINT target_addr = regval;
+    
     if(crash_data.reg_is_tainted(reg)) {
         crash_data.reg_taint(ip, ptr_disas, REG_INST_PTR);
     }
 
-    if(reg != REG_STACK_PTR) {
-        bool mmapd = false;
-        PIN_LockClient();
-        bool invalid = IMG_FindByAddress(regval) == IMG_Invalid();
-        PIN_UnlockClient();
-        if(invalid) {
-            std::map<ADDRINT, ADDRINT>::iterator it;
-            for(it=execd.begin(); it != execd.end(); it++) {
-                ADDRINT mmap_start = it->first;
-                ADDRINT mmap_size = it->second;
-                ADDRINT mmap_end = mmap_start + mmap_size;
-                if(regval >= mmap_start && regval < mmap_end) {
-                    mmapd = true;
-                    break;
-                }
-            }
+    if(reg == REG_STACK_PTR) {
+        if(crash_data.mem_is_tainted(regval)) {
+            crash_data.reg_taint(ip, ptr_disas, REG_INST_PTR);
+        }
+        
+        PIN_SafeCopy(&target_addr, (ADDRINT *)regval, sizeof(ADDRINT));    
+    }
 
-            if(!mmapd) {
-                *out << "BRANCH TO A NON-IMAGE ADDRESS" << std::endl;
+    PIN_LockClient();
+    bool invalid = IMG_FindByAddress(target_addr) == IMG_Invalid();
+    PIN_UnlockClient();
+
+    if(invalid) {
+        std::map<ADDRINT, ADDRINT>::iterator it;
+        for(it=execd.begin(); it != execd.end(); it++) {
+            ADDRINT mmap_start = it->first;
+            ADDRINT mmap_size = it->second;
+            ADDRINT mmap_end = mmap_start + mmap_size;
+            if(target_addr >= mmap_start && target_addr < mmap_end) {
+                mmapd = true;
+                break;
             }
+        }
+
+        if(!mmapd) {
+            *out << "HINT: POSSIBLE BRANCH OR RET TO NON-EXECUTABLE MEMORY: ";
+            *out << std::hex << target_addr << " at " << ip << std::endl;
+            crash_data.hint = ip;
         }
     }
 }
@@ -172,7 +183,7 @@ BOOL handle_specific(INS ins) {
                 IARG_UINT32, INS_RegR(ins, 0),
                 IARG_REG_VALUE, INS_RegR(ins, 0),
                 IARG_END);
-        return false;
+        return true;
     }
 
     // POP
@@ -511,8 +522,6 @@ VOID Image(IMG img, VOID *v)
 
 }
 
-/*** CRASH ANALYSIS ***/
-
 // SIGSEGV
 BOOL HandleSIGSEGV(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
     if(true) {
@@ -522,6 +531,8 @@ BOOL HandleSIGSEGV(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const
 
     crash_data.signal = "SIGSEGV";
     crash_data.location = ip;
+
+    crash_data.examine();
     crash_data.dump_info();
 
     return true;
@@ -536,6 +547,8 @@ BOOL HandleSIGTRAP(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const
     
     crash_data.signal = "SIGTRAP";
     crash_data.location = ip;
+
+    crash_data.examine();
     crash_data.dump_info();
 
     return true;
@@ -550,6 +563,8 @@ BOOL HandleSIGABRT(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const
     
     crash_data.signal = "SIGABRT";
     crash_data.location = ip;
+
+    crash_data.examine();
     crash_data.dump_info();
 
     return true;
@@ -564,6 +579,8 @@ BOOL HandleSIGILL(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const 
     
     crash_data.signal = "SIGILL";
     crash_data.location = ip;
+
+    crash_data.examine();
     crash_data.dump_info();
 
     return true;
@@ -578,6 +595,8 @@ BOOL HandleSIGFPE(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const 
     
     crash_data.signal = "SIGFPE";
     crash_data.location = ip;
+
+    crash_data.examine();
     crash_data.dump_info();
 
     return true;
