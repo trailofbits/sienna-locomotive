@@ -116,11 +116,17 @@ VOID handle_indirect(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg, AD
     
     if(crash_data.reg_is_tainted(reg)) {
         crash_data.reg_taint(ip, ptr_disas, REG_INST_PTR);
+        if(crash_data.insns.count(ip)) {
+            crash_data.insns[ip].add_flag(Instruction::PC_TAINT);
+        }
     }
 
     if(reg == REG_STACK_PTR) {
         if(crash_data.mem_is_tainted(regval)) {
             crash_data.reg_taint(ip, ptr_disas, REG_INST_PTR);
+            if(crash_data.insns.count(ip)) {
+                crash_data.insns[ip].add_flag(Instruction::PC_TAINT);
+            }
         }
         
         PIN_SafeCopy(&target_addr, (ADDRINT *)regval, sizeof(ADDRINT));    
@@ -146,6 +152,10 @@ VOID handle_indirect(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg, AD
             *out << "HINT: POSSIBLE BRANCH OR RET TO NON-EXECUTABLE MEMORY: ";
             *out << std::hex << target_addr << " at " << ip << std::endl;
             crash_data.hint = ip;
+            
+            if(crash_data.insns.count(ip)) {
+                crash_data.insns[ip].add_flag(Instruction::DATA_EXECUTION_PREVENTION);
+            }
         }
     }
 }
@@ -159,7 +169,14 @@ VOID wrap_reg_untaint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg) {
 VOID record(ADDRINT addr) {
     crash_data.last_addrs.push_back(addr);
     while(crash_data.last_addrs.size() > RECORD_COUNT) {
+        ADDRINT addr = crash_data.last_addrs.front();
         crash_data.last_addrs.pop_front();
+
+        std::list<ADDRINT> last_addrs = crash_data.last_addrs;
+        bool contains = (std::find(last_addrs.begin(), last_addrs.end(), addr) != last_addrs.end());
+        if(!contains) {
+            crash_data.insns.erase(addr);
+        }
     }
 }
 
@@ -444,9 +461,9 @@ VOID track_free(VOID *addr) {
     }
 }
 
-VOID free_before(ADDRINT retIp, ADDRINT address) {
+VOID free_before(ADDRINT ip, ADDRINT retIp, ADDRINT address) {
     if(debug) {
-        *out << "FREE CALLED: " << reinterpret_cast<void*>(address) << std::endl;
+        *out << "FREE CALLED: " << reinterpret_cast<void*>(address) << " AT " << ip << std::endl;
     }
     track_free(reinterpret_cast<void*>(address));
 }
@@ -519,6 +536,7 @@ VOID Image(IMG img, VOID *v)
             freeRtn, 
             IPOINT_BEFORE, 
             (AFUNPTR)free_before,
+            IARG_INST_PTR,
             IARG_RETURN_IP, 
             IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
             IARG_END);

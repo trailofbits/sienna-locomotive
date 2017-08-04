@@ -4,19 +4,27 @@
 extern "C" {
 #include "xed-interface.h"
 }
+
 #include <set>
 #include <list>
 #include <iostream>
+#include <signal.h>
 
 class CrashData {
 public:
+    enum Verdict {
+        EXPLOITABLE,
+        LIKELY,
+        UNLIKELY,
+        UNKNOWN
+    };
+
     string signal;
     ADDRINT location;
     ADDRINT hint;
     std::set<ADDRINT> tainted_addrs;
     std::set<LEVEL_BASE::REG> tainted_regs;
     std::map<ADDRINT, Instruction> insns;
-
 
     #define RECORD_COUNT 5
     std::list<ADDRINT> last_addrs;
@@ -26,7 +34,9 @@ public:
     std::ostream *out;
     bool debug;
 
-    CrashData() : hint(0), out(&std::cout), debug(false) { };
+    Verdict verdict;
+
+    CrashData() : hint(0), out(&std::cout), debug(false), verdict(UNKNOWN) { };
     bool reg_is_tainted(LEVEL_BASE::REG reg);
     VOID reg_taint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg);
     VOID reg_untaint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg);
@@ -35,7 +45,5 @@ public:
     VOID mem_taint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT32 size);
     VOID examine();
     VOID dump_info();
-
-private:
-    BOOL xed_at(xed_decoded_inst_t *xedd, ADDRINT ip);
+    string verdict_string();
 };

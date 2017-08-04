@@ -73,35 +73,6 @@ VOID CrashData::mem_taint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT3
 
 /*** CRASH ANALYSIS ***/
 
-BOOL CrashData::xed_at(xed_decoded_inst_t *xedd, ADDRINT ip) {
-#if defined(TARGET_IA32E)
-    static const xed_state_t dstate = {XED_MACHINE_MODE_LONG_64, XED_ADDRESS_WIDTH_64b};
-#else
-    static const xed_state_t dstate = {XED_MACHINE_MODE_LEGACY_32, XED_ADDRESS_WIDTH_32b};
-#endif
-    
-    xed_decoded_inst_zero_set_mode(xedd, &dstate);
-
-    const unsigned int max_inst_len = 15;
-
-    xed_error_enum_t xed_code = xed_decode(xedd, reinterpret_cast<UINT8*>(ip), max_inst_len);
-    BOOL xed_ok = (xed_code == XED_ERROR_NONE);
-    if (xed_ok) {
-        *out << std::hex << ip << " ";
-        char buf[2048];
-
-        // set the runtime adddress for disassembly 
-        xed_uint64_t runtime_address = static_cast<xed_uint64_t>(ip); 
-
-        xed_decoded_inst_dump_xed_format(xedd, buf, 2048, runtime_address);
-        *out << buf << std::endl;
-    } else {
-        return false;
-    }
-
-    return true;
-}
-
 VOID CrashData::examine() {
     ADDRINT last_insn = last_addrs.back();
     if(location != last_insn && hint != 0) {
@@ -119,51 +90,44 @@ VOID CrashData::examine() {
             last_insn = hint;
         }
     }
-    
-    xed_decoded_inst_t xedd;
-    if(xed_at(&xedd, last_insn)) {
-        xed_iclass_enum_t insn_iclass = xed_decoded_inst_get_iclass(&xedd);
-        *out << "ICLASS " << xed_iclass_enum_t2str(insn_iclass) << std::endl;
 
-        UINT nops = xed_decoded_inst_noperands(&xedd);
-        xed_inst_t *p_xedi = (xed_inst_t *)xed_decoded_inst_inst(&xedd);
-        // xed_inst_t xedi = *p_xedi;
-
-        for(UINT i = 0; i < nops; i++) {
-            xed_operand_t *xedo = (xed_operand_t *)xed_inst_operand(p_xedi, i);
-            switch (xed_operand_name(xedo)) {
-                case XED_OPERAND_AGEN:
-                case XED_OPERAND_MEM0:
-                case XED_OPERAND_MEM1:
-                    *out << "MEM OP " << i << " " << xed_operand_name(xedo) << std::endl;
-                    break;
-
-                case XED_OPERAND_REG:
-                case XED_OPERAND_REG0:
-                case XED_OPERAND_REG1:
-                case XED_OPERAND_REG2:
-                case XED_OPERAND_REG3:
-                case XED_OPERAND_REG4:
-                case XED_OPERAND_REG5:
-                case XED_OPERAND_REG6:
-                case XED_OPERAND_REG7:
-                case XED_OPERAND_REG8:
-                    *out << "REG OP " << i << " " << xed_operand_name(xedo) << std::endl;
-
-                    break;
-                default:
-                    break;
-            }
-        }
-    } else {
-        *out << "UNABLE TO DECODE" << std::endl;
+    if(signal == "SIGFPE") {
+        verdict = UNLIKELY;
+        return;
     }
+
+    if(signal == "SIGTRAP") {
+        verdict = UNLIKELY;
+        return;
+    }
+
+    
+    
+
+    if(insns.count(last_insn)) {
+        Instruction insn = insns[last_insn];
+        INS ins = insn.ins;
+        string disas = insn.disas;
+
+        *out << "CRASH ON: " << disas << std::endl;
+        *out << "MEM READ: " << INS_MemoryOperandIsRead(ins, 0) << std::endl;
+        *out << "MEM WRITE: " << INS_MemoryOperandIsWritten(ins, 0) << std::endl;
+    } else {
+        *out << "CAN'T FIND INSN AT " << last_insn << std::endl;
+    }
+}
+
+string CrashData::verdict_string() {
+    string lookup[] = { "EXPLOITABLE", "LIKELY", "UNLIKELY", "UNKNOWN" };
+    return lookup[verdict];
 }
 
 /* TODO: json or serialization library */
 
 VOID CrashData::dump_info() {
     *out << "{" << std::endl;
+    *out << "\t\"verdict\": \"" << verdict_string() << "\"," << std::endl;
+
     *out << "\t\"signal\": \"" << signal << "\"," << std::endl;
     *out << "\t\"location\": 0x" << std::hex << location << "," << std::endl;
     *out << "\t\"hint\": 0x" << std::hex << hint << "," << std::endl;
@@ -198,8 +162,6 @@ VOID CrashData::dump_info() {
     std::list<ADDRINT>::iterator lit;
     for(lit=last_addrs.begin(); lit != last_addrs.end(); lit++) {
         *out << "\t\t0x" << *lit << "," << std::endl;
-        *out << insns[*lit].disas << std::endl;
-        *out << INS_MemoryOperandIsRead(insns[*lit].ins, 0) << std::endl;
     }
     *out << "\t]," << std::endl;
 
