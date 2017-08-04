@@ -386,8 +386,6 @@ use_after_free_t:
 ;   rets:   none
     push    rbp
     mov     rbp, rsp
-    push    rbp
-    mov     rbp, rsp
     mov     rsi, aaaa_data
     mov     rdx, aaaa_len
     call    prep_test
@@ -401,7 +399,7 @@ use_after_free_t:
     mov     rdi, rax
     call    free
     pop     rdi
-    mov     rax, [rdi]
+    mov     [rdi], rax
     mov     rsp, rbp
     pop     rbp
     ret

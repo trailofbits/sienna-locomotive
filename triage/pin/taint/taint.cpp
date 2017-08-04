@@ -238,6 +238,11 @@ BOOL handle_specific(INS ins) {
 VOID Insn(INS ins, VOID *v) {
     // pass address, disassembled insn to all insert calls
     string disas = INS_Disassemble(ins);
+    
+    ADDRINT ip = INS_Address(ins);
+    Instruction _insn(ip, ins, disas);
+    crash_data.insns[ip] = _insn;
+
     if(debug) {
         *out << "OPCODES: " << disas << " " << INS_Opcode(ins) << std::endl;
     }

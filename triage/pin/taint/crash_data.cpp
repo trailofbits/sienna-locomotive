@@ -124,6 +124,37 @@ VOID CrashData::examine() {
     if(xed_at(&xedd, last_insn)) {
         xed_iclass_enum_t insn_iclass = xed_decoded_inst_get_iclass(&xedd);
         *out << "ICLASS " << xed_iclass_enum_t2str(insn_iclass) << std::endl;
+
+        UINT nops = xed_decoded_inst_noperands(&xedd);
+        xed_inst_t *p_xedi = (xed_inst_t *)xed_decoded_inst_inst(&xedd);
+        // xed_inst_t xedi = *p_xedi;
+
+        for(UINT i = 0; i < nops; i++) {
+            xed_operand_t *xedo = (xed_operand_t *)xed_inst_operand(p_xedi, i);
+            switch (xed_operand_name(xedo)) {
+                case XED_OPERAND_AGEN:
+                case XED_OPERAND_MEM0:
+                case XED_OPERAND_MEM1:
+                    *out << "MEM OP " << i << " " << xed_operand_name(xedo) << std::endl;
+                    break;
+
+                case XED_OPERAND_REG:
+                case XED_OPERAND_REG0:
+                case XED_OPERAND_REG1:
+                case XED_OPERAND_REG2:
+                case XED_OPERAND_REG3:
+                case XED_OPERAND_REG4:
+                case XED_OPERAND_REG5:
+                case XED_OPERAND_REG6:
+                case XED_OPERAND_REG7:
+                case XED_OPERAND_REG8:
+                    *out << "REG OP " << i << " " << xed_operand_name(xedo) << std::endl;
+
+                    break;
+                default:
+                    break;
+            }
+        }
     } else {
         *out << "UNABLE TO DECODE" << std::endl;
     }
@@ -167,6 +198,8 @@ VOID CrashData::dump_info() {
     std::list<ADDRINT>::iterator lit;
     for(lit=last_addrs.begin(); lit != last_addrs.end(); lit++) {
         *out << "\t\t0x" << *lit << "," << std::endl;
+        *out << insns[*lit].disas << std::endl;
+        *out << INS_MemoryOperandIsRead(insns[*lit].ins, 0) << std::endl;
     }
     *out << "\t]," << std::endl;
 

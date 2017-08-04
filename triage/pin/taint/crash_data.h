@@ -1,4 +1,6 @@
 #include "pin.H"
+#include "instruction.h"
+
 extern "C" {
 #include "xed-interface.h"
 }
@@ -13,6 +15,8 @@ public:
     ADDRINT hint;
     std::set<ADDRINT> tainted_addrs;
     std::set<LEVEL_BASE::REG> tainted_regs;
+    std::map<ADDRINT, Instruction> insns;
+
 
     #define RECORD_COUNT 5
     std::list<ADDRINT> last_addrs;
