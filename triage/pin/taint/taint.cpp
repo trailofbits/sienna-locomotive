@@ -51,6 +51,8 @@ VOID mem_taint_reg(ADDRINT ip, std::string *ptr_disas, REG reg, ADDRINT mem,  UI
     }
 
     if(tainted) {
+        crash_data.insns[ip].add_flag(Instruction::TAINTED_READ);
+
         if(debug) {
             *out << "REGm TAINT: " << REG_StringShort(reg) << std::endl;
         }
@@ -86,6 +88,8 @@ VOID regs_taint_mem(ADDRINT ip, std::string *ptr_disas, std::list<LEVEL_BASE::RE
     }
 
     if(tainted) {
+        crash_data.insns[ip].add_flag(Instruction::TAINTED_WRITE);
+        *out << "TAINTED WRITE AT " << ip << std::endl;
         crash_data.mem_taint(ip, ptr_disas, mem, size);
     } else {
         crash_data.mem_untaint(ip, ptr_disas, mem, size);
@@ -154,7 +158,7 @@ VOID handle_indirect(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg, AD
             crash_data.hint = ip;
             
             if(crash_data.insns.count(ip)) {
-                crash_data.insns[ip].add_flag(Instruction::DATA_EXECUTION_PREVENTION);
+                crash_data.insns[ip].add_flag(Instruction::DEP);
             }
         }
     }
@@ -192,7 +196,10 @@ BOOL handle_specific(INS ins) {
 
     // indirect jump, indirect call
     if(INS_IsIndirectBranchOrCall(ins)) {
-        *out << "INDIRECT: " << REG_StringShort(INS_RegR(ins, 0)) << std::endl;
+        if(debug) {
+            *out << "INDIRECT: " << REG_StringShort(INS_RegR(ins, 0)) << std::endl;
+        }
+
         INS_InsertCall(
                 ins, IPOINT_BEFORE, (AFUNPTR)handle_indirect,
                 IARG_INST_PTR,
@@ -257,8 +264,15 @@ VOID Insn(INS ins, VOID *v) {
     string disas = INS_Disassemble(ins);
     
     ADDRINT ip = INS_Address(ins);
-    Instruction _insn(ip, ins, disas);
-    crash_data.insns[ip] = _insn;
+    
+    if(!crash_data.insns.count(ip)) {
+        *out << "CREATING " << ip << std::endl;
+        Instruction insn(ip, ins, disas, Instruction::NONE);
+        crash_data.insns[ip] = insn;
+    } else {
+        crash_data.insns[ip].ins = ins;
+        *out << "NOT CREATING " << ip << std::endl;
+    }
 
     if(debug) {
         *out << "OPCODES: " << disas << " " << INS_Opcode(ins) << std::endl;

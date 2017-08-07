@@ -101,19 +101,54 @@ VOID CrashData::examine() {
         return;
     }
 
-    
-    
-
-    if(insns.count(last_insn)) {
-        Instruction insn = insns[last_insn];
-        INS ins = insn.ins;
-        string disas = insn.disas;
-
-        *out << "CRASH ON: " << disas << std::endl;
-        *out << "MEM READ: " << INS_MemoryOperandIsRead(ins, 0) << std::endl;
-        *out << "MEM WRITE: " << INS_MemoryOperandIsWritten(ins, 0) << std::endl;
-    } else {
+    if(!insns.count(last_insn)) {
         *out << "CAN'T FIND INSN AT " << last_insn << std::endl;
+        verdict = LIKELY;
+        return;
+    }
+    
+    Instruction insn = insns[last_insn];
+    INS ins = insn.ins;
+    string disas = insn.disas;
+
+    *out << "CRASH ON: " << disas << std::endl;
+
+    if(INS_MemoryOperandIsRead(ins, 0)) {
+        *out << "MEM READ: " << INS_MemoryOperandIsRead(ins, 0) << std::endl;
+        
+        if(insn.has_flag(Instruction::TAINTED_READ)) {
+            verdict = LIKELY;
+        } else {
+            verdict = UNLIKELY;
+        }
+
+        return;
+    }
+
+    if(INS_MemoryOperandIsWritten(ins, 0)) {
+        *out << "MEM WRITE: " << INS_MemoryOperandIsWritten(ins, 0) << std::endl;
+        *out << "FLAGS " << insn.flags << std::endl;
+        if(insn.has_flag(Instruction::TAINTED_WRITE)) {
+            verdict = LIKELY;
+            return;
+        }
+
+        verdict = UNLIKELY;
+        return;
+    }
+
+    if(INS_IsIndirectBranchOrCall(ins)) {
+        if(insn.has_flag(Instruction::PC_TAINT)) {
+            verdict = EXPLOITABLE;
+        }
+
+        verdict = LIKELY;
+        return;
+    }
+
+    if(insn.has_flag(Instruction::DEP)) {
+        verdict = LIKELY;
+        return;
     }
 }
 
