@@ -270,7 +270,7 @@ VOID Insn(INS ins, VOID *v) {
         Instruction insn(ip, ins, disas, Instruction::NONE);
         crash_data.insns[ip] = insn;
     } else {
-        crash_data.insns[ip].ins = ins;
+        // crash_data.insns[ip].ins = ins;
         *out << "NOT CREATING " << ip << std::endl;
     }
 

@@ -74,7 +74,16 @@ VOID CrashData::mem_taint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT3
 /*** CRASH ANALYSIS ***/
 
 VOID CrashData::examine() {
+    std::list<ADDRINT>::iterator it;
+    for(it=last_addrs.begin(); it != last_addrs.end(); it++) {
+        if(insns.count(*it)) {
+            *out << "INST DISAS: " << insns[*it].disas << std::endl;
+            *out << "CURR DISAS: " << INS_Disassemble(insns[*it].ins) << std::endl << std::endl;
+        }
+    }
+
     ADDRINT last_insn = last_addrs.back();
+
     if(location != last_insn && hint != 0) {
         bool contains_hint = false;
 
@@ -109,7 +118,7 @@ VOID CrashData::examine() {
     
     Instruction insn = insns[last_insn];
     INS ins = insn.ins;
-    string disas = insn.disas;
+    string disas = INS_Disassemble(ins);
 
     *out << "CRASH ON: " << disas << std::endl;
 
