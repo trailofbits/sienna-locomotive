@@ -38,10 +38,14 @@ std::ostream *out = &cout;
 
 /*** TAINT ***/
 
-VOID mem_taint_reg(ADDRINT ip, std::string *ptr_disas, REG reg, ADDRINT mem,  UINT32 size) {
+VOID mem_taint_reg(ADDRINT ip, std::string *ptr_disas, 
+        std::list<LEVEL_BASE::REG> *ptr_regs_r, std::list<LEVEL_BASE::REG> *ptr_regs_w, 
+        ADDRINT mem,  UINT32 size) {
+
     if(debug) {
         *out << std::hex << ip << ": " << *ptr_disas << std::endl;
     }
+
     bool tainted = false;
     for(UINT32 i=0; i<size; i++) {
         if(crash_data.mem_is_tainted(mem+i)) {
@@ -50,31 +54,41 @@ VOID mem_taint_reg(ADDRINT ip, std::string *ptr_disas, REG reg, ADDRINT mem,  UI
         }
     }
 
-    if(tainted) {
-        crash_data.insns[ip].add_flag(Instruction::TAINTED_READ);
-
-        if(debug) {
-            *out << "REGm TAINT: " << REG_StringShort(reg) << std::endl;
+    std::list<LEVEL_BASE::REG>::iterator it;
+    for(it=ptr_regs_r->begin(); it != ptr_regs_r->end() && !tainted; it++) {
+        if(crash_data.reg_is_tainted(*it)) {
+            tainted = true;
         }
-        REG fullReg = REG_FullRegName(reg);
-        crash_data.tainted_regs.insert(fullReg);
+    }
 
-        if(debug) {
-            *out << "TAINTED REGS:" << std::endl;
-            std::set<LEVEL_BASE::REG>::iterator sit;
-            for(sit=crash_data.tainted_regs.begin(); sit != crash_data.tainted_regs.end(); sit++) {
-                *out << REG_StringShort(*sit) << std::endl;
-            }
-        }
+    for(it=ptr_regs_w->begin(); it != ptr_regs_w->end(); it++) {
+        REG reg = *it;
         
-    } else {
-        if(debug) {
-            *out << "REGm UNTAINT: " << REG_StringShort(reg) << std::endl;
-        }
-        REG fullReg = REG_FullRegName(reg);
-        std::set<LEVEL_BASE::REG>::iterator it = crash_data.tainted_regs.find(fullReg);
-        if(it != crash_data.tainted_regs.end()) {
-            crash_data.tainted_regs.erase(it);
+        if(tainted) {
+            crash_data.insns[ip].add_flag(Instruction::TAINTED_READ);
+            *out << "TAINTED READ AT " << ip << std::endl;
+
+            if(debug) {
+                *out << "REGm TAINT: " << REG_StringShort(reg) << std::endl;
+            }
+
+            crash_data.reg_taint(ip, ptr_disas, reg);
+
+            if(debug) {
+                *out << "TAINTED REGS:" << std::endl;
+                std::set<LEVEL_BASE::REG>::iterator sit;
+                for(sit=crash_data.tainted_regs.begin(); sit != crash_data.tainted_regs.end(); sit++) {
+                    *out << REG_StringShort(*sit) << std::endl;
+                }
+            }
+            
+        } else {
+            if(debug) {
+                *out << "REGm UNTAINT: " << REG_StringShort(reg) << std::endl;
+            }
+
+            crash_data.reg_untaint(ip, ptr_disas, reg);
+
         }
     }
 }
@@ -212,20 +226,29 @@ BOOL handle_specific(INS ins) {
 
     // POP
     if(INS_Opcode(ins) == 0x249) {
+        std::list<LEVEL_BASE::REG> *ptr_regs_r = new std::list<LEVEL_BASE::REG>();
+        std::list<LEVEL_BASE::REG> *ptr_regs_w = new std::list<LEVEL_BASE::REG>();
+
+        for(uint32_t i=0; i<INS_MaxNumRRegs(ins); i++) {
+            ptr_regs_r->push_back(INS_RegR(ins, i));
+        }
+
         for(uint32_t i=0; i<INS_MaxNumWRegs(ins); i++) {
-            // don't taint the stack pointer
             if(INS_RegW(ins, i) == REG_STACK_PTR)
                 continue; 
 
-            INS_InsertCall(
-                ins, IPOINT_BEFORE, (AFUNPTR)mem_taint_reg,
-                IARG_INST_PTR,
-                IARG_PTR, new std::string(INS_Disassemble(ins)),
-                IARG_UINT32, INS_RegW(ins, i),
-                IARG_MEMORYOP_EA, 0,
-                IARG_UINT32, (UINT32)INS_MemoryReadSize(ins),
-                IARG_END);
+            ptr_regs_w->push_back(INS_RegW(ins, i));
         }
+
+        INS_InsertCall(
+            ins, IPOINT_BEFORE, (AFUNPTR)mem_taint_reg,
+            IARG_INST_PTR,
+            IARG_PTR, new std::string(INS_Disassemble(ins)),
+            IARG_PTR, ptr_regs_r,
+            IARG_PTR, ptr_regs_w,
+            IARG_MEMORYOP_EA, 0,
+            IARG_UINT32, (UINT32)INS_MemoryReadSize(ins),
+            IARG_END);
 
         return true;
     }
@@ -267,7 +290,7 @@ VOID Insn(INS ins, VOID *v) {
     
     if(!crash_data.insns.count(ip)) {
         *out << "CREATING " << ip << std::endl;
-        Instruction insn(ip, ins, disas, Instruction::NONE);
+        Instruction insn(ip, disas);
         crash_data.insns[ip] = insn;
     } else {
         // crash_data.insns[ip].ins = ins;
@@ -300,17 +323,35 @@ VOID Insn(INS ins, VOID *v) {
         return;
     }
 
-    if(INS_MemoryOperandIsRead(ins, 0) && INS_OperandIsReg(ins, 0)){
-        for(uint32_t i=0; i<INS_MaxNumWRegs(ins); i++) {
-            INS_InsertCall(
-                ins, IPOINT_BEFORE, (AFUNPTR)mem_taint_reg,
-                IARG_INST_PTR,
-                IARG_PTR, new std::string(INS_Disassemble(ins)),
-                IARG_UINT32, INS_RegW(ins, i),
-                IARG_MEMORYOP_EA, 0,
-                IARG_UINT32, (UINT32)INS_MemoryReadSize(ins),
-                IARG_END);
+    // TODO: fix exclusion of nop opcode
+    if(INS_MemoryOperandIsRead(ins, 0) && INS_OperandIsReg(ins, 0) && INS_Opcode(ins) != 0x1c7){
+        *out << "READ" << std::endl;
+        std::list<LEVEL_BASE::REG> *ptr_regs_r = new std::list<LEVEL_BASE::REG>();
+        std::list<LEVEL_BASE::REG> *ptr_regs_w = new std::list<LEVEL_BASE::REG>();
+        *out << __LINE__ << std::endl;
+
+        for(uint32_t i=0; i<INS_MaxNumRRegs(ins); i++) {
+            ptr_regs_r->push_back(INS_RegR(ins, i));
         }
+        *out << __LINE__ << std::endl;
+
+        for(uint32_t i=0; i<INS_MaxNumWRegs(ins); i++) {
+            ptr_regs_w->push_back(INS_RegW(ins, i));
+        }
+        *out << __LINE__ << std::endl;
+
+        INS_InsertCall(
+            ins, IPOINT_BEFORE, (AFUNPTR)mem_taint_reg,
+            IARG_INST_PTR,
+            IARG_PTR, new std::string(INS_Disassemble(ins)),
+            IARG_PTR, ptr_regs_r,
+            IARG_PTR, ptr_regs_w,
+            IARG_MEMORYOP_EA, 0,
+            IARG_UINT32, (UINT32)INS_MemoryReadSize(ins),
+            IARG_END);
+        
+        *out << __LINE__ << std::endl;
+
     } else if(INS_MemoryOperandIsWritten(ins, 0)) {
         if(debug) {
             *out << "xTAINTED REGS:" << std::endl;

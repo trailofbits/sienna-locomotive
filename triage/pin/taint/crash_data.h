@@ -43,6 +43,7 @@ public:
     bool mem_is_tainted(ADDRINT mem);
     VOID mem_untaint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT32 size);
     VOID mem_taint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT32 size);
+    BOOL xed_at(xed_decoded_inst_t *xedd, ADDRINT ip);
     VOID examine();
     VOID dump_info();
     string verdict_string();

@@ -73,15 +73,36 @@ VOID CrashData::mem_taint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT3
 
 /*** CRASH ANALYSIS ***/
 
-VOID CrashData::examine() {
-    std::list<ADDRINT>::iterator it;
-    for(it=last_addrs.begin(); it != last_addrs.end(); it++) {
-        if(insns.count(*it)) {
-            *out << "INST DISAS: " << insns[*it].disas << std::endl;
-            *out << "CURR DISAS: " << INS_Disassemble(insns[*it].ins) << std::endl << std::endl;
-        }
+BOOL CrashData::xed_at(xed_decoded_inst_t *xedd, ADDRINT ip) {
+#if defined(TARGET_IA32E)
+    static const xed_state_t dstate = {XED_MACHINE_MODE_LONG_64, XED_ADDRESS_WIDTH_64b};
+#else
+    static const xed_state_t dstate = {XED_MACHINE_MODE_LEGACY_32, XED_ADDRESS_WIDTH_32b};
+#endif
+    
+    xed_decoded_inst_zero_set_mode(xedd, &dstate);
+
+    const unsigned int max_inst_len = 15;
+
+    xed_error_enum_t xed_code = xed_decode(xedd, reinterpret_cast<UINT8*>(ip), max_inst_len);
+    BOOL xed_ok = (xed_code == XED_ERROR_NONE);
+    if (xed_ok) {
+        *out << std::hex << ip << " ";
+        char buf[2048];
+
+        // set the runtime adddress for disassembly 
+        xed_uint64_t runtime_address = static_cast<xed_uint64_t>(ip); 
+
+        xed_decoded_inst_dump_xed_format(xedd, buf, 2048, runtime_address);
+        *out << buf << std::endl;
+    } else {
+        return false;
     }
 
+    return true;
+}
+
+VOID CrashData::examine() {
     ADDRINT last_insn = last_addrs.back();
 
     if(location != last_insn && hint != 0) {
@@ -117,14 +138,49 @@ VOID CrashData::examine() {
     }
     
     Instruction insn = insns[last_insn];
-    INS ins = insn.ins;
-    string disas = INS_Disassemble(ins);
+    // INS ins = insn.ins;
+    string disas = insn.disas; 
 
     *out << "CRASH ON: " << disas << std::endl;
 
-    if(INS_MemoryOperandIsRead(ins, 0)) {
-        *out << "MEM READ: " << INS_MemoryOperandIsRead(ins, 0) << std::endl;
-        
+    xed_decoded_inst_t xedd;
+    if(!xed_at(&xedd, last_insn)) {
+        *out << "UNABLE TO DECODE" << std::endl;
+        verdict = LIKELY;
+        return;
+    } 
+
+    xed_iclass_enum_t insn_iclass = xed_decoded_inst_get_iclass(&xedd);
+    *out << "ICLASS " << xed_iclass_enum_t2str(insn_iclass) << std::endl;
+
+    UINT mem_nops = xed_decoded_inst_number_of_memory_operands(&xedd);
+
+    bool written = false;
+    bool read = false;
+
+    for(UINT i = 0; i < mem_nops; i++) {
+        if(xed_decoded_inst_mem_written(&xedd, i)) {
+            written = true;
+        }
+
+        if(xed_decoded_inst_mem_read(&xedd, i)) {
+            read = true;
+        }
+    }
+
+    if(written) {
+        *out << "WRITE" << std::endl;
+        if(insn.has_flag(Instruction::TAINTED_WRITE)) {
+            verdict = LIKELY;
+        } else {
+            verdict = UNLIKELY;
+        }
+
+        return;
+    }
+
+    if(read) {
+        *out << "READ" << std::endl;
         if(insn.has_flag(Instruction::TAINTED_READ)) {
             verdict = LIKELY;
         } else {
@@ -134,28 +190,8 @@ VOID CrashData::examine() {
         return;
     }
 
-    if(INS_MemoryOperandIsWritten(ins, 0)) {
-        *out << "MEM WRITE: " << INS_MemoryOperandIsWritten(ins, 0) << std::endl;
-        *out << "FLAGS " << insn.flags << std::endl;
-        if(insn.has_flag(Instruction::TAINTED_WRITE)) {
-            verdict = LIKELY;
-            return;
-        }
-
-        verdict = UNLIKELY;
-        return;
-    }
-
-    if(INS_IsIndirectBranchOrCall(ins)) {
-        if(insn.has_flag(Instruction::PC_TAINT)) {
-            verdict = EXPLOITABLE;
-        }
-
-        verdict = LIKELY;
-        return;
-    }
-
     if(insn.has_flag(Instruction::DEP)) {
+        *out << "DEP" << std::endl;
         verdict = LIKELY;
         return;
     }
@@ -198,7 +234,7 @@ VOID CrashData::dump_info() {
             size++;
         }
 
-        *out << "\t\t{\"start\": 0x" << start << ", \"size\": 0x" << size << " }," << std::endl;
+        *out << "\t\t{ \"start\": 0x" << start << ", \"size\": 0x" << size << " }," << std::endl;
     }
     *out << "\t]," << std::endl;
 

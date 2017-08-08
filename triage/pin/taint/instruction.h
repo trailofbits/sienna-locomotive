@@ -4,7 +4,6 @@
 class Instruction {
 public:
     ADDRINT ip;
-    INS ins;
     string disas;
 
     enum Flags {
@@ -19,7 +18,7 @@ public:
 
     Flags flags;
     Instruction();
-    Instruction(ADDRINT ip, INS ins, string disas, Flags flags);
+    Instruction(ADDRINT ip, string disas);
     VOID add_flag(Flags flag);
     BOOL has_flag(Flags flag);
 /* 
