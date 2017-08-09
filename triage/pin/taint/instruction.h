@@ -20,6 +20,7 @@ public:
     Instruction();
     Instruction(ADDRINT ip, string disas);
     VOID add_flag(Flags flag);
+    VOID remove_flag(Flags flag);
     BOOL has_flag(Flags flag);
 /* 
 address

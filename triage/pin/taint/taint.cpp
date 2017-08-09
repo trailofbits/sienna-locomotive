@@ -86,6 +86,7 @@ VOID mem_taint_reg(ADDRINT ip, std::string *ptr_disas,
             if(debug) {
                 *out << "REGm UNTAINT: " << REG_StringShort(reg) << std::endl;
             }
+            crash_data.insns[ip].remove_flag(Instruction::TAINTED_READ);
 
             crash_data.reg_untaint(ip, ptr_disas, reg);
 
@@ -108,6 +109,7 @@ VOID regs_taint_mem(ADDRINT ip, std::string *ptr_disas, std::list<LEVEL_BASE::RE
         crash_data.insns[ip].add_flag(Instruction::TAINTED_WRITE);
         crash_data.mem_taint(ip, ptr_disas, mem, size);
     } else {
+        crash_data.insns[ip].remove_flag(Instruction::TAINTED_WRITE);
         crash_data.mem_untaint(ip, ptr_disas, mem, size);
     }
 }
@@ -139,6 +141,10 @@ VOID handle_indirect(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg, AD
         if(crash_data.insns.count(ip)) {
             crash_data.insns[ip].add_flag(Instruction::PC_TAINT);
         }
+    } else {
+        if(crash_data.insns.count(ip)) {
+            crash_data.insns[ip].remove_flag(Instruction::PC_TAINT);
+        }
     }
 
     if(reg == REG_STACK_PTR) {
@@ -146,6 +152,10 @@ VOID handle_indirect(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg, AD
             crash_data.reg_taint(ip, ptr_disas, REG_INST_PTR);
             if(crash_data.insns.count(ip)) {
                 crash_data.insns[ip].add_flag(Instruction::PC_TAINT);
+            }
+        } else {
+            if(crash_data.insns.count(ip)) {
+                crash_data.insns[ip].remove_flag(Instruction::PC_TAINT);
             }
         }
         
@@ -177,6 +187,10 @@ VOID handle_indirect(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg, AD
             
             if(crash_data.insns.count(ip)) {
                 crash_data.insns[ip].add_flag(Instruction::DEP);
+            }
+        } else {
+            if(crash_data.insns.count(ip)) {
+                crash_data.insns[ip].remove_flag(Instruction::DEP);
             }
         }
     }
@@ -326,7 +340,6 @@ VOID Insn(INS ins, VOID *v) {
         return;
     }
 
-    // TODO: fix exclusion of nop opcode
     if(INS_MemoryOperandIsRead(ins, 0) && INS_OperandIsReg(ins, 0)){
         std::list<LEVEL_BASE::REG> *ptr_regs_r = new std::list<LEVEL_BASE::REG>();
         std::list<LEVEL_BASE::REG> *ptr_regs_w = new std::list<LEVEL_BASE::REG>();

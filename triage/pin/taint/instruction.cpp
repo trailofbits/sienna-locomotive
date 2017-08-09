@@ -4,6 +4,10 @@ VOID Instruction::add_flag(Flags flag) {
     flags = (Instruction::Flags) (flags | flag);
 }
 
+VOID Instruction::remove_flag(Flags flag) {
+    flags = (Instruction::Flags) (flags & ~flag);
+}
+
 BOOL Instruction::has_flag(Flags flag) {
     return flags & flag;
 }
