@@ -87,14 +87,15 @@ BOOL CrashData::xed_at(xed_decoded_inst_t *xedd, ADDRINT ip) {
     xed_error_enum_t xed_code = xed_decode(xedd, reinterpret_cast<UINT8*>(ip), max_inst_len);
     BOOL xed_ok = (xed_code == XED_ERROR_NONE);
     if (xed_ok) {
-        *out << std::hex << ip << " ";
         char buf[2048];
 
         // set the runtime adddress for disassembly 
         xed_uint64_t runtime_address = static_cast<xed_uint64_t>(ip); 
 
         xed_decoded_inst_dump_xed_format(xedd, buf, 2048, runtime_address);
-        *out << buf << std::endl;
+        if(debug) {
+            *out << std::hex << ip << " " << buf << std::endl;
+        }
     } else {
         return false;
     }
@@ -105,7 +106,7 @@ BOOL CrashData::xed_at(xed_decoded_inst_t *xedd, ADDRINT ip) {
 VOID CrashData::examine() {
     ADDRINT last_insn = last_addrs.back();
 
-    if(location != last_insn && hint != 0) {
+    if(hint != 0) {
         bool contains_hint = false;
 
         std::list<ADDRINT>::iterator it;
@@ -122,17 +123,28 @@ VOID CrashData::examine() {
     }
 
     if(signal == "SIGFPE") {
+        if(debug) {
+            *out << "DECISION SIGFPE" << std::endl;
+        }
+        
         verdict = UNLIKELY;
         return;
     }
 
     if(signal == "SIGTRAP") {
+        if(debug) {
+            *out << "DECISION SIGTRAP" << std::endl;
+        }
+
         verdict = UNLIKELY;
         return;
     }
 
     if(!insns.count(last_insn)) {
-        *out << "CAN'T FIND INSN AT " << last_insn << std::endl;
+        if(debug) {
+            *out << "DECISION INSN404" << std::endl;
+        }
+
         verdict = LIKELY;
         return;
     }
@@ -141,38 +153,64 @@ VOID CrashData::examine() {
     // INS ins = insn.ins;
     string disas = insn.disas; 
 
-    *out << "CRASH ON: " << disas << std::endl;
+    if(debug) {
+        *out << "CRASH ON: " << disas << " AT " << last_insn << std::endl;
+    }
 
     xed_decoded_inst_t xedd;
     if(!xed_at(&xedd, last_insn)) {
-        *out << "UNABLE TO DECODE" << std::endl;
+        if(debug) {
+            *out << "DECISION NODECODE" << std::endl;
+        }
+
         verdict = LIKELY;
         return;
     } 
 
     xed_iclass_enum_t insn_iclass = xed_decoded_inst_get_iclass(&xedd);
-    *out << "ICLASS " << xed_iclass_enum_t2str(insn_iclass) << std::endl;
+    if(debug) {
+        *out << "ICLASS " << xed_iclass_enum_t2str(insn_iclass) << std::endl;
+    }
 
-    UINT mem_nops = xed_decoded_inst_number_of_memory_operands(&xedd);
+    xed_inst_t *p_xedi = (xed_inst_t *)xed_decoded_inst_inst(&xedd);
+    UINT nops = xed_decoded_inst_noperands(&xedd);
 
     bool written = false;
     bool read = false;
 
-    for(UINT i = 0; i < mem_nops; i++) {
-        if(xed_decoded_inst_mem_written(&xedd, i)) {
-            written = true;
-        }
+    for(UINT i = 0; i < nops; i++) {
+        xed_operand_t *p_xedo = (xed_operand_t *)xed_inst_operand(p_xedi, i);
+        switch (xed_operand_name(p_xedo)) {
+            case XED_OPERAND_MEM0:
+            case XED_OPERAND_MEM1:
+                if(xed_operand_operand_visibility(p_xedo) == XED_OPVIS_EXPLICIT) {
+                    if(xed_operand_read(p_xedo)) {
+                        read = true;
+                    }
 
-        if(xed_decoded_inst_mem_read(&xedd, i)) {
-            read = true;
+                    if(xed_operand_written(p_xedo)) {
+                        written = true;
+                    }
+                }
+                *out << "MEM OP " << i << " " << xed_operand_name(p_xedo) << std::endl;
+                break;
+            default:
+                continue;
         }
     }
 
     if(written) {
-        *out << "WRITE" << std::endl;
         if(insn.has_flag(Instruction::TAINTED_WRITE)) {
+            if(debug) {
+                *out << "DECISION WRITE TAINT" << std::endl;
+            }
+
             verdict = LIKELY;
         } else {
+            if(debug) {
+                *out << "DECISION WRITE NOTAINT" << std::endl;
+            }
+
             verdict = UNLIKELY;
         }
 
@@ -180,20 +218,35 @@ VOID CrashData::examine() {
     }
 
     if(read) {
-        *out << "READ" << std::endl;
         if(insn.has_flag(Instruction::TAINTED_READ)) {
+            if(debug) {
+                *out << "DECISION READ TAINT" << std::endl;
+            }
+
             verdict = LIKELY;
         } else {
+            if(debug) {
+                *out << "DECISION READ NOTAINT" << std::endl;
+            }
+
             verdict = UNLIKELY;
         }
 
         return;
     }
 
+    
     if(insn.has_flag(Instruction::DEP)) {
-        *out << "DEP" << std::endl;
+        if(debug) {
+            *out << "DECISION DEP" << std::endl;
+        }
+
         verdict = LIKELY;
         return;
+    }
+
+    if(debug) {
+        *out << "DECISION UNKNOWN" << std::endl;
     }
 }
 

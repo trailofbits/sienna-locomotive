@@ -530,7 +530,7 @@ dep:
     mov     r8, -1      ; fd
     xor     r9, r9
     syscall
-    mov     rbx, 0xcc
+    mov     rbx, 0x41
     mov     [rax], rbx
     call    rax
     mov     rsp, rbp

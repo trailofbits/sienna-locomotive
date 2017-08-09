@@ -66,9 +66,9 @@ VOID mem_taint_reg(ADDRINT ip, std::string *ptr_disas,
         
         if(tainted) {
             crash_data.insns[ip].add_flag(Instruction::TAINTED_READ);
-            *out << "TAINTED READ AT " << ip << std::endl;
 
             if(debug) {
+                *out << "TAINTED READ AT " << ip << std::endl;
                 *out << "REGm TAINT: " << REG_StringShort(reg) << std::endl;
             }
 
@@ -102,8 +102,10 @@ VOID regs_taint_mem(ADDRINT ip, std::string *ptr_disas, std::list<LEVEL_BASE::RE
     }
 
     if(tainted) {
+        if(debug) {
+            *out << "TAINTED WRITE AT " << ip << std::endl;
+        }
         crash_data.insns[ip].add_flag(Instruction::TAINTED_WRITE);
-        *out << "TAINTED WRITE AT " << ip << std::endl;
         crash_data.mem_taint(ip, ptr_disas, mem, size);
     } else {
         crash_data.mem_untaint(ip, ptr_disas, mem, size);
@@ -167,8 +169,10 @@ VOID handle_indirect(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg, AD
         }
 
         if(!mmapd) {
-            *out << "HINT: POSSIBLE BRANCH OR RET TO NON-EXECUTABLE MEMORY: ";
-            *out << std::hex << target_addr << " at " << ip << std::endl;
+            if(debug) {
+                *out << "HINT: POSSIBLE BRANCH OR RET TO NON-EXECUTABLE MEMORY: ";
+                *out << std::hex << target_addr << " at " << ip << std::endl;
+            }
             crash_data.hint = ip;
             
             if(crash_data.insns.count(ip)) {
@@ -206,7 +210,13 @@ VOID record_call(ADDRINT target, ADDRINT loc) {
 }
 
 BOOL handle_specific(INS ins) {
-    // OPCODE opcode = INS_Opcode(ins);
+    OPCODE opcode = INS_Opcode(ins);
+
+    // NOP
+    if(opcode == 0x1c7) {
+        // skip
+        return true;
+    }
 
     // indirect jump, indirect call
     if(INS_IsIndirectBranchOrCall(ins)) {
@@ -225,7 +235,7 @@ BOOL handle_specific(INS ins) {
     }
 
     // POP
-    if(INS_Opcode(ins) == 0x249) {
+    if(opcode == 0x249) {
         std::list<LEVEL_BASE::REG> *ptr_regs_r = new std::list<LEVEL_BASE::REG>();
         std::list<LEVEL_BASE::REG> *ptr_regs_w = new std::list<LEVEL_BASE::REG>();
 
@@ -254,7 +264,7 @@ BOOL handle_specific(INS ins) {
     }
 
     // XOR
-    if(INS_Opcode(ins) == 0x5e4) { 
+    if(opcode == 0x5e4) { 
         // handle xor a, a
         if(INS_OperandIsReg(ins, 0) && INS_OperandIsReg(ins, 1) && INS_RegR(ins, 0) == INS_RegR(ins, 1)) {
             INS_InsertCall(
@@ -289,17 +299,10 @@ VOID Insn(INS ins, VOID *v) {
     ADDRINT ip = INS_Address(ins);
     
     if(!crash_data.insns.count(ip)) {
-        *out << "CREATING " << ip << std::endl;
         Instruction insn(ip, disas);
         crash_data.insns[ip] = insn;
-    } else {
-        // crash_data.insns[ip].ins = ins;
-        *out << "NOT CREATING " << ip << std::endl;
-    }
+    } 
 
-    if(debug) {
-        *out << "OPCODES: " << disas << " " << INS_Opcode(ins) << std::endl;
-    }
     /*
         Special cases
             xor reg, reg -> clear taint
@@ -324,21 +327,17 @@ VOID Insn(INS ins, VOID *v) {
     }
 
     // TODO: fix exclusion of nop opcode
-    if(INS_MemoryOperandIsRead(ins, 0) && INS_OperandIsReg(ins, 0) && INS_Opcode(ins) != 0x1c7){
-        *out << "READ" << std::endl;
+    if(INS_MemoryOperandIsRead(ins, 0) && INS_OperandIsReg(ins, 0)){
         std::list<LEVEL_BASE::REG> *ptr_regs_r = new std::list<LEVEL_BASE::REG>();
         std::list<LEVEL_BASE::REG> *ptr_regs_w = new std::list<LEVEL_BASE::REG>();
-        *out << __LINE__ << std::endl;
 
         for(uint32_t i=0; i<INS_MaxNumRRegs(ins); i++) {
             ptr_regs_r->push_back(INS_RegR(ins, i));
         }
-        *out << __LINE__ << std::endl;
 
         for(uint32_t i=0; i<INS_MaxNumWRegs(ins); i++) {
             ptr_regs_w->push_back(INS_RegW(ins, i));
         }
-        *out << __LINE__ << std::endl;
 
         INS_InsertCall(
             ins, IPOINT_BEFORE, (AFUNPTR)mem_taint_reg,
@@ -350,7 +349,6 @@ VOID Insn(INS ins, VOID *v) {
             IARG_UINT32, (UINT32)INS_MemoryReadSize(ins),
             IARG_END);
         
-        *out << __LINE__ << std::endl;
 
     } else if(INS_MemoryOperandIsWritten(ins, 0)) {
         if(debug) {
