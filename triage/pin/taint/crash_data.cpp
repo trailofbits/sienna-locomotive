@@ -1,75 +1,241 @@
 #include "crash_data.h"
 
-bool CrashData::reg_is_tainted(LEVEL_BASE::REG reg) {
-    REG fullReg = REG_FullRegName(reg);
-    bool tainted = tainted_regs.find(fullReg) != tainted_regs.end();
-
-    return tainted;
+CrashData::CrashData() : hint(0), out(&std::cout), debug(false), verdict(UNKNOWN) {
+    TaintData *ptr_taint_data = new TaintData(0, 0, 0);
+    taint_data_list.push_back(ptr_taint_data);
 }
 
-VOID CrashData::reg_taint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg) {
-    if(debug) {
-        *out << std::hex << ip << ": " << *ptr_disas << std::endl;
-        *out << "REG TAINT: " << REG_StringShort(reg) << std::endl;
-    }
+VOID CrashData::mem_to_reg(ADDRINT ip, std::string *ptr_disas, 
+        std::list<LEVEL_BASE::REG> *ptr_regs_r, 
+        std::list<LEVEL_BASE::REG> *ptr_regs_w, 
+        ADDRINT mem, UINT32 size) {
+    std::list<TaintData*>::iterator taint_it;
+    for(taint_it = taint_data_list.begin(); taint_it != taint_data_list.end(); taint_it++) {
+        TaintData *ptr_taint_data = *taint_it;
+        if(debug && !ptr_taint_data->id) {
+            *out << "M2R " << ip << " " << *ptr_disas << std::endl;
+        }
 
-    REG fullReg = REG_FullRegName(reg);
-    tainted_regs.insert(fullReg);
+        bool tainted = false;
+        for(UINT32 i=0; i<size; i++) {
+            if(ptr_taint_data->mem_is_tainted(mem+i)) {
+                tainted = true;
+                break;
+            }
+        }
+
+        std::list<LEVEL_BASE::REG>::iterator it;
+        for(it=ptr_regs_r->begin(); it != ptr_regs_r->end() && !tainted; it++) {
+            if(ptr_taint_data->reg_is_tainted(*it)) {
+                tainted = true;
+            }
+        }
+
+        for(it=ptr_regs_w->begin(); it != ptr_regs_w->end(); it++) {
+            REG reg = *it;
+            
+            if(tainted) {
+                if(ptr_taint_data->id == 0) {
+                    insns[ip].add_flag(Instruction::TAINTED_READ);
+                }
+
+                if(debug && !ptr_taint_data->id) {
+                    *out << "TAINTED READ AT " << ip << std::endl;
+                    *out << "REGm TAINT: " << REG_StringShort(reg) << std::endl;
+                }
+
+                ptr_taint_data->reg_taint(ip, ptr_disas, reg);
+
+                if(debug && !ptr_taint_data->id) {
+                    *out << "TAINTED REGS:" << std::endl;
+                    std::set<LEVEL_BASE::REG>::iterator sit;
+                    for(sit=ptr_taint_data->tainted_regs.begin(); sit != ptr_taint_data->tainted_regs.end(); sit++) {
+                        *out << REG_StringShort(*sit) << std::endl;
+                    }
+                }
+                
+            } else {
+                if(debug && !ptr_taint_data->id) {
+                    *out << "REGm UNTAINT: " << REG_StringShort(reg) << std::endl;
+                }
+
+                if(ptr_taint_data->id == 0) {
+                    insns[ip].remove_flag(Instruction::TAINTED_READ);
+                }
+
+                ptr_taint_data->reg_untaint(ip, ptr_disas, reg);
+
+            }
+        }
+    }
 }
 
-VOID CrashData::reg_untaint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg) {
-    if(debug) {
-        *out << std::hex << ip << ": " << *ptr_disas << std::endl;
-        *out << "REG UNTAINT: " << REG_StringShort(reg) << std::endl;
+VOID CrashData::regs_to_regs(ADDRINT ip, std::string *ptr_disas, 
+        std::list<LEVEL_BASE::REG> *ptr_regs_r, 
+        std::list<LEVEL_BASE::REG> *ptr_regs_w) {
+
+    std::list<TaintData*>::iterator taint_it;
+    for(taint_it = taint_data_list.begin(); taint_it != taint_data_list.end(); taint_it++) {
+        TaintData *ptr_taint_data = *taint_it;
+        if(debug && !ptr_taint_data->id) {
+            *out << "R2R " << ip << " " << *ptr_disas << std::endl;
+        }
+
+        std::list<LEVEL_BASE::REG>::iterator reg_it;
+        bool tainted = false;
+
+        for(reg_it = ptr_regs_r->begin(); reg_it != ptr_regs_r->end(); reg_it++) {
+            tainted |= ptr_taint_data->reg_is_tainted(*reg_it);
+        }
+
+        for(reg_it=ptr_regs_w->begin(); reg_it != ptr_regs_w->end(); reg_it++) {
+            if(tainted) {
+                ptr_taint_data->reg_taint(ip, ptr_disas, *reg_it);
+            } else {
+                ptr_taint_data->reg_untaint(ip, ptr_disas, *reg_it);
+            }
+        }
     }
+}
+
+VOID CrashData::regs_to_mem(ADDRINT ip, std::string *ptr_disas, 
+        std::list<LEVEL_BASE::REG> *ptr_regs, 
+        ADDRINT mem, UINT32 size) {
+    std::list<TaintData*>::iterator taint_it;
+    for(taint_it = taint_data_list.begin(); taint_it != taint_data_list.end(); taint_it++) {
+        TaintData *ptr_taint_data = *taint_it;
+
+        if(debug && !ptr_taint_data->id) {
+            *out << "R2M " << ip << " " << *ptr_disas << std::endl;
+            std::set<LEVEL_BASE::REG>::iterator sit;
+            *out << "REGS " << std::endl;
+            for(sit=ptr_taint_data->tainted_regs.begin(); sit != ptr_taint_data->tainted_regs.end(); sit++) {
+                *out << REG_StringShort(*sit) << std::endl;
+            }
+        }
+
+        std::list<LEVEL_BASE::REG>::iterator reg_it;
+        bool tainted = false;
+
+        for(reg_it = ptr_regs->begin(); reg_it != ptr_regs->end(); reg_it++) {
+            tainted |= ptr_taint_data->reg_is_tainted(*reg_it);
+        }
+
+        if(tainted) {
+            if(debug && !ptr_taint_data->id) {
+                *out << "TAINTED WRITE AT " << ip << std::endl;
+            }
+            if(ptr_taint_data->id == 0) {
+                insns[ip].add_flag(Instruction::TAINTED_WRITE);
+            }
+            ptr_taint_data->mem_taint(ip, ptr_disas, mem, size);
+        } else {
+            if(ptr_taint_data->id == 0) {
+                insns[ip].remove_flag(Instruction::TAINTED_WRITE);
+            }
+            ptr_taint_data->mem_untaint(ip, ptr_disas, mem, size);
+        }
+    }
+}
+
+VOID CrashData::taint_indirect(ADDRINT ip, std::string *ptr_disas, 
+        LEVEL_BASE::REG reg, ADDRINT regval, std::map<ADDRINT, ADDRINT> execd) {
+    TaintData *ptr_taint_data = taint_data_list.front();
+
+    if(debug && !ptr_taint_data->id) {
+        *out << "M2R " << ip << " " << *ptr_disas << std::endl;
+    }
+
+    bool mmapd = false;
+    ADDRINT target_addr = regval;
     
-    REG fullReg = REG_FullRegName(reg);
-    std::set<LEVEL_BASE::REG>::iterator it = tainted_regs.find(fullReg);
-    if(it != tainted_regs.end()) {
-        tainted_regs.erase(it);
-    }
-}
-
-bool CrashData::mem_is_tainted(ADDRINT mem) {
-    bool tainted = tainted_addrs.find(mem) != tainted_addrs.end();
-    return tainted;
-}
-
-VOID CrashData::mem_untaint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT32 size) {
-    if(debug) {
-        *out << std::hex << ip << ": " << *ptr_disas << std::endl;
-        *out << "TAINTED REGS:" << std::endl;
-    }
-
-    std::set<LEVEL_BASE::REG>::iterator sit;
-    for(sit=tainted_regs.begin(); sit != tainted_regs.end(); sit++) {
-        *out << REG_StringShort(*sit) << std::endl;
-    }
-    
-    for(UINT32 i=0; i<size; i++) {
-        std::set<ADDRINT>::iterator it = tainted_addrs.find(mem+i);   
-        if(debug) {
-            *out << "MEM UNTAINT: " << mem+i << std::endl;
+    if(ptr_taint_data->reg_is_tainted(reg)) {
+        ptr_taint_data->reg_taint(ip, ptr_disas, REG_INST_PTR);
+        if(insns.count(ip)) {
+            insns[ip].add_flag(Instruction::PC_TAINT);
         }
-
-        if(it != tainted_addrs.end()) {
-            tainted_addrs.erase(it);
+    } else {
+        if(insns.count(ip)) {
+            insns[ip].remove_flag(Instruction::PC_TAINT);
         }
     }
-}
 
-VOID CrashData::mem_taint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT32 size) {
-    if(debug) {
-        *out << std::hex << ip << ": " << *ptr_disas << std::endl;
-    }
-
-    for(UINT32 i=0; i<size; i++) {
-        if(debug) {
-            *out << "MEM TAINT: " << mem+i << std::endl;
+    if(reg == REG_STACK_PTR) {
+        if(ptr_taint_data->mem_is_tainted(regval)) {
+            ptr_taint_data->reg_taint(ip, ptr_disas, REG_INST_PTR);
+            if(insns.count(ip)) {
+                insns[ip].add_flag(Instruction::PC_TAINT);
+            }
+        } else {
+            if(insns.count(ip)) {
+                insns[ip].remove_flag(Instruction::PC_TAINT);
+            }
         }
-        tainted_addrs.insert(mem+i);
+        
+        PIN_SafeCopy(&target_addr, (ADDRINT *)regval, sizeof(ADDRINT));    
+    }
+
+    PIN_LockClient();
+    bool invalid = IMG_FindByAddress(target_addr) == IMG_Invalid();
+    PIN_UnlockClient();
+
+    if(invalid) {
+        std::map<ADDRINT, ADDRINT>::iterator it;
+        for(it=execd.begin(); it != execd.end(); it++) {
+            ADDRINT mmap_start = it->first;
+            ADDRINT mmap_size = it->second;
+            ADDRINT mmap_end = mmap_start + mmap_size;
+            if(target_addr >= mmap_start && target_addr < mmap_end) {
+                mmapd = true;
+                break;
+            }
+        }
+
+        if(!mmapd) {
+            if(debug && !ptr_taint_data->id) {
+                *out << "HINT: POSSIBLE BRANCH OR RET TO NON-EXECUTABLE MEMORY: ";
+                *out << std::hex << target_addr << " at " << ip << std::endl;
+            }
+            hint = ip;
+            
+            if(insns.count(ip)) {
+                insns[ip].add_flag(Instruction::DEP);
+            }
+        } else {
+            if(insns.count(ip)) {
+                insns[ip].remove_flag(Instruction::DEP);
+            }
+        }
     }
 }
+
+VOID CrashData::pointer_add(ADDRINT addr, SIZE size) {
+        TaintData *ptr_taint_data = new TaintData(taint_data_list.size(), addr, size);
+    taint_data_list.push_back(ptr_taint_data);
+}
+
+UINT CrashData::pointer_active_id(ADDRINT addr) {
+    std::list<TaintData*>::iterator it;
+    for(it = taint_data_list.begin(); it != taint_data_list.end(); it++) {
+        TaintData *ptr_taint_data = *it;
+        if(ptr_taint_data->addr == addr) {
+            return ptr_taint_data->id;
+        }
+    }
+    return UINT_MAX;
+}
+
+VOID CrashData::pointer_free(ADDRINT addr) {
+    std::list<TaintData*>::iterator it;
+    for(it = taint_data_list.begin(); it != taint_data_list.end(); it++) {
+        TaintData *ptr_taint_data = *it;
+        if(ptr_taint_data->addr == addr && !ptr_taint_data->freed) {
+            ptr_taint_data->freed = true;
+            break;
+        }
+    }
+}
+
 
 /*** CRASH ANALYSIS ***/
 
@@ -265,6 +431,7 @@ VOID CrashData::dump_info() {
     *out << "\t\"location\": 0x" << std::hex << location << "," << std::endl;
     *out << "\t\"hint\": 0x" << std::hex << hint << "," << std::endl;
 
+    std::set<LEVEL_BASE::REG> tainted_regs = taint_data_list.front()->tainted_regs;
     std::set<LEVEL_BASE::REG>::iterator sit;
     *out << "\t\"tainted_regs\": [" << std::endl;
     for(sit=tainted_regs.begin(); sit != tainted_regs.end(); sit++) {
@@ -273,6 +440,7 @@ VOID CrashData::dump_info() {
     *out << "\t]," << std::endl;
 
     *out << "\t\"tainted_addrs\": [" << std::endl;
+    std::set<ADDRINT> tainted_addrs = taint_data_list.front()->tainted_addrs;
     if(tainted_addrs.size() > 0) {
         std::set<ADDRINT>::iterator mit = tainted_addrs.begin();
         ADDRINT start = *mit;
