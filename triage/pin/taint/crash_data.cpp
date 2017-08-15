@@ -37,6 +37,8 @@ VOID CrashData::mem_to_reg(ADDRINT ip, std::string *ptr_disas,
             if(tainted) {
                 if(ptr_taint_data->id == 0) {
                     insns[ip].add_flag(Instruction::TAINTED_READ);
+                } else if(ptr_taint_data->freed) {
+                    insns[ip].add_flag(Instruction::USE_AFTER_FREE);
                 }
 
                 if(debug && !ptr_taint_data->id) {
@@ -125,9 +127,13 @@ VOID CrashData::regs_to_mem(ADDRINT ip, std::string *ptr_disas,
             if(debug && !ptr_taint_data->id) {
                 *out << "TAINTED WRITE AT " << ip << std::endl;
             }
+
             if(ptr_taint_data->id == 0) {
                 insns[ip].add_flag(Instruction::TAINTED_WRITE);
+            } else if(ptr_taint_data->freed) {
+                insns[ip].add_flag(Instruction::USE_AFTER_FREE);
             }
+
             ptr_taint_data->mem_taint(ip, ptr_disas, mem, size);
         } else {
             if(ptr_taint_data->id == 0) {
@@ -207,6 +213,23 @@ VOID CrashData::taint_indirect(ADDRINT ip, std::string *ptr_disas,
             }
         }
     }
+
+    std::list<TaintData*>::iterator taint_it;
+    for(taint_it = taint_data_list.begin(); taint_it != taint_data_list.end(); taint_it++) {
+        ptr_taint_data = *taint_it;
+
+        if(ptr_taint_data->id == 0) {
+            continue;
+        }
+
+        if(ptr_taint_data->freed) {
+            if(ptr_taint_data->reg_is_tainted(reg) 
+                || ptr_taint_data->mem_is_tainted(regval) 
+                || ptr_taint_data->addr == regval) {
+                insns[ip].add_flag(Instruction::USE_AFTER_FREE);
+            }
+        }
+    }
 }
 
 VOID CrashData::pointer_add(ADDRINT addr, SIZE size) {
@@ -267,6 +290,37 @@ BOOL CrashData::xed_at(xed_decoded_inst_t *xedd, ADDRINT ip) {
     }
 
     return true;
+}
+
+bool CrashData::is_branching(xed_iclass_enum_t insn_iclass) {
+    switch(insn_iclass) {
+        case XED_ICLASS_CALL_FAR:
+        case XED_ICLASS_CALL_NEAR:
+        case XED_ICLASS_JB:
+        case XED_ICLASS_JBE:
+        case XED_ICLASS_JL:
+        case XED_ICLASS_JLE:
+        case XED_ICLASS_JMP:
+        case XED_ICLASS_JMP_FAR:
+        case XED_ICLASS_JNB:
+        case XED_ICLASS_JNBE:
+        case XED_ICLASS_JNL:
+        case XED_ICLASS_JNLE:
+        case XED_ICLASS_JNO:
+        case XED_ICLASS_JNP:
+        case XED_ICLASS_JNS:
+        case XED_ICLASS_JNZ:
+        case XED_ICLASS_JO:
+        case XED_ICLASS_JP:
+        case XED_ICLASS_JRCXZ:
+        case XED_ICLASS_JS:
+        case XED_ICLASS_JZ:
+            return true;
+        default:
+            break;
+    }
+
+    return false;
 }
 
 VOID CrashData::examine() {
@@ -338,6 +392,24 @@ VOID CrashData::examine() {
         *out << "ICLASS " << xed_iclass_enum_t2str(insn_iclass) << std::endl;
     }
 
+    if(insn.has_flag(Instruction::USE_AFTER_FREE)) {
+        *out << "DECISION UAF" << std::endl;
+        verdict = EXPLOITABLE;
+        return;   
+    }
+
+    if(insn.has_flag(Instruction::DEP)) {
+        *out << "DECISION DEP" << std::endl;
+        verdict = EXPLOITABLE;
+        return;
+    }
+
+    if(is_branching(insn_iclass)) {
+        *out << "DECISION BRANCHING" << std::endl;
+        verdict = LIKELY;
+        return;
+    }
+
     xed_inst_t *p_xedi = (xed_inst_t *)xed_decoded_inst_inst(&xedd);
     UINT nops = xed_decoded_inst_noperands(&xedd);
 
@@ -402,15 +474,6 @@ VOID CrashData::examine() {
     }
 
     
-    if(insn.has_flag(Instruction::DEP)) {
-        if(debug) {
-            *out << "DECISION DEP" << std::endl;
-        }
-
-        verdict = LIKELY;
-        return;
-    }
-
     if(debug) {
         *out << "DECISION UNKNOWN" << std::endl;
     }

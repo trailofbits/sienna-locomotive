@@ -64,4 +64,7 @@ public:
     VOID examine();
     VOID dump_info();
     string verdict_string();
+
+private:
+    bool is_branching(xed_iclass_enum_t xedi);
 };

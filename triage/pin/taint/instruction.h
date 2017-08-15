@@ -10,10 +10,9 @@ public:
         NONE            = 0,
         DEP             = 1 << 0,
         USE_AFTER_FREE  = 1 << 1,
-        DOUBLE_FREE     = 1 << 2,
-        PC_TAINT        = 1 << 3,
-        TAINTED_READ    = 1 << 4,
-        TAINTED_WRITE   = 1 << 5,
+        PC_TAINT        = 1 << 2,
+        TAINTED_READ    = 1 << 3,
+        TAINTED_WRITE   = 1 << 4,
     };
 
     Flags flags;

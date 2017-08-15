@@ -360,8 +360,6 @@ double_free_nt:
 ;   rets:   none
     push    rbp
     mov     rbp, rsp
-    push    rbp
-    mov     rbp, rsp
     mov     rsi, aaaa_data
     mov     rdx, aaaa_len
     call    prep_test
@@ -390,16 +388,20 @@ use_after_free_t:
     mov     rdx, aaaa_len
     call    prep_test
     call    read_file_8
-    push    rax
-    mov     rdi, 8
-    call    malloc
-    pop     rbx
-    mov     [rax], rbx
-    push    rax
-    mov     rdi, rax
-    call    free
-    pop     rdi
-    mov     [rdi], rax
+    push    rax             ; store tainted data
+    mov     rdi, 8          
+    call    malloc          ; alloc 8
+    xor     rdx, rdx       
+    mov     [rax], rdx      ; set value stored to 0
+    push    rax             ; store address
+    mov     rdi, rax        
+    call    free            ; free address
+    mov     rdi, 8          
+    call    malloc          ; should get same addr
+    pop     rdi             ; dangling pointer to old alloc
+    pop     rbx             ; tainted data
+    mov     [rax], rbx      ; set to AAAAAAAA
+    call    [rdi]           ; call using dangling pointer
     mov     rsp, rbp
     pop     rbp
     ret
