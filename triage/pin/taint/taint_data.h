@@ -14,8 +14,7 @@ public:
     std::set<ADDRINT> tainted_addrs;
     std::set<LEVEL_BASE::REG> tainted_regs;
 
-    TaintData(UINT id, ADDRINT addr, SIZE size) 
-        : id(id), addr(addr), size(size), freed(false), debug(false), out(&std::cout) { };
+    TaintData(UINT id, ADDRINT addr, SIZE size);
 
     bool reg_is_tainted(LEVEL_BASE::REG reg);
     VOID reg_taint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg);

@@ -2,6 +2,9 @@
 #include "instruction.h"
 #include "taint_data.h"
 
+#include "rapidjson/prettywriter.h"
+#include "rapidjson/stringbuffer.h"
+
 extern "C" {
 #include "xed-interface.h"
 }

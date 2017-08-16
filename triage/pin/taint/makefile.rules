@@ -86,4 +86,4 @@ $(OBJDIR)taint$(OBJ_SUFFIX): taint.cpp
 	$(CXX) $(TOOL_CXXFLAGS) $(COMP_OBJ)$@ $<
 
 $(OBJDIR)taint$(PINTOOL_SUFFIX): $(OBJDIR)instruction$(OBJ_SUFFIX) $(OBJDIR)taint_data$(OBJ_SUFFIX) $(OBJDIR)crash_data$(OBJ_SUFFIX) $(OBJDIR)taint$(OBJ_SUFFIX)
-	$(LINKER) $(TOOL_LDFLAGS_NOOPT) $(LINK_EXE)$@ $(^:%.h=) $(TOOL_LPATHS) $(TOOL_LIBS)
+	$(LINKER) $(TOOL_LDFLAGS_NOOPT) $(LINK_EXE)$@ $(^:%.h=) $(TOOL_LPATHS) $(TOOL_LIBS) 

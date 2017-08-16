@@ -224,8 +224,8 @@ VOID CrashData::taint_indirect(ADDRINT ip, std::string *ptr_disas,
 
         if(ptr_taint_data->freed) {
             if(ptr_taint_data->reg_is_tainted(reg) 
-                || ptr_taint_data->mem_is_tainted(regval) 
-                || ptr_taint_data->addr == regval) {
+                    || ptr_taint_data->addr == regval
+                    || ptr_taint_data->mem_is_tainted(regval)) {
                 insns[ip].add_flag(Instruction::USE_AFTER_FREE);
             }
         }
@@ -487,52 +487,83 @@ string CrashData::verdict_string() {
 /* TODO: json or serialization library */
 
 VOID CrashData::dump_info() {
-    *out << "{" << std::endl;
-    *out << "\t\"verdict\": \"" << verdict_string() << "\"," << std::endl;
+    rapidjson::StringBuffer s;
+    rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(s);
 
-    *out << "\t\"signal\": \"" << signal << "\"," << std::endl;
-    *out << "\t\"location\": 0x" << std::hex << location << "," << std::endl;
-    *out << "\t\"hint\": 0x" << std::hex << hint << "," << std::endl;
+    writer.StartObject();
 
+    writer.Key("verdict");
+    writer.String(verdict_string().c_str());
+    
+    writer.Key("signal");
+    writer.String(signal.c_str());
+
+    writer.Key("location");
+    writer.Uint64(location);
+
+    writer.Key("hint");
+    writer.Uint64(hint);
+
+
+    writer.Key("tainted_regs");
+    writer.StartArray();
     std::set<LEVEL_BASE::REG> tainted_regs = taint_data_list.front()->tainted_regs;
     std::set<LEVEL_BASE::REG>::iterator sit;
-    *out << "\t\"tainted_regs\": [" << std::endl;
     for(sit=tainted_regs.begin(); sit != tainted_regs.end(); sit++) {
-        *out << "\t\t\"" << REG_StringShort(*sit) << "\"," << std::endl;
+        writer.String(REG_StringShort(*sit).c_str());
     }
-    *out << "\t]," << std::endl;
+    writer.EndArray();
 
-    *out << "\t\"tainted_addrs\": [" << std::endl;
+
+    writer.Key("tainted_addrs");
+    writer.StartArray();
     std::set<ADDRINT> tainted_addrs = taint_data_list.front()->tainted_addrs;
     if(tainted_addrs.size() > 0) {
         std::set<ADDRINT>::iterator mit = tainted_addrs.begin();
         ADDRINT start = *mit;
         UINT64 size = 1;
+
         mit++;
         for( ; mit != tainted_addrs.end(); mit++) {
             if(*mit > (start+size)) {
-                *out << "\t\t{ \"start\": 0x" << start << ", \"size\": 0x" << size << " }," << std::endl;
+                writer.StartObject();
+                writer.Key("start");
+                writer.Uint64(start);
+                writer.Key("size");
+                writer.Uint64(size);
+                writer.EndObject();
+
                 start = *mit;
                 size = 0;
             }
             size++;
         }
 
-        *out << "\t\t{ \"start\": 0x" << start << ", \"size\": 0x" << size << " }," << std::endl;
+        writer.StartObject();
+        writer.Key("start");
+        writer.Uint64(start);
+        writer.Key("size");
+        writer.Uint64(size);
+        writer.EndObject();
     }
-    *out << "\t]," << std::endl;
+    writer.EndArray();
 
-    *out << "\t\"last_addrs\": [" << std::endl;
+    writer.Key("last_addrs");
+    writer.StartArray();
     std::list<ADDRINT>::iterator lit;
     for(lit=last_addrs.begin(); lit != last_addrs.end(); lit++) {
-        *out << "\t\t0x" << *lit << "," << std::endl;
+        writer.Uint64(*lit);
     }
-    *out << "\t]," << std::endl;
+    writer.EndArray();
 
-    *out << "\t\"last_call\": [" << std::endl;
+    writer.Key("last_calls");
+    writer.StartArray();
     for(lit=last_calls.begin(); lit != last_calls.end(); lit++) {
-        *out << "\t\t0x" << *lit << "," << std::endl;
+        writer.Uint64(*lit);
     }
-    *out << "\t]," << std::endl;
-    *out << "}" << std::endl;
+    writer.EndArray();
+
+    writer.EndObject();
+
+    *out << s.GetString() << std::endl;
 }
