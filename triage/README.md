@@ -1,29 +1,15 @@
 # Crash Triage
 
-## Manticore
+## Pin
 
-A few changes are needed for concrete execution.
+Copy the `pin/taint` directory to your `/path/to/pin-version/source/tools/`. 
 
-In **manticore/core/state.py** comment out the following asserts (around line 93) - 
+Clone [RapidJSON](https://github.com/miloyip/rapidjson) and copy `include/rapidjson` to your `/path/to/pin-version/source/tools/`. 
 
-```python
-        assert self.platform.constraints is self.constraints
-        assert self.mem.constraints is self.constraints
+Compile with `make`.
+
+Running looks something like:
+
 ```
-
-In **manticore/manticore.py** (`makeLinux`) change the lines - 
-
-```python
-platform = linux.SLinux(program, argv=argv, envp=env,
-                             symbolic_files=symbolic_files)
-```
-
-```python
-platform = linux.Linux(program, argv=argv, envp=env)
-```
-
-In **manticore/core/executor.py** comment out the following line -
-
-```python
-    'smem': len(state.platform.current.memory._symbols),
+./pin -t source/tools/taint/obj-intel64/taint.so -f /tmp/crash_scratch -d -o out.txt -- /path/to/sienna-locomotive/triage/corpus/asm/crashy_mccrashface 13
 ```
