@@ -1,9 +1,11 @@
 #include "taint_data.h"
 
 TaintData::TaintData(UINT id, ADDRINT addr, SIZE size) 
-        : id(id), addr(addr), size(size), freed(false), debug(false), out(&std::cout) { 
-    REG fullReg = REG_FullRegName(LEVEL_BASE::REG_EAX);
-    tainted_regs.insert(fullReg);
+        : id(id), addr(addr), size(size), freed(false), debug(false), out(&std::cout) {
+    if(id != 0) {
+        REG fullReg = REG_FullRegName(LEVEL_BASE::REG_EAX);
+        tainted_regs.insert(fullReg);
+    }
 }
 
 bool TaintData::reg_is_tainted(LEVEL_BASE::REG reg) {
