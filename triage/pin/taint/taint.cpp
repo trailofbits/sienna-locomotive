@@ -471,7 +471,7 @@ VOID Image(IMG img, VOID *v)
 
 // SIGSEGV
 BOOL HandleSIGSEGV(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
-    if(true) {
+    if(debug) {
         *out << PIN_ExceptionToString(pExceptInfo) << std::endl;
     }
     ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
@@ -487,7 +487,7 @@ BOOL HandleSIGSEGV(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const
 
 // SIGTRAP
 BOOL HandleSIGTRAP(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
-    if(true) {
+    if(debug) {
         *out << PIN_ExceptionToString(pExceptInfo) << std::endl;
     }
     ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
@@ -503,7 +503,7 @@ BOOL HandleSIGTRAP(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const
 
 // SIGABRT
 BOOL HandleSIGABRT(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
-    if(true) {
+    if(debug) {
         *out << PIN_ExceptionToString(pExceptInfo) << std::endl;
     }
     ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
@@ -519,7 +519,7 @@ BOOL HandleSIGABRT(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const
 
 // SIGILL
 BOOL HandleSIGILL(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
-    if(true) {
+    if(debug) {
         *out << PIN_ExceptionToString(pExceptInfo) << std::endl;
     }
     ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
@@ -535,7 +535,7 @@ BOOL HandleSIGILL(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const 
 
 // SIGFPE 
 BOOL HandleSIGFPE(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
-    if(true) {
+    if(debug) {
         *out << PIN_ExceptionToString(pExceptInfo) << std::endl;
     }
     ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);

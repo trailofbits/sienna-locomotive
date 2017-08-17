@@ -347,7 +347,7 @@ VOID CrashData::examine() {
             *out << "DECISION SIGFPE" << std::endl;
         }
         
-        verdict = UNLIKELY;
+        verdict = UNEXPLOITABLE;
         return;
     }
 
@@ -430,7 +430,9 @@ VOID CrashData::examine() {
                         written = true;
                     }
                 }
-                *out << "MEM OP " << i << " " << xed_operand_name(p_xedo) << std::endl;
+                if(debug) {
+                    *out << "MEM OP " << i << " " << xed_operand_name(p_xedo) << std::endl;
+                }
                 break;
             default:
                 continue;
@@ -480,7 +482,7 @@ VOID CrashData::examine() {
 }
 
 string CrashData::verdict_string() {
-    string lookup[] = { "EXPLOITABLE", "LIKELY", "UNLIKELY", "UNKNOWN" };
+    string lookup[] = { "EXPLOITABLE", "LIKELY", "UNLIKELY", "UNEXPLOITABLE", "UNKNOWN" };
     return lookup[verdict];
 }
 

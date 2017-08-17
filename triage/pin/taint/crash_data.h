@@ -21,6 +21,7 @@ public:
         EXPLOITABLE,
         LIKELY,
         UNLIKELY,
+        UNEXPLOITABLE,
         UNKNOWN
     };
 
