@@ -71,4 +71,5 @@ public:
 
 private:
     bool is_branching(xed_iclass_enum_t xedi);
+    bool is_ret(xed_iclass_enum_t xedi);
 };

@@ -63,8 +63,9 @@ def initialize_data(lookup):
     Useful if test data is ever lost.
     '''
 
-    scratch_file = os.path.join(config['tmp_dir'], 'crash_test_scratch')
+    scratch_file = os.path.join(config['tmp_dir'], 'crash_scratch')
     out_file = os.path.join(config['tmp_dir'], 'crash_test_out')
+    print lookup
 
     for ea in lookup:
         print ea
@@ -82,11 +83,12 @@ def run_tests(tests, lookup):
     Test loop.
     '''
 
-    scratch_file = os.path.join(config['tmp_dir'], 'crash_test_scratch')
+    scratch_file = os.path.join(config['tmp_dir'], 'crash_scratch')
     out_file = os.path.join(config['tmp_dir'], 'crash_test_out')
     results = {}
 
     for test in tests:
+        print 'RUNNING: %s' % test,
         cmd = [config['pin_path'], '-t', config['tool_path'], '-f', scratch_file]
         cmd += ['--', config['crashy_path'], lookup[test]]
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
@@ -99,22 +101,24 @@ def run_tests(tests, lookup):
         expected = json.loads(expected_contents)
 
         if data['verdict'] != expected['verdict']:
+            print 'FAIL'
             results[test] = False
             continue
 
         if data['signal'] != expected['signal']:
+            print 'FAIL'
             results[test] = False
             continue
 
         if len(set(expected['tainted_regs']) - set(data['tainted_regs'])) != 0:
+            print 'FAIL'
             results[test] = False
             continue
 
+        print 'OK'
         results[test] = True
 
     print results
-
-
 
 def main():
     init()
@@ -122,6 +126,7 @@ def main():
     tests, lookup = get_tests()
     print tests
 
+    # initialize_data(lookup)
     run_tests(tests, lookup)
 
     return 0

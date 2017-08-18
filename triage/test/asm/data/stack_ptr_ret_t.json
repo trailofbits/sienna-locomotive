@@ -1,0 +1,31 @@
+{
+    "verdict": "EXPLOITABLE",
+    "signal": "SIGSEGV",
+    "location": 4196961,
+    "hint": 4196961,
+    "tainted_regs": [
+        "rsp",
+        "rax",
+        "rip"
+    ],
+    "tainted_addrs": [
+        {
+            "start": 140726503257648,
+            "size": 16
+        }
+    ],
+    "last_addrs": [
+        4197431,
+        4196954,
+        4196957,
+        4196958,
+        4196961
+    ],
+    "last_calls": [
+        4197141,
+        4196916,
+        4197259,
+        4197518,
+        4197357
+    ]
+}

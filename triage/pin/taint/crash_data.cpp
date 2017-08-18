@@ -323,6 +323,18 @@ bool CrashData::is_branching(xed_iclass_enum_t insn_iclass) {
     return false;
 }
 
+bool CrashData::is_ret(xed_iclass_enum_t insn_iclass) {
+    switch(insn_iclass) {
+        case XED_ICLASS_RET_FAR:
+        case XED_ICLASS_RET_NEAR:
+            return true;
+        default:
+            break;
+    }
+
+    return false;
+}
+
 VOID CrashData::examine() {
     ADDRINT last_insn = last_addrs.back();
 
@@ -340,6 +352,15 @@ VOID CrashData::examine() {
         if(contains_hint) {
             last_insn = hint;
         }
+    }
+
+    if(signal == "SIGILL") {
+        if(debug) {
+            *out << "DECISION SIGILL" << std::endl;
+        }
+        
+        verdict = EXPLOITABLE;
+        return;
     }
 
     if(signal == "SIGFPE") {
@@ -393,19 +414,43 @@ VOID CrashData::examine() {
     }
 
     if(insn.has_flag(Instruction::USE_AFTER_FREE)) {
-        *out << "DECISION UAF" << std::endl;
+        if(debug) {
+            *out << "DECISION UAF" << std::endl;
+        }
         verdict = EXPLOITABLE;
         return;   
     }
 
-    if(insn.has_flag(Instruction::DEP)) {
-        *out << "DECISION DEP" << std::endl;
-        verdict = EXPLOITABLE;
+    if(is_branching(insn_iclass)) {
+        if(debug) {
+            *out << "DECISION BRANCHING" << std::endl;
+        }
+        if(insn.has_flag(Instruction::PC_TAINT)) {
+            verdict = LIKELY;
+        } else {
+            verdict = UNLIKELY;
+        }
         return;
     }
 
-    if(is_branching(insn_iclass)) {
-        *out << "DECISION BRANCHING" << std::endl;
+    if(is_ret(insn_iclass)) {
+        if(debug) {
+            *out << "DECISION RET" << std::endl;
+        }
+
+        if(taint_data_list.front()->tainted_regs.count(LEVEL_BASE::REG_STACK_PTR)) {
+            verdict = EXPLOITABLE;
+        } else {
+            verdict = LIKELY;
+        }
+
+        return;
+    }
+
+    if(insn.has_flag(Instruction::DEP)) {
+        if(debug) {
+            *out << "DECISION DEP" << std::endl;
+        }
         verdict = LIKELY;
         return;
     }
