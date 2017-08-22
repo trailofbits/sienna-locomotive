@@ -23,4 +23,5 @@ public:
     bool mem_is_tainted(ADDRINT mem);
     VOID mem_taint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT32 size);
     VOID mem_untaint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT32 size);
+    VOID dump();
 };

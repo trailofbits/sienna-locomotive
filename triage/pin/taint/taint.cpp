@@ -53,8 +53,8 @@ VOID regs_taint_regs(ADDRINT ip, std::string *ptr_disas,
     crash_data.regs_to_regs(ip, ptr_disas, ptr_regs_r, ptr_regs_w);
 }
 
-VOID handle_indirect(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg, ADDRINT regval) {
-    crash_data.taint_indirect(ip, ptr_disas, reg, regval, execd);
+VOID handle_indirect(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg, ADDRINT regval, BOOL isRet) {
+    crash_data.taint_indirect(ip, ptr_disas, reg, regval, execd, isRet);
 }
 
 VOID wrap_reg_untaint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg) {
@@ -109,6 +109,7 @@ BOOL handle_specific(INS ins) {
                 IARG_PTR, new std::string(INS_Disassemble(ins)),
                 IARG_UINT32, INS_RegR(ins, 0),
                 IARG_REG_VALUE, INS_RegR(ins, 0),
+                IARG_BOOL, INS_IsRet(ins),
                 IARG_END);
         return true;
     }
@@ -334,7 +335,7 @@ VOID SyscallExit(THREADID thread_id, CONTEXT *ctx, SYSCALL_STANDARD std, void *v
         ADDRINT byteCount = PIN_GetSyscallReturn(ctx, std);
         for(UINT32 i=0; i<byteCount; i++) {
             if(debug) {
-                *out << "MEM TAINT: " << start+i << std::endl;
+                *out << "MEMr TAINT: " << start+i << std::endl;
             }
             crash_data.taint_data_list.front()->tainted_addrs.insert(start+i);
         }

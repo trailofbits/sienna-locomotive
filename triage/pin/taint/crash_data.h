@@ -62,7 +62,7 @@ public:
 
     VOID taint_indirect(ADDRINT ip, std::string *ptr_disas, 
         LEVEL_BASE::REG reg, ADDRINT regval, 
-        std::map<ADDRINT, ADDRINT> execd);
+        std::map<ADDRINT, ADDRINT> execd, BOOL isRet);
 
     BOOL xed_at(xed_decoded_inst_t *xedd, ADDRINT ip);
     VOID examine();

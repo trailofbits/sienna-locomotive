@@ -145,7 +145,7 @@ VOID CrashData::regs_to_mem(ADDRINT ip, std::string *ptr_disas,
 }
 
 VOID CrashData::taint_indirect(ADDRINT ip, std::string *ptr_disas, 
-        LEVEL_BASE::REG reg, ADDRINT regval, std::map<ADDRINT, ADDRINT> execd) {
+        LEVEL_BASE::REG reg, ADDRINT regval, std::map<ADDRINT, ADDRINT> execd, BOOL isRet) {
     TaintData *ptr_taint_data = taint_data_list.front();
 
     if(debug && !ptr_taint_data->id) {
@@ -215,7 +215,7 @@ VOID CrashData::taint_indirect(ADDRINT ip, std::string *ptr_disas,
     }
 
     std::list<TaintData*>::iterator taint_it;
-    for(taint_it = taint_data_list.begin(); taint_it != taint_data_list.end(); taint_it++) {
+    for(taint_it = taint_data_list.begin(); taint_it != taint_data_list.end() && !isRet; taint_it++) {
         ptr_taint_data = *taint_it;
 
         if(ptr_taint_data->id == 0) {
@@ -226,6 +226,12 @@ VOID CrashData::taint_indirect(ADDRINT ip, std::string *ptr_disas,
             if(ptr_taint_data->reg_is_tainted(reg) 
                     || ptr_taint_data->addr == regval
                     || ptr_taint_data->mem_is_tainted(regval)) {
+
+                if(debug) {
+                    *out << "HINT: USE AFTER FREE: ";
+                    *out << std::hex << target_addr << " at " << ip << std::endl;
+                }
+
                 insns[ip].add_flag(Instruction::USE_AFTER_FREE);
             }
         }

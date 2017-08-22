@@ -47,11 +47,12 @@ VOID TaintData::mem_taint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT3
     if(debug && !id) {
         *out << std::hex << ip << " (" << id << "): " << *ptr_disas << std::endl;
     }
+    
+    if(debug && !id) {
+        *out << "MEM TAINT: " << mem << ", " << size << std::endl;
+    }
 
     for(UINT32 i=0; i<size; i++) {
-        if(debug && !id) {
-            *out << "MEM TAINT: " << mem+i << std::endl;
-        }
         tainted_addrs.insert(mem+i);
     }
 }
@@ -66,11 +67,12 @@ VOID TaintData::mem_untaint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UIN
         }
     }
     
+    if(debug && !id) {
+        *out << "MEM UNTAINT: " << mem << ", " << size << std::endl;
+    }
+
     for(UINT32 i=0; i<size; i++) {
         std::set<ADDRINT>::iterator it = tainted_addrs.find(mem+i);   
-        if(debug && !id) {
-            *out << "MEM UNTAINT: " << mem+i << std::endl;
-        }
 
         if(it != tainted_addrs.end()) {
             tainted_addrs.erase(it);
@@ -79,5 +81,34 @@ VOID TaintData::mem_untaint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UIN
     
 }
 
+VOID TaintData::dump() {
+    *out << "ID: " << id << std::endl;
+    *out << "ADDR: " << addr << std::endl;
+    *out << "SIZE: " << size << std::endl;
 
+    *out << "TAINTED REGS: " << std::endl;
+    std::set<LEVEL_BASE::REG>::iterator sit;
+    for(sit=tainted_regs.begin(); sit != tainted_regs.end(); sit++) {
+        *out << REG_StringShort(*sit).c_str() << std::endl;
+    }
+
+    *out << "TAINTED MEMS: " << std::endl;
+    if(tainted_addrs.size() > 0) {
+        std::set<ADDRINT>::iterator mit = tainted_addrs.begin();
+        ADDRINT start = *mit;
+        UINT64 size = 1;
+
+        mit++;
+        for( ; mit != tainted_addrs.end(); mit++) {
+            if(*mit > (start+size)) {
+                *out << "\t" << start << ", " << size << std::endl;
+                start = *mit;
+                size = 0;
+            }
+            size++;
+        }
+
+        *out << "\t" << start << ", " << size << std::endl;
+    }
+}
 
