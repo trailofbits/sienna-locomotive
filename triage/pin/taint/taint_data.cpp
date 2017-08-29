@@ -8,7 +8,7 @@ TaintData::TaintData(UINT id, ADDRINT addr, SIZE size)
     }
 }
 
-bool TaintData::reg_is_tainted(LEVEL_BASE::REG reg) {
+BOOL TaintData::reg_is_tainted(LEVEL_BASE::REG reg) {
     REG fullReg = REG_FullRegName(reg);
     bool tainted = tainted_regs.find(fullReg) != tainted_regs.end();
 
@@ -16,7 +16,7 @@ bool TaintData::reg_is_tainted(LEVEL_BASE::REG reg) {
 }
 
 VOID TaintData::reg_taint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg) {
-    if(debug && !id) {
+    if(debug && id == 0) {
         *out << std::hex << ip << " (" << id << "): " << *ptr_disas << std::endl;
         *out << "REG TAINT: " << REG_StringShort(reg) << std::endl;
     }
@@ -26,7 +26,7 @@ VOID TaintData::reg_taint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG re
 }
 
 VOID TaintData::reg_untaint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg) {
-    if(debug && !id) {
+    if(debug && id == 0) {
         *out << std::hex << ip << " (" << id << "): " << *ptr_disas << std::endl;
         *out << "REG UNTAINT: " << REG_StringShort(reg) << std::endl;
     }
@@ -38,18 +38,18 @@ VOID TaintData::reg_untaint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG 
     }
 }
 
-bool TaintData::mem_is_tainted(ADDRINT mem) {
+BOOL TaintData::mem_is_tainted(ADDRINT mem) {
     bool tainted = tainted_addrs.find(mem) != tainted_addrs.end();
     return tainted;
 }
 
 VOID TaintData::mem_taint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT32 size) {
-    if(debug && !id) {
+    if(debug && id == 0) {
         *out << std::hex << ip << " (" << id << "): " << *ptr_disas << std::endl;
     }
     
-    if(debug && !id) {
-        *out << "MEM TAINT: " << mem << ", " << size << std::endl;
+    if(debug && id == 0) {
+        *out << "MEM TAINT: " << std::hex << mem << ", " << size << std::endl;
     }
 
     for(UINT32 i=0; i<size; i++) {
@@ -58,7 +58,7 @@ VOID TaintData::mem_taint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT3
 }
 
 VOID TaintData::mem_untaint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT32 size) {
-    if(debug && !id) {
+    if(debug && id == 0) {
         *out << std::hex << ip << " (" << id << "): " << *ptr_disas << std::endl;
         *out << "TAINTED REGS:" << std::endl;
         std::set<LEVEL_BASE::REG>::iterator sit;
@@ -67,7 +67,7 @@ VOID TaintData::mem_untaint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UIN
         }
     }
     
-    if(debug && !id) {
+    if(debug && id == 0) {
         *out << "MEM UNTAINT: " << mem << ", " << size << std::endl;
     }
 
@@ -79,6 +79,14 @@ VOID TaintData::mem_untaint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UIN
         }
     }
     
+}
+
+BOOL TaintData::intersects(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT32 size) {
+    if(this->addr <= mem+size && mem <= this->addr+this->size) {
+        return true;
+    }
+    
+    return false;
 }
 
 VOID TaintData::dump() {

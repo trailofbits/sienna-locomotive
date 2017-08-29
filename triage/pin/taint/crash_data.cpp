@@ -12,7 +12,7 @@ VOID CrashData::mem_to_reg(ADDRINT ip, std::string *ptr_disas,
     std::list<TaintData*>::iterator taint_it;
     for(taint_it = taint_data_list.begin(); taint_it != taint_data_list.end(); taint_it++) {
         TaintData *ptr_taint_data = *taint_it;
-        if(debug && !ptr_taint_data->id) {
+        if(debug && ptr_taint_data->id == 0) {
             *out << "M2R " << ip << " " << *ptr_disas << std::endl;
         }
 
@@ -37,18 +37,18 @@ VOID CrashData::mem_to_reg(ADDRINT ip, std::string *ptr_disas,
             if(tainted) {
                 if(ptr_taint_data->id == 0) {
                     insns[ip].add_flag(Instruction::TAINTED_READ);
-                } else if(ptr_taint_data->freed) {
+                } else if(ptr_taint_data->freed && ptr_taint_data->intersects(ip, ptr_disas, mem, size)) {
                     insns[ip].add_flag(Instruction::USE_AFTER_FREE);
                 }
 
-                if(debug && !ptr_taint_data->id) {
-                    *out << "TAINTED READ AT " << ip << std::endl;
+                if(debug && ptr_taint_data->id == 0) {
+                    *out << "TAINTED READ AT " << std::hex << ip << " OF " << mem << std::endl;
                     *out << "REGm TAINT: " << REG_StringShort(reg) << std::endl;
                 }
 
                 ptr_taint_data->reg_taint(ip, ptr_disas, reg);
 
-                if(debug && !ptr_taint_data->id) {
+                if(debug && ptr_taint_data->id == 0) {
                     *out << "TAINTED REGS:" << std::endl;
                     std::set<LEVEL_BASE::REG>::iterator sit;
                     for(sit=ptr_taint_data->tainted_regs.begin(); sit != ptr_taint_data->tainted_regs.end(); sit++) {
@@ -57,7 +57,7 @@ VOID CrashData::mem_to_reg(ADDRINT ip, std::string *ptr_disas,
                 }
                 
             } else {
-                if(debug && !ptr_taint_data->id) {
+                if(debug && ptr_taint_data->id == 0) {
                     *out << "REGm UNTAINT: " << REG_StringShort(reg) << std::endl;
                 }
 
@@ -79,8 +79,8 @@ VOID CrashData::regs_to_regs(ADDRINT ip, std::string *ptr_disas,
     std::list<TaintData*>::iterator taint_it;
     for(taint_it = taint_data_list.begin(); taint_it != taint_data_list.end(); taint_it++) {
         TaintData *ptr_taint_data = *taint_it;
-        if(debug && !ptr_taint_data->id) {
-            *out << "R2R " << ip << " " << *ptr_disas << std::endl;
+        if(debug && ptr_taint_data->id == 0) {
+            *out << "R2R " << std::hex << ip << " " << *ptr_disas << std::endl;
         }
 
         std::list<LEVEL_BASE::REG>::iterator reg_it;
@@ -101,13 +101,12 @@ VOID CrashData::regs_to_regs(ADDRINT ip, std::string *ptr_disas,
 }
 
 VOID CrashData::regs_to_mem(ADDRINT ip, std::string *ptr_disas, 
-        std::list<LEVEL_BASE::REG> *ptr_regs, 
-        ADDRINT mem, UINT32 size) {
+        std::list<LEVEL_BASE::REG> *ptr_regs, ADDRINT mem, UINT32 size) {
     std::list<TaintData*>::iterator taint_it;
     for(taint_it = taint_data_list.begin(); taint_it != taint_data_list.end(); taint_it++) {
         TaintData *ptr_taint_data = *taint_it;
 
-        if(debug && !ptr_taint_data->id) {
+        if(debug && ptr_taint_data->id == 0) {
             *out << "R2M " << ip << " " << *ptr_disas << std::endl;
             std::set<LEVEL_BASE::REG>::iterator sit;
             *out << "REGS " << std::endl;
@@ -124,13 +123,20 @@ VOID CrashData::regs_to_mem(ADDRINT ip, std::string *ptr_disas,
         }
 
         if(tainted) {
-            if(debug && !ptr_taint_data->id) {
-                *out << "TAINTED WRITE AT " << ip << std::endl;
-            }
-
             if(ptr_taint_data->id == 0) {
+                if(debug) {
+                    *out << "TAINTED WRITE AT " << ip << std::endl;
+                }
+
                 insns[ip].add_flag(Instruction::TAINTED_WRITE);
-            } else if(ptr_taint_data->freed) {
+            } else if(ptr_taint_data->freed && ptr_taint_data->intersects(ip, ptr_disas, mem, size)) {
+                if(debug) {
+                    *out << "USE AFTER FREE AT " << ip << std::endl;
+                    *out << "ID: " << ptr_taint_data->id << std::endl;
+                    *out << "ADDR: " << ptr_taint_data->addr << std::endl;
+                    *out << "SIZE: " << ptr_taint_data->size << std::endl;
+                }
+
                 insns[ip].add_flag(Instruction::USE_AFTER_FREE);
             }
 
@@ -148,7 +154,7 @@ VOID CrashData::taint_indirect(ADDRINT ip, std::string *ptr_disas,
         LEVEL_BASE::REG reg, ADDRINT regval, std::map<ADDRINT, ADDRINT> execd, BOOL isRet) {
     TaintData *ptr_taint_data = taint_data_list.front();
 
-    if(debug && !ptr_taint_data->id) {
+    if(debug && ptr_taint_data->id == 0) {
         *out << "M2R " << ip << " " << *ptr_disas << std::endl;
     }
 
@@ -198,7 +204,7 @@ VOID CrashData::taint_indirect(ADDRINT ip, std::string *ptr_disas,
         }
 
         if(!mmapd) {
-            if(debug && !ptr_taint_data->id) {
+            if(debug && ptr_taint_data->id == 0) {
                 *out << "HINT: POSSIBLE BRANCH OR RET TO NON-EXECUTABLE MEMORY: ";
                 *out << std::hex << target_addr << " at " << ip << std::endl;
             }
@@ -223,11 +229,10 @@ VOID CrashData::taint_indirect(ADDRINT ip, std::string *ptr_disas,
         }
 
         if(ptr_taint_data->freed) {
-            if(ptr_taint_data->reg_is_tainted(reg) 
-                    || ptr_taint_data->addr == regval
-                    || ptr_taint_data->mem_is_tainted(regval)) {
+            if((ptr_taint_data->reg_is_tainted(reg) || ptr_taint_data->mem_is_tainted(regval))
+                && ptr_taint_data->intersects(ip, ptr_disas, regval, sizeof(ADDRINT))) {
 
-                if(debug) {
+                if(debug && ptr_taint_data->id == 0) {
                     *out << "HINT: USE AFTER FREE: ";
                     *out << std::hex << target_addr << " at " << ip << std::endl;
                 }
@@ -239,7 +244,8 @@ VOID CrashData::taint_indirect(ADDRINT ip, std::string *ptr_disas,
 }
 
 VOID CrashData::pointer_add(ADDRINT addr, SIZE size) {
-        TaintData *ptr_taint_data = new TaintData(taint_data_list.size(), addr, size);
+    TaintData *ptr_taint_data = new TaintData(taint_data_list.size(), addr, size);
+    ptr_taint_data->debug = debug;
     taint_data_list.push_back(ptr_taint_data);
 }
 
@@ -618,5 +624,7 @@ VOID CrashData::dump_info() {
 
     writer.EndObject();
 
+    *out << "#### BEGIN CRASH DATA JSON" << std::endl;
     *out << s.GetString() << std::endl;
+    *out << "#### END CRASH DATA JSON" << std::endl;
 }
