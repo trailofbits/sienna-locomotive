@@ -70,14 +70,7 @@ VOID wrap_reg_untaint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg) {
 VOID record(ADDRINT addr) {
     crash_data.last_addrs.push_back(addr);
     while(crash_data.last_addrs.size() > RECORD_COUNT) {
-        ADDRINT addr = crash_data.last_addrs.front();
         crash_data.last_addrs.pop_front();
-
-        std::list<ADDRINT> last_addrs = crash_data.last_addrs;
-        bool contains = (std::find(last_addrs.begin(), last_addrs.end(), addr) != last_addrs.end());
-        if(!contains) {
-            crash_data.insns.erase(addr);
-        }
     }
 }
 

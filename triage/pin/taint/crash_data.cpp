@@ -156,14 +156,21 @@ VOID CrashData::taint_indirect(ADDRINT ip, std::string *ptr_disas,
 
     if(debug && ptr_taint_data->id == 0) {
         *out << "M2R " << ip << " " << *ptr_disas << std::endl;
+        *out << "M2R " << REG_StringShort(reg) << std::endl;
     }
 
     bool mmapd = false;
     ADDRINT target_addr = regval;
     
     if(ptr_taint_data->reg_is_tainted(reg)) {
+        if(debug && ptr_taint_data->id == 0) {
+            *out << "REG IS TAINTED" << std::endl;
+        }
         ptr_taint_data->reg_taint(ip, ptr_disas, REG_INST_PTR);
         if(insns.count(ip)) {
+            if(debug && ptr_taint_data->id == 0) {
+                *out << "PC TAINT FLAG" << std::endl;
+            }
             insns[ip].add_flag(Instruction::PC_TAINT);
         }
     } else {
