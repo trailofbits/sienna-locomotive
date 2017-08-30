@@ -8,6 +8,10 @@ VOID Instruction::remove_flag(Flags flag) {
     flags = (Instruction::Flags) (flags & ~flag);
 }
 
+VOID Instruction::clear_flags() {
+    flags = NONE;
+}
+
 BOOL Instruction::has_flag(Flags flag) {
     return flags & flag;
 }

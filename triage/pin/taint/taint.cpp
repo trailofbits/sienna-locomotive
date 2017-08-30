@@ -72,6 +72,8 @@ VOID record(ADDRINT addr) {
     while(crash_data.last_addrs.size() > RECORD_COUNT) {
         crash_data.last_addrs.pop_front();
     }
+
+    crash_data.insns[addr].clear_flags();
 }
 
 VOID record_call(ADDRINT target, ADDRINT loc) {
@@ -185,6 +187,7 @@ VOID Insn(INS ins, VOID *v) {
     INS_InsertCall(ins, 
         IPOINT_BEFORE, (AFUNPTR)record,
         IARG_ADDRINT, INS_Address(ins),
+        IARG_CALL_ORDER, CALL_ORDER_FIRST,
         IARG_END);
     
     if(handle_specific(ins)) {

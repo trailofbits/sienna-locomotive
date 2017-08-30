@@ -38,6 +38,10 @@ VOID CrashData::mem_to_reg(ADDRINT ip, std::string *ptr_disas,
                 if(ptr_taint_data->id == 0) {
                     insns[ip].add_flag(Instruction::TAINTED_READ);
                 } else if(ptr_taint_data->freed && ptr_taint_data->intersects(ip, ptr_disas, mem, size)) {
+                    if(debug) {
+                        *out << "HINT: USE AFTER FREE: (r) ";
+                        *out << mem << " at " << ip << std::endl;
+                    }
                     insns[ip].add_flag(Instruction::USE_AFTER_FREE);
                 }
 
@@ -131,10 +135,8 @@ VOID CrashData::regs_to_mem(ADDRINT ip, std::string *ptr_disas,
                 insns[ip].add_flag(Instruction::TAINTED_WRITE);
             } else if(ptr_taint_data->freed && ptr_taint_data->intersects(ip, ptr_disas, mem, size)) {
                 if(debug) {
-                    *out << "USE AFTER FREE AT " << ip << std::endl;
-                    *out << "ID: " << ptr_taint_data->id << std::endl;
-                    *out << "ADDR: " << ptr_taint_data->addr << std::endl;
-                    *out << "SIZE: " << ptr_taint_data->size << std::endl;
+                    *out << "HINT: USE AFTER FREE: (w) ";
+                    *out << mem << " at " << ip << std::endl;
                 }
 
                 insns[ip].add_flag(Instruction::USE_AFTER_FREE);
@@ -239,8 +241,8 @@ VOID CrashData::taint_indirect(ADDRINT ip, std::string *ptr_disas,
             if((ptr_taint_data->reg_is_tainted(reg) || ptr_taint_data->mem_is_tainted(regval))
                 && ptr_taint_data->intersects(ip, ptr_disas, regval, sizeof(ADDRINT))) {
 
-                if(debug && ptr_taint_data->id == 0) {
-                    *out << "HINT: USE AFTER FREE: ";
+                if(debug) {
+                    *out << "HINT: USE AFTER FREE: (e) ";
                     *out << std::hex << target_addr << " at " << ip << std::endl;
                 }
 

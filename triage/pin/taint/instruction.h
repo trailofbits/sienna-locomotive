@@ -21,6 +21,7 @@ public:
     VOID add_flag(Flags flag);
     VOID remove_flag(Flags flag);
     BOOL has_flag(Flags flag);
+    VOID clear_flags();
 /* 
 address
 mnemonic
