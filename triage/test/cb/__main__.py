@@ -1,3 +1,4 @@
+from .. import shared
 import subprocess
 import yaml
 import json
@@ -22,30 +23,14 @@ def init():
     Validates and initializes paths.
     '''
 
-    global config
-    with open('../config.yaml') as f:
-        config = f.read()
+    shared.init()
 
-    config = yaml.load(config)
-
-    tool_path = os.path.join(config['tool_dir'], 'obj-ia32', 'taint.so')
-    if not os.path.exists(tool_path):
-        print 'ERROR: cannot find taint.so at %s' % tool_path
-        sys.exit(1)
-    config['tool_path'] = tool_path
-
-    pin_path = os.path.join(config['pin_dir'], 'pin')
-    if not os.path.exists(pin_path):
-        print 'ERROR: cannot find pin at %s' % pin_path
-        sys.exit(1)
-    config['pin_path'] = pin_path
-
-    if not os.path.exists(config['cb_dir']):
-        print 'ERROR: cannot find cb-multios at %s' % config['cb_dir']
+    if not os.path.exists(shared.config['cb_dir']):
+        print 'ERROR: cannot find cb-multios at %s' % shared.config['cb_dir']
         sys.exit(1)
 
 def get_path(cb):
-    return os.path.join(config['cb_dir'], 'processed-challenges', cb, 'bin', cb)
+    return os.path.join(shared.config['cb_dir'], 'processed-challenges', cb, 'bin', cb)
 
 def get_tests(tests):
     checked = []
@@ -81,7 +66,7 @@ def run_tests(tests):
         print cb,
         
         cb_path = get_path(cb)
-        cmd = [config['pin_path'], '-t', config['tool_path'], '--', cb_path]
+        cmd = [shared.config['pin_path'], '-t', shared.config['tool_path'], '--', cb_path]
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         
         stdout, _ = proc.communicate(inputs[cb])
@@ -110,5 +95,5 @@ def main():
     run_tests(tests)
 
 if __name__ == '__main__':
-    # main()
-    output_inputs()
+    main()
+    # output_inputs()

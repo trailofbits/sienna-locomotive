@@ -459,7 +459,7 @@ VOID CrashData::examine() {
             *out << "DECISION RET" << std::endl;
         }
 
-        if(taint_data_list.front()->tainted_regs.count(LEVEL_BASE::REG_STACK_PTR)) {
+        if(insn.has_flag(Instruction::PC_TAINT) || taint_data_list.front()->tainted_regs.count(LEVEL_BASE::REG_STACK_PTR)) {
             verdict = EXPLOITABLE;
         } else {
             verdict = LIKELY;
