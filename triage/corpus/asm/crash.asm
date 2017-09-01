@@ -24,14 +24,16 @@ section .data
                 db '13	use_after_free_t',0x0a
                 db '14	xor_clear_nt',0x0a
                 db '15	xor_t',0x0a
-                db '16	pop_t',0x0a
-                db '17	stack_ptr_ret_t',0x0a
-                db '18	div_zero',0x0a
-                db '19	stack_exhaustion',0x0a
-                db '20	break_point',0x0a
-                db '21	dep',0x0a
-                db '22	undefined_insn',0x0a
-                db '23	stack_exec',0x0a
+                db '16	xchg_t',0x0a
+                db '17	xchg_nt',0x0a
+                db '18	pop_t',0x0a
+                db '19	stack_ptr_ret_t',0x0a
+                db '20	div_zero',0x0a
+                db '21	stack_exhaustion',0x0a
+                db '22	break_point',0x0a
+                db '23	dep',0x0a
+                db '24	undefined_insn',0x0a
+                db '25	stack_exec',0x0a
     use_len     equ $-use_err
     ; END USAGE
     tmpfile     db '/tmp/crash_scratch',0x00
@@ -90,20 +92,24 @@ main:
     cmp     rax, 15
     je      test_xor_t
     cmp     rax, 16
-    je      test_pop_t
+    je      test_xchg_t
     cmp     rax, 17
-    je      test_stack_ptr_ret_t
+    je      test_xchg_nt
     cmp     rax, 18
-    je      test_div_zero
+    je      test_pop_t
     cmp     rax, 19
-    je      test_stack_exhaustion
+    je      test_stack_ptr_ret_t
     cmp     rax, 20
-    je      test_break_point
+    je      test_div_zero
     cmp     rax, 21
-    je      test_dep
+    je      test_stack_exhaustion
     cmp     rax, 22
-    je      test_undefined_insn
+    je      test_break_point
     cmp     rax, 23
+    je      test_dep
+    cmp     rax, 24
+    je      test_undefined_insn
+    cmp     rax, 25
     je      test_stack_exec
     xor     rax, rax
     call    show_usage
@@ -157,6 +163,12 @@ test_xor_clear_nt:
     jmp     main_finish
 test_xor_t:
     call    xor_t
+    jmp     main_finish
+test_xchg_t:
+    call    xchg_t
+    jmp     main_finish
+test_xchg_nt:
+    call    xchg_nt
     jmp     main_finish
 test_pop_t:
     call    pop_t
@@ -436,6 +448,44 @@ xor_t:
     call    read_file_8
     xor     rax, rsp
     mov     [rax], rbx
+    mov     rsp, rbp
+    pop     rbp
+    ret
+
+global xchg_t
+xchg_t:
+;   args:   none
+;   rets:   none
+    push    rbp
+    mov     rbp, rsp
+    mov     rdi, tmpfile
+    mov     rsi, aaaa_data
+    mov     rdx, aaaa_len
+    call    prep_test
+    call    read_file_8
+    mov     r8, 0
+    mov     r9, 0
+    xchg    rax, r8
+    mov     [r8], r9
+    mov     rsp, rbp
+    pop     rbp
+    ret
+
+global xchg_nt
+xchg_nt:
+;   args:   none
+;   rets:   none
+    push    rbp
+    mov     rbp, rsp
+    mov     rdi, tmpfile
+    mov     rsi, aaaa_data
+    mov     rdx, aaaa_len
+    call    prep_test
+    call    read_file_8
+    mov     r8, 0
+    mov     r9, 0
+    xchg    rax, r8
+    mov     [rax], r9
     mov     rsp, rbp
     pop     rbp
     ret

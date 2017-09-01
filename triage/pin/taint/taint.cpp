@@ -58,10 +58,36 @@ VOID handle_indirect(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg, AD
 }
 
 VOID wrap_reg_untaint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg) {
+    if(debug) {
+        *out << "UT: " << ip << " " << *ptr_disas << std::endl;
+    }
+
     std::list<TaintData*>::iterator taint_it;
     for(taint_it = crash_data.taint_data_list.begin(); taint_it != crash_data.taint_data_list.end(); taint_it++) {
         TaintData *ptr_taint_data = *taint_it;
         ptr_taint_data->reg_untaint(ip, ptr_disas, reg);
+    }
+}
+
+VOID handle_xchg(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg_a, LEVEL_BASE::REG reg_b) {
+    if(debug) {
+        *out << ip << " " << *ptr_disas << std::endl;
+    }
+
+    std::list<TaintData*>::iterator taint_it;
+    for(taint_it = crash_data.taint_data_list.begin(); taint_it != crash_data.taint_data_list.end(); taint_it++) {
+        TaintData *ptr_taint_data = *taint_it;
+        BOOL tainted_a = ptr_taint_data->reg_is_tainted(reg_a);
+        BOOL tainted_b = ptr_taint_data->reg_is_tainted(reg_b);
+        if(tainted_a ^ tainted_b) {
+            if(tainted_a) {
+                ptr_taint_data->reg_untaint(ip, ptr_disas, reg_a);
+                ptr_taint_data->reg_taint(ip, ptr_disas, reg_b);
+            } else {
+                ptr_taint_data->reg_taint(ip, ptr_disas, reg_a);
+                ptr_taint_data->reg_untaint(ip, ptr_disas, reg_b);
+            }
+        }
     }
 }
 
@@ -152,6 +178,20 @@ BOOL handle_specific(INS ins) {
         } 
 
         return false; 
+    }
+
+    // XCHG
+    if(opcode == 0x5e0) {
+        if(INS_OperandIsReg(ins, 0) && INS_OperandIsReg(ins, 1)) {
+            INS_InsertCall(
+                ins, IPOINT_BEFORE, (AFUNPTR)handle_xchg,
+                IARG_INST_PTR,
+                IARG_PTR, new std::string(INS_Disassemble(ins)),
+                IARG_UINT32, INS_RegR(ins, 0),
+                IARG_UINT32, INS_RegR(ins, 1),
+                IARG_END);
+        }
+        return true;
     }
 
     if(INS_IsCall(ins) && INS_IsDirectBranchOrCall(ins)) {
