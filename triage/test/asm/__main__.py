@@ -10,7 +10,7 @@ def init():
     '''
     Validates and initializes paths.
     '''
-    shared.init()
+    shared.init(64)
 
     crashy_path = os.path.join(shared.config['sienna_dir'], 'triage', 'corpus', 'asm', 'crashy_mccrashface')
     if not os.path.exists(crashy_path):
@@ -117,7 +117,7 @@ def run_tests(tests, lookup):
             results[test] = False
             continue
 
-        if len(set(expected['tainted_regs']) - set(data['tainted_regs'])) != 0:
+        if not shared.regs_contain(expected, data):
             print 'FAIL'
             results[test] = False
             continue
@@ -131,7 +131,6 @@ def run():
     init()
 
     tests, lookup = get_tests()
-    print tests
 
     # initialize_data(lookup)
     run_tests(tests, lookup)

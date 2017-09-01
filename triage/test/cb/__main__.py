@@ -23,11 +23,14 @@ def init():
     Validates and initializes paths.
     '''
 
-    shared.init()
+    shared.init(32)
 
     if not os.path.exists(shared.config['cb_dir']):
         print 'ERROR: cannot find cb-multios at %s' % shared.config['cb_dir']
         sys.exit(1)
+
+    data_path = os.path.join(shared.config['sienna_dir'], 'triage/test/cb/data/')
+    shared.config['data_path'] = data_path
 
 def get_path(cb):
     return os.path.join(shared.config['cb_dir'], 'processed-challenges', cb, 'bin', cb)
@@ -48,6 +51,7 @@ def extract_results(out):
     if len(matches) == 0:
         print 'FAIL'
         print 'ERROR: no json found'
+        print out
         sys.exit(1)
 
     if len(matches) > 1:
@@ -57,25 +61,47 @@ def extract_results(out):
 
     result_str = matches[0]
     results = '\n'.join(result_str.split('\n')[1:-1])
-    # results = json.loads('\n'.join(result_str.split('\n')[1:-1]))
+    results = json.loads('\n'.join(result_str.split('\n')[1:-1]))
 
     return results
 
 def run_tests(tests):
-    for cb in tests:
-        print cb,
+    results = {}
+
+    for test in tests:
+        print test,
         
-        cb_path = get_path(cb)
+        cb_path = get_path(test)
         cmd = [shared.config['pin_path'], '-t', shared.config['tool_path'], '--', cb_path]
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         
-        stdout, _ = proc.communicate(inputs[cb])
-        out = extract_results(stdout)
+        stdout, _ = proc.communicate(inputs[test])
+        data = extract_results(stdout)
+
+        expected_path = os.path.join(shared.config['data_path'], '%s.json' % test)
+        with open(expected_path) as f:
+            expected_contents = f.read()
+        expected = json.loads(expected_contents)
         
-        with open('data/' + cb + '._json', 'w') as f:
-            f.write(out)
-        
+        if data['verdict'] != expected['verdict']:
+            print 'FAIL'
+            results[test] = False
+            continue
+
+        if data['signal'] != expected['signal']:
+            print 'FAIL'
+            results[test] = False
+            continue
+
+        if not shared.regs_match(expected, data):
+            print 'FAIL'
+            results[test] = False
+            continue
+
         print 'OK'
+        results[test] = True
+
+    print results
 
 def output_inputs():
     for cb in inputs:
@@ -96,4 +122,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    # output_inputs()
