@@ -44,27 +44,6 @@ def get_tests(tests):
 
     return checked
 
-def extract_results(out):
-    pattern = '#### BEGIN CRASH DATA JSON\n.*?#### END CRASH DATA JSON'
-    matches = re.findall(pattern, out, re.DOTALL)
-
-    if len(matches) == 0:
-        print 'FAIL'
-        print 'ERROR: no json found'
-        print out
-        sys.exit(1)
-
-    if len(matches) > 1:
-        print 'FAIL'
-        print 'ERROR: multiple json found'
-        sys.exit(1)        
-
-    result_str = matches[0]
-    results = '\n'.join(result_str.split('\n')[1:-1])
-    results = json.loads('\n'.join(result_str.split('\n')[1:-1]))
-
-    return results
-
 def run_tests(tests):
     results = {}
 
@@ -76,7 +55,7 @@ def run_tests(tests):
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         
         stdout, _ = proc.communicate(inputs[test])
-        data = extract_results(stdout)
+        data = shared.extract_results(stdout)
 
         expected_path = os.path.join(shared.config['data_path'], '%s.json' % test)
         with open(expected_path) as f:
