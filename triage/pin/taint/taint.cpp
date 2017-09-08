@@ -207,12 +207,45 @@ BOOL handle_specific(INS ins) {
     return false;
 }
 
+int regd_count = 0;
+
+VOID reg_dump(ADDRINT eax, ADDRINT ecx, ADDRINT edx, ADDRINT ebx, 
+    ADDRINT esp, ADDRINT ebp, ADDRINT esi, ADDRINT edi, ADDRINT eip)
+{
+    *out << "eax\t" << std::hex << eax << std::endl;
+    *out << "ecx\t" << std::hex << ecx << std::endl;
+    *out << "edx\t" << std::hex << edx << std::endl;
+    *out << "ebx\t" << std::hex << ebx << std::endl;
+    *out << "esp\t" << std::hex << esp << std::endl;
+    *out << "ebp\t" << std::hex << ebp << std::endl;
+    *out << "esi\t" << std::hex << esi << std::endl;
+    *out << "edi\t" << std::hex << edi << std::endl;
+    *out << "eip\t" << std::hex << eip << std::endl;
+}
+
+/*
+    INS_InsertCall(ins,
+        IPOINT_BEFORE, (AFUNPTR)reg_dump,
+        IARG_REG_VALUE, LEVEL_BASE::REG_EAX,
+        IARG_REG_VALUE, LEVEL_BASE::REG_ECX,
+        IARG_REG_VALUE, LEVEL_BASE::REG_EDX,
+        IARG_REG_VALUE, LEVEL_BASE::REG_EBX,
+        IARG_REG_VALUE, LEVEL_BASE::REG_ESP,
+        IARG_REG_VALUE, LEVEL_BASE::REG_EBP,
+        IARG_REG_VALUE, LEVEL_BASE::REG_ESI,
+        IARG_REG_VALUE, LEVEL_BASE::REG_EDI,
+        IARG_REG_VALUE, LEVEL_BASE::REG_EIP,
+        IARG_END);
+*/
+
 VOID Insn(INS ins, VOID *v) {
     // pass address, disassembled insn to all insert calls
     string disas = INS_Disassemble(ins);
     
+    // *out << "OPCODE: " << disas << " : " << std::hex << INS_Opcode(ins) << std::endl; 
+
     ADDRINT ip = INS_Address(ins);
-    
+
     if(!crash_data.insns.count(ip)) {
         Instruction insn(ip, disas);
         crash_data.insns[ip] = insn;
@@ -369,11 +402,14 @@ VOID SyscallExit(THREADID thread_id, CONTEXT *ctx, SYSCALL_STANDARD std, void *v
         saveRetOpen = false;
     } else if (saveRetRead) {
         ADDRINT byteCount = PIN_GetSyscallReturn(ctx, std);
-        for(UINT32 i=0; i<byteCount; i++) {
-            if(debug) {
-                *out << "MEMr TAINT: " << start+i << std::endl;
+        if(debug) {
+            *out << "MEMr TAINT: " << start << ": " << byteCount << std::endl;
+        }
+        
+        if(byteCount+1 > byteCount) {
+            for(UINT32 i=0; i<byteCount; i++) {
+                crash_data.taint_data_list.front()->tainted_addrs.insert(start+i);
             }
-            crash_data.taint_data_list.front()->tainted_addrs.insert(start+i);
         }
 
         saveRetRead = false;
