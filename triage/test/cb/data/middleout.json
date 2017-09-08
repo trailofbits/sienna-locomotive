@@ -1,5 +1,5 @@
 {
-    "verdict": "EXPLOITABLE",
+    "score": 100,
     "signal": "SIGSEGV",
     "location": 1633771873,
     "hint": 134535113,

@@ -1,5 +1,5 @@
 {
-    "verdict": "UNLIKELY",
+    "score": 50,
     "signal": "SIGSEGV",
     "location": 4196401,
     "hint": 140235798572730,

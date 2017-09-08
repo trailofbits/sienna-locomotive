@@ -1,8 +1,10 @@
 #include "crash_data.h"
 
-CrashData::CrashData() : hint(0), out(&std::cout), debug(false), verdict(UNKNOWN) {
+CrashData::CrashData() : hint(0), out(&std::cout), debug(false), score(50) {
     TaintData *ptr_taint_data = new TaintData(0, 0, 0);
     taint_data_list.push_back(ptr_taint_data);
+    reason = new std::string;
+    *reason = "unknown";
 }
 
 VOID CrashData::mem_to_reg(ADDRINT ip, std::string *ptr_disas, 
@@ -380,7 +382,8 @@ VOID CrashData::examine() {
             *out << "DECISION SIGILL" << std::endl;
         }
         
-        verdict = EXPLOITABLE;
+        *reason = "illegal instruction";
+        score = 100;
         return;
     }
 
@@ -389,7 +392,8 @@ VOID CrashData::examine() {
             *out << "DECISION SIGFPE" << std::endl;
         }
         
-        verdict = UNEXPLOITABLE;
+        *reason = "floating point exception";
+        score = 0;
         return;
     }
 
@@ -398,7 +402,8 @@ VOID CrashData::examine() {
             *out << "DECISION SIGTRAP" << std::endl;
         }
 
-        verdict = UNLIKELY;
+        *reason = "breakpoint";
+        score = 25;
         return;
     }
 
@@ -407,7 +412,8 @@ VOID CrashData::examine() {
             *out << "DECISION INSN404" << std::endl;
         }
 
-        verdict = LIKELY;
+        *reason = "instruction not found";
+        score = 75;
         return;
     }
     
@@ -425,7 +431,8 @@ VOID CrashData::examine() {
             *out << "DECISION NODECODE" << std::endl;
         }
 
-        verdict = LIKELY;
+        *reason = "undecodable instruction";
+        score = 75;
         return;
     } 
 
@@ -438,7 +445,8 @@ VOID CrashData::examine() {
         if(debug) {
             *out << "DECISION UAF" << std::endl;
         }
-        verdict = EXPLOITABLE;
+        *reason = "use after free";
+        score = 100;
         return;   
     }
 
@@ -447,9 +455,11 @@ VOID CrashData::examine() {
             *out << "DECISION BRANCHING" << std::endl;
         }
         if(insn.has_flag(Instruction::PC_TAINT)) {
-            verdict = LIKELY;
+            *reason = "branching tainted pc";
+            score = 75;
         } else {
-            verdict = UNLIKELY;
+            *reason = "branching";
+            score = 25;
         }
         return;
     }
@@ -460,9 +470,11 @@ VOID CrashData::examine() {
         }
 
         if(insn.has_flag(Instruction::PC_TAINT) || taint_data_list.front()->tainted_regs.count(LEVEL_BASE::REG_STACK_PTR)) {
-            verdict = EXPLOITABLE;
+            score = 100;
+            *reason = "return with taint";
         } else {
-            verdict = LIKELY;
+            *reason = "return";
+            score = 75;
         }
 
         return;
@@ -472,7 +484,9 @@ VOID CrashData::examine() {
         if(debug) {
             *out << "DECISION DEP" << std::endl;
         }
-        verdict = LIKELY;
+        
+        *reason = "data execution prevention";
+        score = 75;
         return;
     }
 
@@ -511,15 +525,21 @@ VOID CrashData::examine() {
                 *out << "DECISION WRITE TAINT" << std::endl;
             }
 
-            verdict = LIKELY;
+            *out << __LINE__ << std::endl;
+            *reason = "write with taint";
+            *out << __LINE__ << std::endl;
+            score = 75;
+            *out << __LINE__ << std::endl;
         } else {
             if(debug) {
                 *out << "DECISION WRITE NOTAINT" << std::endl;
             }
 
-            verdict = UNLIKELY;
+            *reason = "write with no taint";
+            score = 50;
         }
 
+        *out << __LINE__ << std::endl;
         return;
     }
 
@@ -529,13 +549,15 @@ VOID CrashData::examine() {
                 *out << "DECISION READ TAINT" << std::endl;
             }
 
-            verdict = LIKELY;
+            *reason = "read with taint";
+            score = 75;
         } else {
             if(debug) {
                 *out << "DECISION READ NOTAINT" << std::endl;
             }
 
-            verdict = UNLIKELY;
+            *reason = "read with no taint";
+            score = 25;
         }
 
         return;
@@ -545,11 +567,9 @@ VOID CrashData::examine() {
     if(debug) {
         *out << "DECISION UNKNOWN" << std::endl;
     }
-}
 
-string CrashData::verdict_string() {
-    string lookup[] = { "EXPLOITABLE", "LIKELY", "UNLIKELY", "UNEXPLOITABLE", "UNKNOWN" };
-    return lookup[verdict];
+    *reason = "unknown";
+    score = 50;
 }
 
 /* TODO: json or serialization library */
@@ -560,8 +580,11 @@ VOID CrashData::dump_info() {
 
     writer.StartObject();
 
-    writer.Key("verdict");
-    writer.String(verdict_string().c_str());
+    writer.Key("score");
+    writer.Uint(score);
+
+    writer.Key("reason");
+    writer.String(reason->c_str());
     
     writer.Key("signal");
     writer.String(signal.c_str());

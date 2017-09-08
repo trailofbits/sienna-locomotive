@@ -1,5 +1,5 @@
 {
-    "verdict": "EXPLOITABLE",
+    "score": 100,
     "signal": "SIGILL",
     "location": 4197118,
     "hint": 140693079383738,

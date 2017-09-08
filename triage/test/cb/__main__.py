@@ -61,7 +61,7 @@ def run_tests(tests):
             expected_contents = f.read()
         expected = json.loads(expected_contents)
         
-        if data['verdict'] != expected['verdict']:
+        if data['score'] != expected['score']:
             print 'FAIL'
             results[test] = False
             continue

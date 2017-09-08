@@ -1,5 +1,5 @@
 {
-    "verdict": "UNEXPLOITABLE",
+    "score": 0,
     "signal": "SIGFPE",
     "location": 4196976,
     "hint": 139658929659578,

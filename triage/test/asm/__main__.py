@@ -89,7 +89,7 @@ def run_tests(tests, lookup):
             expected_contents = f.read()
         expected = json.loads(expected_contents)
 
-        if data['verdict'] != expected['verdict']:
+        if data['score'] != expected['score']:
             print 'FAIL'
             results[test] = False
             continue

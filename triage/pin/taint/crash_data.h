@@ -14,18 +14,11 @@ extern "C" {
 #include <climits>
 #include <iostream>
 #include <signal.h>
+#include <string>
 
 class CrashData {
 public:
-    enum Verdict {
-        EXPLOITABLE,
-        LIKELY,
-        UNLIKELY,
-        UNEXPLOITABLE,
-        UNKNOWN
-    };
-
-    string signal;
+    std::string signal;
     ADDRINT location;
     ADDRINT hint;
     std::map<ADDRINT, Instruction> insns;
@@ -39,7 +32,8 @@ public:
     std::ostream *out;
     bool debug;
 
-    Verdict verdict;
+    uint32_t score;
+    std::string *reason;
 
     CrashData();
 
@@ -67,7 +61,6 @@ public:
     BOOL xed_at(xed_decoded_inst_t *xedd, ADDRINT ip);
     VOID examine();
     VOID dump_info();
-    string verdict_string();
 
 private:
     bool is_branching(xed_iclass_enum_t xedi);

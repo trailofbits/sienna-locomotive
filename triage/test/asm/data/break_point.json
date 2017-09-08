@@ -1,5 +1,5 @@
 {
-    "verdict": "UNLIKELY",
+    "score": 25,
     "signal": "SIGTRAP",
     "location": 4197004,
     "hint": 139733033012922,
