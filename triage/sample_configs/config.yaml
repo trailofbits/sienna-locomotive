@@ -1,0 +1,18 @@
+pin_dir:
+  /home/taxicat/work/pin-3.2-81205-gcc-linux/
+tool_dir:
+  /home/taxicat/work/pin-3.2-81205-gcc-linux/source/tools/taint/
+sienna_dir:
+  /home/taxicat/work/sienna-locomotive/
+tmp_dir:
+  /tmp/
+path_program: 
+  /home/taxicat/work/sienna-locomotive/triage/corpus/asm/
+program_name:
+  crashy_mccrashface
+program_arch:
+  64
+program_params:
+  - 13
+tainted_file:
+  /tmp/crash_scratch
