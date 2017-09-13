@@ -85,6 +85,7 @@ def extract_results(out):
     return results
 
 def run():
+    print ' '.join(config['cmd'])
     proc = subprocess.Popen(config['cmd'], stdout=subprocess.PIPE)
     out, _ = proc.communicate()
     print extract_results(out)

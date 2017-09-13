@@ -7,12 +7,14 @@ path_sienna:
 path_tmp:
   /tmp/
 path_program: 
-  /home/taxicat/work/sienna-locomotive/triage/corpus/asm/
+  /home/taxicat/work/target/clamav-0.99.2/clamscan/.libs/
 program_name:
-  crashy_mccrashface
+  lt-clamscan
 program_arch:
   64
 program_params:
-  - 13
+  - -d
+  - /home/taxicat/Downloads/fd480db8-cd02-4503-8fc3-fc41f8092097-H.ldb
+  - /home/taxicat/work/target/clamav-0.99.2/clamscan/clamscan
 tainted_file:
-  /tmp/crash_scratch
+  fd480db8-cd02-4503-8fc3-fc41f8092097-H.ldb

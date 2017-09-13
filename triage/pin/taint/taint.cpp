@@ -119,7 +119,7 @@ BOOL handle_specific(INS ins) {
     }
 
     // indirect jump, indirect call
-    if(INS_IsIndirectBranchOrCall(ins)) {
+    if(INS_IsIndirectBranchOrCall(ins) && INS_MaxNumRRegs(ins) > 0) {
         if(debug) {
             *out << "INDIRECT: " << REG_StringShort(INS_RegR(ins, 0)) << std::endl;
         }
