@@ -1,10 +1,10 @@
-pin_dir:
+path_pin:
   /home/taxicat/work/pin-3.2-81205-gcc-linux/
-tool_dir:
+path_tool:
   /home/taxicat/work/pin-3.2-81205-gcc-linux/source/tools/taint/
-sienna_dir:
+path_sienna:
   /home/taxicat/work/sienna-locomotive/
-tmp_dir:
+path_tmp:
   /tmp/
 path_program: 
   /home/taxicat/work/sienna-locomotive/triage/corpus/asm/

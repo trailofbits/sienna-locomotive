@@ -43,13 +43,13 @@ def init(config_path):
 
     config['arch'] = arch
 
-    tool_path = os.path.join(config['tool_dir'], arch_lookup[arch], 'taint.so')
+    tool_path = os.path.join(config['path_tool'], arch_lookup[arch], 'taint.so')
     if not os.path.exists(tool_path):
         print 'ERROR: cannot find taint.so at %s' % tool_path
         sys.exit(1)
     config['tool_path'] = tool_path
 
-    pin_path = os.path.join(config['pin_dir'], 'pin')
+    pin_path = os.path.join(config['path_pin'], 'pin')
     if not os.path.exists(pin_path):
         print 'ERROR: cannot find pin at %s' % pin_path
         sys.exit(1)

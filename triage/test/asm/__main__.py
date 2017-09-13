@@ -12,13 +12,13 @@ def init():
     '''
     shared.init(64)
 
-    crashy_path = os.path.join(shared.config['sienna_dir'], 'triage', 'corpus', 'asm', 'crashy_mccrashface')
+    crashy_path = os.path.join(shared.config['path_sienna'], 'triage', 'corpus', 'asm', 'crashy_mccrashface')
     if not os.path.exists(crashy_path):
         print 'ERROR: cannot find crasy_mccrashface at %s' % crashy_path
         sys.exit(1)
     shared.config['crashy_path'] = crashy_path
 
-    data_path = os.path.join(shared.config['sienna_dir'], 'triage/test/asm/data/')
+    data_path = os.path.join(shared.config['path_sienna'], 'triage/test/asm/data/')
     shared.config['data_path'] = data_path
 
 def get_tests():
@@ -27,8 +27,8 @@ def get_tests():
     tests that we have expected output for (in data/).
     '''
 
-    scratch_file = os.path.join(shared.config['tmp_dir'], 'crash_test_scratch')
-    out_file = os.path.join(shared.config['tmp_dir'], 'crash_test_out')
+    scratch_file = os.path.join(shared.config['path_tmp'], 'crash_test_scratch')
+    out_file = os.path.join(shared.config['path_tmp'], 'crash_test_out')
     cmd = [shared.config['pin_path'], '-t', shared.config['tool_path'], '-f', scratch_file, '--', shared.config['crashy_path']]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
     out, _ = proc.communicate()
@@ -51,8 +51,8 @@ def initialize_data(lookup):
     Useful if test data is ever lost.
     '''
 
-    scratch_file = os.path.join(shared.config['tmp_dir'], 'crash_scratch')
-    out_file = os.path.join(shared.config['tmp_dir'], 'crash_test_out')
+    scratch_file = os.path.join(shared.config['path_tmp'], 'crash_scratch')
+    out_file = os.path.join(shared.config['path_tmp'], 'crash_test_out')
     print lookup
 
     for ea in lookup:
@@ -71,8 +71,8 @@ def run_tests(tests, lookup):
     Test loop.
     '''
 
-    scratch_file = os.path.join(shared.config['tmp_dir'], 'crash_scratch')
-    out_file = os.path.join(shared.config['tmp_dir'], 'crash_test_out')
+    scratch_file = os.path.join(shared.config['path_tmp'], 'crash_scratch')
+    out_file = os.path.join(shared.config['path_tmp'], 'crash_test_out')
     results = {}
 
     for test in tests:

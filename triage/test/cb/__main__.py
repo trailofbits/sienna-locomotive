@@ -24,15 +24,15 @@ def init():
 
     shared.init(32)
 
-    if not os.path.exists(shared.config['cb_dir']):
-        print 'ERROR: cannot find cb-multios at %s' % shared.config['cb_dir']
+    if not os.path.exists(shared.config['path_cb']):
+        print 'ERROR: cannot find cb-multios at %s' % shared.config['path_cb']
         sys.exit(1)
 
-    data_path = os.path.join(shared.config['sienna_dir'], 'triage/test/cb/data/')
+    data_path = os.path.join(shared.config['path_sienna'], 'triage/test/cb/data/')
     shared.config['data_path'] = data_path
 
 def get_path(cb):
-    return os.path.join(shared.config['cb_dir'], 'processed-challenges', cb, 'bin', cb)
+    return os.path.join(shared.config['path_cb'], 'processed-challenges', cb, 'bin', cb)
 
 def get_tests(tests):
     checked = []
