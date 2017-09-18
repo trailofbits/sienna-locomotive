@@ -1,4 +1,5 @@
 #include "pin.H"
+#include "memory_manager.h"
 #include <set>
 #include <iostream>
 
@@ -18,11 +19,13 @@ public:
 
     BOOL reg_is_tainted(LEVEL_BASE::REG reg);
     VOID reg_taint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg);
+    VOID reg_taint(ADDRINT ip, MemoryManager memory_manager, LEVEL_BASE::REG reg);
     VOID reg_untaint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg);
+    VOID reg_untaint(ADDRINT ip, MemoryManager memory_manager, LEVEL_BASE::REG reg);
     
     BOOL mem_is_tainted(ADDRINT mem);
     VOID mem_taint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT32 size);
     VOID mem_untaint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT32 size);
-    BOOL intersects(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT32 size);
+    BOOL intersects(ADDRINT mem, UINT32 size);
     VOID dump();
 };

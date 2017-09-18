@@ -38,6 +38,29 @@ VOID TaintData::reg_untaint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG 
     }
 }
 
+VOID TaintData::reg_taint(ADDRINT ip, MemoryManager memory_manager, LEVEL_BASE::REG reg) {
+    if(debug && id == 0) {
+        *out << std::hex << ip << " (" << id << "): " << memory_manager.disas[ip] << std::endl;
+        *out << "REG TAINT: " << REG_StringShort(reg) << std::endl;
+    }
+
+    REG fullReg = REG_FullRegName(reg);
+    tainted_regs.insert(fullReg);
+}
+
+VOID TaintData::reg_untaint(ADDRINT ip, MemoryManager memory_manager, LEVEL_BASE::REG reg) {
+    if(debug && id == 0) {
+        *out << std::hex << ip << " (" << id << "): " << memory_manager.disas[ip] << std::endl;
+        *out << "REG UNTAINT: " << REG_StringShort(reg) << std::endl;
+    }
+    
+    REG fullReg = REG_FullRegName(reg);
+    std::set<LEVEL_BASE::REG>::iterator it = tainted_regs.find(fullReg);
+    if(it != tainted_regs.end()) {
+        tainted_regs.erase(it);
+    }
+}
+
 BOOL TaintData::mem_is_tainted(ADDRINT mem) {
     bool tainted = tainted_addrs.find(mem) != tainted_addrs.end();
     return tainted;
@@ -81,7 +104,7 @@ VOID TaintData::mem_untaint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UIN
     
 }
 
-BOOL TaintData::intersects(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT32 size) {
+BOOL TaintData::intersects(ADDRINT mem, UINT32 size) {
     if(this->addr <= mem+size && mem <= this->addr+this->size) {
         return true;
     }

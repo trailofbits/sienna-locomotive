@@ -7,15 +7,17 @@ CrashData::CrashData() : hint(0), out(&std::cout), debug(false), score(50) {
     *reason = "unknown";
 }
 
-VOID CrashData::mem_to_reg(ADDRINT ip, std::string *ptr_disas, 
-        std::list<LEVEL_BASE::REG> *ptr_regs_r, 
-        std::list<LEVEL_BASE::REG> *ptr_regs_w, 
-        ADDRINT mem, UINT32 size) {
+VOID CrashData::mem_to_reg(ADDRINT ip, MemoryManager memory_manager, ADDRINT mem, UINT32 size) {
+    std::cout << "IN CALLBACK FOR " << ip << std::endl;
+
+    std::list<LEVEL_BASE::REG> regs_r = memory_manager.regs_r[ip];
+    std::list<LEVEL_BASE::REG> regs_w = memory_manager.regs_w[ip];
+
     std::list<TaintData*>::iterator taint_it;
     for(taint_it = taint_data_list.begin(); taint_it != taint_data_list.end(); taint_it++) {
         TaintData *ptr_taint_data = *taint_it;
         if(debug && ptr_taint_data->id == 0) {
-            *out << "M2R " << ip << " " << *ptr_disas << std::endl;
+            *out << "M2R " << ip << " " << memory_manager.disas[ip] << std::endl;
         }
 
         bool tainted = false;
@@ -27,19 +29,19 @@ VOID CrashData::mem_to_reg(ADDRINT ip, std::string *ptr_disas,
         }
 
         std::list<LEVEL_BASE::REG>::iterator it;
-        for(it=ptr_regs_r->begin(); it != ptr_regs_r->end() && !tainted; it++) {
+        for(it=regs_r.begin(); it != regs_r.end() && !tainted; it++) {
             if(ptr_taint_data->reg_is_tainted(*it)) {
                 tainted = true;
             }
         }
 
-        for(it=ptr_regs_w->begin(); it != ptr_regs_w->end(); it++) {
+        for(it=regs_w.begin(); it != regs_w.end(); it++) {
             REG reg = *it;
             
             if(tainted) {
                 if(ptr_taint_data->id == 0) {
                     insns[ip].add_flag(Instruction::TAINTED_READ);
-                } else if(ptr_taint_data->freed && ptr_taint_data->intersects(ip, ptr_disas, mem, size)) {
+                } else if(ptr_taint_data->freed && ptr_taint_data->intersects(mem, size)) {
                     if(debug) {
                         *out << "HINT: USE AFTER FREE: (r) ";
                         *out << mem << " at " << ip << std::endl;
@@ -52,7 +54,7 @@ VOID CrashData::mem_to_reg(ADDRINT ip, std::string *ptr_disas,
                     *out << "REGm TAINT: " << REG_StringShort(reg) << std::endl;
                 }
 
-                ptr_taint_data->reg_taint(ip, ptr_disas, reg);
+                ptr_taint_data->reg_taint(ip, memory_manager, reg);
 
                 if(debug && ptr_taint_data->id == 0) {
                     *out << "TAINTED REGS:" << std::endl;
@@ -71,7 +73,7 @@ VOID CrashData::mem_to_reg(ADDRINT ip, std::string *ptr_disas,
                     insns[ip].remove_flag(Instruction::TAINTED_READ);
                 }
 
-                ptr_taint_data->reg_untaint(ip, ptr_disas, reg);
+                ptr_taint_data->reg_untaint(ip, memory_manager, reg);
 
             }
         }
@@ -135,7 +137,7 @@ VOID CrashData::regs_to_mem(ADDRINT ip, std::string *ptr_disas,
                 }
 
                 insns[ip].add_flag(Instruction::TAINTED_WRITE);
-            } else if(ptr_taint_data->freed && ptr_taint_data->intersects(ip, ptr_disas, mem, size)) {
+            } else if(ptr_taint_data->freed && ptr_taint_data->intersects(mem, size)) {
                 if(debug) {
                     *out << "HINT: USE AFTER FREE: (w) ";
                     *out << mem << " at " << ip << std::endl;
@@ -241,7 +243,7 @@ VOID CrashData::taint_indirect(ADDRINT ip, std::string *ptr_disas,
 
         if(ptr_taint_data->freed) {
             if((ptr_taint_data->reg_is_tainted(reg) || ptr_taint_data->mem_is_tainted(regval))
-                && ptr_taint_data->intersects(ip, ptr_disas, regval, sizeof(ADDRINT))) {
+                && ptr_taint_data->intersects(regval, sizeof(ADDRINT))) {
 
                 if(debug) {
                     *out << "HINT: USE AFTER FREE: (e) ";

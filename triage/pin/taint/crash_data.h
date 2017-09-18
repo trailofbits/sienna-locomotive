@@ -1,6 +1,7 @@
 #include "pin.H"
 #include "instruction.h"
 #include "taint_data.h"
+#include "memory_manager.h"
 
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
@@ -41,10 +42,7 @@ public:
     UINT pointer_active_id(ADDRINT mem);
     VOID pointer_free(ADDRINT mem);
 
-    VOID mem_to_reg(ADDRINT ip, std::string *ptr_disas, 
-        std::list<LEVEL_BASE::REG> *ptr_regs_r, 
-        std::list<LEVEL_BASE::REG> *ptr_regs_w, 
-        ADDRINT mem, UINT32 size);
+    VOID mem_to_reg(ADDRINT ip, MemoryManager memory_manager, ADDRINT mem, UINT32 size);
 
     VOID regs_to_regs(ADDRINT ip, std::string *ptr_disas, 
         std::list<LEVEL_BASE::REG> *ptr_regs_r, 
