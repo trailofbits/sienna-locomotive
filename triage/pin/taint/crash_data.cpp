@@ -7,17 +7,15 @@ CrashData::CrashData() : hint(0), out(&std::cout), debug(false), score(50) {
     *reason = "unknown";
 }
 
-VOID CrashData::mem_to_reg(ADDRINT ip, MemoryManager memory_manager, ADDRINT mem, UINT32 size) {
-    std::cout << "IN CALLBACK FOR " << ip << std::endl;
-
-    std::list<LEVEL_BASE::REG> regs_r = memory_manager.regs_r[ip];
-    std::list<LEVEL_BASE::REG> regs_w = memory_manager.regs_w[ip];
+VOID CrashData::mem_to_reg(ADDRINT ip, MemoryManager *memory_manager, ADDRINT mem, UINT32 size) {
+    std::list<LEVEL_BASE::REG> regs_r = *memory_manager->regs_r[ip];
+    std::list<LEVEL_BASE::REG> regs_w = *memory_manager->regs_w[ip];
 
     std::list<TaintData*>::iterator taint_it;
     for(taint_it = taint_data_list.begin(); taint_it != taint_data_list.end(); taint_it++) {
         TaintData *ptr_taint_data = *taint_it;
         if(debug && ptr_taint_data->id == 0) {
-            *out << "M2R " << ip << " " << memory_manager.disas[ip] << std::endl;
+            *out << "M2R " << ip << " " << *memory_manager->disas[ip] << std::endl;
         }
 
         bool tainted = false;
@@ -80,42 +78,43 @@ VOID CrashData::mem_to_reg(ADDRINT ip, MemoryManager memory_manager, ADDRINT mem
     }
 }
 
-VOID CrashData::regs_to_regs(ADDRINT ip, std::string *ptr_disas, 
-        std::list<LEVEL_BASE::REG> *ptr_regs_r, 
-        std::list<LEVEL_BASE::REG> *ptr_regs_w) {
+VOID CrashData::regs_to_regs(ADDRINT ip, MemoryManager *memory_manager) {
+    std::list<LEVEL_BASE::REG> regs_r = *memory_manager->regs_r[ip];
+    std::list<LEVEL_BASE::REG> regs_w = *memory_manager->regs_w[ip];
 
     std::list<TaintData*>::iterator taint_it;
     for(taint_it = taint_data_list.begin(); taint_it != taint_data_list.end(); taint_it++) {
         TaintData *ptr_taint_data = *taint_it;
         if(debug && ptr_taint_data->id == 0) {
-            *out << "R2R " << std::hex << ip << " " << *ptr_disas << std::endl;
+            *out << "R2R " << std::hex << ip << " " << *memory_manager->disas[ip] << std::endl;
         }
 
         std::list<LEVEL_BASE::REG>::iterator reg_it;
         bool tainted = false;
 
-        for(reg_it = ptr_regs_r->begin(); reg_it != ptr_regs_r->end(); reg_it++) {
+        for(reg_it = regs_r.begin(); reg_it != regs_r.end(); reg_it++) {
             tainted |= ptr_taint_data->reg_is_tainted(*reg_it);
         }
 
-        for(reg_it=ptr_regs_w->begin(); reg_it != ptr_regs_w->end(); reg_it++) {
+        for(reg_it = regs_w.begin(); reg_it != regs_w.end(); reg_it++) {
             if(tainted) {
-                ptr_taint_data->reg_taint(ip, ptr_disas, *reg_it);
+                ptr_taint_data->reg_taint(ip, memory_manager, *reg_it);
             } else {
-                ptr_taint_data->reg_untaint(ip, ptr_disas, *reg_it);
+                ptr_taint_data->reg_untaint(ip, memory_manager, *reg_it);
             }
         }
     }
 }
 
-VOID CrashData::regs_to_mem(ADDRINT ip, std::string *ptr_disas, 
-        std::list<LEVEL_BASE::REG> *ptr_regs, ADDRINT mem, UINT32 size) {
+VOID CrashData::regs_to_mem(ADDRINT ip, MemoryManager *memory_manager, ADDRINT mem, UINT32 size) {
+    std::list<LEVEL_BASE::REG> regs_r = *memory_manager->regs_r[ip];
+
     std::list<TaintData*>::iterator taint_it;
     for(taint_it = taint_data_list.begin(); taint_it != taint_data_list.end(); taint_it++) {
         TaintData *ptr_taint_data = *taint_it;
 
         if(debug && ptr_taint_data->id == 0) {
-            *out << "R2M " << ip << " " << *ptr_disas << std::endl;
+            *out << "R2M " << ip << " " << *memory_manager->disas[ip] << std::endl;
             std::set<LEVEL_BASE::REG>::iterator sit;
             *out << "REGS " << std::endl;
             for(sit=ptr_taint_data->tainted_regs.begin(); sit != ptr_taint_data->tainted_regs.end(); sit++) {
@@ -126,7 +125,7 @@ VOID CrashData::regs_to_mem(ADDRINT ip, std::string *ptr_disas,
         std::list<LEVEL_BASE::REG>::iterator reg_it;
         bool tainted = false;
 
-        for(reg_it = ptr_regs->begin(); reg_it != ptr_regs->end(); reg_it++) {
+        for(reg_it = regs_r.begin(); reg_it != regs_r.end(); reg_it++) {
             tainted |= ptr_taint_data->reg_is_tainted(*reg_it);
         }
 
@@ -146,22 +145,22 @@ VOID CrashData::regs_to_mem(ADDRINT ip, std::string *ptr_disas,
                 insns[ip].add_flag(Instruction::USE_AFTER_FREE);
             }
 
-            ptr_taint_data->mem_taint(ip, ptr_disas, mem, size);
+            ptr_taint_data->mem_taint(ip, memory_manager, mem, size);
         } else {
             if(ptr_taint_data->id == 0) {
                 insns[ip].remove_flag(Instruction::TAINTED_WRITE);
             }
-            ptr_taint_data->mem_untaint(ip, ptr_disas, mem, size);
+            ptr_taint_data->mem_untaint(ip, memory_manager, mem, size);
         }
     }
 }
 
-VOID CrashData::taint_indirect(ADDRINT ip, std::string *ptr_disas, 
-        LEVEL_BASE::REG reg, ADDRINT regval, std::map<ADDRINT, ADDRINT> execd, BOOL isRet) {
+VOID CrashData::taint_indirect(ADDRINT ip, MemoryManager *memory_manager,
+    LEVEL_BASE::REG reg, ADDRINT regval, std::map<ADDRINT, ADDRINT> execd, BOOL isRet) {
     TaintData *ptr_taint_data = taint_data_list.front();
 
     if(debug && ptr_taint_data->id == 0) {
-        *out << "M2R " << ip << " " << *ptr_disas << std::endl;
+        *out << "M2R " << ip << " " << *memory_manager->disas[ip] << std::endl;
         *out << "M2R " << REG_StringShort(reg) << std::endl;
     }
 
@@ -172,7 +171,7 @@ VOID CrashData::taint_indirect(ADDRINT ip, std::string *ptr_disas,
         if(debug && ptr_taint_data->id == 0) {
             *out << "REG IS TAINTED" << std::endl;
         }
-        ptr_taint_data->reg_taint(ip, ptr_disas, REG_INST_PTR);
+        ptr_taint_data->reg_taint(ip, memory_manager, REG_INST_PTR);
         if(insns.count(ip)) {
             if(debug && ptr_taint_data->id == 0) {
                 *out << "PC TAINT FLAG" << std::endl;
@@ -187,7 +186,7 @@ VOID CrashData::taint_indirect(ADDRINT ip, std::string *ptr_disas,
 
     if(reg == REG_STACK_PTR) {
         if(ptr_taint_data->mem_is_tainted(regval)) {
-            ptr_taint_data->reg_taint(ip, ptr_disas, REG_INST_PTR);
+            ptr_taint_data->reg_taint(ip, memory_manager, REG_INST_PTR);
             if(insns.count(ip)) {
                 insns[ip].add_flag(Instruction::PC_TAINT);
             }

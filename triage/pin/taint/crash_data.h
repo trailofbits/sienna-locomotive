@@ -42,17 +42,11 @@ public:
     UINT pointer_active_id(ADDRINT mem);
     VOID pointer_free(ADDRINT mem);
 
-    VOID mem_to_reg(ADDRINT ip, MemoryManager memory_manager, ADDRINT mem, UINT32 size);
-
-    VOID regs_to_regs(ADDRINT ip, std::string *ptr_disas, 
-        std::list<LEVEL_BASE::REG> *ptr_regs_r, 
-        std::list<LEVEL_BASE::REG> *ptr_regs_w);
-
-    VOID regs_to_mem(ADDRINT ip, std::string *ptr_disas, 
-        std::list<LEVEL_BASE::REG> *ptr_regs, 
-        ADDRINT mem, UINT32 size);
-
-    VOID taint_indirect(ADDRINT ip, std::string *ptr_disas, 
+    VOID mem_to_reg(ADDRINT ip, MemoryManager *memory_manager, ADDRINT mem, UINT32 size);
+    VOID regs_to_regs(ADDRINT ip, MemoryManager *memory_manager);
+    VOID regs_to_mem(ADDRINT ip, MemoryManager *memory_manager, ADDRINT mem, UINT32 size);
+    VOID taint_indirect(ADDRINT ip, 
+        MemoryManager *memory_manager, 
         LEVEL_BASE::REG reg, ADDRINT regval, 
         std::map<ADDRINT, ADDRINT> execd, BOOL isRet);
 

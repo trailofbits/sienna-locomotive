@@ -15,9 +15,9 @@ BOOL TaintData::reg_is_tainted(LEVEL_BASE::REG reg) {
     return tainted;
 }
 
-VOID TaintData::reg_taint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg) {
+VOID TaintData::reg_taint(ADDRINT ip, MemoryManager *memory_manager, LEVEL_BASE::REG reg) {
     if(debug && id == 0) {
-        *out << std::hex << ip << " (" << id << "): " << *ptr_disas << std::endl;
+        *out << std::hex << ip << " (" << id << "): " << memory_manager->disas[ip] << std::endl;
         *out << "REG TAINT: " << REG_StringShort(reg) << std::endl;
     }
 
@@ -25,32 +25,9 @@ VOID TaintData::reg_taint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG re
     tainted_regs.insert(fullReg);
 }
 
-VOID TaintData::reg_untaint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg) {
+VOID TaintData::reg_untaint(ADDRINT ip, MemoryManager *memory_manager, LEVEL_BASE::REG reg) {
     if(debug && id == 0) {
-        *out << std::hex << ip << " (" << id << "): " << *ptr_disas << std::endl;
-        *out << "REG UNTAINT: " << REG_StringShort(reg) << std::endl;
-    }
-    
-    REG fullReg = REG_FullRegName(reg);
-    std::set<LEVEL_BASE::REG>::iterator it = tainted_regs.find(fullReg);
-    if(it != tainted_regs.end()) {
-        tainted_regs.erase(it);
-    }
-}
-
-VOID TaintData::reg_taint(ADDRINT ip, MemoryManager memory_manager, LEVEL_BASE::REG reg) {
-    if(debug && id == 0) {
-        *out << std::hex << ip << " (" << id << "): " << memory_manager.disas[ip] << std::endl;
-        *out << "REG TAINT: " << REG_StringShort(reg) << std::endl;
-    }
-
-    REG fullReg = REG_FullRegName(reg);
-    tainted_regs.insert(fullReg);
-}
-
-VOID TaintData::reg_untaint(ADDRINT ip, MemoryManager memory_manager, LEVEL_BASE::REG reg) {
-    if(debug && id == 0) {
-        *out << std::hex << ip << " (" << id << "): " << memory_manager.disas[ip] << std::endl;
+        *out << std::hex << ip << " (" << id << "): " << memory_manager->disas[ip] << std::endl;
         *out << "REG UNTAINT: " << REG_StringShort(reg) << std::endl;
     }
     
@@ -66,9 +43,9 @@ BOOL TaintData::mem_is_tainted(ADDRINT mem) {
     return tainted;
 }
 
-VOID TaintData::mem_taint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT32 size) {
+VOID TaintData::mem_taint(ADDRINT ip, MemoryManager *memory_manager, ADDRINT mem, UINT32 size) {
     if(debug && id == 0) {
-        *out << std::hex << ip << " (" << id << "): " << *ptr_disas << std::endl;
+        *out << std::hex << ip << " (" << id << "): " << memory_manager->disas[ip] << std::endl;
     }
     
     if(debug && id == 0) {
@@ -80,9 +57,9 @@ VOID TaintData::mem_taint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT3
     }
 }
 
-VOID TaintData::mem_untaint(ADDRINT ip, std::string *ptr_disas, ADDRINT mem, UINT32 size) {
+VOID TaintData::mem_untaint(ADDRINT ip, MemoryManager *memory_manager, ADDRINT mem, UINT32 size) {
     if(debug && id == 0) {
-        *out << std::hex << ip << " (" << id << "): " << *ptr_disas << std::endl;
+        *out << std::hex << ip << " (" << id << "): " << memory_manager->disas[ip] << std::endl;
         *out << "TAINTED REGS:" << std::endl;
         std::set<LEVEL_BASE::REG>::iterator sit;
         for(sit=tainted_regs.begin(); sit != tainted_regs.end(); sit++) {

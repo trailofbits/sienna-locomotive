@@ -1,5 +1,6 @@
 #include "pin.H"
 #include "crash_data.h"
+#include "memory_manager.h"
 
 #include <sys/syscall.h>
 #include <signal.h>
@@ -11,6 +12,7 @@
 #include <map>
 
 CrashData crash_data;
+MemoryManager *memory_manager;
 string fname = "";
 
 // syscall control
@@ -38,40 +40,37 @@ std::ostream *out = &cout;
 
 /*** TAINT ***/
 
-VOID mem_taint_reg(ADDRINT ip, std::string *ptr_disas, 
-        std::list<LEVEL_BASE::REG> *ptr_regs_r, std::list<LEVEL_BASE::REG> *ptr_regs_w, 
-        ADDRINT mem,  UINT32 size) {
-    crash_data.mem_to_reg(ip, ptr_disas, ptr_regs_r, ptr_regs_w, mem, size);
+VOID mem_taint_reg(ADDRINT ip, ADDRINT mem,  UINT32 size) {
+    crash_data.mem_to_reg(ip, memory_manager, mem, size);
 }
 
-VOID regs_taint_mem(ADDRINT ip, std::string *ptr_disas, std::list<LEVEL_BASE::REG> *ptr_regs, ADDRINT mem, UINT32 size) {
-    crash_data.regs_to_mem(ip, ptr_disas, ptr_regs, mem, size);
+VOID regs_taint_mem(ADDRINT ip, ADDRINT mem, UINT32 size) {
+    crash_data.regs_to_mem(ip, memory_manager, mem, size);
 }
 
-VOID regs_taint_regs(ADDRINT ip, std::string *ptr_disas, 
-        std::list<LEVEL_BASE::REG> *ptr_regs_r, std::list<LEVEL_BASE::REG> *ptr_regs_w) {
-    crash_data.regs_to_regs(ip, ptr_disas, ptr_regs_r, ptr_regs_w);
+VOID regs_taint_regs(ADDRINT ip) {
+    crash_data.regs_to_regs(ip, memory_manager);
 }
 
-VOID handle_indirect(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg, ADDRINT regval, BOOL isRet) {
-    crash_data.taint_indirect(ip, ptr_disas, reg, regval, execd, isRet);
+VOID handle_indirect(ADDRINT ip, LEVEL_BASE::REG reg, ADDRINT regval, BOOL isRet) {
+    crash_data.taint_indirect(ip, memory_manager, reg, regval, execd, isRet);
 }
 
-VOID wrap_reg_untaint(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg) {
+VOID wrap_reg_untaint(ADDRINT ip, LEVEL_BASE::REG reg) {
     if(debug) {
-        *out << "UT: " << ip << " " << *ptr_disas << std::endl;
+        *out << "UT: " << ip << " " << *memory_manager->disas[ip] << std::endl;
     }
 
     std::list<TaintData*>::iterator taint_it;
     for(taint_it = crash_data.taint_data_list.begin(); taint_it != crash_data.taint_data_list.end(); taint_it++) {
         TaintData *ptr_taint_data = *taint_it;
-        ptr_taint_data->reg_untaint(ip, ptr_disas, reg);
+        ptr_taint_data->reg_untaint(ip, memory_manager, reg);
     }
 }
 
-VOID handle_xchg(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg_a, LEVEL_BASE::REG reg_b) {
+VOID handle_xchg(ADDRINT ip, LEVEL_BASE::REG reg_a, LEVEL_BASE::REG reg_b) {
     if(debug) {
-        *out << ip << " " << *ptr_disas << std::endl;
+        *out << ip << " " << *memory_manager->disas[ip] << std::endl;
     }
 
     std::list<TaintData*>::iterator taint_it;
@@ -81,11 +80,11 @@ VOID handle_xchg(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg_a, LEVE
         BOOL tainted_b = ptr_taint_data->reg_is_tainted(reg_b);
         if(tainted_a ^ tainted_b) {
             if(tainted_a) {
-                ptr_taint_data->reg_untaint(ip, ptr_disas, reg_a);
-                ptr_taint_data->reg_taint(ip, ptr_disas, reg_b);
+                ptr_taint_data->reg_untaint(ip, memory_manager, reg_a);
+                ptr_taint_data->reg_taint(ip, memory_manager, reg_b);
             } else {
-                ptr_taint_data->reg_taint(ip, ptr_disas, reg_a);
-                ptr_taint_data->reg_untaint(ip, ptr_disas, reg_b);
+                ptr_taint_data->reg_taint(ip, memory_manager, reg_a);
+                ptr_taint_data->reg_untaint(ip, memory_manager, reg_b);
             }
         }
     }
@@ -93,13 +92,15 @@ VOID handle_xchg(ADDRINT ip, std::string *ptr_disas, LEVEL_BASE::REG reg_a, LEVE
 
 /*** INSTRUCTION ***/
 
-VOID record(ADDRINT addr) {
-    crash_data.last_addrs.push_back(addr);
+int hit = 0;
+VOID record(ADDRINT ip) {
+    // *out << std::hex << ip << " " << *memory_manager.disas[ip] << std::endl;
+    crash_data.last_addrs.push_back(ip);
     while(crash_data.last_addrs.size() > RECORD_COUNT) {
         crash_data.last_addrs.pop_front();
     }
 
-    crash_data.insns[addr].clear_flags();
+    crash_data.insns[ip].clear_flags();
 }
 
 VOID record_call(ADDRINT target, ADDRINT loc) {
@@ -127,7 +128,6 @@ BOOL handle_specific(INS ins) {
         INS_InsertCall(
                 ins, IPOINT_BEFORE, (AFUNPTR)handle_indirect,
                 IARG_INST_PTR,
-                IARG_PTR, new std::string(INS_Disassemble(ins)),
                 IARG_UINT32, INS_RegR(ins, 0),
                 IARG_REG_VALUE, INS_RegR(ins, 0),
                 IARG_BOOL, INS_IsRet(ins),
@@ -137,26 +137,11 @@ BOOL handle_specific(INS ins) {
 
     // POP
     if(opcode == 0x249) {
-        std::list<LEVEL_BASE::REG> *ptr_regs_r = new std::list<LEVEL_BASE::REG>();
-        std::list<LEVEL_BASE::REG> *ptr_regs_w = new std::list<LEVEL_BASE::REG>();
-
-        for(uint32_t i=0; i<INS_MaxNumRRegs(ins); i++) {
-            ptr_regs_r->push_back(INS_RegR(ins, i));
-        }
-
-        for(uint32_t i=0; i<INS_MaxNumWRegs(ins); i++) {
-            if(INS_RegW(ins, i) == REG_STACK_PTR)
-                continue; 
-
-            ptr_regs_w->push_back(INS_RegW(ins, i));
-        }
+        memory_manager->add_regs_rw_pop(ins);
 
         INS_InsertCall(
             ins, IPOINT_BEFORE, (AFUNPTR)mem_taint_reg,
             IARG_INST_PTR,
-            IARG_PTR, new std::string(INS_Disassemble(ins)),
-            IARG_PTR, ptr_regs_r,
-            IARG_PTR, ptr_regs_w,
             IARG_MEMORYOP_EA, 0,
             IARG_UINT32, (UINT32)INS_MemoryReadSize(ins),
             IARG_END);
@@ -171,7 +156,6 @@ BOOL handle_specific(INS ins) {
             INS_InsertCall(
                 ins, IPOINT_BEFORE, (AFUNPTR)wrap_reg_untaint,
                 IARG_INST_PTR,
-                IARG_PTR, new std::string(INS_Disassemble(ins)),
                 IARG_UINT32, INS_RegR(ins, 0),
                 IARG_END);
             return true;
@@ -186,7 +170,6 @@ BOOL handle_specific(INS ins) {
             INS_InsertCall(
                 ins, IPOINT_BEFORE, (AFUNPTR)handle_xchg,
                 IARG_INST_PTR,
-                IARG_PTR, new std::string(INS_Disassemble(ins)),
                 IARG_UINT32, INS_RegR(ins, 0),
                 IARG_UINT32, INS_RegR(ins, 1),
                 IARG_END);
@@ -238,30 +221,95 @@ VOID reg_dump(ADDRINT eax, ADDRINT ecx, ADDRINT edx, ADDRINT ebx,
         IARG_END);
 */
 
+VOID reg_dump_64(ADDRINT rax, ADDRINT rcx, ADDRINT rdx, ADDRINT rbx, 
+    ADDRINT rsp, ADDRINT rbp, ADDRINT rsi, ADDRINT rdi, ADDRINT rip,
+    ADDRINT r8, ADDRINT r9, ADDRINT r10, ADDRINT r11, 
+    ADDRINT r12, ADDRINT r13, ADDRINT r14, ADDRINT r15)
+{
+    *out << "rax\t" << std::hex << rax << std::endl;
+    *out << "rcx\t" << std::hex << rcx << std::endl;
+    *out << "rdx\t" << std::hex << rdx << std::endl;
+    *out << "rbx\t" << std::hex << rbx << std::endl;
+    *out << "rsp\t" << std::hex << rsp << std::endl;
+    *out << "rbp\t" << std::hex << rbp << std::endl;
+    *out << "rsi\t" << std::hex << rsi << std::endl;
+    *out << "rdi\t" << std::hex << rdi << std::endl;
+    *out << "rip\t" << std::hex << rip << std::endl;
+    *out << "r8\t" << std::hex << r8 << std::endl;
+    *out << "r9\t" << std::hex << r9 << std::endl;
+    *out << "r10\t" << std::hex << r10 << std::endl;
+    *out << "r11\t" << std::hex << r11 << std::endl;
+    *out << "r12\t" << std::hex << r12 << std::endl;
+    *out << "r13\t" << std::hex << r13 << std::endl;
+    *out << "r14\t" << std::hex << r14 << std::endl;
+    *out << "r15\t" << std::hex << r15 << std::endl;
+}
+
+/*
+    INS_InsertCall(ins,
+        IPOINT_BEFORE, (AFUNPTR)reg_dump_64,
+        IARG_REG_VALUE, LEVEL_BASE::REG_RAX,
+        IARG_REG_VALUE, LEVEL_BASE::REG_RCX,
+        IARG_REG_VALUE, LEVEL_BASE::REG_RDX,
+        IARG_REG_VALUE, LEVEL_BASE::REG_RBX,
+        IARG_REG_VALUE, LEVEL_BASE::REG_RSP,
+        IARG_REG_VALUE, LEVEL_BASE::REG_RBP,
+        IARG_REG_VALUE, LEVEL_BASE::REG_RSI,
+        IARG_REG_VALUE, LEVEL_BASE::REG_RDI,
+        IARG_REG_VALUE, LEVEL_BASE::REG_RIP,
+        IARG_REG_VALUE, LEVEL_BASE::REG_R8,
+        IARG_REG_VALUE, LEVEL_BASE::REG_R9,
+        IARG_REG_VALUE, LEVEL_BASE::REG_R10,
+        IARG_REG_VALUE, LEVEL_BASE::REG_R11,
+        IARG_REG_VALUE, LEVEL_BASE::REG_R12,
+        IARG_REG_VALUE, LEVEL_BASE::REG_R13,
+        IARG_REG_VALUE, LEVEL_BASE::REG_R14,
+        IARG_REG_VALUE, LEVEL_BASE::REG_R15,
+        IARG_END);
+*/
+
+std::set<LEVEL_PINCLIENT::PIN_CALLBACK> callbacks;
 VOID Insn(INS ins, VOID *v) {
     // pass address, disassembled insn to all insert calls
     string disas = INS_Disassemble(ins);
-    
-    // *out << "OPCODE: " << disas << " : " << std::hex << INS_Opcode(ins) << std::endl; 
-
     ADDRINT ip = INS_Address(ins);
+    memory_manager->add_disas(ins);
+
+    // std::cout << "OPCODE: (" << std::hex << ip << ") " << disas << " : " << std::hex << INS_Opcode(ins) << std::endl; 
 
     if(!crash_data.insns.count(ip)) {
         Instruction insn(ip, disas);
         crash_data.insns[ip] = insn;
     } 
-
-    /*
-        Special cases
-            xor reg, reg -> clear taint
-            indirect branches and calls
-    */
     
     INS_InsertCall(ins, 
         IPOINT_BEFORE, (AFUNPTR)record,
-        IARG_ADDRINT, INS_Address(ins),
+        IARG_ADDRINT, ip,
         IARG_CALL_ORDER, CALL_ORDER_FIRST,
         IARG_END);
+
+    // if(disas == "cmp r12d, dword ptr [rip-0x2d2a]") {
+    //     INS_InsertCall(ins,
+    //         IPOINT_BEFORE, (AFUNPTR)reg_dump_64,
+    //         IARG_REG_VALUE, LEVEL_BASE::REG_RAX,
+    //         IARG_REG_VALUE, LEVEL_BASE::REG_RCX,
+    //         IARG_REG_VALUE, LEVEL_BASE::REG_RDX,
+    //         IARG_REG_VALUE, LEVEL_BASE::REG_RBX,
+    //         IARG_REG_VALUE, LEVEL_BASE::REG_RSP,
+    //         IARG_REG_VALUE, LEVEL_BASE::REG_RBP,
+    //         IARG_REG_VALUE, LEVEL_BASE::REG_RSI,
+    //         IARG_REG_VALUE, LEVEL_BASE::REG_RDI,
+    //         IARG_REG_VALUE, LEVEL_BASE::REG_RIP,
+    //         IARG_REG_VALUE, LEVEL_BASE::REG_R8,
+    //         IARG_REG_VALUE, LEVEL_BASE::REG_R9,
+    //         IARG_REG_VALUE, LEVEL_BASE::REG_R10,
+    //         IARG_REG_VALUE, LEVEL_BASE::REG_R11,
+    //         IARG_REG_VALUE, LEVEL_BASE::REG_R12,
+    //         IARG_REG_VALUE, LEVEL_BASE::REG_R13,
+    //         IARG_REG_VALUE, LEVEL_BASE::REG_R14,
+    //         IARG_REG_VALUE, LEVEL_BASE::REG_R15,
+    //         IARG_END);
+    // }
     
     if(handle_specific(ins)) {
         return;
@@ -276,62 +324,32 @@ VOID Insn(INS ins, VOID *v) {
     }
 
     if(INS_MemoryOperandIsRead(ins, 0) && INS_OperandIsReg(ins, 0)){
-        std::list<LEVEL_BASE::REG> *ptr_regs_r = new std::list<LEVEL_BASE::REG>();
-        std::list<LEVEL_BASE::REG> *ptr_regs_w = new std::list<LEVEL_BASE::REG>();
-
-        for(uint32_t i=0; i<INS_MaxNumRRegs(ins); i++) {
-            ptr_regs_r->push_back(INS_RegR(ins, i));
-        }
-
-        for(uint32_t i=0; i<INS_MaxNumWRegs(ins); i++) {
-            ptr_regs_w->push_back(INS_RegW(ins, i));
-        }
+        memory_manager->add_regs_rw(ins);
 
         INS_InsertCall(
             ins, IPOINT_BEFORE, (AFUNPTR)mem_taint_reg,
             IARG_INST_PTR,
-            IARG_PTR, new std::string(INS_Disassemble(ins)),
-            IARG_PTR, ptr_regs_r,
-            IARG_PTR, ptr_regs_w,
             IARG_MEMORYOP_EA, 0,
             IARG_UINT32, (UINT32)INS_MemoryReadSize(ins),
             IARG_END);
         
 
     } else if(INS_MemoryOperandIsWritten(ins, 0)) {
-        std::list<LEVEL_BASE::REG> *ptr_regs = new std::list<LEVEL_BASE::REG>();
-
-        for(uint32_t i=0; i<INS_MaxNumRRegs(ins); i++) {
-            ptr_regs->push_back(INS_RegR(ins, i));
-        }
-
+        memory_manager->add_regs_r(ins);
+        
         INS_InsertCall(
             ins, IPOINT_BEFORE, (AFUNPTR)regs_taint_mem,
             IARG_INST_PTR,
-            IARG_PTR, new std::string(INS_Disassemble(ins)),
-            IARG_PTR, ptr_regs,
             IARG_MEMORYOP_EA, 0,
             IARG_MEMORYWRITE_SIZE,
             IARG_END);
 
     } else if(INS_OperandIsReg(ins, 0)) {
-        std::list<LEVEL_BASE::REG> *ptr_regs_r = new std::list<LEVEL_BASE::REG>();
-        std::list<LEVEL_BASE::REG> *ptr_regs_w = new std::list<LEVEL_BASE::REG>();
-
-        for(uint32_t i=0; i<INS_MaxNumRRegs(ins); i++) {
-            ptr_regs_r->push_back(INS_RegR(ins, i));
-        }
-
-        for(uint32_t i=0; i<INS_MaxNumWRegs(ins); i++) {
-            ptr_regs_w->push_back(INS_RegW(ins, i));
-        }
+        memory_manager->add_regs_rw(ins);
 
         INS_InsertCall(
             ins, IPOINT_BEFORE, (AFUNPTR)regs_taint_regs,
             IARG_INST_PTR,
-            IARG_PTR, new std::string(INS_Disassemble(ins)),
-            IARG_PTR, ptr_regs_r,
-            IARG_PTR, ptr_regs_w,
             IARG_END);
     } else {
         if(debug) {
@@ -622,6 +640,20 @@ BOOL HandleSIGFPE(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const 
     return true;
 }
 
+/*** TRACES ***/
+
+VOID TraceInvalidated(ADDRINT orig_pc, ADDRINT cache_pc, BOOL success) {
+    std::cout << "INVALIDATED " << std::hex << orig_pc << " " << cache_pc << " " << success << std::endl;
+}
+
+VOID TraceInserted(TRACE trace, VOID *v) {
+    // memory_manager.add_trace(trace);
+    // if(memory_manager.trace_lru.size() > 200) {
+    //     std::cout << "FREEING MEMORY!" << std::endl;
+    //     memory_manager.free_memory();
+    // }
+}
+
 /*** MAIN ***/
 
 KNOB<string> KnobOutputFile(
@@ -646,6 +678,8 @@ KNOB<string> KnobTaintFile(
     "File name of taint source");
 
 int main(int argc, char *argv[]) {
+    memory_manager = new MemoryManager();
+
     PIN_Init(argc, argv);
     
     FDLookup[0] = "__STDIN";
@@ -668,6 +702,8 @@ int main(int argc, char *argv[]) {
     INS_AddInstrumentFunction(Insn, 0);
     PIN_AddSyscallEntryFunction(SyscallEntry, 0);
     PIN_AddSyscallExitFunction(SyscallExit, 0);
+    CODECACHE_AddTraceInsertedFunction(TraceInserted, 0);
+    CODECACHE_AddTraceInvalidatedFunction(TraceInvalidated, 0);
     
     PIN_InterceptSignal(SIGSEGV, HandleSIGSEGV, 0);
     PIN_InterceptSignal(SIGTRAP, HandleSIGTRAP, 0);
