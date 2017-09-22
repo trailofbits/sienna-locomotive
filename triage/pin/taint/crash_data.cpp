@@ -733,19 +733,15 @@ VOID CrashData::dump_info() {
     *out << s.GetString() << std::endl;
     *out << "#### END CRASH DATA JSON" << std::endl;
 
-    if(insns[location].has_flag(Instruction::POTENTIAL_UAF)) {
-        *out << "#### POTENTIAL UAF DETECTED - RERUN WITH FLAG: " << std::endl;
-        *out << "-uaf ";
+    string uaf_reason = "use after free";
+    if(insns[location].has_flag(Instruction::POTENTIAL_UAF) && reason->compare(uaf_reason) != 0) {
+        *out << "#### POTENTIAL UAF DETECTED - RERUN WITH FLAG(S): ";
         std::set<UINT64>::iterator potential_uaf_it;
         for(potential_uaf_it = insns[location].potential_uaf_sizes.begin(); 
             potential_uaf_it != insns[location].potential_uaf_sizes.end(); 
             potential_uaf_it++) 
         {
-            if(potential_uaf_it != insns[location].potential_uaf_sizes.begin()) {
-                *out << ",";
-            }
-
-            *out << *potential_uaf_it;
+            *out << "-uaf " << *potential_uaf_it << " ";
         }
         *out << std::endl;
     }

@@ -30,6 +30,9 @@ ADDRINT start;
 string taintFile = "__STDIN";
 std::map<UINT64, string> FDLookup;
 
+// malloc
+std::set<UINT64> uaf_sizes;
+
 std::ostream *out = &cout;
 
 /*** TAINT ***/
@@ -502,7 +505,9 @@ void *malloc_hook(CONTEXT * ctxt, AFUNPTR pf_malloc, size_t size) {
     }
     track_allocation(res, size);
 
-    // crash_data.pointer_add((ADDRINT)res, size);
+    if(uaf_sizes.count(size)) {
+        crash_data.pointer_add((ADDRINT)res, size);
+    }
 
     return res;  
 }
@@ -648,7 +653,7 @@ KNOB<string> KnobTaintFile(
     "__STDIN", 
     "File name of taint source");
 
-KNOB<string> KnobUAF(
+KNOB<UINT64> KnobUAF(
     KNOB_MODE_APPEND,  
     "pintool",
     "uaf", 
@@ -681,8 +686,10 @@ int main(int argc, char *argv[]) {
     PIN_AddSyscallExitFunction(SyscallExit, 0);
     
     IMG_AddInstrumentFunction(Image, 0);
-    string uaf_sizes = KnobUAF.Value();
-    std::cout << "UAF KNOB " << uaf_sizes << std::endl;
+
+    for(UINT32 i = 0; i < KnobUAF.NumberOfValues(); i++) {
+        uaf_sizes.insert(KnobUAF.Value(i));
+    }
     
     PIN_InterceptSignal(SIGSEGV, HandleSIGSEGV, 0);
     PIN_InterceptSignal(SIGTRAP, HandleSIGTRAP, 0);
