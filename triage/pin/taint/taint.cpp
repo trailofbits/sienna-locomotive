@@ -30,26 +30,20 @@ ADDRINT start;
 string taintFile = "__STDIN";
 std::map<UINT64, string> FDLookup;
 
-// malloc
-std::map<VOID *, SIZE> allocd;
-std::map<VOID *, SIZE> freed;
-std::set<VOID *> alloc_set;
-std::set<VOID *> free_set;
-
 std::ostream *out = &cout;
 
 /*** TAINT ***/
 
-VOID mem_taint_reg(ADDRINT ip, ADDRINT mem,  UINT32 size) {
-    crash_data.mem_to_reg(ip, memory_manager, mem, size);
+VOID mem_taint_reg(CONTEXT *ctx, ADDRINT ip, ADDRINT mem,  UINT32 size) {
+    crash_data.mem_to_reg(ctx, ip, memory_manager, mem, size);
 }
 
-VOID regs_taint_mem(ADDRINT ip, ADDRINT mem, UINT32 size) {
-    crash_data.regs_to_mem(ip, memory_manager, mem, size);
+VOID regs_taint_mem(CONTEXT *ctx, ADDRINT ip, ADDRINT mem, UINT32 size) {
+    crash_data.regs_to_mem(ctx, ip, memory_manager, mem, size);
 }
 
-VOID regs_taint_regs(ADDRINT ip) {
-    crash_data.regs_to_regs(ip, memory_manager);
+VOID regs_taint_regs(CONTEXT *ctx, ADDRINT ip) {
+    crash_data.regs_to_regs(ctx, ip, memory_manager);
 }
 
 VOID handle_indirect(ADDRINT ip, LEVEL_BASE::REG reg, ADDRINT regval, BOOL isRet) {
@@ -141,6 +135,7 @@ BOOL handle_specific(INS ins) {
 
         INS_InsertCall(
             ins, IPOINT_BEFORE, (AFUNPTR)mem_taint_reg,
+            IARG_CONTEXT,
             IARG_INST_PTR,
             IARG_MEMORYOP_EA, 0,
             IARG_UINT32, (UINT32)INS_MemoryReadSize(ins),
@@ -328,6 +323,7 @@ VOID Insn(INS ins, VOID *v) {
 
         INS_InsertCall(
             ins, IPOINT_BEFORE, (AFUNPTR)mem_taint_reg,
+            IARG_CONTEXT,
             IARG_INST_PTR,
             IARG_MEMORYOP_EA, 0,
             IARG_UINT32, (UINT32)INS_MemoryReadSize(ins),
@@ -339,6 +335,7 @@ VOID Insn(INS ins, VOID *v) {
         
         INS_InsertCall(
             ins, IPOINT_BEFORE, (AFUNPTR)regs_taint_mem,
+            IARG_CONTEXT,
             IARG_INST_PTR,
             IARG_MEMORYOP_EA, 0,
             IARG_MEMORYWRITE_SIZE,
@@ -349,6 +346,7 @@ VOID Insn(INS ins, VOID *v) {
 
         INS_InsertCall(
             ins, IPOINT_BEFORE, (AFUNPTR)regs_taint_regs,
+            IARG_CONTEXT,
             IARG_INST_PTR,
             IARG_END);
     } else {
@@ -443,34 +441,22 @@ VOID SyscallExit(THREADID thread_id, CONTEXT *ctx, SYSCALL_STANDARD std, void *v
 
 /*** FUNCTION HOOKS ***/
 
-VOID track_free(VOID *addr) {
-    if(freed.find(addr) != freed.end()) {
+VOID track_free(ADDRINT addr) {
+    if(crash_data.alloc_info_map.count(addr) == 0) {
         if(debug) {
-            *out << "OMG DOUBLE FREE" << std::endl;
+            *out << "FREEING UNALLOCD OR UNTRACKED MEM" << std::endl;
         }
         return;
     }
 
-    if(allocd.find(addr) == allocd.end()) {
+    if(crash_data.alloc_info_map[addr].back().free) {
         if(debug) {
-            *out << "OMG FREEING UNALLOCD MEM WUT" << std::endl;
+            *out << "POSSIBLE DOUBLE FREE" << std::endl;
         }
         return;
     }
 
-    SIZE size = allocd[addr];
-    allocd.erase(addr);
-
-    freed[addr] = size;
-
-    for(int i=0; i<size; i++) {
-        uint8_t *calc = (uint8_t *)addr + size;
-        alloc_set.insert(calc);
-        
-        if(alloc_set.find(calc) != alloc_set.end()) {
-            alloc_set.erase(calc);
-        }
-    }
+    crash_data.alloc_info_map[addr].back().free = true;
 }
 
 VOID free_before(ADDRINT ip, ADDRINT retIp, ADDRINT address) {
@@ -479,47 +465,46 @@ VOID free_before(ADDRINT ip, ADDRINT retIp, ADDRINT address) {
     if(debug) {
         *out << "FREE CALLED: " << reinterpret_cast<void*>(address) << " AT " << ip << std::endl;
     }
-    track_free(reinterpret_cast<void*>(address));
+    track_free(address);
 }
 
 VOID track_allocation(VOID *addr, SIZE size) {
-    allocd[addr] = size;
-
-    if(freed.find(addr) != freed.end()) {
-        freed.erase(addr);
-    }
-
-    for(int i=0; i<size; i++) {
-        uint8_t *calc = (uint8_t *)addr + size;
-        alloc_set.insert(calc);
-        
-        if(free_set.find(calc) != free_set.end()) {
-            free_set.erase(calc);
+    if(size > 0x7fffffff) { // (2 << 30) - 1 
+        if(debug) {
+            *out << "ALLOC SIZE TOO LARGE, NOT TRACKING" << std::endl;
         }
+        return;
     }
-    // TODO: 
-        // Add out of bounds for +/- 16 (or alignment) on addr
-        // Check OOB on accesses
+
+    struct AllocInfo alloc_info;
+    alloc_info.size = size;
+    alloc_info.free = false;
+    crash_data.alloc_info_map[(ADDRINT)addr].push_back(alloc_info);
+    for(int i = 0; i < size; i++) {
+        crash_data.alloc_addr_map[(ADDRINT)addr+i].insert((ADDRINT)addr);
+    }
 }
 
 void *malloc_hook(CONTEXT * ctxt, AFUNPTR pf_malloc, size_t size) {
-  void *res;
-  PIN_CallApplicationFunction(
-    ctxt, 
-    PIN_ThreadId(),
-    CALLINGSTD_DEFAULT, 
-    pf_malloc,
-    NULL,
-    PIN_PARG(void *), &res, 
-    PIN_PARG(size_t), size, 
-    PIN_PARG_END());
-  
-  if(debug) {
+    void *res;
+    PIN_CallApplicationFunction(
+        ctxt, 
+        PIN_ThreadId(),
+        CALLINGSTD_DEFAULT, 
+        pf_malloc,
+        NULL,
+        PIN_PARG(void *), &res, 
+        PIN_PARG(size_t), size, 
+        PIN_PARG_END());
+
+    if(debug) {
       *out << "MALLOC CALLED: " << res << ", " << size << std::endl;
-  }
-  track_allocation(res, size);
-  crash_data.pointer_add((ADDRINT)res, size);
-  return res;  
+    }
+    track_allocation(res, size);
+
+    // crash_data.pointer_add((ADDRINT)res, size);
+
+    return res;  
 }
 
 VOID Image(IMG img, VOID *v)
@@ -640,20 +625,6 @@ BOOL HandleSIGFPE(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const 
     return true;
 }
 
-/*** TRACES ***/
-
-VOID TraceInvalidated(ADDRINT orig_pc, ADDRINT cache_pc, BOOL success) {
-    std::cout << "INVALIDATED " << std::hex << orig_pc << " " << cache_pc << " " << success << std::endl;
-}
-
-VOID TraceInserted(TRACE trace, VOID *v) {
-    // memory_manager.add_trace(trace);
-    // if(memory_manager.trace_lru.size() > 200) {
-    //     std::cout << "FREEING MEMORY!" << std::endl;
-    //     memory_manager.free_memory();
-    // }
-}
-
 /*** MAIN ***/
 
 KNOB<string> KnobOutputFile(
@@ -677,6 +648,13 @@ KNOB<string> KnobTaintFile(
     "__STDIN", 
     "File name of taint source");
 
+KNOB<string> KnobUAF(
+    KNOB_MODE_APPEND,  
+    "pintool",
+    "uaf", 
+    "", 
+    "Use after free detection");
+
 int main(int argc, char *argv[]) {
     memory_manager = new MemoryManager();
 
@@ -698,12 +676,13 @@ int main(int argc, char *argv[]) {
     taintFile = KnobTaintFile.Value();
 
     PIN_InitSymbols();
-    IMG_AddInstrumentFunction(Image, 0);
     INS_AddInstrumentFunction(Insn, 0);
     PIN_AddSyscallEntryFunction(SyscallEntry, 0);
     PIN_AddSyscallExitFunction(SyscallExit, 0);
-    CODECACHE_AddTraceInsertedFunction(TraceInserted, 0);
-    CODECACHE_AddTraceInvalidatedFunction(TraceInvalidated, 0);
+    
+    IMG_AddInstrumentFunction(Image, 0);
+    string uaf_sizes = KnobUAF.Value();
+    std::cout << "UAF KNOB " << uaf_sizes << std::endl;
     
     PIN_InterceptSignal(SIGSEGV, HandleSIGSEGV, 0);
     PIN_InterceptSignal(SIGTRAP, HandleSIGTRAP, 0);

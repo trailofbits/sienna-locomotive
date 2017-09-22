@@ -6,6 +6,7 @@ BOOL MemoryManager::has_insn(ADDRINT insn_addr) {
 
 VOID MemoryManager::add_trace(TRACE trace) {
     ADDRINT trace_addr = TRACE_Address(trace);
+    trace_lru.push_back(trace_addr);
 
     for(BBL bbl = TRACE_BblHead(trace); BBL_Valid(bbl); bbl = BBL_Next(bbl)) {
         for(INS ins = BBL_InsHead(bbl); INS_Valid(ins); ins = INS_Next(ins)) {

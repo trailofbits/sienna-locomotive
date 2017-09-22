@@ -8,7 +8,7 @@
 #ifndef MEM_MGR
 #define MEM_MGR
 
-#define LRU_TARGET_SIZE 100
+#define LRU_TARGET_SIZE 500
 
 class MemoryManager {
 public:

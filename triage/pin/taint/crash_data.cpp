@@ -7,9 +7,23 @@ CrashData::CrashData() : hint(0), out(&std::cout), debug(false), score(50) {
     *reason = "unknown";
 }
 
-VOID CrashData::mem_to_reg(ADDRINT ip, MemoryManager *memory_manager, ADDRINT mem, UINT32 size) {
+VOID CrashData::mem_to_reg(CONTEXT *ctx, ADDRINT ip, MemoryManager *memory_manager, ADDRINT mem, UINT32 size) {
     std::list<LEVEL_BASE::REG> regs_r = *memory_manager->regs_r[ip];
     std::list<LEVEL_BASE::REG> regs_w = *memory_manager->regs_w[ip];
+
+    std::set<ADDRINT>::iterator alloc_addr_it;
+    for(alloc_addr_it = alloc_addr_map[mem].begin(); alloc_addr_it != alloc_addr_map[mem].end(); alloc_addr_it++) {
+        std::list<struct AllocInfo>::iterator alloc_info_it;
+        for(alloc_info_it = alloc_info_map[*alloc_addr_it].begin(); 
+            alloc_info_it != alloc_info_map[*alloc_addr_it].end(); 
+            alloc_info_it++) 
+        {
+            if((*alloc_info_it).free) {
+                insns[ip].add_flag(Instruction::POTENTIAL_UAF);
+                insns[ip].potential_uaf_sizes.insert((*alloc_info_it).size);
+            }
+        }
+    }
 
     std::list<TaintData*>::iterator taint_it;
     for(taint_it = taint_data_list.begin(); taint_it != taint_data_list.end(); taint_it++) {
@@ -29,7 +43,11 @@ VOID CrashData::mem_to_reg(ADDRINT ip, MemoryManager *memory_manager, ADDRINT me
         std::list<LEVEL_BASE::REG>::iterator it;
         for(it=regs_r.begin(); it != regs_r.end() && !tainted; it++) {
             if(ptr_taint_data->reg_is_tainted(*it)) {
-                tainted = true;
+                if(ptr_taint_data->id == 0) {
+                    tainted = true;
+                } else if(REG_is_gr(*it) && ptr_taint_data->intersects(PIN_GetContextReg(ctx, *it), 1)) {
+                    tainted = true;
+                }
             }
         }
 
@@ -56,7 +74,7 @@ VOID CrashData::mem_to_reg(ADDRINT ip, MemoryManager *memory_manager, ADDRINT me
 
                 if(debug && ptr_taint_data->id == 0) {
                     *out << "TAINTED REGS:" << std::endl;
-                    std::set<LEVEL_BASE::REG>::iterator sit;
+                    set<LEVEL_BASE::REG>::iterator sit;
                     for(sit=ptr_taint_data->tainted_regs.begin(); sit != ptr_taint_data->tainted_regs.end(); sit++) {
                         *out << REG_StringShort(*sit) << std::endl;
                     }
@@ -78,7 +96,7 @@ VOID CrashData::mem_to_reg(ADDRINT ip, MemoryManager *memory_manager, ADDRINT me
     }
 }
 
-VOID CrashData::regs_to_regs(ADDRINT ip, MemoryManager *memory_manager) {
+VOID CrashData::regs_to_regs(CONTEXT *ctx, ADDRINT ip, MemoryManager *memory_manager) {
     std::list<LEVEL_BASE::REG> regs_r = *memory_manager->regs_r[ip];
     std::list<LEVEL_BASE::REG> regs_w = *memory_manager->regs_w[ip];
 
@@ -93,7 +111,15 @@ VOID CrashData::regs_to_regs(ADDRINT ip, MemoryManager *memory_manager) {
         bool tainted = false;
 
         for(reg_it = regs_r.begin(); reg_it != regs_r.end(); reg_it++) {
-            tainted |= ptr_taint_data->reg_is_tainted(*reg_it);
+            if(ptr_taint_data->reg_is_tainted(*reg_it)) {
+                if(ptr_taint_data->id == 0) {
+                    tainted = true;
+                    break;
+                } else if(REG_is_gr(*reg_it) && ptr_taint_data->intersects(PIN_GetContextReg(ctx, *reg_it), 1)) {
+                    tainted = true;
+                    break;
+                }
+            }
         }
 
         for(reg_it = regs_w.begin(); reg_it != regs_w.end(); reg_it++) {
@@ -106,8 +132,27 @@ VOID CrashData::regs_to_regs(ADDRINT ip, MemoryManager *memory_manager) {
     }
 }
 
-VOID CrashData::regs_to_mem(ADDRINT ip, MemoryManager *memory_manager, ADDRINT mem, UINT32 size) {
+VOID CrashData::regs_to_mem(CONTEXT *ctx, ADDRINT ip, MemoryManager *memory_manager, ADDRINT mem, UINT32 size) {
     std::list<LEVEL_BASE::REG> regs_r = *memory_manager->regs_r[ip];
+
+    for(UINT32 i = 0; i < size; i++) {
+        std::set<ADDRINT>::iterator alloc_addr_it;
+        for(alloc_addr_it = alloc_addr_map[mem+size].begin(); 
+            alloc_addr_it != alloc_addr_map[mem+size].end(); 
+            alloc_addr_it++) 
+        {
+            std::list<struct AllocInfo>::iterator alloc_info_it;
+            for(alloc_info_it = alloc_info_map[*alloc_addr_it].begin(); 
+                alloc_info_it != alloc_info_map[*alloc_addr_it].end(); 
+                alloc_info_it++) 
+            {
+                if((*alloc_info_it).free) {
+                    insns[ip].add_flag(Instruction::POTENTIAL_UAF);
+                    insns[ip].potential_uaf_sizes.insert((*alloc_info_it).size);
+                }
+            }
+        }
+    }
 
     std::list<TaintData*>::iterator taint_it;
     for(taint_it = taint_data_list.begin(); taint_it != taint_data_list.end(); taint_it++) {
@@ -115,7 +160,7 @@ VOID CrashData::regs_to_mem(ADDRINT ip, MemoryManager *memory_manager, ADDRINT m
 
         if(debug && ptr_taint_data->id == 0) {
             *out << "R2M " << ip << " " << *memory_manager->disas[ip] << std::endl;
-            std::set<LEVEL_BASE::REG>::iterator sit;
+            set<LEVEL_BASE::REG>::iterator sit;
             *out << "REGS " << std::endl;
             for(sit=ptr_taint_data->tainted_regs.begin(); sit != ptr_taint_data->tainted_regs.end(); sit++) {
                 *out << REG_StringShort(*sit) << std::endl;
@@ -126,7 +171,15 @@ VOID CrashData::regs_to_mem(ADDRINT ip, MemoryManager *memory_manager, ADDRINT m
         bool tainted = false;
 
         for(reg_it = regs_r.begin(); reg_it != regs_r.end(); reg_it++) {
-            tainted |= ptr_taint_data->reg_is_tainted(*reg_it);
+            if(ptr_taint_data->reg_is_tainted(*reg_it)) {
+                if(ptr_taint_data->id == 0) {
+                    tainted = true;
+                    break;
+                } else if(REG_is_gr(*reg_it) && ptr_taint_data->intersects(PIN_GetContextReg(ctx, *reg_it), 1)) {
+                    tainted = true;
+                    break;
+                }
+            }
         }
 
         if(tainted) {
@@ -232,6 +285,23 @@ VOID CrashData::taint_indirect(ADDRINT ip, MemoryManager *memory_manager,
         }
     }
 
+    std::set<ADDRINT>::iterator alloc_addr_it;
+    for(alloc_addr_it = alloc_addr_map[target_addr].begin(); 
+        alloc_addr_it != alloc_addr_map[target_addr].end(); 
+        alloc_addr_it++) 
+    {
+        std::list<struct AllocInfo>::iterator alloc_info_it;
+        for(alloc_info_it = alloc_info_map[*alloc_addr_it].begin(); 
+            alloc_info_it != alloc_info_map[*alloc_addr_it].end(); 
+            alloc_info_it++) 
+        {
+            if((*alloc_info_it).free) {
+                insns[ip].add_flag(Instruction::POTENTIAL_UAF);
+                insns[ip].potential_uaf_sizes.insert((*alloc_info_it).size);
+            }
+        }
+    }
+
     std::list<TaintData*>::iterator taint_it;
     for(taint_it = taint_data_list.begin(); taint_it != taint_data_list.end() && !isRet; taint_it++) {
         ptr_taint_data = *taint_it;
@@ -242,7 +312,7 @@ VOID CrashData::taint_indirect(ADDRINT ip, MemoryManager *memory_manager,
 
         if(ptr_taint_data->freed) {
             if((ptr_taint_data->reg_is_tainted(reg) || ptr_taint_data->mem_is_tainted(regval))
-                && ptr_taint_data->intersects(regval, sizeof(ADDRINT))) {
+                && ptr_taint_data->intersects(target_addr, sizeof(ADDRINT))) {
 
                 if(debug) {
                     *out << "HINT: USE AFTER FREE: (e) ";
@@ -377,6 +447,8 @@ VOID CrashData::examine() {
             last_insn = hint;
         }
     }
+
+    location = last_insn;
 
     if(signal == "SIGILL") {
         if(debug) {
@@ -599,8 +671,8 @@ VOID CrashData::dump_info() {
 
     writer.Key("tainted_regs");
     writer.StartArray();
-    std::set<LEVEL_BASE::REG> tainted_regs = taint_data_list.front()->tainted_regs;
-    std::set<LEVEL_BASE::REG>::iterator sit;
+    set<LEVEL_BASE::REG> tainted_regs = taint_data_list.front()->tainted_regs;
+    set<LEVEL_BASE::REG>::iterator sit;
     for(sit=tainted_regs.begin(); sit != tainted_regs.end(); sit++) {
         writer.String(REG_StringShort(*sit).c_str());
     }
@@ -609,9 +681,9 @@ VOID CrashData::dump_info() {
 
     writer.Key("tainted_addrs");
     writer.StartArray();
-    std::set<ADDRINT> tainted_addrs = taint_data_list.front()->tainted_addrs;
+    set<ADDRINT> tainted_addrs = taint_data_list.front()->tainted_addrs;
     if(tainted_addrs.size() > 0) {
-        std::set<ADDRINT>::iterator mit = tainted_addrs.begin();
+        set<ADDRINT>::iterator mit = tainted_addrs.begin();
         ADDRINT start = *mit;
         UINT64 size = 1;
 
@@ -660,4 +732,21 @@ VOID CrashData::dump_info() {
     *out << "#### BEGIN CRASH DATA JSON" << std::endl;
     *out << s.GetString() << std::endl;
     *out << "#### END CRASH DATA JSON" << std::endl;
+
+    if(insns[location].has_flag(Instruction::POTENTIAL_UAF)) {
+        *out << "#### POTENTIAL UAF DETECTED - RERUN WITH FLAG: " << std::endl;
+        *out << "-uaf ";
+        std::set<UINT64>::iterator potential_uaf_it;
+        for(potential_uaf_it = insns[location].potential_uaf_sizes.begin(); 
+            potential_uaf_it != insns[location].potential_uaf_sizes.end(); 
+            potential_uaf_it++) 
+        {
+            if(potential_uaf_it != insns[location].potential_uaf_sizes.begin()) {
+                *out << ",";
+            }
+
+            *out << *potential_uaf_it;
+        }
+        *out << std::endl;
+    }
 }
