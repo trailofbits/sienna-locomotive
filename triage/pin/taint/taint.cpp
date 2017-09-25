@@ -89,7 +89,6 @@ VOID handle_xchg(ADDRINT ip, LEVEL_BASE::REG reg_a, LEVEL_BASE::REG reg_b) {
 
 /*** INSTRUCTION ***/
 
-int hit = 0;
 VOID record(ADDRINT ip) {
     // *out << std::hex << ip << " " << *memory_manager.disas[ip] << std::endl;
     crash_data.last_addrs.push_back(ip);
@@ -190,7 +189,7 @@ BOOL handle_specific(INS ins) {
 
 int regd_count = 0;
 
-VOID reg_dump(ADDRINT eax, ADDRINT ecx, ADDRINT edx, ADDRINT ebx, 
+VOID reg_dump_32(ADDRINT eax, ADDRINT ecx, ADDRINT edx, ADDRINT ebx, 
     ADDRINT esp, ADDRINT ebp, ADDRINT esi, ADDRINT edi, ADDRINT eip)
 {
     *out << "eax\t" << std::hex << eax << std::endl;
@@ -204,9 +203,9 @@ VOID reg_dump(ADDRINT eax, ADDRINT ecx, ADDRINT edx, ADDRINT ebx,
     *out << "eip\t" << std::hex << eip << std::endl;
 }
 
-/*
+/*  
     INS_InsertCall(ins,
-        IPOINT_BEFORE, (AFUNPTR)reg_dump,
+        IPOINT_BEFORE, (AFUNPTR)reg_dump_32,
         IARG_REG_VALUE, LEVEL_BASE::REG_EAX,
         IARG_REG_VALUE, LEVEL_BASE::REG_ECX,
         IARG_REG_VALUE, LEVEL_BASE::REG_EDX,
@@ -266,9 +265,7 @@ VOID reg_dump_64(ADDRINT rax, ADDRINT rcx, ADDRINT rdx, ADDRINT rbx,
         IARG_END);
 */
 
-std::set<LEVEL_PINCLIENT::PIN_CALLBACK> callbacks;
 VOID Insn(INS ins, VOID *v) {
-    // pass address, disassembled insn to all insert calls
     string disas = INS_Disassemble(ins);
     ADDRINT ip = INS_Address(ins);
     memory_manager->add_disas(ins);
@@ -285,36 +282,12 @@ VOID Insn(INS ins, VOID *v) {
         IARG_ADDRINT, ip,
         IARG_CALL_ORDER, CALL_ORDER_FIRST,
         IARG_END);
-
-    // if(disas == "cmp r12d, dword ptr [rip-0x2d2a]") {
-    //     INS_InsertCall(ins,
-    //         IPOINT_BEFORE, (AFUNPTR)reg_dump_64,
-    //         IARG_REG_VALUE, LEVEL_BASE::REG_RAX,
-    //         IARG_REG_VALUE, LEVEL_BASE::REG_RCX,
-    //         IARG_REG_VALUE, LEVEL_BASE::REG_RDX,
-    //         IARG_REG_VALUE, LEVEL_BASE::REG_RBX,
-    //         IARG_REG_VALUE, LEVEL_BASE::REG_RSP,
-    //         IARG_REG_VALUE, LEVEL_BASE::REG_RBP,
-    //         IARG_REG_VALUE, LEVEL_BASE::REG_RSI,
-    //         IARG_REG_VALUE, LEVEL_BASE::REG_RDI,
-    //         IARG_REG_VALUE, LEVEL_BASE::REG_RIP,
-    //         IARG_REG_VALUE, LEVEL_BASE::REG_R8,
-    //         IARG_REG_VALUE, LEVEL_BASE::REG_R9,
-    //         IARG_REG_VALUE, LEVEL_BASE::REG_R10,
-    //         IARG_REG_VALUE, LEVEL_BASE::REG_R11,
-    //         IARG_REG_VALUE, LEVEL_BASE::REG_R12,
-    //         IARG_REG_VALUE, LEVEL_BASE::REG_R13,
-    //         IARG_REG_VALUE, LEVEL_BASE::REG_R14,
-    //         IARG_REG_VALUE, LEVEL_BASE::REG_R15,
-    //         IARG_END);
-    // }
     
     if(handle_specific(ins)) {
         return;
     }
 
     if(INS_OperandCount(ins) < 2) {
-        // mostly nops and nots
         if(debug) {
             *out << "5: " << disas << std::endl;
         }
@@ -366,12 +339,10 @@ void handle_read(CONTEXT *ctx, SYSCALL_STANDARD std) {
     start = static_cast<UINT64>((PIN_GetSyscallArgument(ctx, std, 1)));
 
     if(FDLookup.find(fd) != FDLookup.end() && FDLookup[fd].find(taintFile) != string::npos) {
-#ifdef DEBUG
-        ADDRINT size  = PIN_GetSyscallArgument(ctx, std, 2);
         if(debug) {
+            ADDRINT size  = PIN_GetSyscallArgument(ctx, std, 2);
             *out << "READ of " << FDLookup[fd] << " for size 0x" << std::hex << size << " to 0x" << start << std::endl;
         }
-#endif
         saveRetRead = true;
     }
 

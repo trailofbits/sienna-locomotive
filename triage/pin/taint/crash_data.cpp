@@ -491,7 +491,6 @@ VOID CrashData::examine() {
     }
     
     Instruction insn = insns[last_insn];
-    // INS ins = insn.ins;
     string disas = insn.disas; 
 
     if(debug) {
@@ -644,8 +643,6 @@ VOID CrashData::examine() {
     *reason = "unknown";
     score = 50;
 }
-
-/* TODO: json or serialization library */
 
 VOID CrashData::dump_info() {
     rapidjson::StringBuffer s;
