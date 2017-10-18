@@ -3,6 +3,7 @@
 CrashData::CrashData() : hint(0), out(&std::cout), debug(false), score(50) {
     TaintData *ptr_taint_data = new TaintData(0, 0, 0);
     taint_data_list.push_back(ptr_taint_data);
+
     reason = new std::string;
     *reason = "unknown";
 }
@@ -29,7 +30,7 @@ VOID CrashData::mem_to_reg(CONTEXT *ctx, ADDRINT ip, MemoryManager *memory_manag
     for(taint_it = taint_data_list.begin(); taint_it != taint_data_list.end(); taint_it++) {
         TaintData *ptr_taint_data = *taint_it;
         if(debug && ptr_taint_data->id == 0) {
-            *out << "M2R " << ip << " " << *memory_manager->disas[ip] << std::endl;
+            *out << "M2R " << ip << " " << *memory_manager->disas[ip] << std::endl << std::flush;
         }
 
         bool tainted = false;
@@ -42,7 +43,7 @@ VOID CrashData::mem_to_reg(CONTEXT *ctx, ADDRINT ip, MemoryManager *memory_manag
 
         std::list<LEVEL_BASE::REG>::iterator it;
         for(it=regs_r.begin(); it != regs_r.end() && !tainted; it++) {
-            if(ptr_taint_data->reg_is_tainted(*it)) {
+            if(REG_valid(*it) && ptr_taint_data->reg_is_tainted(*it)) {
                 if(ptr_taint_data->id == 0) {
                     tainted = true;
                 } else if(REG_is_gr(*it) && ptr_taint_data->intersects(PIN_GetContextReg(ctx, *it), 1)) {
@@ -60,29 +61,30 @@ VOID CrashData::mem_to_reg(CONTEXT *ctx, ADDRINT ip, MemoryManager *memory_manag
                 } else if(ptr_taint_data->freed && ptr_taint_data->intersects(mem, size)) {
                     if(debug) {
                         *out << "HINT: USE AFTER FREE: (r) ";
-                        *out << mem << " at " << ip << std::endl;
+                        *out << mem << " at " << ip << std::endl << std::flush;
                     }
                     insns[ip].add_flag(Instruction::USE_AFTER_FREE);
                 }
 
                 if(debug && ptr_taint_data->id == 0) {
-                    *out << "TAINTED READ AT " << std::hex << ip << " OF " << mem << std::endl;
-                    *out << "REGm TAINT: " << REG_StringShort(reg) << std::endl;
+                    *out << "TAINTED READ AT " << std::hex << ip << " OF " << mem << std::endl << std::flush;
+                    *out << "REGm TAINT: " << REG_StringShort(reg) << std::endl << std::flush;
                 }
 
                 ptr_taint_data->reg_taint(ip, memory_manager, reg);
 
                 if(debug && ptr_taint_data->id == 0) {
-                    *out << "TAINTED REGS:" << std::endl;
+                    *out << "TAINTED REGS:" << std::endl << std::flush;
                     set<LEVEL_BASE::REG>::iterator sit;
                     for(sit=ptr_taint_data->tainted_regs.begin(); sit != ptr_taint_data->tainted_regs.end(); sit++) {
-                        *out << REG_StringShort(*sit) << std::endl;
+                        *out << REG_StringShort(*sit) << std::endl << std::flush;
                     }
                 }
                 
             } else {
                 if(debug && ptr_taint_data->id == 0) {
-                    *out << "REGm UNTAINT: " << REG_StringShort(reg) << std::endl;
+					*out << "M2R2 " << ip << " " << *memory_manager->disas[ip] << std::endl << std::flush;
+					*out << "REGm UNTAINT: " << reg << " " << REG_StringShort(reg) << std::endl << std::flush;
                 }
 
                 if(ptr_taint_data->id == 0) {
@@ -104,7 +106,7 @@ VOID CrashData::regs_to_regs(CONTEXT *ctx, ADDRINT ip, MemoryManager *memory_man
     for(taint_it = taint_data_list.begin(); taint_it != taint_data_list.end(); taint_it++) {
         TaintData *ptr_taint_data = *taint_it;
         if(debug && ptr_taint_data->id == 0) {
-            *out << "R2R " << std::hex << ip << " " << *memory_manager->disas[ip] << std::endl;
+            *out << "R2R " << std::hex << ip << " " << *memory_manager->disas[ip] << std::endl << std::flush;
         }
 
         std::list<LEVEL_BASE::REG>::iterator reg_it;
@@ -159,12 +161,12 @@ VOID CrashData::regs_to_mem(CONTEXT *ctx, ADDRINT ip, MemoryManager *memory_mana
         TaintData *ptr_taint_data = *taint_it;
 
         if(debug && ptr_taint_data->id == 0) {
-            *out << "R2M " << ip << " " << *memory_manager->disas[ip] << std::endl;
-            set<LEVEL_BASE::REG>::iterator sit;
-            *out << "REGS " << std::endl;
+            *out << "R2M " << ip << " " << *memory_manager->disas[ip] << std::endl << std::flush;
+            /*set<LEVEL_BASE::REG>::iterator sit;
+            *out << "REGS " << std::endl << std::flush;
             for(sit=ptr_taint_data->tainted_regs.begin(); sit != ptr_taint_data->tainted_regs.end(); sit++) {
-                *out << REG_StringShort(*sit) << std::endl;
-            }
+                *out << REG_StringShort(*sit) << std::endl << std::flush;
+            }*/
         }
 
         std::list<LEVEL_BASE::REG>::iterator reg_it;
@@ -185,14 +187,14 @@ VOID CrashData::regs_to_mem(CONTEXT *ctx, ADDRINT ip, MemoryManager *memory_mana
         if(tainted) {
             if(ptr_taint_data->id == 0) {
                 if(debug) {
-                    *out << "TAINTED WRITE AT " << ip << std::endl;
+                    *out << "TAINTED WRITE AT " << ip << std::endl << std::flush;
                 }
 
                 insns[ip].add_flag(Instruction::TAINTED_WRITE);
             } else if(ptr_taint_data->freed && ptr_taint_data->intersects(mem, size)) {
                 if(debug) {
                     *out << "HINT: USE AFTER FREE: (w) ";
-                    *out << mem << " at " << ip << std::endl;
+                    *out << mem << " at " << ip << std::endl << std::flush;
                 }
 
                 insns[ip].add_flag(Instruction::USE_AFTER_FREE);
@@ -213,8 +215,8 @@ VOID CrashData::taint_indirect(ADDRINT ip, MemoryManager *memory_manager,
     TaintData *ptr_taint_data = taint_data_list.front();
 
     if(debug && ptr_taint_data->id == 0) {
-        *out << "M2R " << ip << " " << *memory_manager->disas[ip] << std::endl;
-        *out << "M2R " << REG_StringShort(reg) << std::endl;
+        *out << "M2R (ind) " << ip << " " << *memory_manager->disas[ip] << std::endl << std::flush;
+        *out << "M2R (reg) " << REG_StringShort(reg) << std::endl << std::flush;
     }
 
     bool mmapd = false;
@@ -222,12 +224,12 @@ VOID CrashData::taint_indirect(ADDRINT ip, MemoryManager *memory_manager,
     
     if(ptr_taint_data->reg_is_tainted(reg)) {
         if(debug && ptr_taint_data->id == 0) {
-            *out << "REG IS TAINTED" << std::endl;
+            *out << "REG IS TAINTED" << std::endl << std::flush;
         }
         ptr_taint_data->reg_taint(ip, memory_manager, REG_INST_PTR);
         if(insns.count(ip)) {
             if(debug && ptr_taint_data->id == 0) {
-                *out << "PC TAINT FLAG" << std::endl;
+                *out << "PC TAINT FLAG" << std::endl << std::flush;
             }
             insns[ip].add_flag(Instruction::PC_TAINT);
         }
@@ -271,7 +273,7 @@ VOID CrashData::taint_indirect(ADDRINT ip, MemoryManager *memory_manager,
         if(!mmapd) {
             if(debug && ptr_taint_data->id == 0) {
                 *out << "HINT: POSSIBLE BRANCH OR RET TO NON-EXECUTABLE MEMORY: ";
-                *out << std::hex << target_addr << " at " << ip << std::endl;
+                *out << std::hex << target_addr << " at " << ip << std::endl << std::flush;
             }
             hint = ip;
             
@@ -316,7 +318,7 @@ VOID CrashData::taint_indirect(ADDRINT ip, MemoryManager *memory_manager,
 
                 if(debug) {
                     *out << "HINT: USE AFTER FREE: (e) ";
-                    *out << std::hex << target_addr << " at " << ip << std::endl;
+                    *out << std::hex << target_addr << " at " << ip << std::endl << std::flush;
                 }
 
                 insns[ip].add_flag(Instruction::USE_AFTER_FREE);
@@ -377,7 +379,7 @@ BOOL CrashData::xed_at(xed_decoded_inst_t *xedd, ADDRINT ip) {
 
         xed_decoded_inst_dump_xed_format(xedd, buf, 2048, runtime_address);
         if(debug) {
-            *out << std::hex << ip << " " << buf << std::endl;
+            *out << std::hex << ip << " " << buf << std::endl << std::flush;
         }
     } else {
         return false;
@@ -430,14 +432,13 @@ bool CrashData::is_ret(xed_iclass_enum_t insn_iclass) {
 }
 
 VOID CrashData::examine() {
-    ADDRINT last_insn = last_addrs.back();
+    ADDRINT last_insn = last_addrs[last_addrs_head];
 
     if(hint != 0) {
         bool contains_hint = false;
 
-        std::list<ADDRINT>::iterator it;
-        for(it = last_addrs.begin(); it != last_addrs.end(); it++) {
-            if(*it == hint) {
+		for (uint32_t i = 0; i < RECORD_COUNT; i++) {
+            if(last_addrs[(last_addrs_head+i)%RECORD_COUNT] == hint) {
                 contains_hint = true;
                 break;
             }
@@ -452,7 +453,7 @@ VOID CrashData::examine() {
 
     if(signal == "SIGILL") {
         if(debug) {
-            *out << "DECISION SIGILL" << std::endl;
+            *out << "DECISION SIGILL" << std::endl << std::flush;
         }
         
         *reason = "illegal instruction";
@@ -462,7 +463,7 @@ VOID CrashData::examine() {
 
     if(signal == "SIGFPE") {
         if(debug) {
-            *out << "DECISION SIGFPE" << std::endl;
+            *out << "DECISION SIGFPE" << std::endl << std::flush;
         }
         
         *reason = "floating point exception";
@@ -472,7 +473,7 @@ VOID CrashData::examine() {
 
     if(signal == "SIGTRAP") {
         if(debug) {
-            *out << "DECISION SIGTRAP" << std::endl;
+            *out << "DECISION SIGTRAP" << std::endl << std::flush;
         }
 
         *reason = "breakpoint";
@@ -482,7 +483,7 @@ VOID CrashData::examine() {
 
     if(!insns.count(last_insn)) {
         if(debug) {
-            *out << "DECISION INSN404" << std::endl;
+            *out << "DECISION INSN404" << std::endl << std::flush;
         }
 
         *reason = "instruction not found";
@@ -494,13 +495,13 @@ VOID CrashData::examine() {
     string disas = insn.disas; 
 
     if(debug) {
-        *out << "CRASH ON: " << disas << " AT " << last_insn << std::endl;
+        *out << "CRASH ON: " << disas << " AT " << last_insn << std::endl << std::flush;
     }
 
     xed_decoded_inst_t xedd;
     if(!xed_at(&xedd, last_insn)) {
         if(debug) {
-            *out << "DECISION NODECODE" << std::endl;
+            *out << "DECISION NODECODE" << std::endl << std::flush;
         }
 
         *reason = "undecodable instruction";
@@ -510,12 +511,12 @@ VOID CrashData::examine() {
 
     xed_iclass_enum_t insn_iclass = xed_decoded_inst_get_iclass(&xedd);
     if(debug) {
-        *out << "ICLASS " << xed_iclass_enum_t2str(insn_iclass) << std::endl;
+        *out << "ICLASS " << xed_iclass_enum_t2str(insn_iclass) << std::endl << std::flush;
     }
 
     if(insn.has_flag(Instruction::USE_AFTER_FREE)) {
         if(debug) {
-            *out << "DECISION UAF" << std::endl;
+            *out << "DECISION UAF" << std::endl << std::flush;
         }
         *reason = "use after free";
         score = 100;
@@ -524,7 +525,7 @@ VOID CrashData::examine() {
 
     if(is_branching(insn_iclass)) {
         if(debug) {
-            *out << "DECISION BRANCHING" << std::endl;
+            *out << "DECISION BRANCHING" << std::endl << std::flush;
         }
         if(insn.has_flag(Instruction::PC_TAINT)) {
             *reason = "branching tainted pc";
@@ -538,7 +539,7 @@ VOID CrashData::examine() {
 
     if(is_ret(insn_iclass)) {
         if(debug) {
-            *out << "DECISION RET" << std::endl;
+            *out << "DECISION RET" << std::endl << std::flush;
         }
 
         if(insn.has_flag(Instruction::PC_TAINT) || taint_data_list.front()->tainted_regs.count(LEVEL_BASE::REG_STACK_PTR)) {
@@ -554,7 +555,7 @@ VOID CrashData::examine() {
 
     if(insn.has_flag(Instruction::DEP)) {
         if(debug) {
-            *out << "DECISION DEP" << std::endl;
+            *out << "DECISION DEP" << std::endl << std::flush;
         }
         
         *reason = "data execution prevention";
@@ -583,7 +584,7 @@ VOID CrashData::examine() {
                     }
                 }
                 if(debug) {
-                    *out << "MEM OP " << i << " " << xed_operand_name(p_xedo) << std::endl;
+                    *out << "MEM OP " << i << " " << xed_operand_name(p_xedo) << std::endl << std::flush;
                 }
                 break;
             default:
@@ -594,38 +595,34 @@ VOID CrashData::examine() {
     if(written) {
         if(insn.has_flag(Instruction::TAINTED_WRITE)) {
             if(debug) {
-                *out << "DECISION WRITE TAINT" << std::endl;
+                *out << "DECISION WRITE TAINT" << std::endl << std::flush;
             }
 
-            *out << __LINE__ << std::endl;
             *reason = "write with taint";
-            *out << __LINE__ << std::endl;
             score = 75;
-            *out << __LINE__ << std::endl;
         } else {
             if(debug) {
-                *out << "DECISION WRITE NOTAINT" << std::endl;
+                *out << "DECISION WRITE NOTAINT" << std::endl << std::flush;
             }
 
             *reason = "write with no taint";
             score = 50;
         }
 
-        *out << __LINE__ << std::endl;
         return;
     }
 
     if(read) {
         if(insn.has_flag(Instruction::TAINTED_READ)) {
             if(debug) {
-                *out << "DECISION READ TAINT" << std::endl;
+                *out << "DECISION READ TAINT" << std::endl << std::flush;
             }
 
             *reason = "read with taint";
             score = 75;
         } else {
             if(debug) {
-                *out << "DECISION READ NOTAINT" << std::endl;
+                *out << "DECISION READ NOTAINT" << std::endl << std::flush;
             }
 
             *reason = "read with no taint";
@@ -637,7 +634,7 @@ VOID CrashData::examine() {
 
     
     if(debug) {
-        *out << "DECISION UNKNOWN" << std::endl;
+        *out << "DECISION UNKNOWN" << std::endl << std::flush;
     }
 
     *reason = "unknown";
@@ -711,24 +708,23 @@ VOID CrashData::dump_info() {
 
     writer.Key("last_addrs");
     writer.StartArray();
-    std::list<ADDRINT>::iterator lit;
-    for(lit=last_addrs.begin(); lit != last_addrs.end(); lit++) {
-        writer.Uint64(*lit);
-    }
+	for (uint32_t i = 0; i < RECORD_COUNT; i++) {
+		writer.Uint64(last_addrs[(last_addrs_head - i) % RECORD_COUNT]);
+	}
     writer.EndArray();
 
     writer.Key("last_calls");
     writer.StartArray();
-    for(lit=last_calls.begin(); lit != last_calls.end(); lit++) {
-        writer.Uint64(*lit);
-    }
+	for (uint32_t i = 0; i < RECORD_COUNT; i++) {
+		writer.Uint64(last_calls[(last_calls_head - i) % RECORD_COUNT]);
+	}
     writer.EndArray();
 
     writer.EndObject();
 
-    *out << "#### BEGIN CRASH DATA JSON" << std::endl;
-    *out << s.GetString() << std::endl;
-    *out << "#### END CRASH DATA JSON" << std::endl;
+    *out << "#### BEGIN CRASH DATA JSON" << std::endl << std::flush;
+    *out << s.GetString() << std::endl << std::flush;
+    *out << "#### END CRASH DATA JSON" << std::endl << std::flush;
 
     string uaf_reason = "use after free";
     if(insns[location].has_flag(Instruction::POTENTIAL_UAF) && reason->compare(uaf_reason) != 0) {
@@ -740,6 +736,6 @@ VOID CrashData::dump_info() {
         {
             *out << "-uaf " << *potential_uaf_it << " ";
         }
-        *out << std::endl;
+        *out << std::endl << std::flush;
     }
 }

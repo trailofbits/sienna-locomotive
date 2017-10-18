@@ -34,9 +34,10 @@ public:
     std::map<ADDRINT, std::list<struct AllocInfo> > alloc_info_map;
 
     #define RECORD_COUNT 5
-    std::list<ADDRINT> last_addrs;
-    std::list<INS> last_insns;
-    std::list<ADDRINT> last_calls;
+    ADDRINT last_addrs[RECORD_COUNT];
+	uint32_t last_addrs_head = 0;
+	ADDRINT last_calls[RECORD_COUNT];
+	UINT32 last_calls_head = 0;
 
     std::ostream *out;
     bool debug;

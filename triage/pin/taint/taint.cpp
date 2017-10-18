@@ -2,7 +2,10 @@
 #include "crash_data.h"
 #include "memory_manager.h"
 
+#ifdef __linux__
 #include <sys/syscall.h>
+#endif
+
 #include <signal.h>
 #include <iostream>
 #include <fstream>
@@ -10,6 +13,19 @@
 #include <list>
 #include <set>
 #include <map>
+
+#ifdef _WIN32
+//https://msdn.microsoft.com/en-us/library/windows/desktop/aa383751(v=vs.85).aspx
+typedef const char* LPCSTR;
+typedef uint32_t DWORD;
+typedef void* LPVOID;
+typedef void* HANDLE;
+typedef struct _SECURITY_ATTRIBUTES {
+	DWORD  nLength;
+	LPVOID lpSecurityDescriptor;
+	BOOL   bInheritHandle;
+} SECURITY_ATTRIBUTES, *PSECURITY_ATTRIBUTES, *LPSECURITY_ATTRIBUTES;
+#endif
 
 CrashData crash_data;
 MemoryManager *memory_manager;
@@ -20,6 +36,7 @@ bool saveRetOpen = false;
 bool saveRetRead = false;
 bool saveRetMmap = false;
 bool debug = false;
+bool recon = false;
 
 // mmap
 ADDRINT size;
@@ -55,7 +72,7 @@ VOID handle_indirect(ADDRINT ip, LEVEL_BASE::REG reg, ADDRINT regval, BOOL isRet
 
 VOID wrap_reg_untaint(ADDRINT ip, LEVEL_BASE::REG reg) {
     if(debug) {
-        *out << "UT: " << ip << " " << *memory_manager->disas[ip] << std::endl;
+        *out << "UT: " << ip << " " << *memory_manager->disas[ip] << std::endl << std::flush;
     }
 
     std::list<TaintData*>::iterator taint_it;
@@ -67,7 +84,7 @@ VOID wrap_reg_untaint(ADDRINT ip, LEVEL_BASE::REG reg) {
 
 VOID handle_xchg(ADDRINT ip, LEVEL_BASE::REG reg_a, LEVEL_BASE::REG reg_b) {
     if(debug) {
-        *out << ip << " " << *memory_manager->disas[ip] << std::endl;
+        *out << ip << " " << *memory_manager->disas[ip] << std::endl << std::flush;
     }
 
     std::list<TaintData*>::iterator taint_it;
@@ -83,27 +100,23 @@ VOID handle_xchg(ADDRINT ip, LEVEL_BASE::REG reg_a, LEVEL_BASE::REG reg_b) {
                 ptr_taint_data->reg_taint(ip, memory_manager, reg_a);
                 ptr_taint_data->reg_untaint(ip, memory_manager, reg_b);
             }
-        }
+       } 
     }
 }
 
 /*** INSTRUCTION ***/
 
 VOID record(ADDRINT ip) {
-    // *out << std::hex << ip << " " << *memory_manager.disas[ip] << std::endl;
-    crash_data.last_addrs.push_back(ip);
-    while(crash_data.last_addrs.size() > RECORD_COUNT) {
-        crash_data.last_addrs.pop_front();
-    }
+    // *out << std::hex << ip << " " << *memory_manager.disas[ip] << std::endl << std::flush;
+	crash_data.last_addrs_head = (crash_data.last_addrs_head + 1) % RECORD_COUNT;
+    crash_data.last_addrs[crash_data.last_addrs_head] = ip;
 
     crash_data.insns[ip].clear_flags();
 }
 
 VOID record_call(ADDRINT target, ADDRINT loc) {
-    crash_data.last_calls.push_back(target);
-    while(crash_data.last_calls.size() > RECORD_COUNT) {
-        crash_data.last_calls.pop_front();
-    }
+	crash_data.last_calls_head = (crash_data.last_calls_head + 1) % RECORD_COUNT;
+	crash_data.last_calls[crash_data.last_calls_head] = target;
 }
 
 BOOL handle_specific(INS ins) {
@@ -118,7 +131,7 @@ BOOL handle_specific(INS ins) {
     // indirect jump, indirect call
     if(INS_IsIndirectBranchOrCall(ins) && INS_MaxNumRRegs(ins) > 0) {
         if(debug) {
-            *out << "INDIRECT: " << REG_StringShort(INS_RegR(ins, 0)) << std::endl;
+            *out << "INDIRECT: " << REG_StringShort(INS_RegR(ins, 0)) << std::endl << std::flush;
         }
 
         INS_InsertCall(
@@ -192,15 +205,15 @@ int regd_count = 0;
 VOID reg_dump_32(ADDRINT eax, ADDRINT ecx, ADDRINT edx, ADDRINT ebx, 
     ADDRINT esp, ADDRINT ebp, ADDRINT esi, ADDRINT edi, ADDRINT eip)
 {
-    *out << "eax\t" << std::hex << eax << std::endl;
-    *out << "ecx\t" << std::hex << ecx << std::endl;
-    *out << "edx\t" << std::hex << edx << std::endl;
-    *out << "ebx\t" << std::hex << ebx << std::endl;
-    *out << "esp\t" << std::hex << esp << std::endl;
-    *out << "ebp\t" << std::hex << ebp << std::endl;
-    *out << "esi\t" << std::hex << esi << std::endl;
-    *out << "edi\t" << std::hex << edi << std::endl;
-    *out << "eip\t" << std::hex << eip << std::endl;
+    *out << "eax\t" << std::hex << eax << std::endl << std::flush;
+    *out << "ecx\t" << std::hex << ecx << std::endl << std::flush;
+    *out << "edx\t" << std::hex << edx << std::endl << std::flush;
+    *out << "ebx\t" << std::hex << ebx << std::endl << std::flush;
+    *out << "esp\t" << std::hex << esp << std::endl << std::flush;
+    *out << "ebp\t" << std::hex << ebp << std::endl << std::flush;
+    *out << "esi\t" << std::hex << esi << std::endl << std::flush;
+    *out << "edi\t" << std::hex << edi << std::endl << std::flush;
+    *out << "eip\t" << std::hex << eip << std::endl << std::flush;
 }
 
 /*  
@@ -223,23 +236,23 @@ VOID reg_dump_64(ADDRINT rax, ADDRINT rcx, ADDRINT rdx, ADDRINT rbx,
     ADDRINT r8, ADDRINT r9, ADDRINT r10, ADDRINT r11, 
     ADDRINT r12, ADDRINT r13, ADDRINT r14, ADDRINT r15)
 {
-    *out << "rax\t" << std::hex << rax << std::endl;
-    *out << "rcx\t" << std::hex << rcx << std::endl;
-    *out << "rdx\t" << std::hex << rdx << std::endl;
-    *out << "rbx\t" << std::hex << rbx << std::endl;
-    *out << "rsp\t" << std::hex << rsp << std::endl;
-    *out << "rbp\t" << std::hex << rbp << std::endl;
-    *out << "rsi\t" << std::hex << rsi << std::endl;
-    *out << "rdi\t" << std::hex << rdi << std::endl;
-    *out << "rip\t" << std::hex << rip << std::endl;
-    *out << "r8\t" << std::hex << r8 << std::endl;
-    *out << "r9\t" << std::hex << r9 << std::endl;
-    *out << "r10\t" << std::hex << r10 << std::endl;
-    *out << "r11\t" << std::hex << r11 << std::endl;
-    *out << "r12\t" << std::hex << r12 << std::endl;
-    *out << "r13\t" << std::hex << r13 << std::endl;
-    *out << "r14\t" << std::hex << r14 << std::endl;
-    *out << "r15\t" << std::hex << r15 << std::endl;
+    *out << "rax\t" << std::hex << rax << std::endl << std::flush;
+    *out << "rcx\t" << std::hex << rcx << std::endl << std::flush;
+    *out << "rdx\t" << std::hex << rdx << std::endl << std::flush;
+    *out << "rbx\t" << std::hex << rbx << std::endl << std::flush;
+    *out << "rsp\t" << std::hex << rsp << std::endl << std::flush;
+    *out << "rbp\t" << std::hex << rbp << std::endl << std::flush;
+    *out << "rsi\t" << std::hex << rsi << std::endl << std::flush;
+    *out << "rdi\t" << std::hex << rdi << std::endl << std::flush;
+    *out << "rip\t" << std::hex << rip << std::endl << std::flush;
+    *out << "r8\t" << std::hex << r8 << std::endl << std::flush;
+    *out << "r9\t" << std::hex << r9 << std::endl << std::flush;
+    *out << "r10\t" << std::hex << r10 << std::endl << std::flush;
+    *out << "r11\t" << std::hex << r11 << std::endl << std::flush;
+    *out << "r12\t" << std::hex << r12 << std::endl << std::flush;
+    *out << "r13\t" << std::hex << r13 << std::endl << std::flush;
+    *out << "r14\t" << std::hex << r14 << std::endl << std::flush;
+    *out << "r15\t" << std::hex << r15 << std::endl << std::flush;
 }
 
 /*
@@ -270,7 +283,7 @@ VOID Insn(INS ins, VOID *v) {
     ADDRINT ip = INS_Address(ins);
     memory_manager->add_disas(ins);
 
-    // std::cout << "OPCODE: (" << std::hex << ip << ") " << disas << " : " << std::hex << INS_Opcode(ins) << std::endl; 
+    // std::cout << "OPCODE: (" << std::hex << ip << ") " << disas << " : " << std::hex << INS_Opcode(ins) << std::endl << std::flush; 
 
     if(!crash_data.insns.count(ip)) {
         Instruction insn(ip, disas);
@@ -286,10 +299,10 @@ VOID Insn(INS ins, VOID *v) {
     if(handle_specific(ins)) {
         return;
     }
-
+	
     if(INS_OperandCount(ins) < 2) {
         if(debug) {
-            *out << "5: " << disas << std::endl;
+            *out << "5: " << disas << std::endl << std::flush;
         }
         return;
     }
@@ -327,7 +340,7 @@ VOID Insn(INS ins, VOID *v) {
             IARG_END);
     } else {
         if(debug) {
-            *out << "4: " << disas << std::endl;
+            *out << "4: " << disas << std::endl << std::flush;
         }
     }
 }
@@ -341,7 +354,7 @@ void handle_read(CONTEXT *ctx, SYSCALL_STANDARD std) {
     if(FDLookup.find(fd) != FDLookup.end() && FDLookup[fd].find(taintFile) != string::npos) {
         if(debug) {
             ADDRINT size  = PIN_GetSyscallArgument(ctx, std, 2);
-            *out << "READ of " << FDLookup[fd] << " for size 0x" << std::hex << size << " to 0x" << start << std::endl;
+            *out << "READ of " << FDLookup[fd] << " for size 0x" << std::hex << size << " to 0x" << start << std::endl << std::flush;
         }
         saveRetRead = true;
     }
@@ -351,7 +364,7 @@ void handle_read(CONTEXT *ctx, SYSCALL_STANDARD std) {
 void handle_open(CONTEXT *ctx, SYSCALL_STANDARD std) {
     fname = reinterpret_cast<char *>((PIN_GetSyscallArgument(ctx, std, 0)));
     if(debug) {
-        *out << "OPEN ENTRY: " << fname << std::endl;
+        *out << "OPEN ENTRY: " << fname << std::endl << std::flush;
     }
     saveRetOpen = true;
 }
@@ -359,7 +372,7 @@ void handle_open(CONTEXT *ctx, SYSCALL_STANDARD std) {
 void handle_mmap(CONTEXT *ctx, SYSCALL_STANDARD std) {
     ADDRINT prot = PIN_GetSyscallArgument(ctx, std, 2);
     if(debug) {
-        *out << "MMAP ENTRY: " << std::hex << prot << std::endl;
+        *out << "MMAP ENTRY: " << std::hex << prot << std::endl << std::flush;
     }
 
     if(prot & 0x4) {
@@ -369,31 +382,35 @@ void handle_mmap(CONTEXT *ctx, SYSCALL_STANDARD std) {
 }
 
 VOID SyscallEntry(THREADID thread_id, CONTEXT *ctx, SYSCALL_STANDARD std, void *v) {
-    switch(PIN_GetSyscallNumber(ctx, std)) {
-        case __NR_read:
+	if (recon) {
+		*out << "SYSCALL NUMBER: " << (PIN_GetSyscallNumber(ctx, std) & 0xFF) << std::endl << std::flush;
+	}
+
+	switch(PIN_GetSyscallNumber(ctx, std) & 0xFF) {
+        case 6:
             handle_read(ctx, std);
             break;
-        case __NR_open:
+        case 85:
             handle_open(ctx, std);
             break;
-        case __NR_mmap:
+        /*case __NR_mmap:
             handle_mmap(ctx, std);
-            break;
-    }
+            break;*/
+    }//*/
 }
 
 VOID SyscallExit(THREADID thread_id, CONTEXT *ctx, SYSCALL_STANDARD std, void *v) {
     if (saveRetOpen){
         ADDRINT fd = PIN_GetSyscallReturn(ctx, std);
         if(debug) {
-            *out << "OPEN EXIT: " << fname << " " << fd << std::endl;
+            *out << "OPEN EXIT: " << fname << " " << fd << std::endl << std::flush;
         }
         FDLookup[fd] = fname;
         saveRetOpen = false;
     } else if (saveRetRead) {
         ADDRINT byteCount = PIN_GetSyscallReturn(ctx, std);
         if(debug) {
-            *out << "MEMr TAINT: " << start << ": " << byteCount << std::endl;
+            *out << "MEMr TAINT: " << start << ": " << byteCount << std::endl << std::flush;
         }
         
         if(byteCount+1 > byteCount) {
@@ -407,7 +424,7 @@ VOID SyscallExit(THREADID thread_id, CONTEXT *ctx, SYSCALL_STANDARD std, void *v
         ADDRINT execAddr = PIN_GetSyscallReturn(ctx, std);
         execd[execAddr] = size;
         if(debug) {
-            *out << "MMAP EXEC MEM: " << std::hex << execAddr << " " << size << std::endl;
+            *out << "MMAP EXEC MEM: " << std::hex << execAddr << " " << size << std::endl << std::flush;
         }
         saveRetMmap = false;
     }
@@ -416,16 +433,16 @@ VOID SyscallExit(THREADID thread_id, CONTEXT *ctx, SYSCALL_STANDARD std, void *v
 /*** FUNCTION HOOKS ***/
 
 VOID track_free(ADDRINT addr) {
-    if(crash_data.alloc_info_map.count(addr) == 0) {
+	if(crash_data.alloc_info_map.count(addr) == 0) {
         if(debug) {
-            *out << "FREEING UNALLOCD OR UNTRACKED MEM" << std::endl;
+            *out << "FREEING UNALLOCD OR UNTRACKED MEM" << std::endl << std::flush;
         }
         return;
     }
 
     if(crash_data.alloc_info_map[addr].back().free) {
         if(debug) {
-            *out << "POSSIBLE DOUBLE FREE" << std::endl;
+            *out << "POSSIBLE DOUBLE FREE" << std::endl << std::flush;
         }
         return;
     }
@@ -437,7 +454,7 @@ VOID free_before(ADDRINT ip, ADDRINT retIp, ADDRINT address) {
     crash_data.pointer_free(address);
 
     if(debug) {
-        *out << "FREE CALLED: " << reinterpret_cast<void*>(address) << " AT " << ip << std::endl;
+        *out << "FREE CALLED: " << reinterpret_cast<void*>(address) << " AT " << ip << std::endl << std::flush;
     }
     track_free(address);
 }
@@ -445,7 +462,7 @@ VOID free_before(ADDRINT ip, ADDRINT retIp, ADDRINT address) {
 VOID track_allocation(VOID *addr, SIZE size) {
     if(size > 0x7fffffff) { // (2 << 30) - 1 
         if(debug) {
-            *out << "ALLOC SIZE TOO LARGE, NOT TRACKING" << std::endl;
+            *out << "ALLOC SIZE TOO LARGE, NOT TRACKING" << std::endl << std::flush;
         }
         return;
     }
@@ -472,9 +489,10 @@ void *malloc_hook(CONTEXT * ctxt, AFUNPTR pf_malloc, size_t size) {
         PIN_PARG_END());
 
     if(debug) {
-      *out << "MALLOC CALLED: " << res << ", " << size << std::endl;
+      *out << "MALLOC CALLED: " << res << ", " << size << std::endl << std::flush;
     }
-    track_allocation(res, size);
+
+	track_allocation(res, size);
 
     if(uaf_sizes.count(size)) {
         crash_data.pointer_add((ADDRINT)res, size);
@@ -483,13 +501,64 @@ void *malloc_hook(CONTEXT * ctxt, AFUNPTR pf_malloc, size_t size) {
     return res;  
 }
 
+FILE * fopen_hook(CONTEXT * ctxt, AFUNPTR pf_fopen, const char *fname, const char *mode) {
+	FILE *res;
+	//*out << "FOPEN CALLED " << fname << std::endl << std::flush;
+	PIN_CallApplicationFunction(
+		ctxt,
+		PIN_ThreadId(),
+		CALLINGSTD_DEFAULT,
+		pf_fopen,
+		NULL,
+		PIN_PARG(int), &res,
+		PIN_PARG(const char *), fname,
+		PIN_PARG(const char *), mode,
+		PIN_PARG_END());
+
+	if (debug) {
+		*out << "FOPEN CALLED: " << fname << " (" << res << ")" << std::endl << std::flush;
+	}
+
+	//FDLookup[res] = fname;
+
+	return res;
+}
+
+HANDLE cf_hook(CONTEXT * ctxt, AFUNPTR pf_cf,
+		LPCSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode,
+		LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition,
+		DWORD dwFlagsAndAttributes, HANDLE hTemplateFile)
+{
+	HANDLE res;
+	//*out << "CREATEFILE CALLED " << fname << std::endl << std::flush;
+	PIN_CallApplicationFunction(
+		ctxt,
+		PIN_ThreadId(),
+		CALLINGSTD_DEFAULT,
+		pf_cf,
+		NULL,
+		PIN_PARG(HANDLE), &res,
+		PIN_PARG(LPCSTR), lpFileName,
+		PIN_PARG(DWORD), dwDesiredAccess,
+		PIN_PARG(DWORD), dwShareMode,
+		PIN_PARG(LPSECURITY_ATTRIBUTES), lpSecurityAttributes,
+		PIN_PARG(DWORD), dwCreationDisposition,
+		PIN_PARG(DWORD), dwFlagsAndAttributes,
+		PIN_PARG(HANDLE), hTemplateFile,
+		PIN_PARG_END());
+
+	//FDLookup[res] = fname;
+
+	return res;
+}
+
 VOID Image(IMG img, VOID *v)
 {
     RTN mallocRtn = RTN_FindByName(img, "malloc");  
-    if (RTN_Valid(mallocRtn)) {
+    if (RTN_Valid(mallocRtn)){ 
         PROTO protoMalloc = PROTO_Allocate(
-            PIN_PARG(void *), 
-            CALLINGSTD_DEFAULT,
+            PIN_PARG(VOID *), 
+			CALLINGSTD_DEFAULT,
             "malloc", 
             PIN_PARG(size_t), 
             PIN_PARG_END());
@@ -502,7 +571,7 @@ VOID Image(IMG img, VOID *v)
             IARG_ORIG_FUNCPTR,
             IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
             IARG_END);
-      }
+    }
 
     RTN freeRtn = RTN_FindByName(img, "free"); 
     if (RTN_Valid(freeRtn))
@@ -519,12 +588,65 @@ VOID Image(IMG img, VOID *v)
         RTN_Close(freeRtn);
     }
 
+//#ifndef __linux__
+//	RTN cfRtn = RTN_FindByName(img, "CreateFileW");
+//	if (RTN_Valid(cfRtn)) {
+//		PROTO protoCF = PROTO_Allocate(
+//			PIN_PARG(HANDLE),
+//			CALLINGSTD_DEFAULT,
+//			"CreateFileW",
+//			PIN_PARG(LPCSTR),
+//			PIN_PARG(DWORD),
+//			PIN_PARG(DWORD),
+//			PIN_PARG(LPSECURITY_ATTRIBUTES),
+//			PIN_PARG(DWORD),
+//			PIN_PARG(DWORD),
+//			PIN_PARG(HANDLE),
+//			PIN_PARG_END());
+//
+//		RTN_ReplaceSignature(
+//			cfRtn,
+//			AFUNPTR(cf_hook),
+//			IARG_PROTOTYPE, protoCF,
+//			IARG_CONST_CONTEXT,
+//			IARG_ORIG_FUNCPTR,
+//			IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
+//			IARG_FUNCARG_ENTRYPOINT_VALUE, 1,
+//			IARG_FUNCARG_ENTRYPOINT_VALUE, 2,
+//			IARG_FUNCARG_ENTRYPOINT_VALUE, 3,
+//			IARG_FUNCARG_ENTRYPOINT_VALUE, 3,
+//			IARG_FUNCARG_ENTRYPOINT_VALUE, 5,
+//			IARG_FUNCARG_ENTRYPOINT_VALUE, 6,
+//			IARG_END);
+//	}
+//
+//	RTN fopenRtn = RTN_FindByName(img, "fopen");
+//	if (RTN_Valid(fopenRtn)) {
+//		PROTO protoFopen = PROTO_Allocate(
+//			PIN_PARG(INT),
+//			CALLINGSTD_DEFAULT,
+//			"fopen",
+//			PIN_PARG(const char *),
+//			PIN_PARG(const char *),
+//			PIN_PARG_END());
+//
+//		RTN_ReplaceSignature(
+//			fopenRtn,
+//			AFUNPTR(fopen_hook),
+//			IARG_PROTOTYPE, protoFopen,
+//			IARG_CONST_CONTEXT,
+//			IARG_ORIG_FUNCPTR,
+//			IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
+//			IARG_FUNCARG_ENTRYPOINT_VALUE, 1,
+//			IARG_END);
+//	}
+//#endif
 }
 
 // SIGSEGV
 BOOL HandleSIGSEGV(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
     if(debug) {
-        *out << PIN_ExceptionToString(pExceptInfo) << std::endl;
+        *out << PIN_ExceptionToString(pExceptInfo) << std::endl << std::flush;
     }
     ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
 
@@ -540,7 +662,7 @@ BOOL HandleSIGSEGV(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const
 // SIGTRAP
 BOOL HandleSIGTRAP(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
     if(debug) {
-        *out << PIN_ExceptionToString(pExceptInfo) << std::endl;
+        *out << PIN_ExceptionToString(pExceptInfo) << std::endl << std::flush;
     }
     ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
     
@@ -556,7 +678,7 @@ BOOL HandleSIGTRAP(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const
 // SIGABRT
 BOOL HandleSIGABRT(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
     if(debug) {
-        *out << PIN_ExceptionToString(pExceptInfo) << std::endl;
+        *out << PIN_ExceptionToString(pExceptInfo) << std::endl << std::flush;
     }
     ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
     
@@ -572,7 +694,7 @@ BOOL HandleSIGABRT(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const
 // SIGILL
 BOOL HandleSIGILL(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
     if(debug) {
-        *out << PIN_ExceptionToString(pExceptInfo) << std::endl;
+        *out << PIN_ExceptionToString(pExceptInfo) << std::endl << std::flush;
     }
     ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
     
@@ -588,7 +710,7 @@ BOOL HandleSIGILL(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const 
 // SIGFPE 
 BOOL HandleSIGFPE(THREADID tid, INT32 sig, CONTEXT *ctx, BOOL hasHandler, const EXCEPTION_INFO *pExceptInfo, VOID *v) {
     if(debug) {
-        *out << PIN_ExceptionToString(pExceptInfo) << std::endl;
+        *out << PIN_ExceptionToString(pExceptInfo) << std::endl << std::flush;
     }
     ADDRINT ip = PIN_GetContextReg(ctx, REG_INST_PTR);
     
@@ -617,6 +739,13 @@ KNOB<BOOL> KnobDebug(
     "0", 
     "Debug prints");
 
+KNOB<BOOL> KnobRecon(
+	KNOB_MODE_WRITEONCE,
+	"pintool",
+	"r",
+	"0",
+	"Print syscall numbers");
+
 KNOB<string> KnobTaintFile(
     KNOB_MODE_WRITEONCE,  
     "pintool",
@@ -631,6 +760,13 @@ KNOB<UINT64> KnobUAF(
     "", 
     "Use after free detection");
 
+VOID Fini(INT32 code, VOID *v)
+{
+	*out << "===============================================" << std::endl;
+	*out << "ANALYSIS COMPLETE" << std::endl;
+	*out << "===============================================" << std::endl;
+}
+
 int main(int argc, char *argv[]) {
     memory_manager = new MemoryManager();
 
@@ -644,19 +780,25 @@ int main(int argc, char *argv[]) {
     if (!fileName.empty()) { 
         out = new std::ofstream(fileName.c_str());
         crash_data.out = out;
+		crash_data.taint_data_list.front()->out = out;
     }
 
     debug = KnobDebug.Value();
+	recon = KnobRecon.Value();
     crash_data.debug = debug;
+	crash_data.taint_data_list.front()->debug = debug;
 
     taintFile = KnobTaintFile.Value();
-
+	*out << "init" << std::endl << std::flush;
     PIN_InitSymbols();
     INS_AddInstrumentFunction(Insn, 0);
+
+//#ifdef __linux__
     PIN_AddSyscallEntryFunction(SyscallEntry, 0);
     PIN_AddSyscallExitFunction(SyscallExit, 0);
+//#endif
     
-    IMG_AddInstrumentFunction(Image, 0);
+   // IMG_AddInstrumentFunction(Image, 0);
 
     for(UINT32 i = 0; i < KnobUAF.NumberOfValues(); i++) {
         uaf_sizes.insert(KnobUAF.Value(i));
@@ -667,6 +809,8 @@ int main(int argc, char *argv[]) {
     PIN_InterceptSignal(SIGABRT, HandleSIGABRT, 0);
     PIN_InterceptSignal(SIGILL, HandleSIGILL, 0);
     PIN_InterceptSignal(SIGFPE, HandleSIGFPE, 0);
+
+	PIN_AddFiniFunction(Fini, 0);
 
     // Start the program, never returns
     PIN_StartProgram();
