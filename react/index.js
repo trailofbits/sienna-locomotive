@@ -144,21 +144,19 @@ class SettingsButton extends React.Component {
 
 class Crashes {
     constructor() {
-        super(props, context);
-
         this.add = this.add.bind(this);
         this.run = this.run.bind(this);
 
         this.queue = [];
-        this.crashes = [];
+        this.triaged = [];
         this.running = false;
     }
 
     add(cmd, filename) {
         console.log(cmd, filename);
-        this.queue.oush({'cmd': cmd, 'filename': filename});
+        this.queue.push({'cmd': cmd, 'filename': filename});
         if(!this.running) { 
-            run();
+            this.run();
         }
     }
 
@@ -166,33 +164,51 @@ class Crashes {
         this.running = true;
         let settings = Settings.get();
         let job = this.queue.shift();
-        this.crashes.push(job);
+        this.triaged.push(job);
 
         let args = [
             '-t', settings['triage_path'], 
             '-f',  job['filename'], 
-            '--', job['cmd']
+            '--'
         ];
+
+        args = args.concat(job['cmd'].match(/[^" ]+|"[^"]+"/g));
+        console.log('args', args);
 
         const child = execFile(settings['pin_path'], args,
             (error, stdout, stderr) => {
-                if (error) {
+                let start = '#### BEGIN CRASH DATA JSON';
+                let end = '#### END CRASH DATA JSON';
+                if(stdout.includes(start) && stdout.includes(end)) {
+                    let json_str = stdout.split(start)[1].split(end)[0];
+                    let crash_data = JSON.parse(json_str);
+                    console.log(crash_data);
+
+                    let job = this.triaged.pop();
+                    job['crash_data'] = crash_data;
+                    this.triaged.push(job);
+                } else if (error) {
+                    this.running = false;
+                    console.log(stdout);
+                    console.log(stderr);
                     throw error;
+                } else {
+                    console.log('Unknown error!');
                 }
 
-                console.log(stdout);
-                let job = this.crashes.pop();
-                job['stdout'] = stdout;
-                this.crashes.push(job);
-
                 if(this.queue.length !== 0) {
-                    run();
+                    console.log("Running next!");
+                    this.run();
                 } else {
+                    console.log("Empty queue!");
                     this.running = false;
                 }
             });
     }
 }
+
+let crashes = new Crashes;
+global['crashes'] = crashes;
 
 class AddCrash extends React.Component {
     constructor(props, context) {
@@ -207,11 +223,13 @@ class AddCrash extends React.Component {
     }
 
     render() {
+        let test_file = 'crash_scratch';
+        let test_cmd = '/home/taxicat/work/sienna-locomotive/triage/corpus/asm/crashy_mccrashface 3';
         return (
             <div className='modal'>
                 <h2>Add Crash</h2>
-                Run command: <input type="text" ref="cmd" /><br />
-                File name: <input type="text" ref="filename" /><br />
+                Run command: <input type="text" ref="cmd" defaultValue={test_cmd}/><br />
+                File name: <input type="text" ref="filename" defaultValue={test_file}/><br />
                 <button onClick={this.props.close}>Close</button>
                 <button onClick={this.saveCrash}>Save</button>
             </div>
@@ -242,7 +260,7 @@ class AddCrashButton extends React.Component {
 
     childSave(cmd, filename) {
         this.setState({showDialog: false});
-        Crashes.add(cmd, filename);
+        crashes.add(cmd, filename);
     }
 
     render() {
