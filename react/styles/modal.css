@@ -1,0 +1,11 @@
+.modal {
+    position: fixed;
+    width: 90%;
+    height: 90%;
+    top: 5%;
+    left: 5%;
+    background: #fff;
+    border: 1px black solid;
+    z-index: 1;
+    padding: 5px;
+}
