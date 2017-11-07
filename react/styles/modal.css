@@ -1,11 +1,18 @@
 .modal {
     position: fixed;
-    width: 90%;
-    height: 90%;
-    top: 5%;
-    left: 5%;
-    background: #fff;
-    border: 1px black solid;
+    width: calc(100% - 8px);
+    height: 100%;
+    top: 0;
+    left: 0;
+    background-color: #000;
     z-index: 1;
-    padding: 5px;
+    margin-left: 8px;
+    overflow: auto;
+    max-height: 100%;
+}
+
+.modal_content {
+    text-align:left;
+    font-size: 1.3em;
+    font-family: "Lucida Console", Monaco, monospace;
 }

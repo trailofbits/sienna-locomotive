@@ -18,9 +18,22 @@
              },
              {
                 test: /\.css$/,  
-                include: /styles/,  
+                // include: /styles/,  
                 loaders: ['style-loader', 'css-loader'],
-            }
+            },
+            {
+                test: /\.png$/,
+                loader: "url-loader",
+                query: { mimetype: "image/png" }
+            },
+            {
+              test: /\.(woff|woff2)?$/,
+              loader: 'url-loader',
+              options: {
+                limit: 50000,
+                mimetype: 'application/font-woff',
+              },
+            },
          ]
      },
      stats: {
