@@ -57,7 +57,6 @@ EXTRN   WriteFile:                  PROC
 EXTRN   ReadFile:                   PROC
 EXTRN   CloseHandle:                PROC
 EXTRN   GetStdHandle:               PROC
-EXTRN   WriteConsoleA:              PROC
 EXTRN   LoadLibraryA:               PROC
 EXTRN   GetProcAddress:             PROC
 EXTRN   FreeLibrary:                PROC
@@ -166,7 +165,7 @@ main PROC
   je      test_dep
   mcall   show_usage
 main_finish:
-  mov     rcx, 2
+  mov     rcx, 0
   mcall   ExitProcess
 test_read_null_nt:
   mcall   read_null_nt
@@ -720,15 +719,22 @@ console_write PROC
   mov     ecx, [stdout]
   mcall   GetStdHandle
   mov     rcx, rax
-  xor     rdx, rdx
+  ; Write File
   pop     r8    ; len
   pop     rdx   ; msg
-  push    0
-  mov     r9, rsp
-  push    0
-  mcall   WriteConsoleA
-  pop     rcx
-  pop     rcx
+  ; unalign for odd number of pushed args
+  mov     rbx, rsp
+  sub     rbx, 8        
+  and     rbx, 0Fh
+  sub     rsp, rbx
+  ; args
+  mov     rcx, rax        ; handle
+  xor     r9, r9
+  push    0               ; 1 arg (ununaligns)
+  sub     rsp, 20h        ; shadow 
+  call    WriteFile
+  add     rsp, 28h        ; shadow + arg
+  add     rsp, rbx        ; realign
   epilogue
 console_write ENDP
 

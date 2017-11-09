@@ -7,7 +7,7 @@ main PROC
   mcall   parse_args
 %s  mcall   show_usage
 main_finish:
-  mov     rcx, 2
+  mov     rcx, 0
   mcall   ExitProcess
 %smain ENDP 
 '''

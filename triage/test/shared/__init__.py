@@ -20,13 +20,21 @@ def init(arch):
 
     config = yaml.load(config)
 
-    tool_path = os.path.join(config['path_tool'], arches[arch], 'taint.so')
+    if os.name == 'nt':
+        tool_path = os.path.join(config['path_tool'], 'taint.dll')
+    else:
+        tool_path = os.path.join(config['path_tool'], arches[arch], 'taint.so')
+
     if not os.path.exists(tool_path):
         print 'ERROR: cannot find taint.so at %s' % tool_path
         sys.exit(1)
     config['tool_path'] = tool_path
 
-    pin_path = os.path.join(config['path_pin'], 'pin')
+    if os.name == 'nt':
+        pin_path = os.path.join(config['path_pin'], 'pin.exe')
+    else:
+        pin_path = os.path.join(config['path_pin'], 'pin')
+
     if not os.path.exists(pin_path):
         print 'ERROR: cannot find pin at %s' % pin_path
         sys.exit(1)
