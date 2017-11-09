@@ -21,8 +21,8 @@ public:
     Flags flags;
     Instruction();
     Instruction(ADDRINT ip, string disas);
-    VOID add_flag(Flags flag);
-    VOID remove_flag(Flags flag);
+    VOID add_flag(Flags flag, std::ostream *out);
+    VOID remove_flag(Flags flag, std::ostream *out);
     BOOL has_flag(Flags flag);
     VOID clear_flags();
 /* 
