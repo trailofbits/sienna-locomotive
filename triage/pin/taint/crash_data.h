@@ -17,8 +17,12 @@ extern "C" {
 #include <signal.h>
 #include <string>
 
+#define DBG_OUT if(debug) *out << "DEBUG: " <<
+#undef DBG_OUT_ID0 
+#define DBG_OUT_ID0 if(debug && ptr_taint_data->id == 0) *out << "DEBUG: " <<
+
 struct AllocInfo {
-    uint32_t size:31;
+    UINT32 size:31;
     bool free:1;
 } __attribute__ ((packed));
 
@@ -35,14 +39,14 @@ public:
 
     #define RECORD_COUNT 5
     ADDRINT last_addrs[RECORD_COUNT];
-	uint32_t last_addrs_head = 0;
+	UINT32 last_addrs_head;
 	ADDRINT last_calls[RECORD_COUNT];
-	UINT32 last_calls_head = 0;
+	UINT32 last_calls_head;
 
     std::ostream *out;
     bool debug;
 
-    uint32_t score;
+    UINT32 score;
     std::string *reason;
 
     CrashData();

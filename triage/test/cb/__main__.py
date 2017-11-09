@@ -1,5 +1,6 @@
 from .. import shared
 import subprocess
+import timeit
 import yaml
 import json
 import sys
@@ -81,6 +82,21 @@ def run_tests(tests):
 
     print results
 
+def baseline(tests):
+    total = 0
+    for test in tests:
+        print test,
+        
+        cb_path = get_path(test)
+        cmd = [cb_path]
+        start = timeit.default_timer()
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        stdout, _ = proc.communicate(inputs[test])
+        end = timeit.default_timer()
+        total += end - start
+    print
+    print total
+
 def output_inputs():
     for cb in inputs:
         with open('/tmp/%s_input' % cb, 'w') as f:
@@ -97,6 +113,7 @@ def main():
     tests = get_tests(tests)
 
     run_tests(tests)
+    #baseline(tests)
 
 if __name__ == '__main__':
     main()

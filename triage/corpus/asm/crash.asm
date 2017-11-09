@@ -515,8 +515,8 @@ stack_ptr_ret_t:
     push    rbp
     mov     rbp, rsp
     mov     rdi, tmpfile
-    mov     rsi, null_data
-    mov     rdx, null_len
+    mov     rsi, aaaa_data
+    mov     rdx, aaaa_len
     call    prep_test
     call    read_file_8
     mov     rsp, rbp
