@@ -5,7 +5,6 @@
 #include <Windows.h>
 #include <psapi.h>
 #include <DbgHelp.h>
-#include <winnt.h>
 #include <tchar.h>
 #include <iostream>
 
@@ -176,6 +175,74 @@ int walk_imports(CREATE_PROCESS_DEBUG_INFO cpdi) {
 	return 0;
 }
 
+int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
+	HANDLE hFile = CreateFile(L"injectable.dll", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hFile == INVALID_HANDLE_VALUE) {
+		printf("ERROR: CreateFile (%x)\n", GetLastError());
+		return 1;
+	}
+
+	DWORD highSize = 0;
+	DWORD lowSize = GetFileSize(hFile, &highSize);
+
+	if (highSize) {
+		printf("ERROR: injectable exceeds 4GB\n");
+		return 1;
+	}
+
+	PBYTE buf = (PBYTE)VirtualAlloc(NULL, lowSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+	if (!buf) {
+		printf("ERROR: VirtualAlloc (%x)\n", GetLastError());
+		return 1;
+	}
+
+	DWORD bytes_read;
+	if (!ReadFile(hFile, buf, lowSize, &bytes_read, NULL) || bytes_read != lowSize) {
+		printf("ERROR: ReadFile (ms_buf) (%x)\n", GetLastError());
+		return 1;
+	}
+
+	PIMAGE_NT_HEADERS pNtHeaders = ImageNtHeader(buf);
+	if (!pNtHeaders) {
+		printf("ERROR: ImageNtHeader (%x)\n", GetLastError());
+		return 1;
+	}
+
+	printf("IMAGE SIZE: %x\n", pNtHeaders->OptionalHeader.SizeOfImage);
+	LPVOID remoteBase = VirtualAllocEx(cpdi.hProcess, NULL, pNtHeaders->OptionalHeader.SizeOfImage, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+
+	PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)buf;
+	PIMAGE_SECTION_HEADER pSectionHeader = (PIMAGE_SECTION_HEADER)(buf + pDosHeader->e_lfanew + sizeof(IMAGE_NT_HEADERS));
+
+	// write headers
+	SIZE_T bytesWritten;
+	WriteProcessMemory(cpdi.hProcess, remoteBase, buf, pSectionHeader->PointerToRawData, &bytesWritten);
+
+	// loop write sections
+	WORD sectionCount = pNtHeaders->FileHeader.NumberOfSections;
+	for (WORD i = 0; i < sectionCount; i++) {
+		pSectionHeader = (PIMAGE_SECTION_HEADER)(buf + pDosHeader->e_lfanew + sizeof(IMAGE_NT_HEADERS) + sizeof(IMAGE_SECTION_HEADER) * i);
+	
+		LPVOID remoteVA = (LPVOID)((uintptr_t)remoteBase + pSectionHeader->VirtualAddress);
+		WriteProcessMemory(cpdi.hProcess, remoteVA, buf + pSectionHeader->PointerToRawData, pSectionHeader->SizeOfRawData, &bytesWritten);
+	}
+
+	// fixup reloc
+	// fixup IAT
+
+	return 0;
+}
+
+// inject
+// read file
+// sum headers + virtual sizes (just use ImageSize?)
+// allocate virtual size in remote process
+// load file into remote process section by section
+
+// hook
+// locate hook functions (export table?)
+// walk import table and replace any functions found to match
+
 int debug_main_loop() {
 	DWORD dwContinueStatus = DBG_CONTINUE;
 	CREATE_PROCESS_DEBUG_INFO cpdi;
@@ -195,11 +262,14 @@ int debug_main_loop() {
 		switch (dbgev.dwDebugEventCode)
 		{
 		case EXCEPTION_DEBUG_EVENT:
+			PVOID address;
+			address = dbgev.u.Exception.ExceptionRecord.ExceptionAddress;
 			switch (dbgev.u.Exception.ExceptionRecord.ExceptionCode)
 			{
 				case EXCEPTION_ACCESS_VIOLATION:
 					break;
 				case EXCEPTION_BREAKPOINT:
+					printf("BREAK AT %x\n", address);
 					walk_imports(cpdi);
 					break;
 				case EXCEPTION_DATATYPE_MISALIGNMENT:
@@ -216,7 +286,9 @@ int debug_main_loop() {
 			break;
 		case CREATE_PROCESS_DEBUG_EVENT:
 			cpdi = dbgev.u.CreateProcessInfo;
+			printf("START ADDR %x\n", cpdi.lpStartAddress);
 			DebugBreakProcess(cpdi.hProcess);
+			injector();
 			break;
 		case EXIT_THREAD_DEBUG_EVENT:
 			break;
