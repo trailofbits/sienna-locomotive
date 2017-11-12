@@ -7,175 +7,30 @@
 #include <DbgHelp.h>
 #include <tchar.h>
 #include <iostream>
+#include "ImportHandler.h"
 
 typedef unsigned __int64 QWORD;
 // TODO: check return of every call
+// TODO: support 32bit
 
-int walk_import_descriptor(CREATE_PROCESS_DEBUG_INFO cpdi, IMAGE_IMPORT_DESCRIPTOR iid, WORD machine) {
-	PVOID lpBaseOfImage = cpdi.lpBaseOfImage;
-	LPVOID lpvScratch;
-	SIZE_T bytesRead;
-	
-	if (machine == IMAGE_FILE_MACHINE_AMD64) {
-		DWORD index = 0;
-		do {
-			IMAGE_THUNK_DATA64 itd_orig;
-			lpvScratch = (LPVOID)((uintptr_t)lpBaseOfImage + iid.OriginalFirstThunk + index * sizeof(IMAGE_THUNK_DATA64));
-			ReadProcessMemory(cpdi.hProcess, lpvScratch, &itd_orig, sizeof(IMAGE_THUNK_DATA64), &bytesRead);
-
-			if (itd_orig.u1.AddressOfData == 0) {
-				break;
-			}
-
-			uint64_t iatFirstThunkAddr;
-			lpvScratch = (LPVOID)((uintptr_t)lpBaseOfImage + iid.FirstThunk + index * sizeof(uint64_t));
-			ReadProcessMemory(cpdi.hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint64_t), &bytesRead);
-
-			if (iatFirstThunkAddr == 0) {
-				break;
-			}
-
-			if (itd_orig.u1.Ordinal & 0x80000000) {
-				// ordinal 
-				printf("\t%x\t%x (ord)\n", iatFirstThunkAddr, itd_orig.u1.Ordinal & 0x7FFFFFFF);
-			}
-			else {
-				BYTE pFuncName[MAX_PATH];
-				PBYTE dst = pFuncName;
-				lpvScratch = (LPVOID)((uintptr_t)lpBaseOfImage + itd_orig.u1.AddressOfData + 2);
-
-				DWORD nameIndex = 0;
-				do {
-					ReadProcessMemory(cpdi.hProcess, lpvScratch, pFuncName + nameIndex, sizeof(BYTE), &bytesRead);
-					nameIndex++;
-					lpvScratch = (LPVOID)((uintptr_t)lpvScratch + 1);
-				} while (pFuncName[nameIndex - 1] != 0 && nameIndex < MAX_PATH);
-
-				printf("\t%x\t%s\n", iatFirstThunkAddr, pFuncName);
-			}
-
-			index++;
-		} while (1);
-	}
-	else if (machine == IMAGE_FILE_MACHINE_I386) {
-		DWORD index = 0;
-		do {
-			IMAGE_THUNK_DATA32 itd_orig;
-			lpvScratch = (LPVOID)((uintptr_t)lpBaseOfImage + iid.OriginalFirstThunk + index * sizeof(IMAGE_THUNK_DATA32));
-			ReadProcessMemory(cpdi.hProcess, lpvScratch, &itd_orig, sizeof(IMAGE_THUNK_DATA32), &bytesRead);
-
-			if (itd_orig.u1.AddressOfData == 0) {
-				break;
-			}
-
-			uint32_t iatFirstThunkAddr;
-			lpvScratch = (LPVOID)((uintptr_t)lpBaseOfImage + iid.FirstThunk + index * sizeof(uint32_t));
-			ReadProcessMemory(cpdi.hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint32_t), &bytesRead);
-
-			if (iatFirstThunkAddr == 0) {
-				break;
-			}
-
-			if (itd_orig.u1.Ordinal & 0x80000000) {
-				// ordinal 
-				printf("\t%x\t%x (ord)\n", iatFirstThunkAddr, itd_orig.u1.Ordinal & 0x7FFFFFFF);
-			}
-			else {
-				BYTE pFuncName[MAX_PATH];
-				PBYTE dst = pFuncName;
-				lpvScratch = (LPVOID)((uintptr_t)lpBaseOfImage + itd_orig.u1.AddressOfData + 2);
-
-				DWORD nameIndex = 0;
-				do {
-					ReadProcessMemory(cpdi.hProcess, lpvScratch, pFuncName + nameIndex, sizeof(BYTE), &bytesRead);
-					nameIndex++;
-					lpvScratch = (LPVOID)((uintptr_t)lpvScratch + 1);
-				} while (pFuncName[nameIndex - 1] != 0 && nameIndex < MAX_PATH);
-
-				printf("\t%x\t%s\n", iatFirstThunkAddr, pFuncName);
-			}
-
-			index++;
-		} while (1);
-	}
-
-	return 0;
-}
-
-int walk_imports(CREATE_PROCESS_DEBUG_INFO cpdi) {
-	SIZE_T bytesRead;
-	PVOID lpBaseOfImage = cpdi.lpBaseOfImage;
-
-	if (lpBaseOfImage != 0) {
-		IMAGE_DOS_HEADER dosHeader;
-		printf("dosHeader addr: %x\n", lpBaseOfImage);
-		ReadProcessMemory(cpdi.hProcess, lpBaseOfImage, &dosHeader, sizeof(IMAGE_DOS_HEADER), &bytesRead);
-
-		// IMAGE_NT_HEADERS64?
-		WORD machine;
-		LPVOID lpvScratch = (LPVOID)((uintptr_t)lpBaseOfImage + dosHeader.e_lfanew + 4);
-		printf("machine addr: %x\n", lpvScratch);
-		if (!ReadProcessMemory(cpdi.hProcess, (PVOID)((uintptr_t)lpvScratch), &machine, sizeof(WORD), &bytesRead) || bytesRead != sizeof(WORD)) {
-			printf("ERROR: ReadProcessMemory(machine) (%x) (%x)\n", GetLastError(), bytesRead);
+int walk_imports(HANDLE hProcess, PVOID lpBaseOfImage) {
+	ImportHandler importHandler(hProcess, lpBaseOfImage);
+	while (1) {
+		std::string moduleName = importHandler.GetNextModule();
+		if (moduleName == "") {
+			break;
 		}
-		printf("machine: %x\n", machine);
+		printf("%s\n", moduleName.c_str());
 
-		lpvScratch = (LPVOID)((uintptr_t)lpBaseOfImage + dosHeader.e_lfanew);
-		printf("ntHeaders addr: %x\n", lpvScratch);
-		uintptr_t importEntryVA;
-		if (machine == IMAGE_FILE_MACHINE_AMD64) {
-			IMAGE_NT_HEADERS64 ntHeaders = { 0 };
-			if (!ReadProcessMemory(cpdi.hProcess, lpvScratch, &ntHeaders, sizeof(IMAGE_NT_HEADERS64), &bytesRead)) {
-				printf("ERROR: ReadProcessMemory(ntHeaders) (%x)\n", GetLastError());
-				return 1;
-			}
-
-			IMAGE_DATA_DIRECTORY importEntry = ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
-			printf("importEntry.virtual addr: %x\n", importEntry.VirtualAddress);
-			importEntryVA = importEntry.VirtualAddress;
-		}
-		else if (machine == IMAGE_FILE_MACHINE_I386) {
-			IMAGE_NT_HEADERS32 ntHeaders = { 0 };
-			if (!ReadProcessMemory(cpdi.hProcess, lpvScratch, &ntHeaders, sizeof(IMAGE_NT_HEADERS32), &bytesRead)) {
-				printf("ERROR: ReadProcessMemory(ntHeaders) (%x)\n", GetLastError());
-				return 1;
-			}
-
-			IMAGE_DATA_DIRECTORY importEntry = ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
-			printf("importEntry.virtual addr: %x\n", importEntry.VirtualAddress);
-			importEntryVA = importEntry.VirtualAddress;
-		}
-		
-		IMAGE_IMPORT_DESCRIPTOR iid;
-		DWORD index = 0;
-		printf("iid addr: %x\n", lpvScratch);
-		
-		do {
-			lpvScratch = (PVOID)((uintptr_t)lpBaseOfImage + importEntryVA + sizeof(IMAGE_IMPORT_DESCRIPTOR)*index);
-			ReadProcessMemory(cpdi.hProcess, lpvScratch, &iid, sizeof(IMAGE_IMPORT_DESCRIPTOR), &bytesRead);
-			index++;
-
-			if (iid.Characteristics == 0) {
+		while (1) {
+			std::string functionName = importHandler.GetNextFunction();
+			if (functionName == "") {
 				break;
 			}
 
-			BYTE pModName[MAX_PATH];
-			PBYTE dst = pModName;
-			lpvScratch = (LPVOID)((uintptr_t)lpBaseOfImage + iid.Name);
-
-			DWORD nameIndex = 0;
-			do {
-				ReadProcessMemory(cpdi.hProcess, lpvScratch, pModName + nameIndex, sizeof(BYTE), &bytesRead);
-				nameIndex++;
-				lpvScratch = (LPVOID)((uintptr_t)lpvScratch + 1);
-			} while (pModName[nameIndex - 1] != 0 && nameIndex < MAX_PATH);
-
-			printf("Name: %s\n", (CHAR *)pModName);
-			walk_import_descriptor(cpdi, iid, machine);
-		} while (iid.Characteristics != 0); // this is checked elsewhere but whatever, safety first
+			printf("\t%x\t%s\n", importHandler.GetFunctionAddr(), functionName.c_str());
+		}
 	}
-
-	return 0;
 }
 
 int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
@@ -337,9 +192,66 @@ int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
 	}
 
 	// fixup IAT
-	// enum modules
-	// fixup what we have
-	// load what we don't
+	walk_imports(cpdi.hProcess, remoteBase);
+
+	// EnumProcessModules
+	HMODULE hMods[1024] = { 0 };
+	DWORD cbNeeded;
+	EnumProcessModules(cpdi.hProcess, hMods, sizeof(HMODULE) * 1024, &cbNeeded);
+	
+	walk_imports(cpdi.hProcess, cpdi.lpBaseOfImage);
+
+	DWORD modCount = cbNeeded / sizeof(HMODULE);
+	if (modCount > 1024) {
+		modCount = 1024;
+	}
+
+	for (DWORD i = 0; i < modCount; i++) {
+		TCHAR baseName[MAX_PATH];
+		GetModuleBaseName(cpdi.hProcess, hMods[i], baseName, MAX_PATH);
+		printf("BASE NAME: %S\n", baseName);
+	}
+
+	ImportHandler targetImportHandler(cpdi.hProcess, cpdi.lpBaseOfImage);
+	// walk target
+		// MODULE MAP:
+			// FUNCTION MAP:
+				// FUNCTION NAME : FUNCTION ADDR
+		// std::map<std::string, std::map<std::string, UINT64>>;
+
+	ImportHandler injectableImportHandler(cpdi.hProcess, remoteBase);
+	// walk injectable imports
+		// walk functions till we have a match
+			// get base
+		// reset functions
+		// walk functions and fixup addresses
+		
+
+	while (1) {
+		std::string moduleName = injectableImportHandler.GetNextModule();
+		if (moduleName == "") {
+			break;
+		}
+		printf("%s\n", moduleName.c_str());
+
+		while (1) {
+			std::string functionName = injectableImportHandler.GetNextFunction();
+			if (functionName == "") {
+				break;
+			}
+
+			printf("\t%x\t%s\n", importHandler.GetFunctionAddr(), functionName.c_str());
+		}
+	}
+	// walk injected's imported libs
+		// match names with
+			// GetModuleInformation
+			// injected libs
+			// if no match
+				// inject lib
+		// get base
+		// get expected base
+		// walk inject import functions and fix base
 
 	return 0;
 }
@@ -376,7 +288,8 @@ int debug_main_loop() {
 					break;
 				case EXCEPTION_BREAKPOINT:
 					printf("BREAK AT %x\n", address);
-					walk_imports(cpdi);
+					//walk_imports(cpdi.hProcess, cpdi.lpBaseOfImage);
+					injector(cpdi);
 					break;
 				case EXCEPTION_DATATYPE_MISALIGNMENT:
 					break;
@@ -394,7 +307,6 @@ int debug_main_loop() {
 			cpdi = dbgev.u.CreateProcessInfo;
 			printf("START ADDR %x\n", cpdi.lpStartAddress);
 			DebugBreakProcess(cpdi.hProcess);
-			injector(cpdi);
 			break;
 		case EXIT_THREAD_DEBUG_EVENT:
 			break;
