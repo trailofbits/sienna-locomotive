@@ -228,6 +228,16 @@ int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
 	}
 
 	// fixup reloc
+	// get size of reloc table
+	// calculate diff between preferred and remote base
+	// iterate over reloc bases
+		// calculate remoteBase + pageRVA
+		// calculate num blocks (block size - 8)
+		// iterate blocks
+			// get reloc type, offset
+			// switch reloc type
+				// do reloc
+
 	// fixup IAT
 
 	return 0;
@@ -288,7 +298,7 @@ int debug_main_loop() {
 			cpdi = dbgev.u.CreateProcessInfo;
 			printf("START ADDR %x\n", cpdi.lpStartAddress);
 			DebugBreakProcess(cpdi.hProcess);
-			injector();
+			injector(cpdi);
 			break;
 		case EXIT_THREAD_DEBUG_EVENT:
 			break;
