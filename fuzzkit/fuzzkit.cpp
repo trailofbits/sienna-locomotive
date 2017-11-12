@@ -8,6 +8,9 @@
 #include <tchar.h>
 #include <iostream>
 
+typedef unsigned __int64 QWORD;
+// TODO: check return of every call
+
 int walk_import_descriptor(CREATE_PROCESS_DEBUG_INFO cpdi, IMAGE_IMPORT_DESCRIPTOR iid, WORD machine) {
 	PVOID lpBaseOfImage = cpdi.lpBaseOfImage;
 	LPVOID lpvScratch;
@@ -176,6 +179,7 @@ int walk_imports(CREATE_PROCESS_DEBUG_INFO cpdi) {
 }
 
 int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
+	// read in injectable
 	HANDLE hFile = CreateFile(L"injectable.dll", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hFile == INVALID_HANDLE_VALUE) {
 		printf("ERROR: CreateFile (%x)\n", GetLastError());
@@ -184,7 +188,6 @@ int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
 
 	DWORD highSize = 0;
 	DWORD lowSize = GetFileSize(hFile, &highSize);
-
 	if (highSize) {
 		printf("ERROR: injectable exceeds 4GB\n");
 		return 1;
@@ -202,15 +205,18 @@ int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
 		return 1;
 	}
 
+	// get nt headers
 	PIMAGE_NT_HEADERS pNtHeaders = ImageNtHeader(buf);
 	if (!pNtHeaders) {
 		printf("ERROR: ImageNtHeader (%x)\n", GetLastError());
 		return 1;
 	}
 
+	// allocate mem in target process
 	printf("IMAGE SIZE: %x\n", pNtHeaders->OptionalHeader.SizeOfImage);
 	LPVOID remoteBase = VirtualAllocEx(cpdi.hProcess, NULL, pNtHeaders->OptionalHeader.SizeOfImage, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
 
+	// get dos and section headers
 	PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)buf;
 	PIMAGE_SECTION_HEADER pSectionHeader = (PIMAGE_SECTION_HEADER)(buf + pDosHeader->e_lfanew + sizeof(IMAGE_NT_HEADERS));
 
@@ -229,16 +235,111 @@ int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
 
 	// fixup reloc
 	// get size of reloc table
-	// calculate diff between preferred and remote base
+	IMAGE_DATA_DIRECTORY relocDir = pNtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
+
+	// intended base
+	DWORD baseOfCode = pNtHeaders->OptionalHeader.BaseOfCode;
+
+	DWORD consumed = 0;
+	LPVOID relocVA = (LPVOID)((uintptr_t)remoteBase + relocDir.VirtualAddress);
 	// iterate over reloc bases
+	while (consumed < relocDir.Size) {
+		SIZE_T bytesRead;
+		IMAGE_BASE_RELOCATION relocBase;
+		ReadProcessMemory(cpdi.hProcess, relocVA, &relocBase, sizeof(IMAGE_BASE_RELOCATION), &bytesRead);
+
 		// calculate remoteBase + pageRVA
+		LPVOID pageBase = (LPVOID)((uintptr_t)remoteBase + relocBase.VirtualAddress);
+
+		// consume relocBase
+		consumed += 8;
+		relocVA = (LPVOID)((uintptr_t)relocVA + 8);
+
 		// calculate num blocks (block size - 8)
+		DWORD blockCount = (relocBase.SizeOfBlock - 8) / 2;
+
 		// iterate blocks
+		DWORD highAdj = 0;
+		LPVOID highAdjVA = 0;
+		BOOL processHighAdj = false;
+
+		uintptr_t imageBaseInt = pNtHeaders->OptionalHeader.ImageBase;
+		uintptr_t remoteBaseInt = (uintptr_t)remoteBase;
+
+		for (int i = 0; i < blockCount; i++) {
 			// get reloc type, offset
-			// switch reloc type
-				// do reloc
+			WORD relocationBlock;
+			ReadProcessMemory(cpdi.hProcess, relocVA, &relocationBlock, sizeof(WORD), &bytesRead);
+
+			WORD type = relocationBlock >> 12;
+			WORD offset = relocationBlock & 0xFFF;
+
+			LPVOID targetVA = (LPVOID)((uintptr_t)pageBase + offset);
+			
+			WORD target16;
+			DWORD target32;
+			QWORD target64;
+
+			if (!processHighAdj) {
+				// switch reloc type
+				switch (type) {
+					case IMAGE_REL_BASED_HIGH:
+						ReadProcessMemory(cpdi.hProcess, targetVA, &target16, sizeof(WORD), &bytesRead);
+						target16 -= imageBaseInt >> 16;
+						target16 += remoteBaseInt >> 16;
+						WriteProcessMemory(cpdi.hProcess, targetVA, &target16, sizeof(WORD), &bytesWritten);
+						break;
+					case IMAGE_REL_BASED_LOW:
+						ReadProcessMemory(cpdi.hProcess, targetVA, &target16, sizeof(WORD), &bytesRead);
+						target16 -= imageBaseInt & 0xFFFF;
+						target16 += remoteBaseInt & 0xFFFF;
+						WriteProcessMemory(cpdi.hProcess, targetVA, &target16, sizeof(WORD), &bytesWritten);
+						break;
+					case IMAGE_REL_BASED_HIGHLOW:
+						ReadProcessMemory(cpdi.hProcess, targetVA, &target32, sizeof(DWORD), &bytesRead);
+						target32 -= imageBaseInt;
+						target32 += remoteBaseInt;
+						WriteProcessMemory(cpdi.hProcess, targetVA, &target32, sizeof(DWORD), &bytesWritten);
+						break;
+					case IMAGE_REL_BASED_HIGHADJ:
+						// who the fuck designed this bullshit?
+						ReadProcessMemory(cpdi.hProcess, targetVA, &target16, sizeof(WORD), &bytesRead);
+						highAdj = target16 << 16;
+						highAdjVA = targetVA;
+						processHighAdj = true;
+						break;
+					case IMAGE_REL_BASED_DIR64:
+						ReadProcessMemory(cpdi.hProcess, targetVA, &target64, sizeof(QWORD), &bytesRead);
+						target64 -= imageBaseInt;
+						target64 += remoteBaseInt;
+						WriteProcessMemory(cpdi.hProcess, targetVA, &target64, sizeof(QWORD), &bytesWritten);
+						break;
+					default:
+						break;
+				}
+			}
+			else {
+				// seriously, HIGHADJ is stupid
+				highAdj |= relocationBlock;
+				highAdj -= imageBaseInt & 0xFFFF0000;
+				highAdj += remoteBaseInt & 0xFFFF0000;
+				target16 = highAdj >> 16;
+				WriteProcessMemory(cpdi.hProcess, highAdjVA, &target16, sizeof(WORD), &bytesWritten);
+			
+				highAdj = 0;
+				highAdjVA = 0;
+				processHighAdj = false;
+			}
+
+			consumed += 2;
+			relocVA = (LPVOID)((uintptr_t)relocVA + 2);
+		}
+	}
 
 	// fixup IAT
+	// enum modules
+	// fixup what we have
+	// load what we don't
 
 	return 0;
 }
@@ -256,11 +357,6 @@ int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
 int debug_main_loop() {
 	DWORD dwContinueStatus = DBG_CONTINUE;
 	CREATE_PROCESS_DEBUG_INFO cpdi;
-	// TODO: exit when all processes have exited
-
-	// ANSWER: does LOAD_DLL_DEBUG_EVENT fire before first brk hit
-	// ANSWER: should we hook them as they are loaded (probably) or when brk is hit
-	// ANSWER: once first brk is hit, which DLLs are loaded
 
 	for (;;)
 	{
@@ -304,6 +400,7 @@ int debug_main_loop() {
 			break;
 		case EXIT_PROCESS_DEBUG_EVENT:
 			EXIT_PROCESS_DEBUG_INFO epdi = dbgev.u.ExitProcess;
+			// TODO: exit when all processes have exited
 			break;
 		case LOAD_DLL_DEBUG_EVENT:
 			LOAD_DLL_DEBUG_INFO lddi = dbgev.u.LoadDll;
