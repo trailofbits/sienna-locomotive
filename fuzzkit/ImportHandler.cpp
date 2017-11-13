@@ -8,18 +8,14 @@ ImportHandler::ImportHandler(HANDLE hProcess, LPVOID lpvBaseOfImage) {
 	SIZE_T bytesRead;
 
 	if (this->lpvBaseOfImage != 0) {
-		printf("dosHeader addr: %x\n", this->lpvBaseOfImage);
 		ReadProcessMemory(hProcess, this->lpvBaseOfImage, &(this->dosHeader), sizeof(IMAGE_DOS_HEADER), &bytesRead);
 
 		LPVOID lpvScratch = (LPVOID)((uintptr_t)this->lpvBaseOfImage + this->dosHeader.e_lfanew + 4);
-		printf("machine addr: %x\n", lpvScratch);
 		if (!ReadProcessMemory(hProcess, (PVOID)((uintptr_t)lpvScratch), &(this->machine), sizeof(WORD), &bytesRead) || bytesRead != sizeof(WORD)) {
 			printf("ERROR: ReadProcessMemory(machine) (%x) (%x)\n", GetLastError(), bytesRead);
 		}
-		printf("machine: %x\n", this->machine);
 
 		lpvScratch = (LPVOID)((uintptr_t)this->lpvBaseOfImage + this->dosHeader.e_lfanew);
-		printf("ntHeaders addr: %x\n", lpvScratch);
 		if (this->machine == IMAGE_FILE_MACHINE_AMD64) {
 			IMAGE_NT_HEADERS64 ntHeaders = { 0 };
 			if (!ReadProcessMemory(hProcess, lpvScratch, &ntHeaders, sizeof(IMAGE_NT_HEADERS64), &bytesRead)) {
@@ -28,7 +24,6 @@ ImportHandler::ImportHandler(HANDLE hProcess, LPVOID lpvBaseOfImage) {
 			}
 
 			IMAGE_DATA_DIRECTORY importEntry = ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
-			printf("importEntry.virtual addr: %x\n", importEntry.VirtualAddress);
 			this->importEntryVA = importEntry.VirtualAddress;
 		}
 		else if (this->machine == IMAGE_FILE_MACHINE_I386) {
@@ -39,7 +34,6 @@ ImportHandler::ImportHandler(HANDLE hProcess, LPVOID lpvBaseOfImage) {
 			}
 
 			IMAGE_DATA_DIRECTORY importEntry = ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
-			printf("importEntry.virtual addr: %x\n", importEntry.VirtualAddress);
 			this->importEntryVA = importEntry.VirtualAddress;
 		}
 	}

@@ -8,6 +8,7 @@
 #include <tchar.h>
 #include <iostream>
 #include "ImportHandler.h"
+#include <map>
 
 typedef unsigned __int64 QWORD;
 // TODO: check return of every call
@@ -33,61 +34,8 @@ int walk_imports(HANDLE hProcess, PVOID lpBaseOfImage) {
 	}
 }
 
-int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
-	// read in injectable
-	HANDLE hFile = CreateFile(L"injectable.dll", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (hFile == INVALID_HANDLE_VALUE) {
-		printf("ERROR: CreateFile (%x)\n", GetLastError());
-		return 1;
-	}
-
-	DWORD highSize = 0;
-	DWORD lowSize = GetFileSize(hFile, &highSize);
-	if (highSize) {
-		printf("ERROR: injectable exceeds 4GB\n");
-		return 1;
-	}
-
-	PBYTE buf = (PBYTE)VirtualAlloc(NULL, lowSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-	if (!buf) {
-		printf("ERROR: VirtualAlloc (%x)\n", GetLastError());
-		return 1;
-	}
-
-	DWORD bytes_read;
-	if (!ReadFile(hFile, buf, lowSize, &bytes_read, NULL) || bytes_read != lowSize) {
-		printf("ERROR: ReadFile (ms_buf) (%x)\n", GetLastError());
-		return 1;
-	}
-
-	// get nt headers
-	PIMAGE_NT_HEADERS pNtHeaders = ImageNtHeader(buf);
-	if (!pNtHeaders) {
-		printf("ERROR: ImageNtHeader (%x)\n", GetLastError());
-		return 1;
-	}
-
-	// allocate mem in target process
-	printf("IMAGE SIZE: %x\n", pNtHeaders->OptionalHeader.SizeOfImage);
-	LPVOID remoteBase = VirtualAllocEx(cpdi.hProcess, NULL, pNtHeaders->OptionalHeader.SizeOfImage, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-
-	// get dos and section headers
-	PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)buf;
-	PIMAGE_SECTION_HEADER pSectionHeader = (PIMAGE_SECTION_HEADER)(buf + pDosHeader->e_lfanew + sizeof(IMAGE_NT_HEADERS));
-
-	// write headers
+int injectorRelocations(CREATE_PROCESS_DEBUG_INFO cpdi, PIMAGE_NT_HEADERS pNtHeaders, LPVOID remoteBase) {
 	SIZE_T bytesWritten;
-	WriteProcessMemory(cpdi.hProcess, remoteBase, buf, pSectionHeader->PointerToRawData, &bytesWritten);
-
-	// loop write sections
-	WORD sectionCount = pNtHeaders->FileHeader.NumberOfSections;
-	for (WORD i = 0; i < sectionCount; i++) {
-		pSectionHeader = (PIMAGE_SECTION_HEADER)(buf + pDosHeader->e_lfanew + sizeof(IMAGE_NT_HEADERS) + sizeof(IMAGE_SECTION_HEADER) * i);
-	
-		LPVOID remoteVA = (LPVOID)((uintptr_t)remoteBase + pSectionHeader->VirtualAddress);
-		WriteProcessMemory(cpdi.hProcess, remoteVA, buf + pSectionHeader->PointerToRawData, pSectionHeader->SizeOfRawData, &bytesWritten);
-	}
-
 	// fixup reloc
 	// get size of reloc table
 	IMAGE_DATA_DIRECTORY relocDir = pNtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
@@ -130,7 +78,7 @@ int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
 			WORD offset = relocationBlock & 0xFFF;
 
 			LPVOID targetVA = (LPVOID)((uintptr_t)pageBase + offset);
-			
+
 			WORD target16;
 			DWORD target32;
 			QWORD target64;
@@ -138,39 +86,39 @@ int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
 			if (!processHighAdj) {
 				// switch reloc type
 				switch (type) {
-					case IMAGE_REL_BASED_HIGH:
-						ReadProcessMemory(cpdi.hProcess, targetVA, &target16, sizeof(WORD), &bytesRead);
-						target16 -= imageBaseInt >> 16;
-						target16 += remoteBaseInt >> 16;
-						WriteProcessMemory(cpdi.hProcess, targetVA, &target16, sizeof(WORD), &bytesWritten);
-						break;
-					case IMAGE_REL_BASED_LOW:
-						ReadProcessMemory(cpdi.hProcess, targetVA, &target16, sizeof(WORD), &bytesRead);
-						target16 -= imageBaseInt & 0xFFFF;
-						target16 += remoteBaseInt & 0xFFFF;
-						WriteProcessMemory(cpdi.hProcess, targetVA, &target16, sizeof(WORD), &bytesWritten);
-						break;
-					case IMAGE_REL_BASED_HIGHLOW:
-						ReadProcessMemory(cpdi.hProcess, targetVA, &target32, sizeof(DWORD), &bytesRead);
-						target32 -= imageBaseInt;
-						target32 += remoteBaseInt;
-						WriteProcessMemory(cpdi.hProcess, targetVA, &target32, sizeof(DWORD), &bytesWritten);
-						break;
-					case IMAGE_REL_BASED_HIGHADJ:
-						// who the fuck designed this bullshit?
-						ReadProcessMemory(cpdi.hProcess, targetVA, &target16, sizeof(WORD), &bytesRead);
-						highAdj = target16 << 16;
-						highAdjVA = targetVA;
-						processHighAdj = true;
-						break;
-					case IMAGE_REL_BASED_DIR64:
-						ReadProcessMemory(cpdi.hProcess, targetVA, &target64, sizeof(QWORD), &bytesRead);
-						target64 -= imageBaseInt;
-						target64 += remoteBaseInt;
-						WriteProcessMemory(cpdi.hProcess, targetVA, &target64, sizeof(QWORD), &bytesWritten);
-						break;
-					default:
-						break;
+				case IMAGE_REL_BASED_HIGH:
+					ReadProcessMemory(cpdi.hProcess, targetVA, &target16, sizeof(WORD), &bytesRead);
+					target16 -= imageBaseInt >> 16;
+					target16 += remoteBaseInt >> 16;
+					WriteProcessMemory(cpdi.hProcess, targetVA, &target16, sizeof(WORD), &bytesWritten);
+					break;
+				case IMAGE_REL_BASED_LOW:
+					ReadProcessMemory(cpdi.hProcess, targetVA, &target16, sizeof(WORD), &bytesRead);
+					target16 -= imageBaseInt & 0xFFFF;
+					target16 += remoteBaseInt & 0xFFFF;
+					WriteProcessMemory(cpdi.hProcess, targetVA, &target16, sizeof(WORD), &bytesWritten);
+					break;
+				case IMAGE_REL_BASED_HIGHLOW:
+					ReadProcessMemory(cpdi.hProcess, targetVA, &target32, sizeof(DWORD), &bytesRead);
+					target32 -= imageBaseInt;
+					target32 += remoteBaseInt;
+					WriteProcessMemory(cpdi.hProcess, targetVA, &target32, sizeof(DWORD), &bytesWritten);
+					break;
+				case IMAGE_REL_BASED_HIGHADJ:
+					// who the fuck designed this bullshit?
+					ReadProcessMemory(cpdi.hProcess, targetVA, &target16, sizeof(WORD), &bytesRead);
+					highAdj = target16 << 16;
+					highAdjVA = targetVA;
+					processHighAdj = true;
+					break;
+				case IMAGE_REL_BASED_DIR64:
+					ReadProcessMemory(cpdi.hProcess, targetVA, &target64, sizeof(QWORD), &bytesRead);
+					target64 -= imageBaseInt;
+					target64 += remoteBaseInt;
+					WriteProcessMemory(cpdi.hProcess, targetVA, &target64, sizeof(QWORD), &bytesWritten);
+					break;
+				default:
+					break;
 				}
 			}
 			else {
@@ -180,7 +128,7 @@ int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
 				highAdj += remoteBaseInt & 0xFFFF0000;
 				target16 = highAdj >> 16;
 				WriteProcessMemory(cpdi.hProcess, highAdjVA, &target16, sizeof(WORD), &bytesWritten);
-			
+
 				highAdj = 0;
 				highAdjVA = 0;
 				processHighAdj = false;
@@ -191,14 +139,21 @@ int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
 		}
 	}
 
+	return 0;
+}
+
+int injectorImports(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
+
 	// fixup IAT
 	walk_imports(cpdi.hProcess, remoteBase);
-
+	// 8998 b7fc
+	// 89c7 3ea2
+	// 8998 f332
 	// EnumProcessModules
 	HMODULE hMods[1024] = { 0 };
 	DWORD cbNeeded;
 	EnumProcessModules(cpdi.hProcess, hMods, sizeof(HMODULE) * 1024, &cbNeeded);
-	
+
 	walk_imports(cpdi.hProcess, cpdi.lpBaseOfImage);
 
 	DWORD modCount = cbNeeded / sizeof(HMODULE);
@@ -213,26 +168,43 @@ int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
 	}
 
 	ImportHandler targetImportHandler(cpdi.hProcess, cpdi.lpBaseOfImage);
-	// walk target
-		// MODULE MAP:
-			// FUNCTION MAP:
-				// FUNCTION NAME : FUNCTION ADDR
-		// std::map<std::string, std::map<std::string, UINT64>>;
+	std::map<std::string, std::map<std::string, UINT64>> targetImports;
+
+	// walk target and map modules : (functions : addrs)
+	while (1) {
+		std::string moduleName = targetImportHandler.GetNextModule();
+		if (moduleName == "") {
+			break;
+		}
+
+		while (1) {
+			std::string functionName = targetImportHandler.GetNextFunction();
+			if (functionName == "") {
+				break;
+			}
+
+			targetImports[moduleName][functionName] = targetImportHandler.GetFunctionAddr();
+		}
+	}
 
 	ImportHandler injectableImportHandler(cpdi.hProcess, remoteBase);
-	// walk injectable imports
-		// walk functions till we have a match
-			// get base
-		// reset functions
-		// walk functions and fixup addresses
-		
 
+	// walk injectable imports
 	while (1) {
 		std::string moduleName = injectableImportHandler.GetNextModule();
 		if (moduleName == "") {
 			break;
 		}
-		printf("%s\n", moduleName.c_str());
+
+		std::map<std::string, std::map<std::string, UINT64>>::iterator targetImportsIt;
+		targetImportsIt = targetImports.find(moduleName);
+
+		if (targetImportsIt == targetImports.end()) {
+			printf("ERROR: cannot find %s\n", moduleName.c_str());
+			// TODO: implement recursive inject loading
+			// TODO: search inject loaded modules
+			continue;
+		}
 
 		while (1) {
 			std::string functionName = injectableImportHandler.GetNextFunction();
@@ -240,18 +212,79 @@ int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
 				break;
 			}
 
-			printf("\t%x\t%s\n", importHandler.GetFunctionAddr(), functionName.c_str());
+			std::map<std::string, UINT64>::iterator functionsIt;
+			functionsIt = targetImportsIt->second.find(functionName);
+
+			if (functionsIt == targetImportsIt->second.end()) {
+				printf("ERROR: no function match for %s\n", functionName);
+				continue;
+			}
+
+			UINT64 offset = injectableImportHandler.GetFunctionAddr();
+			injectableImportHandler.RewriteFunctionAddr(functionsIt->second);
 		}
 	}
-	// walk injected's imported libs
-		// match names with
-			// GetModuleInformation
-			// injected libs
-			// if no match
-				// inject lib
-		// get base
-		// get expected base
-		// walk inject import functions and fix base
+
+	walk_imports(cpdi.hProcess, remoteBase);
+}
+
+int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
+	// read in injectable
+	HANDLE hFile = CreateFile(L"injectable.dll", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hFile == INVALID_HANDLE_VALUE) {
+		printf("ERROR: CreateFile (%x)\n", GetLastError());
+		return 1;
+	}
+
+	DWORD highSize = 0;
+	DWORD lowSize = GetFileSize(hFile, &highSize);
+	if (highSize) {
+		printf("ERROR: injectable exceeds 4GB\n");
+		return 1;
+	}
+
+	PBYTE buf = (PBYTE)VirtualAlloc(NULL, lowSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+	if (!buf) {
+		printf("ERROR: VirtualAlloc (%x)\n", GetLastError());
+		return 1;
+	}
+
+	DWORD bytes_read;
+	if (!ReadFile(hFile, buf, lowSize, &bytes_read, NULL) || bytes_read != lowSize) {
+		printf("ERROR: ReadFile (ms_buf) (%x)\n", GetLastError());
+		return 1;
+	}
+
+	// get nt headers
+	PIMAGE_NT_HEADERS pNtHeaders = ImageNtHeader(buf);
+	if (!pNtHeaders) {
+		printf("ERROR: ImageNtHeader (%x)\n", GetLastError());
+		return 1;
+	}
+
+	// allocate mem in target process
+	LPVOID remoteBase = VirtualAllocEx(cpdi.hProcess, NULL, pNtHeaders->OptionalHeader.SizeOfImage, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+
+	// get dos and section headers
+	PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)buf;
+	PIMAGE_SECTION_HEADER pSectionHeader = (PIMAGE_SECTION_HEADER)(buf + pDosHeader->e_lfanew + sizeof(IMAGE_NT_HEADERS));
+
+	// write headers
+	SIZE_T bytesWritten;
+	WriteProcessMemory(cpdi.hProcess, remoteBase, buf, pSectionHeader->PointerToRawData, &bytesWritten);
+
+	// loop write sections
+	WORD sectionCount = pNtHeaders->FileHeader.NumberOfSections;
+	for (WORD i = 0; i < sectionCount; i++) {
+		pSectionHeader = (PIMAGE_SECTION_HEADER)(buf + pDosHeader->e_lfanew + sizeof(IMAGE_NT_HEADERS) + sizeof(IMAGE_SECTION_HEADER) * i);
+	
+		LPVOID remoteVA = (LPVOID)((uintptr_t)remoteBase + pSectionHeader->VirtualAddress);
+		WriteProcessMemory(cpdi.hProcess, remoteVA, buf + pSectionHeader->PointerToRawData, pSectionHeader->SizeOfRawData, &bytesWritten);
+	}
+
+	injectorRelocations(cpdi, pNtHeaders, remoteBase);
+
+	injectorImports(cpdi, remoteBase);
 
 	return 0;
 }
