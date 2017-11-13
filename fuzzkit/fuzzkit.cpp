@@ -22,16 +22,16 @@ int walk_imports(HANDLE hProcess, PVOID lpBaseOfImage) {
 		if (moduleName == "") {
 			break;
 		}
-		printf("%s\n", moduleName.c_str());
+		printf("\t%s\n", moduleName.c_str());
 
-		while (1) {
+		/*while (1) {
 			std::string functionName = importHandler.GetNextFunction();
 			if (functionName == "") {
 				break;
 			}
 
 			printf("\t%x\t%s\n", importHandler.GetFunctionAddr(), functionName.c_str());
-		}
+		}*/
 	}
 }
 
@@ -157,55 +157,51 @@ int injectorImports(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 	ntqip(cpdi.hProcess, ProcessBasicInformation, &pbi, sizeof(PROCESS_BASIC_INFORMATION), NULL);
 
 	PEB peb;
-	printf("remotePedAddr: %x\n", pbi.PebBaseAddress);
 	ReadProcessMemory(cpdi.hProcess, pbi.PebBaseAddress, &peb, sizeof(PEB), &bytesRead);
 
 	PEB_LDR_DATA pld;
-	printf("peb.Ldr: %x\n", peb.Ldr);
 	ReadProcessMemory(cpdi.hProcess, peb.Ldr, &pld, sizeof(PEB_LDR_DATA), &bytesRead);
 
-	LPVOID firstListEntryAddr = pld.InMemoryOrderModuleList.Flink;
-	printf("firstListEntryAddr: %x\n", firstListEntryAddr);
-	
 	LDR_DATA_TABLE_ENTRY ldte;
 	LIST_ENTRY listCurr;
 	WCHAR nameBuf[MAX_PATH];
+	LPVOID firstListEntryAddr = pld.InMemoryOrderModuleList.Flink;
 
+	printf("PEB MODULES:\n");
 	ReadProcessMemory(cpdi.hProcess, firstListEntryAddr, &ldte, sizeof(LDR_DATA_TABLE_ENTRY), &bytesRead);
-	printf("ldte.DllBase: %x\n", ldte.DllBase);
-
 	ReadProcessMemory(cpdi.hProcess, firstListEntryAddr, &listCurr, sizeof(LIST_ENTRY), &bytesRead);
-	printf("listCurr.Flink: %x\n", listCurr.Flink);
-	printf("listCurr.Blink: %x\n", listCurr.Blink);
-
 	ReadProcessMemory(cpdi.hProcess, ldte.FullDllName.Buffer, &nameBuf, sizeof(WCHAR) * ldte.FullDllName.Length, &bytesRead);
-	printf("%S\n", nameBuf);
+	printf("\t%S\n", nameBuf);
 
+	while (1) {
+		ReadProcessMemory(cpdi.hProcess, listCurr.Flink, &ldte, sizeof(LDR_DATA_TABLE_ENTRY), &bytesRead);
+		ReadProcessMemory(cpdi.hProcess, listCurr.Flink, &listCurr, sizeof(LIST_ENTRY), &bytesRead);
+		ReadProcessMemory(cpdi.hProcess, ldte.FullDllName.Buffer, &nameBuf, sizeof(WCHAR) * ldte.FullDllName.Length, &bytesRead);
+		printf("\t%S\n", nameBuf);
 
-	ReadProcessMemory(cpdi.hProcess, listCurr.Flink, &ldte, sizeof(LDR_DATA_TABLE_ENTRY), &bytesRead);
-	ReadProcessMemory(cpdi.hProcess, listCurr.Flink, &listCurr, sizeof(LIST_ENTRY), &bytesRead);
+		if (listCurr.Flink == firstListEntryAddr) {
+			break;
+		}
+	}
 	
-	ReadProcessMemory(cpdi.hProcess, ldte.FullDllName.Buffer, &nameBuf, sizeof(WCHAR) * ldte.FullDllName.Length, &bytesRead);
-	printf("%S\n", nameBuf);
+	printf("IMPORTS:\n");
+	walk_imports(cpdi.hProcess, cpdi.lpBaseOfImage);
 
-	ReadProcessMemory(cpdi.hProcess, listCurr.Flink, &ldte, sizeof(LDR_DATA_TABLE_ENTRY), &bytesRead);
-	ReadProcessMemory(cpdi.hProcess, listCurr.Flink, &listCurr, sizeof(LIST_ENTRY), &bytesRead);
+	printf("ENUM PROCESS MODULES:\n");
+	HMODULE hMods[1024] = { 0 };
+	DWORD cbNeeded;
+	EnumProcessModules(cpdi.hProcess, hMods, sizeof(HMODULE) * 1024, &cbNeeded);
 
-	ReadProcessMemory(cpdi.hProcess, ldte.FullDllName.Buffer, &nameBuf, sizeof(WCHAR) * ldte.FullDllName.Length, &bytesRead);
-	printf("%S\n", nameBuf);
+	DWORD modCount = cbNeeded / sizeof(HMODULE);
+	if (modCount > 1024) {
+		modCount = 1024;
+	}
 
-	ReadProcessMemory(cpdi.hProcess, listCurr.Flink, &ldte, sizeof(LDR_DATA_TABLE_ENTRY), &bytesRead);
-	ReadProcessMemory(cpdi.hProcess, listCurr.Flink, &listCurr, sizeof(LIST_ENTRY), &bytesRead);
-
-	ReadProcessMemory(cpdi.hProcess, ldte.FullDllName.Buffer, &nameBuf, sizeof(WCHAR) * ldte.FullDllName.Length, &bytesRead);
-	printf("%S\n", nameBuf);
-
-	ReadProcessMemory(cpdi.hProcess, listCurr.Flink, &ldte, sizeof(LDR_DATA_TABLE_ENTRY), &bytesRead);
-	ReadProcessMemory(cpdi.hProcess, listCurr.Flink, &listCurr, sizeof(LIST_ENTRY), &bytesRead);
-
-	ReadProcessMemory(cpdi.hProcess, ldte.FullDllName.Buffer, &nameBuf, sizeof(WCHAR) * ldte.FullDllName.Length, &bytesRead);
-	printf("%S\n", nameBuf);
-
+	for (DWORD i = 0; i < modCount; i++) {
+		TCHAR baseName[MAX_PATH];
+		GetModuleBaseName(cpdi.hProcess, hMods[i], baseName, MAX_PATH);
+		printf("\t%S\n", baseName);
+	}
 
 	// TODO: load (inject) missing
 
@@ -272,6 +268,9 @@ int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
 	injectorRelocations(cpdi, pNtHeaders, remoteBase);
 
 	injectorImports(cpdi, remoteBase);
+
+	printf("Injectable imports:\n");
+	walk_imports(cpdi.hProcess, remoteBase);
 
 	return 0;
 }
