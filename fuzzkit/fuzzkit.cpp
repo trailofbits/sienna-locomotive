@@ -205,11 +205,47 @@ int injectorImports(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 	}
 
 	// walk import table of injectable
-		// walk export tables of modules (from bases)
-			// find functions needed
-		// fixup import addresses
+	ImportHandler injectableImportHandler(cpdi.hProcess, remoteBase);
+	while (1) {
+		std::string moduleName = injectableImportHandler.GetNextModule();
+		std::transform(moduleName.begin(), moduleName.end(), moduleName.begin(), ::tolower);
+		if (moduleName == "") {
+			break;
+		}
 
-	// TODO: load (inject) missing
+		// get base
+		// check bases
+		std::map<std::string, LPVOID>::iterator itBases;
+		itBases = bases.find(moduleName);
+		if (itBases == bases.end()) {
+			continue;
+			// check hints
+				// TODO: get base from hint
+			// else 
+				// TODO: load (inject) missing
+		}
+
+		// gather desired functions
+		while (1) {
+			std::string functionName = injectableImportHandler.GetNextFunction();
+			if (functionName == "") {
+				break;
+			}
+		}
+
+		// TODO: walk exports from base, gather function addrs
+
+		injectableImportHandler.ResetFunctions();
+		while (1) {
+			std::string functionName = injectableImportHandler.GetNextFunction();
+			if (functionName == "") {
+				break;
+			}
+
+			UINT64 addr = 0; // exports[functionName];
+			injectableImportHandler.RewriteFunctionAddr(addr);
+		}
+	}
 }
 
 int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
@@ -270,6 +306,8 @@ int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
 
 	injectorImports(cpdi, remoteBase);
 
+	// TODO: hooks
+
 	return 0;
 }
 
@@ -290,6 +328,8 @@ int debug_main_loop() {
 	for (;;)
 	{
 		DEBUG_EVENT dbgev;
+		TCHAR nameW[MAX_PATH] = { 0 };
+		DWORD index = 0;
 
 		WaitForDebugEvent(&dbgev, INFINITE);
 		printf("DEBUG EVENT: %d\n", dbgev.dwDebugEventCode);
@@ -333,6 +373,19 @@ int debug_main_loop() {
 			break;
 		case LOAD_DLL_DEBUG_EVENT:
 			LOAD_DLL_DEBUG_INFO lddi = dbgev.u.LoadDll;
+			UINT64 addr;
+			ReadProcessMemory(cpdi.hProcess, lddi.lpImageName, &addr, sizeof(UINT64), NULL);
+			printf("LOAD DLL: %x\n", lddi.lpImageName);
+			printf("LOAD DLL ADDR: %x\n", addr);
+			printf("LOAD DLL UNICODE: %x\n", lddi.fUnicode);
+			while (1) {
+				ReadProcessMemory(cpdi.hProcess, (LPVOID)(addr+sizeof(TCHAR)*index), nameW+index, sizeof(TCHAR), NULL);
+				index++;
+				if (nameW[index - 1] == 0 || index > MAX_PATH) {
+					break;
+				}
+			}
+			printf("%S\n", nameW);
 			break;
 		case UNLOAD_DLL_DEBUG_EVENT:
 			break;
