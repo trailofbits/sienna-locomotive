@@ -45,7 +45,6 @@ std::string ImportHandler::GetNextModule() {
 	}
 
 	SIZE_T bytesRead;
-
 	LPVOID lpvScratch = (PVOID)((uintptr_t)this->lpvBaseOfImage + this->importEntryVA + sizeof(IMAGE_IMPORT_DESCRIPTOR)*this->iidIndex);
 	ReadProcessMemory(this->hProcess, lpvScratch, &(this->iid), sizeof(IMAGE_IMPORT_DESCRIPTOR), &bytesRead);
 	this->iidIndex++;

@@ -10,6 +10,9 @@
 #include "ImportHandler.h"
 #include <map>
 #include <winternl.h>
+#include <stdlib.h>
+#include <algorithm>
+#include <string> 
 
 typedef unsigned __int64 QWORD;
 // TODO: check return of every call
@@ -22,16 +25,16 @@ int walk_imports(HANDLE hProcess, PVOID lpBaseOfImage) {
 		if (moduleName == "") {
 			break;
 		}
-		printf("\t%s\n", moduleName.c_str());
+		printf("%s\n", moduleName.c_str());
 
-		/*while (1) {
+		while (1) {
 			std::string functionName = importHandler.GetNextFunction();
 			if (functionName == "") {
 				break;
 			}
 
 			printf("\t%x\t%s\n", importHandler.GetFunctionAddr(), functionName.c_str());
-		}*/
+		}
 	}
 }
 
@@ -143,53 +146,18 @@ int injectorRelocations(CREATE_PROCESS_DEBUG_INFO cpdi, PIMAGE_NT_HEADERS pNtHea
 	return 0;
 }
 
-typedef NTSTATUS(*NTQIP)(HANDLE, PROCESSINFOCLASS, PVOID, ULONG, PULONG);
-
 int injectorImports(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 	// get module bases
-	std::map<std::string, UINT64> bases;
+	std::map<std::string, LPVOID> bases;
+	std::map<std::string, LPVOID> hints;
 	SIZE_T bytesRead;
 
-	HMODULE ntdll = LoadLibrary(TEXT("ntdll.dll"));
-	NTQIP ntqip = (NTQIP)GetProcAddress(ntdll, "NtQueryInformationProcess");
-
-	PROCESS_BASIC_INFORMATION pbi;
-	ntqip(cpdi.hProcess, ProcessBasicInformation, &pbi, sizeof(PROCESS_BASIC_INFORMATION), NULL);
-
-	PEB peb;
-	ReadProcessMemory(cpdi.hProcess, pbi.PebBaseAddress, &peb, sizeof(PEB), &bytesRead);
-
-	PEB_LDR_DATA pld;
-	ReadProcessMemory(cpdi.hProcess, peb.Ldr, &pld, sizeof(PEB_LDR_DATA), &bytesRead);
-
-	LDR_DATA_TABLE_ENTRY ldte;
-	LIST_ENTRY listCurr;
-	WCHAR nameBuf[MAX_PATH];
-	LPVOID firstListEntryAddr = pld.InMemoryOrderModuleList.Flink;
-
-	printf("PEB MODULES:\n");
-	ReadProcessMemory(cpdi.hProcess, firstListEntryAddr, &ldte, sizeof(LDR_DATA_TABLE_ENTRY), &bytesRead);
-	ReadProcessMemory(cpdi.hProcess, firstListEntryAddr, &listCurr, sizeof(LIST_ENTRY), &bytesRead);
-	ReadProcessMemory(cpdi.hProcess, ldte.FullDllName.Buffer, &nameBuf, sizeof(WCHAR) * ldte.FullDllName.Length, &bytesRead);
-	printf("\t%S\n", nameBuf);
-
-	while (1) {
-		ReadProcessMemory(cpdi.hProcess, listCurr.Flink, &ldte, sizeof(LDR_DATA_TABLE_ENTRY), &bytesRead);
-		ReadProcessMemory(cpdi.hProcess, listCurr.Flink, &listCurr, sizeof(LIST_ENTRY), &bytesRead);
-		ReadProcessMemory(cpdi.hProcess, ldte.FullDllName.Buffer, &nameBuf, sizeof(WCHAR) * ldte.FullDllName.Length, &bytesRead);
-		printf("\t%S\n", nameBuf);
-
-		if (listCurr.Flink == firstListEntryAddr) {
-			break;
-		}
-	}
-	
-	printf("IMPORTS:\n");
-	walk_imports(cpdi.hProcess, cpdi.lpBaseOfImage);
-
+	// get addrs from EnumProcessModules
 	printf("ENUM PROCESS MODULES:\n");
 	HMODULE hMods[1024] = { 0 };
 	DWORD cbNeeded;
+
+	// TODO: use EnumProcessModulesEx for 32 bit compatibility
 	EnumProcessModules(cpdi.hProcess, hMods, sizeof(HMODULE) * 1024, &cbNeeded);
 
 	DWORD modCount = cbNeeded / sizeof(HMODULE);
@@ -198,17 +166,50 @@ int injectorImports(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 	}
 
 	for (DWORD i = 0; i < modCount; i++) {
-		TCHAR baseName[MAX_PATH];
-		GetModuleBaseName(cpdi.hProcess, hMods[i], baseName, MAX_PATH);
-		printf("\t%S\n", baseName);
+		TCHAR nameW[MAX_PATH];
+		GetModuleBaseName(cpdi.hProcess, hMods[i], nameW, MAX_PATH);
+		
+		CHAR nameC[MAX_PATH];
+		SIZE_T ret;
+		wcstombs_s(&ret, nameC, MAX_PATH, nameW, MAX_PATH);
+		printf("\t%s\n", nameC);
+
+		MODULEINFO modinfo;
+		GetModuleInformation(cpdi.hProcess, hMods[i], &modinfo, sizeof(modinfo));
+		std::string name(nameC);
+		std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+		bases[name] = modinfo.lpBaseOfDll;
 	}
 
-	// TODO: load (inject) missing
+	// get bases from imports
+	ImportHandler importHandler(cpdi.hProcess, cpdi.lpBaseOfImage);
+	while (1) {
+		std::string moduleName = importHandler.GetNextModule();
+		std::transform(moduleName.begin(), moduleName.end(), moduleName.begin(), ::tolower);
+
+		if (moduleName == "") {
+			break;
+		}
+
+		importHandler.GetNextFunction();
+		LPVOID addr = (LPVOID)importHandler.GetFunctionAddr();
+		
+		std::map<std::string, LPVOID>::iterator itBases;
+		itBases = bases.find(moduleName);
+		if (itBases != bases.end()) {
+			continue;
+		}
+
+		printf("%x\t%s\n", addr, moduleName.c_str());
+		hints[moduleName] = addr;
+	}
 
 	// walk import table of injectable
 		// walk export tables of modules (from bases)
 			// find functions needed
 		// fixup import addresses
+
+	// TODO: load (inject) missing
 }
 
 int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
@@ -268,9 +269,6 @@ int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
 	injectorRelocations(cpdi, pNtHeaders, remoteBase);
 
 	injectorImports(cpdi, remoteBase);
-
-	printf("Injectable imports:\n");
-	walk_imports(cpdi.hProcess, remoteBase);
 
 	return 0;
 }
