@@ -9,6 +9,7 @@
 #include <iostream>
 #include "ImportHandler.h"
 #include <map>
+#include <winternl.h>
 
 typedef unsigned __int64 QWORD;
 // TODO: check return of every call
@@ -142,90 +143,76 @@ int injectorRelocations(CREATE_PROCESS_DEBUG_INFO cpdi, PIMAGE_NT_HEADERS pNtHea
 	return 0;
 }
 
+typedef NTSTATUS(*NTQIP)(HANDLE, PROCESSINFOCLASS, PVOID, ULONG, PULONG);
+
 int injectorImports(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
+	// get module bases
+	std::map<std::string, UINT64> bases;
+	SIZE_T bytesRead;
 
-	// fixup IAT
-	walk_imports(cpdi.hProcess, remoteBase);
-	// 8998 b7fc
-	// 89c7 3ea2
-	// 8998 f332
-	// EnumProcessModules
-	HMODULE hMods[1024] = { 0 };
-	DWORD cbNeeded;
-	EnumProcessModules(cpdi.hProcess, hMods, sizeof(HMODULE) * 1024, &cbNeeded);
+	HMODULE ntdll = LoadLibrary(TEXT("ntdll.dll"));
+	NTQIP ntqip = (NTQIP)GetProcAddress(ntdll, "NtQueryInformationProcess");
 
-	walk_imports(cpdi.hProcess, cpdi.lpBaseOfImage);
+	PROCESS_BASIC_INFORMATION pbi;
+	ntqip(cpdi.hProcess, ProcessBasicInformation, &pbi, sizeof(PROCESS_BASIC_INFORMATION), NULL);
 
-	DWORD modCount = cbNeeded / sizeof(HMODULE);
-	if (modCount > 1024) {
-		modCount = 1024;
-	}
+	PEB peb;
+	printf("remotePedAddr: %x\n", pbi.PebBaseAddress);
+	ReadProcessMemory(cpdi.hProcess, pbi.PebBaseAddress, &peb, sizeof(PEB), &bytesRead);
 
-	for (DWORD i = 0; i < modCount; i++) {
-		TCHAR baseName[MAX_PATH];
-		GetModuleBaseName(cpdi.hProcess, hMods[i], baseName, MAX_PATH);
-		printf("BASE NAME: %S\n", baseName);
-	}
+	PEB_LDR_DATA pld;
+	printf("peb.Ldr: %x\n", peb.Ldr);
+	ReadProcessMemory(cpdi.hProcess, peb.Ldr, &pld, sizeof(PEB_LDR_DATA), &bytesRead);
 
-	ImportHandler targetImportHandler(cpdi.hProcess, cpdi.lpBaseOfImage);
-	std::map<std::string, std::map<std::string, UINT64>> targetImports;
+	LPVOID firstListEntryAddr = pld.InMemoryOrderModuleList.Flink;
+	printf("firstListEntryAddr: %x\n", firstListEntryAddr);
+	
+	LDR_DATA_TABLE_ENTRY ldte;
+	LIST_ENTRY listCurr;
+	WCHAR nameBuf[MAX_PATH];
 
-	// walk target and map modules : (functions : addrs)
-	while (1) {
-		std::string moduleName = targetImportHandler.GetNextModule();
-		if (moduleName == "") {
-			break;
-		}
+	ReadProcessMemory(cpdi.hProcess, firstListEntryAddr, &ldte, sizeof(LDR_DATA_TABLE_ENTRY), &bytesRead);
+	printf("ldte.DllBase: %x\n", ldte.DllBase);
 
-		while (1) {
-			std::string functionName = targetImportHandler.GetNextFunction();
-			if (functionName == "") {
-				break;
-			}
+	ReadProcessMemory(cpdi.hProcess, firstListEntryAddr, &listCurr, sizeof(LIST_ENTRY), &bytesRead);
+	printf("listCurr.Flink: %x\n", listCurr.Flink);
+	printf("listCurr.Blink: %x\n", listCurr.Blink);
 
-			targetImports[moduleName][functionName] = targetImportHandler.GetFunctionAddr();
-		}
-	}
+	ReadProcessMemory(cpdi.hProcess, ldte.FullDllName.Buffer, &nameBuf, sizeof(WCHAR) * ldte.FullDllName.Length, &bytesRead);
+	printf("%S\n", nameBuf);
 
-	ImportHandler injectableImportHandler(cpdi.hProcess, remoteBase);
 
-	// walk injectable imports
-	while (1) {
-		std::string moduleName = injectableImportHandler.GetNextModule();
-		if (moduleName == "") {
-			break;
-		}
+	ReadProcessMemory(cpdi.hProcess, listCurr.Flink, &ldte, sizeof(LDR_DATA_TABLE_ENTRY), &bytesRead);
+	ReadProcessMemory(cpdi.hProcess, listCurr.Flink, &listCurr, sizeof(LIST_ENTRY), &bytesRead);
+	
+	ReadProcessMemory(cpdi.hProcess, ldte.FullDllName.Buffer, &nameBuf, sizeof(WCHAR) * ldte.FullDllName.Length, &bytesRead);
+	printf("%S\n", nameBuf);
 
-		std::map<std::string, std::map<std::string, UINT64>>::iterator targetImportsIt;
-		targetImportsIt = targetImports.find(moduleName);
+	ReadProcessMemory(cpdi.hProcess, listCurr.Flink, &ldte, sizeof(LDR_DATA_TABLE_ENTRY), &bytesRead);
+	ReadProcessMemory(cpdi.hProcess, listCurr.Flink, &listCurr, sizeof(LIST_ENTRY), &bytesRead);
 
-		if (targetImportsIt == targetImports.end()) {
-			printf("ERROR: cannot find %s\n", moduleName.c_str());
-			// TODO: implement recursive inject loading
-			// TODO: search inject loaded modules
-			continue;
-		}
+	ReadProcessMemory(cpdi.hProcess, ldte.FullDllName.Buffer, &nameBuf, sizeof(WCHAR) * ldte.FullDllName.Length, &bytesRead);
+	printf("%S\n", nameBuf);
 
-		while (1) {
-			std::string functionName = injectableImportHandler.GetNextFunction();
-			if (functionName == "") {
-				break;
-			}
+	ReadProcessMemory(cpdi.hProcess, listCurr.Flink, &ldte, sizeof(LDR_DATA_TABLE_ENTRY), &bytesRead);
+	ReadProcessMemory(cpdi.hProcess, listCurr.Flink, &listCurr, sizeof(LIST_ENTRY), &bytesRead);
 
-			std::map<std::string, UINT64>::iterator functionsIt;
-			functionsIt = targetImportsIt->second.find(functionName);
+	ReadProcessMemory(cpdi.hProcess, ldte.FullDllName.Buffer, &nameBuf, sizeof(WCHAR) * ldte.FullDllName.Length, &bytesRead);
+	printf("%S\n", nameBuf);
 
-			if (functionsIt == targetImportsIt->second.end()) {
-				printf("ERROR: no function match for %s\n", functionName);
-				continue;
-			}
+	ReadProcessMemory(cpdi.hProcess, listCurr.Flink, &ldte, sizeof(LDR_DATA_TABLE_ENTRY), &bytesRead);
+	ReadProcessMemory(cpdi.hProcess, listCurr.Flink, &listCurr, sizeof(LIST_ENTRY), &bytesRead);
 
-			UINT64 offset = injectableImportHandler.GetFunctionAddr();
-			injectableImportHandler.RewriteFunctionAddr(functionsIt->second);
-		}
-	}
+	ReadProcessMemory(cpdi.hProcess, ldte.FullDllName.Buffer, &nameBuf, sizeof(WCHAR) * ldte.FullDllName.Length, &bytesRead);
+	printf("%S\n", nameBuf);
 
-	walk_imports(cpdi.hProcess, remoteBase);
+
+	// TODO: load (inject) missing
+
+	// walk import table of injectable
+		// walk export tables of modules (from bases)
+			// find functions needed
+		// fixup import addresses
 }
 
 int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
