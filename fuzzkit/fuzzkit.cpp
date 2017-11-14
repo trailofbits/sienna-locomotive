@@ -293,7 +293,9 @@ int injectorImports(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 
 int hooker(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 	ExportHandler injectedExportHandler(cpdi.hProcess, remoteBase);
-	UINT64 address = (UINT64)remoteBase + injectedExportHandler.GetFunctionAddress("ReadFileHook");
+	printf("Hook remoteBase: %x\n", remoteBase);
+	UINT64 address = injectedExportHandler.GetFunctionAddress("ReadFileHook");
+	printf("Hook address: %x\n", address);
 
 	printf("ADDRESS: %x\n", address);
 
@@ -357,6 +359,7 @@ int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
 
 	// allocate mem in target process
 	LPVOID remoteBase = VirtualAllocEx(cpdi.hProcess, NULL, pNtHeaders->OptionalHeader.SizeOfImage, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+	printf("remoteBase: %x\n", remoteBase);
 
 	// get dos and section headers
 	PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)buf;
@@ -413,6 +416,7 @@ int debug_main_loop() {
 			switch (dbgev.u.Exception.ExceptionRecord.ExceptionCode)
 			{
 				case EXCEPTION_ACCESS_VIOLATION:
+					exit(1);
 					break;
 				case EXCEPTION_BREAKPOINT:
 					printf("BREAK AT %x\n", address);
