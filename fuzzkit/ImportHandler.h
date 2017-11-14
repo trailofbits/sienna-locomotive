@@ -2,6 +2,7 @@
 
 #include <Windows.h>
 #include <string>
+#include <algorithm>
 
 class ImportHandler {
 public:

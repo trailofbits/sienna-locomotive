@@ -160,6 +160,9 @@ UINT64 ImportHandler::GetFunctionAddr() {
 		uint64_t iatFirstThunkAddr;
 		lpvScratch = (LPVOID)((uintptr_t)this->lpvBaseOfImage + this->iid.FirstThunk + (this->itdIndex - 1) * sizeof(uint64_t));
 		ReadProcessMemory(this->hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint64_t), &bytesRead);
+		/*printf("READ ADDR: %x\n", iatFirstThunkAddr);
+		printf("IAT ENTRY ADDR: %x\n", lpvScratch);
+		printf("BYTES READ: %x\n", bytesRead);*/
 		return iatFirstThunkAddr;
 	}
 	else if (machine == IMAGE_FILE_MACHINE_I386) {
@@ -173,13 +176,16 @@ UINT64 ImportHandler::GetFunctionAddr() {
 }
 
 BOOL ImportHandler::RewriteFunctionAddr(UINT64 addr) {
-	LPVOID lpvScratch;
-	SIZE_T bytesWritten;
+	LPVOID lpvScratch = 0;
+	SIZE_T bytesWritten = 0;
 
 	if (this->machine == IMAGE_FILE_MACHINE_AMD64) {
 		uint64_t iatFirstThunkAddr = addr;
 		lpvScratch = (LPVOID)((uintptr_t)this->lpvBaseOfImage + this->iid.FirstThunk + (this->itdIndex-1) * sizeof(uint64_t));
-		WriteProcessMemory(this->hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint64_t), &bytesWritten);
+		if (!WriteProcessMemory(this->hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint64_t), &bytesWritten)) {
+			printf("ERROR: RewriteFunctionAddr %x %x\n", bytesWritten, GetLastError());
+			return false;
+		}
 		return true;
 	}
 	else if (machine == IMAGE_FILE_MACHINE_I386) {

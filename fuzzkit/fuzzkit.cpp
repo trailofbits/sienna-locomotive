@@ -293,7 +293,9 @@ int injectorImports(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 
 int hooker(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 	ExportHandler injectedExportHandler(cpdi.hProcess, remoteBase);
-	UINT64 address = injectedExportHandler.GetFunctionAddress("ReadFileHook");
+	UINT64 address = (UINT64)remoteBase + injectedExportHandler.GetFunctionAddress("ReadFileHook");
+
+	printf("ADDRESS: %x\n", address);
 
 	ImportHandler importHandler(cpdi.hProcess, cpdi.lpBaseOfImage);
 	while (1) {
@@ -308,14 +310,14 @@ int hooker(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 				break;
 			}
 
-			if (functionName.compare("ReadFile")) {
-				importHandler.RewriteFunctionAddr((UINT64)remoteBase + address);
-				printf("REPLACED: %s\t%x\t%s\n", moduleName, functionName.c_str());
+			if (!functionName.compare("ReadFile")) {
+				importHandler.RewriteFunctionAddr(address);
+				printf("FUNCTION ADDR: %x\n", importHandler.GetFunctionAddr());
 			}
-
 		}
 	}
 
+	walk_imports(cpdi.hProcess, cpdi.lpBaseOfImage);
 	return 0;
 }
 
