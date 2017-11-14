@@ -93,6 +93,7 @@ std::string ImportHandler::GetNextFunction() {
 		BYTE pFuncName[MAX_PATH];
 		if (this->itdOrig.u1.Ordinal & 0x80000000) {
 			// ordinal 
+			// TODO: return #N
 			return "!ORDINAL";
 			//printf("\t%x\t%x (ord)\n", iatFirstThunkAddr, itd_orig.u1.Ordinal & 0x7FFFFFFF);
 		}
@@ -106,8 +107,6 @@ std::string ImportHandler::GetNextFunction() {
 				nameIndex++;
 				lpvScratch = (LPVOID)((uintptr_t)lpvScratch + 1);
 			} while (pFuncName[nameIndex - 1] != 0 && nameIndex < MAX_PATH);
-
-			//printf("\t%x\t%s\n", iatFirstThunkAddr, pFuncName);
 		}
 
 		this->itdIndex++;
@@ -124,8 +123,8 @@ std::string ImportHandler::GetNextFunction() {
 		BYTE pFuncName[MAX_PATH];
 		if (this->itdOrig.u1.Ordinal & 0x80000000) {
 			// ordinal 
+			// TODO: return #N
 			return "!ORDINAL";
-			//printf("\t%x\t%x (ord)\n", iatFirstThunkAddr, this->itdOrig.u1.Ordinal & 0x7FFFFFFF);
 		}
 		else {
 			PBYTE dst = pFuncName;
@@ -137,8 +136,6 @@ std::string ImportHandler::GetNextFunction() {
 				nameIndex++;
 				lpvScratch = (LPVOID)((uintptr_t)lpvScratch + 1);
 			} while (pFuncName[nameIndex - 1] != 0 && nameIndex < MAX_PATH);
-
-			printf("\t%x\t%s\n", iatFirstThunkAddr, pFuncName);
 		}
 
 		this->itdIndex++;
@@ -160,9 +157,6 @@ UINT64 ImportHandler::GetFunctionAddr() {
 		uint64_t iatFirstThunkAddr;
 		lpvScratch = (LPVOID)((uintptr_t)this->lpvBaseOfImage + this->iid.FirstThunk + (this->itdIndex - 1) * sizeof(uint64_t));
 		ReadProcessMemory(this->hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint64_t), &bytesRead);
-		/*printf("READ ADDR: %x\n", iatFirstThunkAddr);
-		printf("IAT ENTRY ADDR: %x\n", lpvScratch);
-		printf("BYTES READ: %x\n", bytesRead);*/
 		return iatFirstThunkAddr;
 	}
 	else if (machine == IMAGE_FILE_MACHINE_I386) {
@@ -185,8 +179,8 @@ BOOL ImportHandler::RewriteFunctionAddr(UINT64 addr) {
 		if (!WriteProcessMemory(this->hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint64_t), &bytesWritten)) {
 			MEMORY_BASIC_INFORMATION mbi;
 			VirtualQueryEx(this->hProcess, lpvScratch, &mbi, sizeof(MEMORY_BASIC_INFORMATION));
-			printf("PERMISSIONS: %x\n", mbi.Protect);
-			printf("ERROR: RewriteFunctionAddr %x %x\n", bytesWritten, GetLastError());
+			//printf("ERROR: RewriteFunctionAddr %x %x\n", bytesWritten, GetLastError());
+			// TODO: do this intelligently
 			DWORD old;
 			VirtualProtectEx(this->hProcess, mbi.BaseAddress, mbi.RegionSize, PAGE_EXECUTE_READWRITE, &old);
 			WriteProcessMemory(this->hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint64_t), &bytesWritten);

@@ -37,8 +37,6 @@ ExportHandler::ExportHandler(HANDLE hProcess, LPVOID lpvBaseOfImage) {
 			IMAGE_DATA_DIRECTORY exportEntry = ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
 			this->exportEntryVA = exportEntry.VirtualAddress;
 		}
-
-		printf("exportEntryVA: %x\n", this->exportEntryVA);
 	}
 }
 
@@ -52,10 +50,6 @@ std::map<std::string, UINT64> ExportHandler::GetFunctionAddresses(std::list<std:
 	DWORD numFunctions = ied.NumberOfFunctions;
 	DWORD addressTableRVA = ied.AddressOfFunctions;
 	DWORD nameTableRVA = ied.AddressOfNames;
-
-	printf("numFunctions: %x\n", numFunctions);
-	printf("addressTableRVA: %x\n", addressTableRVA);
-	printf("nameTableRVA: %x\n", nameTableRVA);
 
 	if (numFunctions != ied.NumberOfNames) {
 		printf("WARNING: numFunctions != numNames\n");
@@ -80,7 +74,6 @@ std::map<std::string, UINT64> ExportHandler::GetFunctionAddresses(std::list<std:
 				DWORD addressRVA;
 				ReadProcessMemory(this->hProcess, (LPVOID)((UINT64)this->lpvBaseOfImage + addressTableRVA + sizeof(DWORD) * i), &addressRVA, sizeof(DWORD), NULL);
 				addresses[nameStr] = (UINT64)this->lpvBaseOfImage + addressRVA;
-				printf("Found: %s\t%x\n", name, addressRVA);
 				break;
 			}
 		}
@@ -119,11 +112,8 @@ UINT64 ExportHandler::GetFunctionAddress(std::string targetName)
 			DWORD addressRVA;
 			ReadProcessMemory(this->hProcess, (LPVOID)((UINT64)this->lpvBaseOfImage + addressTableRVA + sizeof(DWORD) * i), &addressRVA, sizeof(DWORD), NULL);
 			address = (UINT64)this->lpvBaseOfImage + addressRVA;
-			printf("Found: %s\t%x\n", name, addressRVA);
 			break;
 		}
-	
-		printf("CHECK: %s\n", name);
 	}
 
 	return address;

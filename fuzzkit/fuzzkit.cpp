@@ -156,7 +156,6 @@ int injectorImports(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 	SIZE_T bytesRead;
 
 	// get addrs from EnumProcessModules
-	printf("ENUM PROCESS MODULES:\n");
 	HMODULE hMods[1024] = { 0 };
 	DWORD cbNeeded;
 
@@ -175,7 +174,6 @@ int injectorImports(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 		CHAR nameC[MAX_PATH];
 		SIZE_T ret;
 		wcstombs_s(&ret, nameC, MAX_PATH, nameW, MAX_PATH);
-		printf("\t%s\n", nameC);
 
 		MODULEINFO modinfo;
 		GetModuleInformation(cpdi.hProcess, hMods[i], &modinfo, sizeof(modinfo));
@@ -203,7 +201,6 @@ int injectorImports(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 			continue;
 		}
 
-		printf("%x\t%s\n", addr, moduleName.c_str());
 		hints[moduleName] = addr;
 	}
 
@@ -215,8 +212,6 @@ int injectorImports(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 		if (moduleName == "") {
 			break;
 		}
-
-		printf("%s\n", moduleName.c_str());
 
 		// get base
 		// check bases
@@ -230,7 +225,7 @@ int injectorImports(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 
 			if (itHints != hints.end()) {
 				// get base from hint
-				printf("OMG HINT %x\n", itHints->second);
+				//printf("WARNING: using hint %x\n", itHints->second);
 				UINT64 hintPage = (UINT64)itHints->second & 0xFFFFFFFFFFFFF000;
 				BYTE magic[2];
 				
@@ -242,7 +237,6 @@ int injectorImports(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 					}
 
 					if (magic[0] == 0x4D && magic[1] == 0x5A) {
-						printf("%x\t%x, %x\n", hintPage, magic[0], magic[1]);
 						bases[moduleName] = (LPVOID)hintPage;
 						found = true;
 						break;
@@ -254,7 +248,7 @@ int injectorImports(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 			
 			if (!found) {
 				// TODO: implement recursive loader (read: injector)
-				printf("OMG NOT FOUND %s\n", moduleName);
+				printf("ERROR: address not found for %s\n", moduleName);
 				continue;
 			}
 		}
@@ -293,11 +287,7 @@ int injectorImports(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 
 int hooker(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 	ExportHandler injectedExportHandler(cpdi.hProcess, remoteBase);
-	printf("Hook remoteBase: %x\n", remoteBase);
 	UINT64 address = injectedExportHandler.GetFunctionAddress("ReadFileHook");
-	printf("Hook address: %x\n", address);
-
-	printf("ADDRESS: %x\n", address);
 
 	ImportHandler importHandler(cpdi.hProcess, cpdi.lpBaseOfImage);
 	while (1) {
@@ -314,12 +304,10 @@ int hooker(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 
 			if (!functionName.compare("ReadFile")) {
 				importHandler.RewriteFunctionAddr(address);
-				printf("FUNCTION ADDR: %x\n", importHandler.GetFunctionAddr());
 			}
 		}
 	}
 
-	walk_imports(cpdi.hProcess, cpdi.lpBaseOfImage);
 	return 0;
 }
 
@@ -359,7 +347,6 @@ int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
 
 	// allocate mem in target process
 	LPVOID remoteBase = VirtualAllocEx(cpdi.hProcess, NULL, pNtHeaders->OptionalHeader.SizeOfImage, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-	printf("remoteBase: %x\n", remoteBase);
 
 	// get dos and section headers
 	PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)buf;
@@ -406,7 +393,7 @@ int debug_main_loop() {
 		DEBUG_EVENT dbgev;
 
 		WaitForDebugEvent(&dbgev, INFINITE);
-		printf("DEBUG EVENT: %d\n", dbgev.dwDebugEventCode);
+		//printf("DEBUG EVENT: %d\n", dbgev.dwDebugEventCode);
 
 		switch (dbgev.dwDebugEventCode)
 		{
@@ -419,7 +406,7 @@ int debug_main_loop() {
 					exit(1);
 					break;
 				case EXCEPTION_BREAKPOINT:
-					printf("BREAK AT %x\n", address);
+					//printf("BREAK AT %x\n", address);
 					//walk_imports(cpdi.hProcess, cpdi.lpBaseOfImage);
 					injector(cpdi);
 					break;
@@ -437,7 +424,7 @@ int debug_main_loop() {
 			break;
 		case CREATE_PROCESS_DEBUG_EVENT:
 			cpdi = dbgev.u.CreateProcessInfo;
-			printf("START ADDR %x\n", cpdi.lpStartAddress);
+			//printf("START ADDR %x\n", cpdi.lpStartAddress);
 			DebugBreakProcess(cpdi.hProcess);
 			break;
 		case EXIT_THREAD_DEBUG_EVENT:
@@ -445,6 +432,7 @@ int debug_main_loop() {
 		case EXIT_PROCESS_DEBUG_EVENT:
 			EXIT_PROCESS_DEBUG_INFO epdi = dbgev.u.ExitProcess;
 			// TODO: exit when all processes have exited
+			exit(0);
 			break;
 		case LOAD_DLL_DEBUG_EVENT:
 			LOAD_DLL_DEBUG_INFO lddi = dbgev.u.LoadDll;
@@ -482,8 +470,6 @@ int main()
 	if (argc > 2) {
 		args = argv[2];
 	}
-
-	printf("CALLING: CreateProcess %S\n", name);
 
 	STARTUPINFO si;
 	ZeroMemory(&si, sizeof(si));
