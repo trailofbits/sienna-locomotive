@@ -285,7 +285,7 @@ int injectorImports(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 	}
 }
 
-int hooker(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
+int hook(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 	ExportHandler injectedExportHandler(cpdi.hProcess, remoteBase);
 	UINT64 address = injectedExportHandler.GetFunctionAddress("ReadFileHook");
 
@@ -369,7 +369,7 @@ int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
 
 	injectorImports(cpdi, remoteBase);
 
-	hooker(cpdi, remoteBase);
+	hook(cpdi, remoteBase);
 
 	return 0;
 }
