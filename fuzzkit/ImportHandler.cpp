@@ -183,7 +183,14 @@ BOOL ImportHandler::RewriteFunctionAddr(UINT64 addr) {
 		uint64_t iatFirstThunkAddr = addr;
 		lpvScratch = (LPVOID)((uintptr_t)this->lpvBaseOfImage + this->iid.FirstThunk + (this->itdIndex-1) * sizeof(uint64_t));
 		if (!WriteProcessMemory(this->hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint64_t), &bytesWritten)) {
+			MEMORY_BASIC_INFORMATION mbi;
+			VirtualQueryEx(this->hProcess, lpvScratch, &mbi, sizeof(MEMORY_BASIC_INFORMATION));
+			printf("PERMISSIONS: %x\n", mbi.Protect);
 			printf("ERROR: RewriteFunctionAddr %x %x\n", bytesWritten, GetLastError());
+			DWORD old;
+			VirtualProtectEx(this->hProcess, mbi.BaseAddress, mbi.RegionSize, PAGE_EXECUTE_READWRITE, &old);
+			WriteProcessMemory(this->hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint64_t), &bytesWritten);
+			VirtualProtectEx(this->hProcess, mbi.BaseAddress, mbi.RegionSize, mbi.Protect, &old);
 			return false;
 		}
 		return true;

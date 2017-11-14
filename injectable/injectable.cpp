@@ -2,6 +2,7 @@
 //
 
 #include "stdafx.h"
+#include <stdio.h>
 
 extern "C" __declspec(dllexport) BOOL ReadFileHook(
 	HANDLE       hFile,
@@ -10,6 +11,7 @@ extern "C" __declspec(dllexport) BOOL ReadFileHook(
 	LPDWORD      lpNumberOfBytesRead,
 	LPOVERLAPPED lpOverlapped) 
 {
+	printf("IN READ FILE HOOK!!!!\n");
 	for (DWORD i = 0; i < nNumberOfBytesToRead; i++) {
 		((BYTE *)lpBuffer)[i] = 'A';
 	}
