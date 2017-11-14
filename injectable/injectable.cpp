@@ -3,7 +3,7 @@
 
 #include "stdafx.h"
 
-__declspec(dllexport) BOOL ReadFileHook(
+extern "C" __declspec(dllexport) BOOL ReadFileHook(
 	HANDLE       hFile,
 	LPVOID       lpBuffer,
 	DWORD        nNumberOfBytesToRead,

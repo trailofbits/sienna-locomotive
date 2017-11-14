@@ -153,11 +153,13 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ExportHandler.h" />
     <ClInclude Include="ImportHandler.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ExportHandler.cpp" />
     <ClCompile Include="fuzzkit.cpp" />
     <ClCompile Include="ImportHandler.cpp" />
     <ClCompile Include="stdafx.cpp">

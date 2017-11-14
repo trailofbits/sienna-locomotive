@@ -3,16 +3,19 @@
 
 #include "stdafx.h"
 #include <Windows.h>
-#include <psapi.h>
-#include <DbgHelp.h>
-#include <tchar.h>
-#include <iostream>
-#include "ImportHandler.h"
-#include <map>
 #include <winternl.h>
+#include <DbgHelp.h>
 #include <stdlib.h>
+#include <psapi.h>
+#include <tchar.h>
 #include <algorithm>
+#include <iostream>
 #include <string> 
+#include <map>
+#include <list>
+
+#include "ImportHandler.h"
+#include "ExportHandler.h"
 
 typedef unsigned __int64 QWORD;
 // TODO: check return of every call
@@ -213,28 +216,64 @@ int injectorImports(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 			break;
 		}
 
+		printf("%s\n", moduleName.c_str());
+
 		// get base
 		// check bases
 		std::map<std::string, LPVOID>::iterator itBases;
 		itBases = bases.find(moduleName);
 		if (itBases == bases.end()) {
-			continue;
 			// check hints
-				// TODO: get base from hint
-			// else 
-				// TODO: load (inject) missing
+			std::map<std::string, LPVOID>::iterator itHints;
+			itHints = hints.find(moduleName);
+			bool found = false;
+
+			if (itHints != hints.end()) {
+				// get base from hint
+				printf("OMG HINT %x\n", itHints->second);
+				UINT64 hintPage = (UINT64)itHints->second & 0xFFFFFFFFFFFFF000;
+				BYTE magic[2];
+				
+				for (int i = 0; i < 20; i++) {
+					ReadProcessMemory(cpdi.hProcess, (LPVOID)hintPage, magic, sizeof(BYTE) * 2, &bytesRead);
+					
+					if (bytesRead == 0) {
+						break;
+					}
+
+					if (magic[0] == 0x4D && magic[1] == 0x5A) {
+						printf("%x\t%x, %x\n", hintPage, magic[0], magic[1]);
+						bases[moduleName] = (LPVOID)hintPage;
+						found = true;
+						break;
+					}
+
+					hintPage -= 0x1000;
+				}
+			}
+			
+			if (!found) {
+				// TODO: implement recursive loader (read: injector)
+				printf("OMG NOT FOUND %s\n", moduleName);
+				continue;
+			}
 		}
 
 		// gather desired functions
+		std::list<std::string> functions;
 		while (1) {
 			std::string functionName = injectableImportHandler.GetNextFunction();
 			if (functionName == "") {
 				break;
 			}
+			functions.push_back(functionName);
 		}
 
-		// TODO: walk exports from base, gather function addrs
+		// walk exports from base, gather function addrs
+		ExportHandler exportHandler(cpdi.hProcess, bases[moduleName]);
+		std::map<std::string, UINT64> exportAddresses = exportHandler.GetFunctionAddresses(functions);
 
+		// fixup imports
 		injectableImportHandler.ResetFunctions();
 		while (1) {
 			std::string functionName = injectableImportHandler.GetNextFunction();
@@ -242,10 +281,42 @@ int injectorImports(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 				break;
 			}
 
-			UINT64 addr = 0; // exports[functionName];
+			if (exportAddresses.find(functionName) == exportAddresses.end()) {
+				printf("ERROR: Could not resolve %s", functionName.c_str());
+			}
+
+			UINT64 addr = exportAddresses[functionName];
 			injectableImportHandler.RewriteFunctionAddr(addr);
 		}
 	}
+}
+
+int hooker(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
+	ExportHandler injectedExportHandler(cpdi.hProcess, remoteBase);
+	UINT64 address = injectedExportHandler.GetFunctionAddress("ReadFileHook");
+
+	ImportHandler importHandler(cpdi.hProcess, cpdi.lpBaseOfImage);
+	while (1) {
+		std::string moduleName = importHandler.GetNextModule();
+		if (moduleName == "") {
+			break;
+		}
+
+		while (1) {
+			std::string functionName = importHandler.GetNextFunction();
+			if (functionName == "") {
+				break;
+			}
+
+			if (functionName.compare("ReadFile")) {
+				importHandler.RewriteFunctionAddr((UINT64)remoteBase + address);
+				printf("REPLACED: %s\t%x\t%s\n", moduleName, functionName.c_str());
+			}
+
+		}
+	}
+
+	return 0;
 }
 
 int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
@@ -306,7 +377,7 @@ int injector(CREATE_PROCESS_DEBUG_INFO cpdi) {
 
 	injectorImports(cpdi, remoteBase);
 
-	// TODO: hooks
+	hooker(cpdi, remoteBase);
 
 	return 0;
 }
@@ -328,8 +399,6 @@ int debug_main_loop() {
 	for (;;)
 	{
 		DEBUG_EVENT dbgev;
-		TCHAR nameW[MAX_PATH] = { 0 };
-		DWORD index = 0;
 
 		WaitForDebugEvent(&dbgev, INFINITE);
 		printf("DEBUG EVENT: %d\n", dbgev.dwDebugEventCode);
@@ -373,19 +442,6 @@ int debug_main_loop() {
 			break;
 		case LOAD_DLL_DEBUG_EVENT:
 			LOAD_DLL_DEBUG_INFO lddi = dbgev.u.LoadDll;
-			UINT64 addr;
-			ReadProcessMemory(cpdi.hProcess, lddi.lpImageName, &addr, sizeof(UINT64), NULL);
-			printf("LOAD DLL: %x\n", lddi.lpImageName);
-			printf("LOAD DLL ADDR: %x\n", addr);
-			printf("LOAD DLL UNICODE: %x\n", lddi.fUnicode);
-			while (1) {
-				ReadProcessMemory(cpdi.hProcess, (LPVOID)(addr+sizeof(TCHAR)*index), nameW+index, sizeof(TCHAR), NULL);
-				index++;
-				if (nameW[index - 1] == 0 || index > MAX_PATH) {
-					break;
-				}
-			}
-			printf("%S\n", nameW);
 			break;
 		case UNLOAD_DLL_DEBUG_EVENT:
 			break;
