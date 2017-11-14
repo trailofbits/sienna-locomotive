@@ -12,6 +12,7 @@
     "babel-preset-react": "^6.24.1",
     "css-loader": "^0.28.7",
     "electron": "^1.7.9",
+    "os": "^0.1.1",
     "path": "^0.12.7",
     "react": "^16.0.0",
     "react-dom": "^16.0.0",
@@ -22,6 +23,7 @@
   },
   "scripts": {
     "webpack": "webpack",
-    "launch": "cp build/index.bundle.js ../app/ && electron ../app/"
+    "launch": "cp build/index.bundle.js ../app/ && electron ../app/",
+    "win-launch": "copy build\\index.bundle.js ..\\app\\ && electron ..\\app\\"
   }
 }

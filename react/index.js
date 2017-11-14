@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 const fs = window.require('fs');
+const os = window.require('os');
 const electron = window.require('electron');
 const path = window.require('path');
 const { execFile } = window.require('child_process');
@@ -61,6 +62,7 @@ class Settings extends React.Component {
     static set(pin_path, triage_path) {
         const userDataPath = (electron.app || electron.remote.app).getPath('userData');
         let filePath = path.join(userDataPath, 'settings.json');
+        console.log(filePath);
 
         let data = {'pin_path': '', 'triage_path': ''};
         try {
@@ -95,7 +97,8 @@ class Settings extends React.Component {
     }
 
     render() {
-        let lib = process.platform === 'win32' ? 'taint.dll' : 'taint.so';
+        console.log('PLATFORM: ', os.platform());
+        let lib = os.platform() === 'win32' ? 'taint.dll' : 'taint.so';
         let padding = Array(lib.length - 'pin.exe'.length).fill(<span>&nbsp;</span>);
         let data = Settings.get();
         return (
@@ -262,11 +265,11 @@ class Crashes extends React.Component {
     getSorted() {
         return this.triaged.concat().sort(
             function(a, b) {
-                if(!("crash_data" in a)) { 
+                if(!("crash_data" in a && "score" in a.crash_data)) { 
                     return -1;
                 }
 
-                if(!("crash_data" in b)) { 
+                if(!("crash_data" in b && "score" in b.crash_data)) { 
                     return 1;
                 }
 
@@ -315,8 +318,8 @@ class AddCrashModal extends React.Component {
     }
 
     render() {
-        let test_file = 'crash_scratch';
-        let test_cmd = '/home/taxicat/work/sienna-locomotive/triage/corpus/asm/crashy_mccrashface 3';
+        let test_file = 'crash_scratch.txt';
+        let test_cmd = 'C:\\Users\\dgoddard\\Documents\\GitHub\\sienna-locomotive\\triage\\corpus\\win_asm\\crashes.exe 3';
         let padding = Array('Run command:'.length - 'File name:'.length).fill(<span>&nbsp;</span>);
         return (
             <div className='modal'>
@@ -459,6 +462,16 @@ class CrashList extends React.Component {
             let cd = crash.crash_data;
             let comp_cd = compare.crash_data;
 
+            if(cd === undefined) {
+                continue;
+            }
+
+            if(comp_cd === undefined) {
+                compare = crash;
+                group = [crash];
+                continue;
+            }
+
             if(cd.score === comp_cd.score 
                 && cd.signal === comp_cd.signal 
                 && cd.reason === comp_cd.reason 
@@ -472,7 +485,8 @@ class CrashList extends React.Component {
             }
         }
 
-        grouped.push(group);
+        if(group.length != 0)
+            grouped.push(group);
         this.grouped = grouped;
 
         let crash_list = [];
