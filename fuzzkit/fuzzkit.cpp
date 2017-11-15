@@ -21,6 +21,7 @@ typedef unsigned __int64 QWORD;
 // TODO: check return of every call
 // TODO: support 32bit
 
+CONTEXT c;
 int walk_imports(HANDLE hProcess, PVOID lpBaseOfImage) {
 	ImportHandler importHandler(hProcess, lpBaseOfImage);
 	while (1) {
@@ -478,6 +479,7 @@ int main()
 	PROCESS_INFORMATION pi;
 	ZeroMemory(&pi, sizeof(pi));
 
+	// TODO: use args
 	BOOL success = CreateProcess(
 		name,
 		NULL,

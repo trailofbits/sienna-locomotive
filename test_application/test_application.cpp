@@ -23,7 +23,7 @@ int main()
 
 	buf[8] = 0;
 	printf("BUF: %s\n", buf);
-
+	
 	CloseHandle(file);
     return 0;
 }
