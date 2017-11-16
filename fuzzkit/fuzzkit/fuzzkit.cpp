@@ -40,6 +40,7 @@ int walk_imports(HANDLE hProcess, PVOID lpBaseOfImage) {
 			printf("\t%x\t%s\n", importHandler.GetFunctionAddr(), functionName.c_str());
 		}
 	}
+	return 0;
 }
 
 int injectorRelocations(CREATE_PROCESS_DEBUG_INFO cpdi, PIMAGE_NT_HEADERS pNtHeaders, LPVOID remoteBase) {
@@ -284,6 +285,7 @@ int injectorImports(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {
 			injectableImportHandler.RewriteFunctionAddr(addr);
 		}
 	}
+	return 0;
 }
 
 int hook(CREATE_PROCESS_DEBUG_INFO cpdi, LPVOID remoteBase) {

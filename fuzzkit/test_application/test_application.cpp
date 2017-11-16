@@ -6,7 +6,7 @@
 
 int main()
 {
-	LPCWSTR name = L"C:\\Users\\dgoddard\\Documents\\sample.txt";
+	LPCWSTR name = L"sample.txt";
 	HANDLE file = CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (file == INVALID_HANDLE_VALUE) {
 		printf("ERROR: CreateFile (%x)\n", GetLastError());
