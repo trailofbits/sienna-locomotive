@@ -1,4 +1,0 @@
-AutoIT script examples
-=====================
-
-
