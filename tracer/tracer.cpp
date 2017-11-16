@@ -79,7 +79,7 @@ int restoreBreak(HANDLE hProcess, HANDLE hThread) {
 	return 0;
 }
 
-int getLength(HANDLE hProcess, PVOID address) {
+BYTE getLength(HANDLE hProcess, PVOID address) {
 	xed_decoded_inst_t xedd;
 	BYTE buf[15];
 	xed_error_enum_t xed_err;
