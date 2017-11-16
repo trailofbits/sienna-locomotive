@@ -448,7 +448,7 @@ class CrashList extends React.Component {
     }
 
     render() {
-        let sorted = this.props.getSorted();
+        let sorted = this.props.getSorted().filter(ea => 'crash_data' in ea);
 
         let compare = {};
         if(sorted.length > 0) {
@@ -461,16 +461,6 @@ class CrashList extends React.Component {
             let crash = sorted[idx];
             let cd = crash.crash_data;
             let comp_cd = compare.crash_data;
-
-            if(cd === undefined) {
-                continue;
-            }
-
-            if(comp_cd === undefined) {
-                compare = crash;
-                group = [crash];
-                continue;
-            }
 
             if(cd.score === comp_cd.score 
                 && cd.signal === comp_cd.signal 
@@ -485,8 +475,9 @@ class CrashList extends React.Component {
             }
         }
 
-        if(group.length != 0)
+        if(group.length != 0) {
             grouped.push(group);
+        }
         this.grouped = grouped;
 
         let crash_list = [];
