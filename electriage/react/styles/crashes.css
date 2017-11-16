@@ -1,0 +1,39 @@
+.crash_column {
+    padding-right: 5px;
+}
+
+.crash_table {
+    font-size: 1.4em;
+    width: 100%;
+    text-align: left;
+}
+
+.add_cmd_input {
+    width: calc(100% - 24px);
+    padding: 6px;
+    font-size: 0.7em;
+    font-family: "Lucida console", monaco, monospace;
+}
+
+.add_cmd_save {
+    width: calc(100% - 8px);
+    height: 35px;
+    margin-top: 24px;
+    background-color: #AD182B;
+    font-size: 1em;
+    font-family: "Alegreya Sans";
+    color: #eee;
+    font-weight: bold;
+    border: none;
+    outline: none;
+    letter-spacing: 0.1em;
+}
+
+.details_heading {
+    font-family: "Alegreya Sans";
+    font-size: 1.7em;
+    font-weight: 400;
+    padding: 10px;
+    padding-left:0px;
+    margin: 0px;
+}
