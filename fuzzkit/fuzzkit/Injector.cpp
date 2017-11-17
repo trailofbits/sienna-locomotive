@@ -1,0 +1,399 @@
+#include "stdafx.h"
+#include "Injector.h"
+
+#define IFNERR(call) if(!call) { printf("ERROR: %s:%d %d\n", __FILE__, __LINE__, GetLastError()); exit(1); }
+
+LPVOID Injector::BaseOfInjected() {
+	return this->injectedBase;
+}
+
+std::list<std::string> Injector::MissingModules() {
+	return this->missingModules;
+}
+
+DWORD Injector::HandleRelocations(PIMAGE_NT_HEADERS pNtHeaders) {
+	SIZE_T bytesWritten;
+	// fixup reloc
+	// get size of reloc table
+	IMAGE_DATA_DIRECTORY relocDir = pNtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
+
+	// intended base
+	DWORD baseOfCode = pNtHeaders->OptionalHeader.BaseOfCode;
+
+	DWORD consumed = 0;
+	LPVOID relocVA = (LPVOID)((uintptr_t)this->injectedBase + relocDir.VirtualAddress);
+	// iterate over reloc bases
+	while (consumed < relocDir.Size) {
+		SIZE_T bytesRead;
+		IMAGE_BASE_RELOCATION relocBase;
+		IFNERR(ReadProcessMemory(this->hProcess, relocVA, &relocBase, sizeof(IMAGE_BASE_RELOCATION), &bytesRead))
+
+			// calculate this->injectedBase + pageRVA
+			LPVOID pageBase = (LPVOID)((uintptr_t)this->injectedBase + relocBase.VirtualAddress);
+
+		// consume relocBase
+		consumed += 8;
+		relocVA = (LPVOID)((uintptr_t)relocVA + 8);
+
+		// calculate num blocks (block size - 8)
+		DWORD blockCount = (relocBase.SizeOfBlock - 8) / 2;
+
+		// iterate blocks
+		DWORD highAdj = 0;
+		LPVOID highAdjVA = 0;
+		BOOL processHighAdj = false;
+
+		uintptr_t imageBaseInt = pNtHeaders->OptionalHeader.ImageBase;
+		uintptr_t injectedBaseInt = (uintptr_t)this->injectedBase;
+
+		for (int i = 0; i < blockCount; i++) {
+			// get reloc type, offset
+			WORD relocationBlock;
+			IFNERR(ReadProcessMemory(this->hProcess, relocVA, &relocationBlock, sizeof(WORD), &bytesRead))
+
+				WORD type = relocationBlock >> 12;
+			WORD offset = relocationBlock & 0xFFF;
+
+			LPVOID targetVA = (LPVOID)((uintptr_t)pageBase + offset);
+
+			WORD target16;
+			DWORD target32;
+			QWORD target64;
+
+			if (!processHighAdj) {
+				// switch reloc type
+				switch (type) {
+				case IMAGE_REL_BASED_HIGH:
+					IFNERR(ReadProcessMemory(this->hProcess, targetVA, &target16, sizeof(WORD), &bytesRead))
+						target16 -= imageBaseInt >> 16;
+					target16 += injectedBaseInt >> 16;
+					IFNERR(WriteProcessMemory(this->hProcess, targetVA, &target16, sizeof(WORD), &bytesWritten))
+						break;
+				case IMAGE_REL_BASED_LOW:
+					IFNERR(ReadProcessMemory(this->hProcess, targetVA, &target16, sizeof(WORD), &bytesRead))
+						target16 -= imageBaseInt & 0xFFFF;
+					target16 += injectedBaseInt & 0xFFFF;
+					IFNERR(WriteProcessMemory(this->hProcess, targetVA, &target16, sizeof(WORD), &bytesWritten))
+						break;
+				case IMAGE_REL_BASED_HIGHLOW:
+					IFNERR(ReadProcessMemory(this->hProcess, targetVA, &target32, sizeof(DWORD), &bytesRead))
+						target32 -= imageBaseInt;
+					target32 += injectedBaseInt;
+					IFNERR(WriteProcessMemory(this->hProcess, targetVA, &target32, sizeof(DWORD), &bytesWritten))
+						break;
+				case IMAGE_REL_BASED_HIGHADJ:
+					// who the fuck designed this bullshit?
+					IFNERR(ReadProcessMemory(this->hProcess, targetVA, &target16, sizeof(WORD), &bytesRead))
+						highAdj = target16 << 16;
+					highAdjVA = targetVA;
+					processHighAdj = true;
+					break;
+				case IMAGE_REL_BASED_DIR64:
+					IFNERR(ReadProcessMemory(this->hProcess, targetVA, &target64, sizeof(QWORD), &bytesRead))
+						target64 -= imageBaseInt;
+					target64 += injectedBaseInt;
+					IFNERR(WriteProcessMemory(this->hProcess, targetVA, &target64, sizeof(QWORD), &bytesWritten))
+						break;
+				default:
+					break;
+				}
+			}
+			else {
+				// seriously, HIGHADJ is stupid
+				highAdj |= relocationBlock;
+				highAdj -= imageBaseInt & 0xFFFF0000;
+				highAdj += injectedBaseInt & 0xFFFF0000;
+				target16 = highAdj >> 16;
+				IFNERR(WriteProcessMemory(this->hProcess, highAdjVA, &target16, sizeof(WORD), &bytesWritten))
+
+					highAdj = 0;
+				highAdjVA = 0;
+				processHighAdj = false;
+			}
+
+			consumed += 2;
+			relocVA = (LPVOID)((uintptr_t)relocVA + 2);
+		}
+	}
+
+	return 0;
+}
+
+DWORD Injector::HandleImports() {
+	// get module bases
+	std::map<std::string, LPVOID> bases;
+	std::map<std::string, LPVOID> hints;
+	SIZE_T bytesRead;
+
+	// get addrs from EnumProcessModules
+	HMODULE hMods[1024] = { 0 };
+	DWORD cbNeeded;
+
+	// TODO: use EnumProcessModulesEx for 32 bit compatibility
+	IFNERR(EnumProcessModules(this->hProcess, hMods, sizeof(HMODULE) * 1024, &cbNeeded))
+
+		DWORD modCount = cbNeeded / sizeof(HMODULE);
+	if (modCount > 1024) {
+		modCount = 1024;
+	}
+
+	for (DWORD i = 0; i < modCount; i++) {
+		TCHAR nameW[MAX_PATH];
+		IFNERR(GetModuleBaseName(this->hProcess, hMods[i], nameW, MAX_PATH))
+
+			CHAR nameC[MAX_PATH];
+		SIZE_T ret;
+		wcstombs_s(&ret, nameC, MAX_PATH, nameW, MAX_PATH);
+
+		MODULEINFO modinfo;
+		IFNERR(GetModuleInformation(this->hProcess, hMods[i], &modinfo, sizeof(modinfo)))
+			std::string name(nameC);
+		std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+		bases[name] = modinfo.lpBaseOfDll;
+	}
+
+	// get bases from imports
+	ImportHandler importHandler(this->hProcess, this->lpBaseOfImage);
+	while (1) {
+		std::string moduleName = importHandler.GetNextModule();
+		std::transform(moduleName.begin(), moduleName.end(), moduleName.begin(), ::tolower);
+
+		if (moduleName == "") {
+			break;
+		}
+
+		importHandler.GetNextFunction();
+		LPVOID addr = (LPVOID)importHandler.GetFunctionAddr();
+
+		std::map<std::string, LPVOID>::iterator itBases;
+		itBases = bases.find(moduleName);
+		if (itBases != bases.end()) {
+			continue;
+		}
+
+		hints[moduleName] = addr;
+	}
+
+	// walk import table of injectable
+	ImportHandler injectableImportHandler(this->hProcess, this->injectedBase);
+	while (1) {
+		std::string moduleName = injectableImportHandler.GetNextModule();
+		std::transform(moduleName.begin(), moduleName.end(), moduleName.begin(), ::tolower);
+		if (moduleName == "") {
+			break;
+		}
+
+		// get base
+		// check bases
+		std::map<std::string, LPVOID>::iterator itBases;
+		itBases = bases.find(moduleName);
+		if (itBases == bases.end()) {
+			// check hints
+			std::map<std::string, LPVOID>::iterator itHints;
+			itHints = hints.find(moduleName);
+			bool found = false;
+
+			if (itHints != hints.end()) {
+				// get base from hint
+				//printf("WARNING: using hint %x\n", itHints->second);
+				UINT64 hintPage = (UINT64)itHints->second & 0xFFFFFFFFFFFFF000;
+				BYTE magic[2];
+
+				for (int i = 0; i < 20; i++) {
+					IFNERR(ReadProcessMemory(this->hProcess, (LPVOID)hintPage, magic, sizeof(BYTE) * 2, &bytesRead))
+
+						if (bytesRead == 0) {
+							break;
+						}
+
+					if (magic[0] == 0x4D && magic[1] == 0x5A) {
+						bases[moduleName] = (LPVOID)hintPage;
+						found = true;
+						break;
+					}
+
+					hintPage -= 0x1000;
+				}
+			}
+
+			if (!found) {
+				printf("WARN: address not found for %s\n", moduleName);
+				missingModules.push_back(moduleName);
+				continue;
+			}
+		}
+
+		// gather desired functions
+		std::list<std::string> functions;
+		while (1) {
+			std::string functionName = injectableImportHandler.GetNextFunction();
+			if (functionName == "") {
+				break;
+			}
+			functions.push_back(functionName);
+		}
+
+		// walk exports from base, gather function addrs
+		ExportHandler exportHandler(this->hProcess, bases[moduleName]);
+		std::map<std::string, UINT64> exportAddresses = exportHandler.GetFunctionAddresses(functions);
+
+		// fixup imports
+		injectableImportHandler.ResetFunctions();
+		while (1) {
+			std::string functionName = injectableImportHandler.GetNextFunction();
+			if (functionName == "") {
+				break;
+			}
+
+			if (exportAddresses.find(functionName) == exportAddresses.end()) {
+				printf("WARN: Could not resolve %s", functionName.c_str());
+			}
+
+			UINT64 addr = exportAddresses[functionName];
+			injectableImportHandler.RewriteFunctionAddr(addr);
+		}
+	}
+	return 0;
+}
+
+DWORD Injector::ResolveImports(std::map<std::string, LPVOID> loadedMap) {
+	ImportHandler injectableImportHandler(this->hProcess, this->injectedBase);
+	while (1) {
+		std::string moduleName = injectableImportHandler.GetNextModule();
+		std::transform(moduleName.begin(), moduleName.end(), moduleName.begin(), ::tolower);
+		if (moduleName == "") {
+			break;
+		}
+
+		std::map<std::string, LPVOID>::iterator loadedMapIt;
+		if (loadedMap.find(moduleName) == loadedMap.end()) {
+			continue;
+		}
+
+		// gather desired functions
+		std::list<std::string> functions;
+		while (1) {
+			std::string functionName = injectableImportHandler.GetNextFunction();
+			if (functionName == "") {
+				break;
+			}
+			functions.push_back(functionName);
+		}
+
+		// walk exports from base, gather function addrs
+		ExportHandler exportHandler(this->hProcess, loadedMap[moduleName]);
+		std::map<std::string, UINT64> exportAddresses = exportHandler.GetFunctionAddresses(functions);
+
+		// fixup imports
+		injectableImportHandler.ResetFunctions();
+		while (1) {
+			std::string functionName = injectableImportHandler.GetNextFunction();
+			if (functionName == "") {
+				break;
+			}
+
+			if (exportAddresses.find(functionName) == exportAddresses.end()) {
+				printf("WARN: Could not resolve %s", functionName.c_str());
+			}
+
+			UINT64 addr = exportAddresses[functionName];
+			injectableImportHandler.RewriteFunctionAddr(addr);
+		}
+	}
+}
+
+DWORD Injector::HandleHook() {
+	std::map<std::string, std::string>::iterator hookMapIt;
+
+	// TODO: add filtering by DLL name
+	for (hookMapIt = hookMap.begin(); hookMapIt != hookMap.end(); hookMapIt++) {
+		std::string hookFn = hookMapIt->first;
+		std::string origFn = hookMapIt->second;
+		ExportHandler injectedExportHandler(this->hProcess, this->injectedBase);
+		UINT64 address = injectedExportHandler.GetFunctionAddress(hookFn);
+
+		ImportHandler importHandler(this->hProcess, this->lpBaseOfImage);
+		while (1) {
+			std::string moduleName = importHandler.GetNextModule();
+			if (moduleName == "") {
+				break;
+			}
+
+			while (1) {
+				std::string functionName = importHandler.GetNextFunction();
+				if (functionName == "") {
+					break;
+				}
+
+				if (!functionName.compare(origFn)) {
+					importHandler.RewriteFunctionAddr(address);
+				}
+			}
+		}
+	}
+
+	return 0;
+}
+
+DWORD Injector::Inject() {
+	// read in injectable
+	HANDLE hFile = CreateFile(L"injectable.dll", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hFile == INVALID_HANDLE_VALUE) {
+		printf("ERROR: CreateFile (%x)\n", GetLastError());
+		exit(1);
+	}
+
+	DWORD highSize = 0;
+	DWORD lowSize = GetFileSize(hFile, &highSize);
+	if (highSize) {
+		printf("ERROR: injectable exceeds 4GB\n");
+		exit(1);
+	}
+
+	PBYTE buf = (PBYTE)VirtualAlloc(NULL, lowSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+	if (!buf) {
+		printf("ERROR: VirtualAlloc (%x)\n", GetLastError());
+		exit(1);
+	}
+
+	DWORD bytes_read;
+	if (!ReadFile(hFile, buf, lowSize, &bytes_read, NULL) || bytes_read != lowSize) {
+		printf("ERROR: ReadFile (ms_buf) (%x)\n", GetLastError());
+		exit(1);
+	}
+
+	// get nt headers
+	PIMAGE_NT_HEADERS pNtHeaders = ImageNtHeader(buf);
+	if (!pNtHeaders) {
+		printf("ERROR: ImageNtHeader (%x)\n", GetLastError());
+		exit(1);
+	}
+
+	// allocate mem in target process
+	this->injectedBase = VirtualAllocEx(this->hProcess, NULL, pNtHeaders->OptionalHeader.SizeOfImage, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+
+	// get dos and section headers
+	PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)buf;
+	PIMAGE_SECTION_HEADER pSectionHeader = (PIMAGE_SECTION_HEADER)(buf + pDosHeader->e_lfanew + sizeof(IMAGE_NT_HEADERS));
+
+	// write headers
+	SIZE_T bytesWritten;
+	IFNERR(WriteProcessMemory(this->hProcess, this->injectedBase, buf, pSectionHeader->PointerToRawData, &bytesWritten))
+
+		// loop write sections
+		WORD sectionCount = pNtHeaders->FileHeader.NumberOfSections;
+	for (WORD i = 0; i < sectionCount; i++) {
+		pSectionHeader = (PIMAGE_SECTION_HEADER)(buf + pDosHeader->e_lfanew + sizeof(IMAGE_NT_HEADERS) + sizeof(IMAGE_SECTION_HEADER) * i);
+
+		LPVOID remoteVA = (LPVOID)((uintptr_t)this->injectedBase + pSectionHeader->VirtualAddress);
+		IFNERR(WriteProcessMemory(this->hProcess, remoteVA, buf + pSectionHeader->PointerToRawData, pSectionHeader->SizeOfRawData, &bytesWritten))
+	}
+
+	HandleRelocations(pNtHeaders);
+
+	HandleImports();
+
+	HandleHook();
+
+	return 0;
+}

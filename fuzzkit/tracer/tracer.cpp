@@ -9,6 +9,8 @@ extern "C" {
 #include "include/xed-interface.h"
 }
 
+// TODO: ascii art tracer
+
 /*
 Trace:
 	Single step instructions
@@ -41,7 +43,14 @@ loop:
 
 */
 
+// cache:
+	// address head (lookup)
+	// list addresses and lengths
+	// address tail (break)
+	// note: make base address agnostic for speed after first run
+
 std::map<LPVOID, BYTE> restoreBytes;
+HANDLE hTraceFile;
 
 int singleStep(HANDLE hThread) {
 	CONTEXT context;
@@ -49,10 +58,12 @@ int singleStep(HANDLE hThread) {
 	SuspendThread(hThread);
 	GetThreadContext(hThread, &context);
 	context.EFlags = context.EFlags | (1 << 8);
+
 	if (!SetThreadContext(hThread, &context)) {
 		printf("ERROR: SetThreadContext (%x)\n", GetLastError());
 		return 1;
 	}
+
 	ResumeThread(hThread);
 	return 0;
 }
@@ -71,6 +82,9 @@ int restoreBreak(HANDLE hProcess, HANDLE hThread) {
 	context.ContextFlags = CONTEXT_ALL;
 	GetThreadContext(hThread, &context);
 	printf("RIP: %x\n", context.Rip);
+	
+	// TODO: check that Rip is in restoreBytes
+	
 	context.Rip -= 1;
 	SetThreadContext(hThread, &context);
 	
@@ -79,7 +93,16 @@ int restoreBreak(HANDLE hProcess, HANDLE hThread) {
 	return 0;
 }
 
-BYTE getLength(HANDLE hProcess, PVOID address) {
+BOOL isBranch(xed_decoded_inst_t xedd) {
+	xed_iclass_enum_t iclass = xed_decoded_inst_get_iclass(&xedd);
+	if (iclass >= XED_ICLASS_JB && iclass <= XED_ICLASS_JZ) {
+		return true;
+	}
+
+	return false;
+}
+
+BYTE trace(HANDLE hProcess, PVOID address) {
 	xed_decoded_inst_t xedd;
 	BYTE buf[15];
 	xed_error_enum_t xed_err;
@@ -89,25 +112,43 @@ BYTE getLength(HANDLE hProcess, PVOID address) {
 	xed_decoded_inst_set_mode(&xedd, XED_MACHINE_MODE_LONG_64, XED_ADDRESS_WIDTH_64b);
 	xed_err = xed_decode(&xedd, buf, 15);
 
+	// check cache
+
+	//If have address:
+	//	Set break on end of bb
+	//	Record trace (bb)
+	//Don't have address:
+	//	Walk forward through memory until control flow insn
+	//	Set break on end of bb
+	//	Store bb by address
+	//	Record trace (bb)
+
+	DWORD bytesWritten;
+	WriteFile(hTraceFile, &(xedd._decoded_length), 1, &bytesWritten, NULL);
+	WriteFile(hTraceFile, buf, xedd._decoded_length, &bytesWritten, NULL);
+
 	//printf("INSN: %x %x\n", address, xedd._decoded_length);
 	//for (int i = 0; i < 15; i++) {
 	//	printf("%x ", buf[i]);
 	//}
 	//printf("\n");
+	//exit(0);
+	
 	//printf("ERR: %s\n", xed_error_enum_t2str(xed_err));
 	//
 	//CHAR outBuf[1024];
-	////xed_decoded_inst_dump(&xedd, outBuf, 1024);
+	//xed_decoded_inst_dump(&xedd, outBuf, 1024);
 	//xed_format_context(XED_SYNTAX_INTEL, &xedd, outBuf, 1024, 0, 0, 0);
 	//printf("%s\n\n", outBuf);
 
 	return xedd._decoded_length;
 }
 
+std::map<DWORD, HANDLE> threadMap;
+
 int debug_main_loop() {
 	DWORD dwContinueStatus = DBG_CONTINUE;
 	CREATE_PROCESS_DEBUG_INFO cpdi;
-	std::map<DWORD, HANDLE> threadMap;
 	xed_tables_init();
 	for (;;)
 	{
@@ -133,14 +174,14 @@ int debug_main_loop() {
 					printf("!!! AT START: %x\n", address);
 					restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId]);
 					singleStep(threadMap[dbgev.dwThreadId]);
-					getLength(cpdi.hProcess, address);
+					trace(cpdi.hProcess, address);
 				}
 				break;
 			case EXCEPTION_DATATYPE_MISALIGNMENT:
 				break;
 			case EXCEPTION_SINGLE_STEP:
 				singleStep(threadMap[dbgev.dwThreadId]);
-				getLength(cpdi.hProcess, address);
+				trace(cpdi.hProcess, address);
 				break;
 			case DBG_CONTROL_C:
 				break;
@@ -227,6 +268,13 @@ int main()
 		return 1;
 	}
 
+	hTraceFile = CreateFile(L"trace.bin", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hTraceFile == INVALID_HANDLE_VALUE) {
+		printf("ERROR: CreateFile (%x)\n", GetLastError());
+		exit(1);
+	}
+
+	threadMap[pi.dwThreadId] = pi.hThread;
 	DebugBreakProcess(pi.hProcess);
 	//trap_card(threadMap);
 

@@ -4,6 +4,13 @@
 #include "stdafx.h"
 #include <stdio.h>
 
+/*
+	Lookup: fastest IPC on Windows
+	Read data
+	Send to server
+	Server sends back mutation
+*/
+
 extern "C" __declspec(dllexport) BOOL WINAPI ReadFileHook(
 	HANDLE       hFile,
 	LPVOID       lpBuffer,
