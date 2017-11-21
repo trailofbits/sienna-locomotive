@@ -23,6 +23,10 @@ int main()
 
 	buf[8] = 0;
 	printf("BUF: %s\n", buf);
+
+	int *crashPtr = *(int **)buf;
+	printf("CRASH PTR: %x\n", crashPtr);
+	printf("*CRASH PTR: %x\n", *crashPtr);
 	
 	CloseHandle(file);
     return 0;

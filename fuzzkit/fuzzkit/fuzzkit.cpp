@@ -80,7 +80,7 @@ int debug_main_loop() {
 			switch (dbgev.u.Exception.ExceptionRecord.ExceptionCode)
 			{
 				case EXCEPTION_ACCESS_VIOLATION:
-					printf("EAV: exiting\n");
+					printf("EAV: winning\n");
 					// TODO: log crash
 					exit(1);
 					break;

@@ -72,5 +72,36 @@ Tracer
 
 Triage
   Really just a matter of implementing this
-  Abel to run in standalone mode
+  Able to run in standalone mode
 ```
+
+## Short Term Design thoughts
+
+```
+Code coverage / tracing   # problem 1
+  Debugger
+  DynamoRIO (can we use as a library?)
+  Pin (can we use as a library?)
+  VMill
+
+Fuzz server
+  Unique id per session
+    DLLMain to initialize variables / named pipe connection?
+    DLLMain could call out to fuzz server when complete which could notify fuzzkit to continue
+  Named pipe
+    Fork on connection?
+  Log data used for each call (reproducibility)
+    Per unique run
+  Replay mode with data to gather trace, to triage
+
+Taint tracking with Triton
+  In replay, at first taint
+    Minidump (includes registers?)
+    Can one process minidump another? Maybe use user defined exceptions
+  In replay, at any taint
+    Output buffer and size that is tainted
+  Replay trace between first taint and crash
+  Set initial register state
+  Use minidump for concrete memory values
+```
+
