@@ -4,7 +4,7 @@
 #include "stdafx.h"
 #include "Windows.h"
 #include <list>
-#include <map>
+#include <unordered_map>
 #include "Cache.h"
 extern "C" {
 #include "include/xed-interface.h"
@@ -12,46 +12,10 @@ extern "C" {
 
 // TODO: ascii art tracer
 
-/*
-Trace:
-	Single step instructions
-	At each address get instruction context
-	Use value in PC to get instruction bytes
-	If non-branching maybe save some time by using next insn address to get length
-	Alt: Pass bytes to xed to get opcode length
-	Log address, opcode, and length (for Triton inst)
-*/
-
-/*
-Profiler:
-	Break on start
-	Restore breakpoint
-loop:
-	Check have basic block at address
-	If have address:
-		Set break on end of bb
-		Record trace (bb)
-		Restore breakpoint
-		Set single step for branch
-	Don't have address:
-		Single step until control flow insn 
-		OR Walk forward through memory until control flow insn
-		Store bb by address
-		Record trace (bb)
-		Set single step for branch
-	
-	GOTO loop
-
-*/
-
-// cache:
-	// address head (lookup)
-	// list addresses and lengths
-	// address tail (break)
-	// note: make base address agnostic for speed after first run
-
-std::map<LPVOID, BYTE> restoreBytes;
+std::unordered_map<LPVOID, BYTE> restoreBytes;
 HANDLE hTraceFile;
+Cache cache;
+HANDLE hHeap;
 
 int singleStep(HANDLE hThread) {
 	CONTEXT context;
@@ -144,8 +108,6 @@ BOOL isTerminator(xed_decoded_inst_t xedd) {
 	return false;
 }
 
-Cache cache;
-
 UINT64 trace(HANDLE hProcess, PVOID address) {
 	// check cache
 
@@ -153,17 +115,20 @@ UINT64 trace(HANDLE hProcess, PVOID address) {
 	//	Set break on end of bb
 	//	Record trace (bb)
 	struct BasicBlock bb;
+	std::list<struct Instruction> insnList;
 	if (cache.HasBB((UINT64)address)) {
 		//printf("HIT: found bb at %x\n", address);
 		bb = cache.FetchBB((UINT64)address);
 	}
 	else {
+		//printf("MISS: new bb at %x\n", address);
 		bb.head = (UINT64)address;
 		
 		xed_decoded_inst_t xedd;
 		xedd._decoded_length = 0;
 		UINT64 currAddr = (UINT64)address;
-		
+		DWORD traceSize = 0;
+
 		do {
 			currAddr += xedd._decoded_length;
 			struct Instruction insn;
@@ -174,17 +139,30 @@ UINT64 trace(HANDLE hProcess, PVOID address) {
 			xed_decoded_inst_set_mode(&xedd, XED_MACHINE_MODE_LONG_64, XED_ADDRESS_WIDTH_64b);
 			xed_err = xed_decode(&xedd, insn.bytes, 15);
 			insn.length = xedd._decoded_length;
-			bb.insnList.push_back(insn);
+			insnList.push_back(insn);
 			
+			traceSize += 1;
+			traceSize += insn.length;
+
 			//CHAR outBuf[1024];
 			//xed_decoded_inst_dump(&xedd, outBuf, 1024);
 			//xed_format_context(XED_SYNTAX_INTEL, &xedd, outBuf, 1024, 0, 0, 0);
 			//printf("%s\n", outBuf);
 		} while (!isTerminator(xedd));
 		
+		bb.bbTrace = (BYTE *)HeapAlloc(hHeap, NULL, traceSize);
+		bb.traceSize = traceSize;
+		DWORD pos = 0;
+		std::list<struct Instruction>::iterator insnIt;
+		for (insnIt = insnList.begin(); insnIt != insnList.end(); insnIt++) {
+			bb.bbTrace[pos] = insnIt->length;
+			pos += 1;
+			memcpy(bb.bbTrace + pos, insnIt->bytes, insnIt->length);
+			pos += insnIt->length;
+		}
+
 		bb.tail = currAddr;
 		cache.AddBB(bb);
-		//printf("MISS: new bb at %x to %x\n", address, currAddr);
 	}
 	//Don't have address:
 	//	Walk forward through memory until control flow insn
@@ -192,17 +170,13 @@ UINT64 trace(HANDLE hProcess, PVOID address) {
 	//	Store bb by address
 	//	Record trace (bb)
 
-	std::list<struct Instruction>::iterator insnIt;
-	for (insnIt = bb.insnList.begin(); insnIt != bb.insnList.end(); insnIt++) {
-		DWORD bytesWritten;
-		WriteFile(hTraceFile, &(insnIt->length), 1, &bytesWritten, NULL);
-		WriteFile(hTraceFile, insnIt->bytes, insnIt->length, &bytesWritten, NULL);
-	}
+	DWORD bytesWritten;
+	WriteFile(hTraceFile, bb.bbTrace, bb.traceSize, &bytesWritten, NULL);
 
 	return bb.tail;
 }
 
-std::map<DWORD, HANDLE> threadMap;
+std::unordered_map<DWORD, HANDLE> threadMap;
 
 int debug_main_loop() {
 	DWORD dwContinueStatus = DBG_CONTINUE;
@@ -231,14 +205,18 @@ int debug_main_loop() {
 				//printf("BREAK AT %x\n", address);
 				if (address == cpdi.lpStartAddress) {
 					printf("!!! AT START: %x\n", address);
-				}
-				if (restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId])) {
+					restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId]);
 					tail = trace(cpdi.hProcess, address);
 					if (tail == (UINT64)address) {
 						singleStep(threadMap[dbgev.dwThreadId]);
 					}
 					else {
 						setBreak(cpdi.hProcess, tail);
+					}
+				}
+				else {
+					if (restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId])) {
+						singleStep(threadMap[dbgev.dwThreadId]);
 					}
 				}
 				break;
@@ -295,7 +273,17 @@ int debug_main_loop() {
 	return 0;
 }
 
+int getTime() {
+	SYSTEMTIME st;
+
+	GetSystemTime(&st);
+	printf("TIME (MM:SS:MS): %02d:%02d:%03d\n", st.wMinute, st.wSecond, st.wMilliseconds);
+
+	return 0;
+}
+
 int run(LPCTSTR name, LPCTSTR traceName) {
+	hHeap = GetProcessHeap();
 	STARTUPINFO si;
 	ZeroMemory(&si, sizeof(si));
 	si.cb = sizeof(si);
@@ -331,22 +319,15 @@ int run(LPCTSTR name, LPCTSTR traceName) {
 	threadMap[pi.dwThreadId] = pi.hThread;
 	DebugBreakProcess(pi.hProcess);
 	//trap_card(threadMap);
-
+	
+	getTime();
 	ResumeThread(pi.hThread);
 	debug_main_loop();
+	getTime();
 
 	CloseHandle(hTraceFile);
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
-	return 0;
-}
-
-int getTime() {
-	SYSTEMTIME st;
-
-	GetSystemTime(&st);
-	printf("TIME (MM:SS:MS): %02d:%02d:%02d\n", st.wMinute, st.wSecond, st.wMilliseconds);
-
 	return 0;
 }
 
@@ -372,12 +353,9 @@ int main()
 	// this issue may be largely addressed with a program that crashes
 	// investigation may prove useful for fuzzing loops though
 	printf("RUN 1\n");
-	getTime();
 	run(name, L"trace1.bin");
-	getTime();
+	printf("\n");
 	printf("RUN 2\n");
-	getTime();
 	run(name, L"trace2.bin");
-	getTime();
 	return 0;
 }

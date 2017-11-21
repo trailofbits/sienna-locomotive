@@ -1,7 +1,7 @@
 #pragma once
 #include "stdafx.h"
 #include <Windows.h>
-#include <map>
+#include <unordered_map>
 #include <list>
 
 struct Instruction {
@@ -12,7 +12,8 @@ struct Instruction {
 struct BasicBlock {
 	UINT64 head;
 	UINT64 tail;
-	std::list<struct Instruction> insnList;
+	BYTE *bbTrace;
+	DWORD traceSize;
 };
 
 class Cache {
@@ -22,5 +23,5 @@ public:
 	BOOL HasBB(UINT64 address);
 	struct BasicBlock FetchBB(UINT64 address);
 private:
-	std::map<UINT64, struct BasicBlock> cache;
+	std::unordered_map<UINT64, struct BasicBlock> cache;
 };

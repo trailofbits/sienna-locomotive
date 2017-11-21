@@ -300,6 +300,8 @@ DWORD Injector::ResolveImports(std::map<std::string, LPVOID> loadedMap) {
 			injectableImportHandler.RewriteFunctionAddr(addr);
 		}
 	}
+
+	return 0;
 }
 
 DWORD Injector::HandleHook() {

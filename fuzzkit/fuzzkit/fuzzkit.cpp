@@ -21,7 +21,6 @@
 
 #define IFNERR(call) if(!call) { printf("ERROR: %s:%d %d\n", __FILE__, __LINE__, GetLastError()); exit(1); }
 
-CONTEXT c;
 int walk_imports(HANDLE hProcess, PVOID lpBaseOfImage) {
 	ImportHandler importHandler(hProcess, lpBaseOfImage);
 	while (1) {
