@@ -217,7 +217,7 @@ DWORD Injector::HandleImports() {
 			}
 
 			if (!found) {
-				printf("WARN: address not found for %s\n", moduleName);
+				printf("WARN: address not found for %s\n", moduleName.c_str());
 				missingModules.push_back(moduleName);
 				continue;
 			}
@@ -337,7 +337,18 @@ DWORD Injector::HandleHook() {
 	return 0;
 }
 
-DWORD Injector::Inject() {
+DWORD Injector::HandleRunId(DWORD runId) {
+	ExportHandler exportHandler(this->hProcess, this->injectedBase);
+	UINT64 address = exportHandler.GetFunctionAddress("runId");
+
+	if (!WriteProcessMemory(this->hProcess, (LPVOID)address, &runId, sizeof(DWORD), NULL)) {
+		printf("ERROR: WriteProcessMemory (%x)\n", GetLastError());
+		return 1;
+	}
+	return 0;
+}
+
+DWORD Injector::Inject(DWORD runId) {
 	// read in injectable
 	HANDLE hFile = CreateFile(L"injectable.dll", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hFile == INVALID_HANDLE_VALUE) {
@@ -396,6 +407,8 @@ DWORD Injector::Inject() {
 	HandleImports();
 
 	HandleHook();
+
+	HandleRunId(runId);
 
 	return 0;
 }

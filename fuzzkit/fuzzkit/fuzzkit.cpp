@@ -42,11 +42,11 @@ int walk_imports(HANDLE hProcess, PVOID lpBaseOfImage) {
 	return 0;
 }
 
-DWORD handleInjection(CREATE_PROCESS_DEBUG_INFO cpdi) {
+DWORD handleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId) {
 	std::map<std::string, std::string> hookMap;
 	hookMap["ReadFileHook"] = "ReadFile";
 	Injector injector(cpdi.hProcess, cpdi.lpBaseOfImage, "injectable.dll", hookMap);
-	injector.Inject();
+	injector.Inject(runId);
 
 	// TODO: 
 	// while have missing
@@ -60,7 +60,7 @@ DWORD handleInjection(CREATE_PROCESS_DEBUG_INFO cpdi) {
 	return 0;
 }
 
-int debug_main_loop() {
+int debug_main_loop(DWORD runId) {
 	DWORD dwContinueStatus = DBG_CONTINUE;
 	CREATE_PROCESS_DEBUG_INFO cpdi;
 
@@ -85,7 +85,7 @@ int debug_main_loop() {
 					break;
 				case EXCEPTION_BREAKPOINT:
 					// TODO: breakpoint on start address
-					handleInjection(cpdi);
+					handleInjection(cpdi, runId);
 					break;
 				case EXCEPTION_DATATYPE_MISALIGNMENT:
 					break;
@@ -128,9 +128,42 @@ int debug_main_loop() {
 	return 0;
 }
 
+DWORD getRunID() {
+	HANDLE hPipe = CreateFile(
+		L"\\\\.\\pipe\\fuzz_server",
+		GENERIC_READ | GENERIC_WRITE,
+		0,
+		NULL,
+		OPEN_EXISTING,
+		0,
+		NULL);
+
+	if (hPipe == INVALID_HANDLE_VALUE) {
+		// TODO: fallback mutations?
+		return 1;
+	}
+
+	DWORD readMode = PIPE_READMODE_MESSAGE;
+	SetNamedPipeHandleState(
+		hPipe,
+		&readMode,
+		NULL,
+		NULL);
+
+	DWORD bytesRead = 0;
+	DWORD bytesWritten = 0;
+	
+	BYTE eventId = 0;
+	DWORD runId = 0;
+	TransactNamedPipe(hPipe, &eventId, sizeof(BYTE), &runId, sizeof(DWORD), &bytesRead, NULL);
+	printf("INFO: runId %x\n", runId);
+	return runId;
+}
+
 int main()
 {
 	printf("Welcome to fuzzkit!\n");
+	HANDLE hHeap = GetProcessHeap();
 
 	int argc;
 	LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
@@ -153,17 +186,14 @@ int main()
 
 	PROCESS_INFORMATION pi;
 	ZeroMemory(&pi, sizeof(pi));
+	
+	SIZE_T fullLen = lstrlen(name) + lstrlen(args) + 2; // 1 for the space, 1 for the terminator
+	SIZE_T fullSize = fullLen * sizeof(TCHAR);
 
-	TCHAR fullArgs[2048] = { 0 };
-	if (lstrlen(name) + lstrlen(args) < 2048) {
-		wsprintf(fullArgs, L"%S %S", name, args);
-	}
-	else {
-		printf("ERROR: name + args too long\n");
-		exit(1);
-	}
+	TCHAR *fullArgs = (TCHAR *)HeapAlloc(hHeap, 0, fullSize);
+	fullArgs[fullLen - 1] = 0;
+	wsprintf(fullArgs, L"%S %S", name, args);
 
-	// TODO: use args
 	BOOL success = CreateProcess(
 		name,
 		fullArgs,
@@ -182,9 +212,10 @@ int main()
 		return 1;
 	}
 
+	DWORD runId = getRunID();
 	ResumeThread(pi.hThread);
 
-	debug_main_loop();
+	debug_main_loop(runId);
 
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);

@@ -11,6 +11,9 @@
 	Server sends back mutation
 */
 
+extern "C" __declspec(dllexport) DWORD runId;
+__declspec(dllexport) DWORD runId;
+
 VOID mutate(LPVOID buf, DWORD size) {
 	HANDLE hPipe = CreateFile(
 		L"\\\\.\\pipe\\fuzz_server",
@@ -35,6 +38,10 @@ VOID mutate(LPVOID buf, DWORD size) {
 
 	DWORD bytesRead = 0;
 	DWORD bytesWritten = 0;
+	BYTE eventId = 1;
+
+	WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL);
+	WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL);
 	WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL);
 	TransactNamedPipe(hPipe, buf, size, buf, size, &bytesRead, NULL);
 }
