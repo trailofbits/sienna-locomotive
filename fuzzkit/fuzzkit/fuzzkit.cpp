@@ -128,7 +128,18 @@ int debug_main_loop(DWORD runId) {
 	return 0;
 }
 
-DWORD getRunID() {
+DWORD getRunID(HANDLE hPipe) {
+	DWORD bytesRead = 0;
+	DWORD bytesWritten = 0;
+	
+	BYTE eventId = 0;
+	DWORD runId = 0;
+	TransactNamedPipe(hPipe, &eventId, sizeof(BYTE), &runId, sizeof(DWORD), &bytesRead, NULL);
+	printf("INFO: runId %x\n", runId);
+	return runId;
+}
+
+HANDLE getPipe() {
 	HANDLE hPipe = CreateFile(
 		L"\\\\.\\pipe\\fuzz_server",
 		GENERIC_READ | GENERIC_WRITE,
@@ -140,7 +151,8 @@ DWORD getRunID() {
 
 	if (hPipe == INVALID_HANDLE_VALUE) {
 		// TODO: fallback mutations?
-		return 1;
+		printf("ERROR: could not connect to server\n");
+		exit(1);
 	}
 
 	DWORD readMode = PIPE_READMODE_MESSAGE;
@@ -150,35 +162,75 @@ DWORD getRunID() {
 		NULL,
 		NULL);
 
-	DWORD bytesRead = 0;
-	DWORD bytesWritten = 0;
+	return hPipe;
+}
+
+DWORD printUsage(LPWSTR *argv) {
+	printf("USAGE: \t%S [-r ID] TARGET_PROGRAM.EXE \"[ARGUMENTS]\"\n", argv[0]);
+	return 0;
+}
+
+struct parsedArgs {
+	LPCTSTR targetName;
+	LPTSTR targetArgs;
+	BOOL replay;
+	DWORD runId;
+};
+
+struct parsedArgs parseArgs(LPWSTR *argv, int argc) {
+	struct parsedArgs args;
 	
-	BYTE eventId = 0;
-	DWORD runId = 0;
-	TransactNamedPipe(hPipe, &eventId, sizeof(BYTE), &runId, sizeof(DWORD), &bytesRead, NULL);
-	printf("INFO: runId %x\n", runId);
-	return runId;
+	if (argc < 2) {
+		printUsage(argv);
+		exit(1);
+	}
+
+	DWORD progIdx = 1;
+	if (lstrcmp(argv[1], L"-r") == 0) {
+		if (argc < 4) {
+			printUsage(argv);
+			exit(1);
+		}
+
+		args.replay = true;
+		args.runId = wcstoul(argv[2], NULL, NULL);
+		progIdx = 3;
+	}
+	else {
+		args.replay = false;
+		args.runId = 0;
+	}
+
+	args.targetName = argv[progIdx];
+
+	if (argc > progIdx+1) {
+		args.targetArgs = argv[progIdx + 1];
+
+		HANDLE hHeap = GetProcessHeap();
+		SIZE_T fullLen = lstrlen(args.targetName) + lstrlen(args.targetArgs) + 2; // 1 for the space, 1 for the terminator
+		SIZE_T fullSize = fullLen * sizeof(TCHAR);
+
+		// TODO: free this
+		TCHAR *fullArgs = (TCHAR *)HeapAlloc(hHeap, 0, fullSize);
+		fullArgs[fullLen - 1] = 0;
+		wsprintf(fullArgs, L"%S %S", args.targetName, args.targetArgs);
+
+		args.targetArgs = fullArgs;
+	}
+	else {
+		args.targetArgs = argv[progIdx];
+	}
+
+	return args;
 }
 
 int main()
 {
 	printf("Welcome to fuzzkit!\n");
-	HANDLE hHeap = GetProcessHeap();
 
 	int argc;
 	LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-
-	if (argc < 2) {
-		printf("USAGE: \t%S TARGET_PROGRAM.EXE \"[ARGUMENTS]\"\n", argv[0]);
-		return 1;
-	}
-
-	LPCTSTR name = argv[1];
-	LPTSTR args = argv[1];
-
-	if (argc > 2) {
-		args = argv[2];
-	}
+	struct parsedArgs args = parseArgs(argv, argc);
 
 	STARTUPINFO si;
 	ZeroMemory(&si, sizeof(si));
@@ -187,16 +239,9 @@ int main()
 	PROCESS_INFORMATION pi;
 	ZeroMemory(&pi, sizeof(pi));
 	
-	SIZE_T fullLen = lstrlen(name) + lstrlen(args) + 2; // 1 for the space, 1 for the terminator
-	SIZE_T fullSize = fullLen * sizeof(TCHAR);
-
-	TCHAR *fullArgs = (TCHAR *)HeapAlloc(hHeap, 0, fullSize);
-	fullArgs[fullLen - 1] = 0;
-	wsprintf(fullArgs, L"%S %S", name, args);
-
 	BOOL success = CreateProcess(
-		name,
-		fullArgs,
+		args.targetName,
+		args.targetArgs,
 		NULL,
 		NULL,
 		FALSE,
@@ -212,11 +257,20 @@ int main()
 		return 1;
 	}
 
-	DWORD runId = getRunID();
+	HANDLE hPipe = getPipe();
+
+	if (!args.replay) {
+		args.runId = getRunID(hPipe);
+	}
+	else {
+		// use high bit of runId to indicate replay
+		args.runId |= 1 << 31;
+	}
+
 	ResumeThread(pi.hThread);
+	debug_main_loop(args.runId);
 
-	debug_main_loop(runId);
-
+	CloseHandle(hPipe);
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
     return 0;
