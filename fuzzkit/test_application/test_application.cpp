@@ -6,7 +6,18 @@
 
 int main()
 {
+	int argc;
+	LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+
 	LPCWSTR name = L"sample.txt";
+
+	printf("ARGV[0]: %S\n", argv[0]);
+	
+	if (argc > 1) {
+		printf("ARGV[1]: %S\n", argv[1]);
+		name = argv[1];
+	}
+
 	HANDLE file = CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (file == INVALID_HANDLE_VALUE) {
 		printf("ERROR: CreateFile (%x)\n", GetLastError());
