@@ -60,7 +60,7 @@ DWORD handleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId) {
 	return 0;
 }
 
-int debug_main_loop(DWORD runId) {
+BOOL debug_main_loop(DWORD runId) {
 	DWORD dwContinueStatus = DBG_CONTINUE;
 	CREATE_PROCESS_DEBUG_INFO cpdi;
 
@@ -70,6 +70,7 @@ int debug_main_loop(DWORD runId) {
 
 		WaitForDebugEvent(&dbgev, INFINITE);
 		//printf("DEBUG EVENT: %d\n", dbgev.dwDebugEventCode);
+		BOOL crashed = true;
 
 		switch (dbgev.dwDebugEventCode)
 		{
@@ -79,22 +80,74 @@ int debug_main_loop(DWORD runId) {
 			switch (dbgev.u.Exception.ExceptionRecord.ExceptionCode)
 			{
 				case EXCEPTION_ACCESS_VIOLATION:
-					printf("EAV: winning\n");
+					printf("EXCEPTION_ACCESS_VIOLATION\n");
 					// TODO: log crash
 					exit(1);
 					break;
+				case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+					printf("EXCEPTION_ARRAY_BOUNDS_EXCEEDED\n");
+					break;
 				case EXCEPTION_BREAKPOINT:
-					// TODO: breakpoint on start address
+					printf("EXCEPTION_BREAKPOINT\n");
 					handleInjection(cpdi, runId);
+					crashed = false;
 					break;
 				case EXCEPTION_DATATYPE_MISALIGNMENT:
+					printf("EXCEPTION_DATATYPE_MISALIGNMENT\n");
+					break;
+				case EXCEPTION_FLT_DENORMAL_OPERAND:
+					printf("EXCEPTION_FLT_DENORMAL_OPERAND\n");
+					break;
+				case EXCEPTION_FLT_DIVIDE_BY_ZERO:
+					printf("EXCEPTION_FLT_DIVIDE_BY_ZERO\n");
+					break;
+				case EXCEPTION_FLT_INEXACT_RESULT:
+					printf("EXCEPTION_FLT_INEXACT_RESULT\n");
+					break;
+				case EXCEPTION_FLT_INVALID_OPERATION:
+					printf("EXCEPTION_FLT_INVALID_OPERATION\n");
+					break;
+				case EXCEPTION_FLT_OVERFLOW:
+					printf("EXCEPTION_FLT_OVERFLOW\n");
+					break;
+				case EXCEPTION_FLT_STACK_CHECK:
+					printf("EXCEPTION_FLT_STACK_CHECK\n");
+					break;
+				case EXCEPTION_FLT_UNDERFLOW:
+					printf("EXCEPTION_FLT_UNDERFLOW\n");
+					break;
+				case EXCEPTION_ILLEGAL_INSTRUCTION:
+					printf("EXCEPTION_ILLEGAL_INSTRUCTION\n");
+					break;
+				case EXCEPTION_IN_PAGE_ERROR:
+					printf("EXCEPTION_IN_PAGE_ERROR\n");
+					break;
+				case EXCEPTION_INT_DIVIDE_BY_ZERO:
+					printf("EXCEPTION_INT_DIVIDE_BY_ZERO\n");
+					break;
+				case EXCEPTION_INT_OVERFLOW:
+					printf("EXCEPTION_INT_OVERFLOW\n");
+					break;
+				case EXCEPTION_INVALID_DISPOSITION:
+					printf("EXCEPTION_INVALID_DISPOSITION\n");
+					break;
+				case EXCEPTION_NONCONTINUABLE_EXCEPTION:
+					printf("EXCEPTION_NONCONTINUABLE_EXCEPTION\n");
+					break;
+				case EXCEPTION_PRIV_INSTRUCTION:
+					printf("EXCEPTION_PRIV_INSTRUCTION\n");
 					break;
 				case EXCEPTION_SINGLE_STEP:
+					printf("EXCEPTION_SINGLE_STEP\n");
 					break;
-				case DBG_CONTROL_C:
+				case EXCEPTION_STACK_OVERFLOW:
+					printf("EXCEPTION_STACK_OVERFLOW\n");
 					break;
 				default:
 					break;
+			}
+			if (crashed) {
+				return crashed;
 			}
 			break;
 		case CREATE_THREAD_DEBUG_EVENT:
@@ -109,7 +162,8 @@ int debug_main_loop(DWORD runId) {
 		case EXIT_PROCESS_DEBUG_EVENT:
 			EXIT_PROCESS_DEBUG_INFO epdi = dbgev.u.ExitProcess;
 			// TODO: exit when all processes have exited
-			exit(0);
+			printf("PROCESS EXITED\n");
+			return false;
 			break;
 		case LOAD_DLL_DEBUG_EVENT:
 			break;
@@ -125,7 +179,7 @@ int debug_main_loop(DWORD runId) {
 			dbgev.dwThreadId,
 			dwContinueStatus);
 	}
-	return 0;
+	return false;
 }
 
 DWORD getRunInfo(HANDLE hPipe, DWORD runId, LPCTSTR *targetName, LPTSTR *targetArgs) {
@@ -202,6 +256,17 @@ DWORD printUsage(LPWSTR *argv) {
 	return 0;
 }
 
+DWORD finalize(HANDLE hPipe, DWORD runId, BOOL crashed) {
+	DWORD bytesWritten;
+	BYTE eventId = 4;
+	
+	WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL);
+	WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL);
+	WriteFile(hPipe, &crashed, sizeof(BOOL), &bytesWritten, NULL);
+
+	return 0;
+}
+
 int main()
 {
 	printf("Welcome to fuzzkit!\n");
@@ -244,6 +309,7 @@ int main()
 
 		runId = getRunID(hPipe, targetName, targetArgs);
 	}
+	CloseHandle(hPipe);
 
 	STARTUPINFO si;
 	ZeroMemory(&si, sizeof(si));
@@ -271,9 +337,12 @@ int main()
 	}
 
 	ResumeThread(pi.hThread);
-	debug_main_loop(runId);
-
+	BOOL crashed = debug_main_loop(runId);
+	
+	hPipe = getPipe();
+	finalize(hPipe, runId, crashed);
 	CloseHandle(hPipe);
+	
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
     return 0;
