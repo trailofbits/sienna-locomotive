@@ -1,11 +1,5 @@
 #include "stdafx.h"
-#include "Windows.h"
-#include <list>
-#include <unordered_map>
-#include "Cache.h"
-extern "C" {
-#include "include/xed-interface.h"
-}
+#include "Tracer.h"
 
 /*
                 .yNss/-.                                                                             
@@ -61,12 +55,7 @@ extern "C" {
                                            `+mMMMMMMMyo-`           `-oyMMMMMMMm+`.cpp          
 */
 
-std::unordered_map<LPVOID, BYTE> restoreBytes;
-HANDLE hTraceFile;
-Cache cache;
-HANDLE hHeap;
-
-int singleStep(HANDLE hThread) {
+DWORD Tracer::singleStep(HANDLE hThread) {
 	CONTEXT context;
 	context.ContextFlags = CONTEXT_CONTROL;
 	SuspendThread(hThread);
@@ -82,7 +71,7 @@ int singleStep(HANDLE hThread) {
 	return 0;
 }
 
-int setBreak(HANDLE hProcess, UINT64 address) {
+DWORD Tracer::setBreak(HANDLE hProcess, UINT64 address) {
 	BYTE breakByte = 0xCC;
 	BYTE startByte;
 	ReadProcessMemory(hProcess, (LPVOID)address, &startByte, sizeof(BYTE), NULL);
@@ -92,7 +81,7 @@ int setBreak(HANDLE hProcess, UINT64 address) {
 	return 0;
 }
 
-BOOL restoreBreak(HANDLE hProcess, HANDLE hThread) {
+BOOL Tracer::restoreBreak(HANDLE hProcess, HANDLE hThread) {
 	CONTEXT context;
 	context.ContextFlags = CONTEXT_ALL;
 	GetThreadContext(hThread, &context);
@@ -111,7 +100,7 @@ BOOL restoreBreak(HANDLE hProcess, HANDLE hThread) {
 	return true;
 }
 
-BOOL isTerminator(xed_decoded_inst_t xedd) {
+BOOL Tracer::isTerminator(xed_decoded_inst_t xedd) {
 	xed_iclass_enum_t iclass = xed_decoded_inst_get_iclass(&xedd);
 
 	switch (iclass) {
@@ -157,7 +146,7 @@ BOOL isTerminator(xed_decoded_inst_t xedd) {
 	return false;
 }
 
-UINT64 trace(HANDLE hProcess, PVOID address) {
+UINT64 Tracer::trace(HANDLE hProcess, PVOID address) {
 	// check cache
 
 	//If have address:
@@ -225,9 +214,7 @@ UINT64 trace(HANDLE hProcess, PVOID address) {
 	return bb.tail;
 }
 
-std::unordered_map<DWORD, HANDLE> threadMap;
-
-int debug_main_loop() {
+DWORD Tracer::TraceMainLoop(DWORD runId) {
 	DWORD dwContinueStatus = DBG_CONTINUE;
 	CREATE_PROCESS_DEBUG_INFO cpdi;
 	xed_tables_init();
@@ -322,89 +309,16 @@ int debug_main_loop() {
 	return 0;
 }
 
-int getTime() {
-	SYSTEMTIME st;
-
-	GetSystemTime(&st);
-	printf("TIME (MM:SS:MS): %02d:%02d:%03d\n", st.wMinute, st.wSecond, st.wMilliseconds);
-
+DWORD Tracer::addThread(DWORD dwThreadId, HANDLE hThread) {
+	threadMap[dwThreadId] = hThread;
 	return 0;
 }
 
-int run(LPCTSTR name, LPCTSTR traceName) {
+Tracer::Tracer(LPCTSTR traceName) {
 	hHeap = GetProcessHeap();
-	STARTUPINFO si;
-	ZeroMemory(&si, sizeof(si));
-	si.cb = sizeof(si);
-
-	PROCESS_INFORMATION pi;
-	ZeroMemory(&pi, sizeof(pi));
-
-	// TODO: use args
-	BOOL success = CreateProcess(
-		name,
-		NULL,
-		NULL,
-		NULL,
-		FALSE,
-		DEBUG_PROCESS | CREATE_SUSPENDED,
-		NULL,
-		NULL,
-		&si,
-		&pi
-	);
-
-	if (!success) {
-		printf("ERROR: CreateProcess (%x)\n", GetLastError());
-		return 1;
-	}
-
 	hTraceFile = CreateFile(traceName, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hTraceFile == INVALID_HANDLE_VALUE) {
 		printf("ERROR: CreateFile (%x)\n", GetLastError());
 		exit(1);
 	}
-
-	threadMap[pi.dwThreadId] = pi.hThread;
-	DebugBreakProcess(pi.hProcess);
-	//trap_card(threadMap);
-	
-	getTime();
-	ResumeThread(pi.hThread);
-	debug_main_loop();
-	getTime();
-
-	CloseHandle(hTraceFile);
-	CloseHandle(pi.hProcess);
-	CloseHandle(pi.hThread);
-	return 0;
-}
-
-int main()
-{
-	int argc;
-	LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-
-	if (argc < 2) {
-		printf("USAGE: \t%S TARGET_PROGRAM.EXE \"[ARGUMENTS]\"\n", argv[0]);
-		return 1;
-	}
-
-	LPCTSTR name = argv[1];
-	LPTSTR args = L"";
-
-	if (argc > 2) {
-		args = argv[2];
-	}
-
-	// TODO: why is it a non-deterministic amount of runtime after end of main?
-	// can we detect and kill the process after core functionality has been executed?
-	// this issue may be largely addressed with a program that crashes
-	// investigation may prove useful for fuzzing loops though
-	printf("RUN 1\n");
-	run(name, L"trace1.bin");
-	printf("\n");
-	printf("RUN 2\n");
-	run(name, L"trace2.bin");
-	return 0;
 }

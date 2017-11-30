@@ -33,6 +33,12 @@
     <ClInclude Include="Injector.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="Cache.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Tracer.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -48,6 +54,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Injector.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Cache.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Tracer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

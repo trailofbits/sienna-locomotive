@@ -15,6 +15,7 @@
 
 #include "ImportHandler.h"
 #include "Injector.h"
+#include "Tracer.h"
 
 // TODO: check return of every call
 // TODO: support 32bit
@@ -337,11 +338,18 @@ int main()
 	}
 
 	ResumeThread(pi.hThread);
-	BOOL crashed = debug_main_loop(runId);
-	
-	hPipe = getPipe();
-	finalize(hPipe, runId, crashed);
-	CloseHandle(hPipe);
+
+	if (!replay) {
+		BOOL crashed = debug_main_loop(runId);
+		hPipe = getPipe();
+		finalize(hPipe, runId, crashed);
+		CloseHandle(hPipe);
+	}
+	else {
+		Tracer tracer(L"trace.bin");
+		tracer.addThread(pi.dwThreadId, pi.hThread);
+		tracer.TraceMainLoop(runId);
+	}
 	
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
