@@ -1,6 +1,3 @@
-// tracer.cpp : Defines the entry point for the console application.
-//
-
 #include "stdafx.h"
 #include "Windows.h"
 #include <list>
@@ -10,7 +7,59 @@ extern "C" {
 #include "include/xed-interface.h"
 }
 
-// TODO: ascii art tracer
+/*
+                .yNss/-.                                                                             
+                 .hMMMNddh+.`                                                                       
+                   -yMMMMMMMMmyys---                                                                
+                     -hMMMMMMMMMMMMNdddh+++/```````````                                             
+                       -ydMMMMMMMMMMMMMMMMMMNNNNNNNNNNmyyyy/:-                                      
+                         `/dMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMNNdd++-`                                
+                           `+MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMNNy+:                             
+                            `NMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMNd+:                          
+                             -hMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMNhs.                       
+ .`                           `+mMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMNs.                     
+.hhs:.                          .sMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMmo.                   
+ `+mMmdh++-..`                   `+dMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMmo.  //             
+   .dMMMMMNNNhyyy/:::::::-``````   `+mMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMmo`mN/            
+    `/dMMMMMMMMMMMMMMMMMMNdddddd++:...+mMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMyNMN/           
+      `dNMMMMMMMMMMMMMMMMMMMMMMMMMNNNdydMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMN:          
+       `/hMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMm`         
+         `/NMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMy`        
+           :hNMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMo        
+             :hNMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM-       
+               :omNMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMm`      
+                  `/shNMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMh      
+  ```                 ./oNNMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMN+     
+  oMNyyyy+:::::::::::::oyydMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMm-    
+   oNMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMy.   
+    -mMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMN+  
+     `+NMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMNy.
+       `+mMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM-
+         `.sNMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMo 
+            .:hMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMm: 
+               `/omNMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMs  
+                  `.shMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMm   
+                      `:odNMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMo   
+                         `.::hMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMN`   
+                             `oNMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMmmMMMMMMMM+    
+                              -mMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMmy+`/MMMMMMMy`    
+                             :dMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMdhy/.  -NMMMMMN+     
+                           `yNMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMNNNNhysoNdmNNmh/.hMMMMMh      
+                         `/hMMMMMMMMMMMMMMMMMMMMMMMMMMMMMNddddddo+++++-...-ymNMMMMMMMMyMMMMMM.      
+                         oMMMMMMMMMMMMMMMMMMMMMMMMMMm::::-``````       `-sNMMMMMNNNMMMMMMMMMh       
+                       .oMMMMMMMMMMMMMMMMmd+++dmMMMMNs-`             `+dNMMMMmo/..-yMMMMMMMM-       
+                      .hMMMMMMMMMMMMMNMMh.     .omMMMMMm+:``     ``/hmMMMMNyo.     +MMMMMMMs`       
+                     `hMMMMMMMMMMMMMMsdMm-       .+yNMMMMMmyssssymmMMMMMNy-        +MMMMMMN/        
+                    `hMMMMMMMMNhhMMMMohMM+          -yNNMMMMMMMMMMMMMNhs-          oMMMMMMs         
+                   `yMMMNNmmo/. .NMMMosMM+            .:+dmmNNNNNmmo+:`           .NMMMMMm`         
+                  `sNyy+:-       +MMN: NMm.                 -:::-                 -MMMMNM:          
+                   ..            +Mms  oMM/                `.---.`                yMMMmmm`          
+                                 +M.   .NMM`            `.ohNMMMNho.`            :MMMN+N:           
+                                 /N.    /NMh.        `:smNMMMMMMMMMNm+-`       `+NMNNd `            
+                                  .      sMMmo/   //ydMMMMMMyyyyyMMMMMMdy/.   /mMMN/.               
+                                          /mMMMNNNMMMMMMm+:`     -+hmMMMMMMNNNMMMm/                 
+                                           `+mMMMMMMMyo-`           `-oyMMMMMMMm+`.cpp          
+*/
 
 std::unordered_map<LPVOID, BYTE> restoreBytes;
 HANDLE hTraceFile;
