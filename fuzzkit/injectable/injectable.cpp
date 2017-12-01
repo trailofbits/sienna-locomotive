@@ -44,6 +44,9 @@ VOID mutate(LPVOID buf, DWORD size) {
 		WriteFile(hPipe, &mutateCount, sizeof(DWORD), &bytesWritten, NULL);
 		WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL);
 		TransactNamedPipe(hPipe, buf, size, buf, size, &bytesRead, NULL);
+
+		// send buf size to server
+		// send buf addr to server
 	}
 	else {
 		BYTE eventId = 2;

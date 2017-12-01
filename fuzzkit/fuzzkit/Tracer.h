@@ -1,7 +1,9 @@
 #include "Windows.h"
 #include <list>
 #include <unordered_map>
+#include <map>
 #include "Cache.h"
+#include "Injector.h"
 extern "C" {
 #include "xed-interface.h"
 }

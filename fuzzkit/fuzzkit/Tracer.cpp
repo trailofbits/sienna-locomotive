@@ -146,9 +146,43 @@ BOOL Tracer::isTerminator(xed_decoded_inst_t xedd) {
 	return false;
 }
 
-UINT64 Tracer::trace(HANDLE hProcess, PVOID address) {
-	// check cache
+DWORD traceInit(DWORD runId) {
+	// get minidump path
+	// open file
+	// write minidump
 
+	return 0;
+}
+
+DWORD traceInsn(DWORD runId) {
+	// send head address to server
+	// send trace size to server
+	// send trace to server
+
+	return 0;
+}
+
+DWORD traceCrash(DWORD runId) {
+	// send crash addr to server
+	// send crash type to server
+
+	return 0;
+}
+
+UINT64 Tracer::trace(HANDLE hProcess, PVOID address) {
+	/* 
+	trace format
+		in tracer::trace:
+			bb head addr
+			insn size, insn
+		in injectable:
+			taint size, buf addr
+		in fuzzkit (on crash):
+			crash addr
+			crash type
+	*/
+
+	// check cache
 	//If have address:
 	//	Set break on end of bb
 	//	Record trace (bb)
@@ -214,6 +248,25 @@ UINT64 Tracer::trace(HANDLE hProcess, PVOID address) {
 	return bb.tail;
 }
 
+// TODO: deduplicate this from fuzzkit
+DWORD traceHandleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId) {
+	std::map<std::string, std::string> hookMap;
+	hookMap["ReadFileHook"] = "ReadFile";
+	Injector injector(cpdi.hProcess, cpdi.lpBaseOfImage, "injectable.dll", hookMap);
+	injector.Inject(runId);
+
+	// TODO: 
+	// while have missing
+	// get map<base, missing modules>
+	// search for dlls
+	// load each
+	// add child missing to map
+	// fixup
+	// ALT: recursion?
+
+	return 0;
+}
+
 DWORD Tracer::TraceMainLoop(DWORD runId) {
 	DWORD dwContinueStatus = DBG_CONTINUE;
 	CREATE_PROCESS_DEBUG_INFO cpdi;
@@ -242,6 +295,10 @@ DWORD Tracer::TraceMainLoop(DWORD runId) {
 				if (address == cpdi.lpStartAddress) {
 					printf("!!! AT START: %x\n", address);
 					restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId]);
+
+					traceHandleInjection(cpdi, runId);
+					traceInit(runId);
+
 					tail = trace(cpdi.hProcess, address);
 					if (tail == (UINT64)address) {
 						singleStep(threadMap[dbgev.dwThreadId]);
