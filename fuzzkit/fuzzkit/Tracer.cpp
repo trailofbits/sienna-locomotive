@@ -146,30 +146,98 @@ BOOL Tracer::isTerminator(xed_decoded_inst_t xedd) {
 	return false;
 }
 
-DWORD traceInit(DWORD runId) {
+HANDLE tracerGetPipe() {
+	HANDLE hPipe = CreateFile(
+		L"\\\\.\\pipe\\fuzz_server",
+		GENERIC_READ | GENERIC_WRITE,
+		0,
+		NULL,
+		OPEN_EXISTING,
+		0,
+		NULL);
+
+	if (hPipe == INVALID_HANDLE_VALUE) {
+		// TODO: fallback mutations?
+		printf("ERROR: could not connect to server\n");
+		exit(1);
+	}
+
+	DWORD readMode = PIPE_READMODE_MESSAGE;
+	SetNamedPipeHandleState(
+		hPipe,
+		&readMode,
+		NULL,
+		NULL);
+
+	return hPipe;
+}
+
+DWORD traceInit(DWORD runId, HANDLE hProc, DWORD procId) {
+	DWORD bytesRead;
+	DWORD bytesWritten;
+	HANDLE hPipe = tracerGetPipe();
+
+	WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL);
+
+	DWORD size = 0;
+	ReadFile(hPipe, &size, sizeof(DWORD), &bytesRead, NULL);
+	
 	// get minidump path
+	HANDLE hHeap = GetProcessHeap();
+	WCHAR *minidumpPath = (WCHAR *)HeapAlloc(hHeap, NULL, size);
+	ReadFile(hPipe, minidumpPath, size, &bytesRead, NULL);
+
 	// open file
+	HANDLE minidumpFile = CreateFile(minidumpPath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
+
 	// write minidump
+	DWORD type = MiniDumpWithFullMemory | MiniDumpWithFullMemoryInfo;
+	MiniDumpWriteDump(hProc, procId, minidumpFile, (MINIDUMP_TYPE)type, NULL, NULL, NULL);
 
+	CloseHandle(hPipe);
 	return 0;
 }
 
-DWORD traceInsn(DWORD runId) {
+DWORD traceInsn(DWORD runId, UINT64 addr, UINT64 traceSize, BYTE *trace) {
+	DWORD bytesRead;
+	DWORD bytesWritten;
+	HANDLE hPipe = tracerGetPipe();
+
+	WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL);
+
 	// send head address to server
+	WriteFile(hPipe, &addr, sizeof(UINT64), &bytesWritten, NULL);
+
 	// send trace size to server
+	WriteFile(hPipe, &traceSize, sizeof(UINT64), &bytesWritten, NULL);
+
 	// send trace to server
+	BYTE nullByte = 0;
+	TransactNamedPipe(hPipe, &trace, traceSize, &nullByte, sizeof(BYTE), &bytesRead, NULL);
+	CloseHandle(hPipe);
 
 	return 0;
 }
 
-DWORD traceCrash(DWORD runId) {
+DWORD traceCrash(DWORD runId, UINT64 exceptionAddr, DWORD exceptionCode) {
+	DWORD bytesRead;
+	DWORD bytesWritten;
+	HANDLE hPipe = tracerGetPipe();
+
+	WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL);
+
 	// send crash addr to server
+	WriteFile(hPipe, &exceptionAddr, sizeof(UINT64), &bytesWritten, NULL);
+
 	// send crash type to server
+	BYTE nullByte = 0;
+	TransactNamedPipe(hPipe, &exceptionCode, sizeof(DWORD), &nullByte, sizeof(BYTE), &bytesRead, NULL);
+	CloseHandle(hPipe);
 
 	return 0;
 }
 
-UINT64 Tracer::trace(HANDLE hProcess, PVOID address) {
+UINT64 Tracer::trace(HANDLE hProcess, PVOID address, DWORD runId) {
 	/* 
 	trace format
 		in tracer::trace:
@@ -242,8 +310,9 @@ UINT64 Tracer::trace(HANDLE hProcess, PVOID address) {
 	//	Store bb by address
 	//	Record trace (bb)
 
-	DWORD bytesWritten;
-	WriteFile(hTraceFile, bb.bbTrace, bb.traceSize, &bytesWritten, NULL);
+	//DWORD bytesWritten;
+	//WriteFile(hTraceFile, bb.bbTrace, bb.traceSize, &bytesWritten, NULL);
+	traceInsn(runId, bb.head, bb.traceSize, bb.bbTrace);
 
 	return bb.tail;
 }
@@ -276,15 +345,20 @@ DWORD Tracer::TraceMainLoop(DWORD runId) {
 		DEBUG_EVENT dbgev;
 		WaitForDebugEvent(&dbgev, INFINITE);
 		UINT64 tail;
+		
+		BOOL crashed = false;
+		PVOID address = 0;
+		DWORD code;
 
 		//printf("DEBUG EVENT: %d\n", dbgev.dwDebugEventCode);
 
 		switch (dbgev.dwDebugEventCode)
 		{
 		case EXCEPTION_DEBUG_EVENT:
-			PVOID address;
+			crashed = true;
 			address = dbgev.u.Exception.ExceptionRecord.ExceptionAddress;
-			switch (dbgev.u.Exception.ExceptionRecord.ExceptionCode)
+			code = dbgev.u.Exception.ExceptionRecord.ExceptionCode;
+			switch (code)
 			{
 			case EXCEPTION_ACCESS_VIOLATION:
 				printf("SEGGY AT %x\n", address);
@@ -293,13 +367,14 @@ DWORD Tracer::TraceMainLoop(DWORD runId) {
 			case EXCEPTION_BREAKPOINT:
 				//printf("BREAK AT %x\n", address);
 				if (address == cpdi.lpStartAddress) {
+					crashed = false;
 					printf("!!! AT START: %x\n", address);
 					restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId]);
 
 					traceHandleInjection(cpdi, runId);
-					traceInit(runId);
+					traceInit(runId, cpdi.hProcess, dbgev.dwProcessId);
 
-					tail = trace(cpdi.hProcess, address);
+					tail = trace(cpdi.hProcess, address, runId);
 					if (tail == (UINT64)address) {
 						singleStep(threadMap[dbgev.dwThreadId]);
 					}
@@ -309,6 +384,7 @@ DWORD Tracer::TraceMainLoop(DWORD runId) {
 				}
 				else {
 					if (restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId])) {
+						crashed = false;
 						singleStep(threadMap[dbgev.dwThreadId]);
 					}
 				}
@@ -316,7 +392,7 @@ DWORD Tracer::TraceMainLoop(DWORD runId) {
 			case EXCEPTION_DATATYPE_MISALIGNMENT:
 				break;
 			case EXCEPTION_SINGLE_STEP:
-				tail = trace(cpdi.hProcess, address);
+				tail = trace(cpdi.hProcess, address, runId);
 				if (tail == (UINT64)address) {
 					singleStep(threadMap[dbgev.dwThreadId]);
 				}
@@ -328,6 +404,10 @@ DWORD Tracer::TraceMainLoop(DWORD runId) {
 				break;
 			default:
 				break;
+			}
+
+			if (crashed) {
+				traceCrash(runId, (UINT64)address, code);
 			}
 			break;
 		case CREATE_THREAD_DEBUG_EVENT:
@@ -373,9 +453,9 @@ DWORD Tracer::addThread(DWORD dwThreadId, HANDLE hThread) {
 
 Tracer::Tracer(LPCTSTR traceName) {
 	hHeap = GetProcessHeap();
-	hTraceFile = CreateFile(traceName, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	/*hTraceFile = CreateFile(traceName, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hTraceFile == INVALID_HANDLE_VALUE) {
 		printf("ERROR: CreateFile (%x)\n", GetLastError());
 		exit(1);
-	}
+	}*/
 }

@@ -1,4 +1,5 @@
-#include "Windows.h"
+#include <Windows.h>
+#include <DbgHelp.h>
 #include <list>
 #include <unordered_map>
 #include <map>
@@ -15,11 +16,11 @@ public:
 	DWORD Tracer::addThread(DWORD dwThreadId, HANDLE hThread);
 private:
 	std::unordered_map<LPVOID, BYTE> restoreBytes;
-	HANDLE hTraceFile;
+	//HANDLE hTraceFile;
 	Cache cache;
 	HANDLE hHeap;
 	std::unordered_map<DWORD, HANDLE> threadMap;
-	UINT64 trace(HANDLE hProcess, PVOID address);
+	UINT64 trace(HANDLE hProcess, PVOID address, DWORD runId);
 	DWORD singleStep(HANDLE hThread);
 	DWORD setBreak(HANDLE hProcess, UINT64 address);
 	BOOL restoreBreak(HANDLE hProcess, HANDLE hThread);
