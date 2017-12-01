@@ -158,7 +158,7 @@ HANDLE tracerGetPipe() {
 
 	if (hPipe == INVALID_HANDLE_VALUE) {
 		// TODO: fallback mutations?
-		printf("ERROR: could not connect to server\n");
+		printf("ERROR: trc could not connect to server\n");
 		exit(1);
 	}
 
@@ -172,10 +172,50 @@ HANDLE tracerGetPipe() {
 	return hPipe;
 }
 
+HANDLE tracerGetPipeInsn() {
+	HANDLE hPipe = INVALID_HANDLE_VALUE;
+	
+	while (hPipe == INVALID_HANDLE_VALUE) {
+		hPipe = CreateFile(
+			L"\\\\.\\pipe\\fuzz_server",
+			GENERIC_READ | GENERIC_WRITE,
+			0,
+			NULL,
+			OPEN_EXISTING,
+			0,
+			NULL);
+
+		if (hPipe == INVALID_HANDLE_VALUE) {
+			DWORD err = GetLastError();
+			printf("ERROR: insn trc could not connect to server (%x)\n", err);
+			exit(1);
+
+			//if (err != ERROR_PIPE_BUSY) {
+			//	
+			//}
+
+			//WaitNamedPipe(L"\\\\.\\pipe\\fuzz_server", NMPWAIT_USE_DEFAULT_WAIT);
+		}
+	}
+
+	DWORD readMode = PIPE_READMODE_MESSAGE;
+	SetNamedPipeHandleState(
+		hPipe,
+		&readMode,
+		NULL,
+		NULL);
+
+	return hPipe;
+}
+
 DWORD traceInit(DWORD runId, HANDLE hProc, DWORD procId) {
+	printf("in init\n");
 	DWORD bytesRead;
 	DWORD bytesWritten;
 	HANDLE hPipe = tracerGetPipe();
+	
+	BYTE eventId = 5;
+	WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL);
 
 	WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL);
 
@@ -194,6 +234,7 @@ DWORD traceInit(DWORD runId, HANDLE hProc, DWORD procId) {
 	DWORD type = MiniDumpWithFullMemory | MiniDumpWithFullMemoryInfo;
 	MiniDumpWriteDump(hProc, procId, minidumpFile, (MINIDUMP_TYPE)type, NULL, NULL, NULL);
 
+	HeapFree(hHeap, NULL, minidumpPath);
 	CloseHandle(hPipe);
 	return 0;
 }
@@ -201,7 +242,10 @@ DWORD traceInit(DWORD runId, HANDLE hProc, DWORD procId) {
 DWORD traceInsn(DWORD runId, UINT64 addr, UINT64 traceSize, BYTE *trace) {
 	DWORD bytesRead;
 	DWORD bytesWritten;
-	HANDLE hPipe = tracerGetPipe();
+	HANDLE hPipe = tracerGetPipeInsn();
+
+	BYTE eventId = 6;
+	WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL);
 
 	WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL);
 
@@ -211,18 +255,28 @@ DWORD traceInsn(DWORD runId, UINT64 addr, UINT64 traceSize, BYTE *trace) {
 	// send trace size to server
 	WriteFile(hPipe, &traceSize, sizeof(UINT64), &bytesWritten, NULL);
 
+	printf("%x, %x, %x\t", runId, addr, traceSize);
+	for (int i = 0; i < traceSize; i++) {
+		printf("%x ", trace[i]);
+	}
+	printf("\n");
+
 	// send trace to server
 	BYTE nullByte = 0;
-	TransactNamedPipe(hPipe, &trace, traceSize, &nullByte, sizeof(BYTE), &bytesRead, NULL);
+	TransactNamedPipe(hPipe, trace, traceSize, &nullByte, sizeof(BYTE), &bytesRead, NULL);
 	CloseHandle(hPipe);
 
 	return 0;
 }
 
 DWORD traceCrash(DWORD runId, UINT64 exceptionAddr, DWORD exceptionCode) {
+	printf("in crash\n");
 	DWORD bytesRead;
 	DWORD bytesWritten;
 	HANDLE hPipe = tracerGetPipe();
+
+	BYTE eventId = 8;
+	WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL);
 
 	WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL);
 
@@ -313,7 +367,6 @@ UINT64 Tracer::trace(HANDLE hProcess, PVOID address, DWORD runId) {
 	//DWORD bytesWritten;
 	//WriteFile(hTraceFile, bb.bbTrace, bb.traceSize, &bytesWritten, NULL);
 	traceInsn(runId, bb.head, bb.traceSize, bb.bbTrace);
-
 	return bb.tail;
 }
 
@@ -365,6 +418,7 @@ DWORD Tracer::TraceMainLoop(DWORD runId) {
 				return 0;
 				break;
 			case EXCEPTION_BREAKPOINT:
+				crashed = false;
 				//printf("BREAK AT %x\n", address);
 				if (address == cpdi.lpStartAddress) {
 					crashed = false;
@@ -392,6 +446,7 @@ DWORD Tracer::TraceMainLoop(DWORD runId) {
 			case EXCEPTION_DATATYPE_MISALIGNMENT:
 				break;
 			case EXCEPTION_SINGLE_STEP:
+				crashed = false;
 				tail = trace(cpdi.hProcess, address, runId);
 				if (tail == (UINT64)address) {
 					singleStep(threadMap[dbgev.dwThreadId]);

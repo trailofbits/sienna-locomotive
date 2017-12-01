@@ -86,7 +86,7 @@ VOID taint(LPVOID buf, DWORD size) {
 			NULL,
 			NULL);
 
-		BYTE eventId = 6;
+		BYTE eventId = 7;
 		UINT64 taintAddr = (UINT64)buf;
 		UINT64 taintSize = (UINT64)size;
 
