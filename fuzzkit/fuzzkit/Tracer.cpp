@@ -146,7 +146,7 @@ BOOL Tracer::isTerminator(xed_decoded_inst_t xedd) {
 	return false;
 }
 
-HANDLE tracerGetPipe() {
+HANDLE Tracer::tracerGetPipe() {
 	HANDLE hPipe = CreateFile(
 		L"\\\\.\\pipe\\fuzz_server",
 		GENERIC_READ | GENERIC_WRITE,
@@ -172,43 +172,7 @@ HANDLE tracerGetPipe() {
 	return hPipe;
 }
 
-HANDLE tracerGetPipeInsn() {
-	HANDLE hPipe = INVALID_HANDLE_VALUE;
-	
-	while (hPipe == INVALID_HANDLE_VALUE) {
-		hPipe = CreateFile(
-			L"\\\\.\\pipe\\fuzz_server",
-			GENERIC_READ | GENERIC_WRITE,
-			0,
-			NULL,
-			OPEN_EXISTING,
-			0,
-			NULL);
-
-		if (hPipe == INVALID_HANDLE_VALUE) {
-			DWORD err = GetLastError();
-			printf("ERROR: insn trc could not connect to server (%x)\n", err);
-			exit(1);
-
-			//if (err != ERROR_PIPE_BUSY) {
-			//	
-			//}
-
-			//WaitNamedPipe(L"\\\\.\\pipe\\fuzz_server", NMPWAIT_USE_DEFAULT_WAIT);
-		}
-	}
-
-	DWORD readMode = PIPE_READMODE_MESSAGE;
-	SetNamedPipeHandleState(
-		hPipe,
-		&readMode,
-		NULL,
-		NULL);
-
-	return hPipe;
-}
-
-DWORD traceInit(DWORD runId, HANDLE hProc, DWORD procId) {
+DWORD Tracer::traceInit(DWORD runId, HANDLE hProc, DWORD procId) {
 	printf("in init\n");
 	DWORD bytesRead;
 	DWORD bytesWritten;
@@ -239,15 +203,45 @@ DWORD traceInit(DWORD runId, HANDLE hProc, DWORD procId) {
 	return 0;
 }
 
-DWORD traceInsn(DWORD runId, UINT64 addr, UINT64 traceSize, BYTE *trace) {
+HANDLE Tracer::tracerGetPipeInsn(DWORD runId) {
+	if (hPipeInsn == INVALID_HANDLE_VALUE) {
+		printf("NEW INSN PIPE\n");
+		hPipeInsn = CreateFile(
+			L"\\\\.\\pipe\\fuzz_server",
+			GENERIC_READ | GENERIC_WRITE,
+			0,
+			NULL,
+			OPEN_EXISTING,
+			0,
+			NULL);
+
+		if (hPipeInsn == INVALID_HANDLE_VALUE) {
+			DWORD err = GetLastError();
+			printf("ERROR: insn trc could not connect to server (%x)\n", err);
+			exit(1);
+		}
+
+		DWORD readMode = PIPE_READMODE_MESSAGE;
+		SetNamedPipeHandleState(
+			hPipeInsn,
+			&readMode,
+			NULL,
+			NULL);
+
+		BYTE eventId = 6;
+		DWORD bytesWritten;
+		WriteFile(hPipeInsn, &eventId, sizeof(BYTE), &bytesWritten, NULL);
+
+		WriteFile(hPipeInsn, &runId, sizeof(DWORD), &bytesWritten, NULL);
+	}
+
+	return hPipeInsn;
+}
+
+DWORD Tracer::traceInsn(DWORD runId, UINT64 addr, UINT64 traceSize, BYTE *trace) {
 	DWORD bytesRead;
 	DWORD bytesWritten;
-	HANDLE hPipe = tracerGetPipeInsn();
-
-	BYTE eventId = 6;
-	WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL);
-
-	WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL);
+	HANDLE hPipe = tracerGetPipeInsn(runId);
 
 	// send head address to server
 	WriteFile(hPipe, &addr, sizeof(UINT64), &bytesWritten, NULL);
@@ -255,24 +249,29 @@ DWORD traceInsn(DWORD runId, UINT64 addr, UINT64 traceSize, BYTE *trace) {
 	// send trace size to server
 	WriteFile(hPipe, &traceSize, sizeof(UINT64), &bytesWritten, NULL);
 
-	printf("%x, %x, %x\t", runId, addr, traceSize);
-	for (int i = 0; i < traceSize; i++) {
-		printf("%x ", trace[i]);
-	}
-	printf("\n");
+	//printf("%x, %x, %x\t", runId, addr, traceSize);
+	//for (int i = 0; i < traceSize; i++) {
+	//	printf("%x ", trace[i]);
+	//}
+	//printf("\n");
 
 	// send trace to server
 	BYTE nullByte = 0;
 	TransactNamedPipe(hPipe, trace, traceSize, &nullByte, sizeof(BYTE), &bytesRead, NULL);
-	CloseHandle(hPipe);
 
 	return 0;
 }
 
-DWORD traceCrash(DWORD runId, UINT64 exceptionAddr, DWORD exceptionCode) {
+DWORD Tracer::traceCrash(DWORD runId, UINT64 exceptionAddr, DWORD exceptionCode) {
 	printf("in crash\n");
 	DWORD bytesRead;
 	DWORD bytesWritten;
+
+	HANDLE hInsnPipe = tracerGetPipeInsn(runId);
+	UINT64 zero = 0;
+	WriteFile(hInsnPipe, &zero, sizeof(UINT64), &bytesWritten, NULL);
+	WriteFile(hInsnPipe, &zero, sizeof(UINT64), &bytesWritten, NULL);
+
 	HANDLE hPipe = tracerGetPipe();
 
 	BYTE eventId = 8;
@@ -415,7 +414,6 @@ DWORD Tracer::TraceMainLoop(DWORD runId) {
 			{
 			case EXCEPTION_ACCESS_VIOLATION:
 				printf("SEGGY AT %x\n", address);
-				return 0;
 				break;
 			case EXCEPTION_BREAKPOINT:
 				crashed = false;
@@ -463,6 +461,7 @@ DWORD Tracer::TraceMainLoop(DWORD runId) {
 
 			if (crashed) {
 				traceCrash(runId, (UINT64)address, code);
+				return 0;
 			}
 			break;
 		case CREATE_THREAD_DEBUG_EVENT:
@@ -508,6 +507,7 @@ DWORD Tracer::addThread(DWORD dwThreadId, HANDLE hThread) {
 
 Tracer::Tracer(LPCTSTR traceName) {
 	hHeap = GetProcessHeap();
+	hPipeInsn = INVALID_HANDLE_VALUE;
 	/*hTraceFile = CreateFile(traceName, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hTraceFile == INVALID_HANDLE_VALUE) {
 		printf("ERROR: CreateFile (%x)\n", GetLastError());

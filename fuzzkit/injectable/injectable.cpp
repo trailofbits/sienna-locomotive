@@ -92,7 +92,7 @@ VOID taint(LPVOID buf, DWORD size) {
 
 		WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL);
 		WriteFile(hPipe, &maskedRunId, sizeof(DWORD), &bytesWritten, NULL);
-		WriteFile(hPipe, &taintSize, sizeof(UINT64), &bytesWritten, NULL);
+		WriteFile(hPipe, &taintAddr, sizeof(UINT64), &bytesWritten, NULL);
 
 		BYTE nullByte = 0;
 		TransactNamedPipe(hPipe, &taintSize, sizeof(UINT64), &nullByte, sizeof(BYTE), &bytesRead, NULL);
