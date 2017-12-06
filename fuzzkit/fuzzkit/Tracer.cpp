@@ -366,6 +366,7 @@ UINT64 Tracer::trace(HANDLE hProcess, PVOID address, DWORD runId) {
 	//DWORD bytesWritten;
 	//WriteFile(hTraceFile, bb.bbTrace, bb.traceSize, &bytesWritten, NULL);
 	traceInsn(runId, bb.head, bb.traceSize, bb.bbTrace);
+	HeapFree(hHeap, NULL, bb.bbTrace);
 	return bb.tail;
 }
 
