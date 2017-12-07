@@ -366,7 +366,6 @@ UINT64 Tracer::trace(HANDLE hProcess, PVOID address, DWORD runId) {
 	//DWORD bytesWritten;
 	//WriteFile(hTraceFile, bb.bbTrace, bb.traceSize, &bytesWritten, NULL);
 	traceInsn(runId, bb.head, bb.traceSize, bb.bbTrace);
-	HeapFree(hHeap, NULL, bb.bbTrace);
 	return bb.tail;
 }
 
@@ -422,6 +421,7 @@ DWORD Tracer::TraceMainLoop(DWORD runId) {
 				if (address == cpdi.lpStartAddress) {
 					crashed = false;
 					printf("!!! AT START: %x\n", address);
+					printf("!!! THREAD: %x\n", dbgev.dwThreadId);
 					restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId]);
 
 					traceHandleInjection(cpdi, runId);
