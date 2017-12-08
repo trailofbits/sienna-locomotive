@@ -70,7 +70,7 @@ bool Crash::is_ret(xed_iclass_enum_t insn_iclass) {
 	return false;
 }
 
-Crash::Crash(triton::arch::Instruction *insn, UINT8 insnBytes[], BYTE insnLength, UINT64 exceptionAddr, DWORD exceptionCode) 
+Crash::Crash(triton::API &api, triton::arch::Instruction *insn, UINT8 insnBytes[], BYTE insnLength, UINT64 exceptionAddr, DWORD exceptionCode)
 	: insn(insn), insnLength(insnLength), exceptionAddr(exceptionAddr), exceptionCode(exceptionCode)
 {
 	if (insnLength > 15) {
@@ -81,6 +81,20 @@ Crash::Crash(triton::arch::Instruction *insn, UINT8 insnBytes[], BYTE insnLength
 	memcpy(this->insnBytes, insnBytes, insnLength);
 	reason = "unknown";
 	score = 50;
+
+	std::set<const triton::arch::Register *> pTaintedRegs = api.getTaintedRegisters();
+	std::set<const triton::arch::Register *>::iterator regIt;
+	for (regIt = pTaintedRegs.begin(); regIt != pTaintedRegs.end(); regIt++) {
+		taintedRegs.emplace(*(*regIt));
+	}
+
+	std::set<UINT64> taintedMems = api.getTaintedMemory();
+	std::set<UINT64>::iterator memIt;
+	for (memIt = taintedMems.begin(); memIt != taintedMems.end(); memIt++) {
+		taintedAddrs.insert(*memIt);
+	}
+
+	examine(api);
 }
 
 VOID Crash::examine(triton::API &api) {
@@ -286,6 +300,51 @@ VOID Crash::dumpInfo() {
 
 	writer.Key("location");
 	writer.Uint64(exceptionAddr);
+
+	writer.Key("disassembly");
+	writer.String(insn->getDisassembly().c_str());
+
+	writer.Key("tainted_regs");
+	writer.StartArray();
+	std::set<triton::arch::Register>::iterator taintedRegsIt;
+	for (taintedRegsIt = taintedRegs.begin(); taintedRegsIt != taintedRegs.end(); taintedRegsIt++) {
+		writer.String(taintedRegsIt->getName().c_str());
+	}
+	writer.EndArray();
+
+	writer.Key("tainted_addrs");
+	writer.StartArray();
+	if (taintedAddrs.size() > 0) {
+		std::set<UINT64>::iterator mit = taintedAddrs.begin();
+		UINT64 start = *mit;
+		UINT64 size = 1;
+
+		mit++;
+		for (; mit != taintedAddrs.end(); mit++) {
+			if (*mit > (start + size)) {
+				writer.StartObject();
+				writer.Key("start");
+				writer.Uint64(start);
+				writer.Key("size");
+				writer.Uint64(size);
+				writer.EndObject();
+
+				start = *mit;
+				size = 0;
+			}
+			size++;
+		}
+
+		writer.StartObject();
+		writer.Key("start");
+		writer.Uint64(start);
+		writer.Key("size");
+		writer.Uint64(size);
+		writer.EndObject();
+	}
+	writer.EndArray();
+
+	// TODO: dump register values
 
 	writer.EndObject();
 

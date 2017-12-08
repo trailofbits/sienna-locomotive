@@ -17,19 +17,21 @@ extern "C" {
 
 class Crash {
 public:
-	UINT64 exceptionAddr;
-	DWORD exceptionCode;
+	Crash(triton::API &api, triton::arch::Instruction *insn, UINT8 insnBytes[], BYTE insnLength, UINT64 exceptionAddr, DWORD exceptionCode);
+	VOID dumpInfo();
+private:
+	triton::arch::Instruction *insn;
 	UINT8 insnBytes[15] = { 0 };
 	BYTE insnLength;
-	triton::arch::Instruction *insn;
+	UINT64 exceptionAddr;
+	DWORD exceptionCode;
 
+	std::set<triton::arch::Register> taintedRegs;
+	std::set<UINT64> taintedAddrs;
 	std::string reason;
 	BYTE score;
 
-	Crash(triton::arch::Instruction *insn, UINT8 insnBytes[], BYTE insnLength, UINT64 exceptionAddr, DWORD exceptionCode);
-	VOID examine(triton::API & api);
-	VOID dumpInfo();
-private:
+	VOID examine(triton::API &api);
 	BOOL xed_at(xed_decoded_inst_t * xedd);
 	bool is_branching(xed_iclass_enum_t insn_iclass);
 	bool is_ret(xed_iclass_enum_t insn_iclass);
