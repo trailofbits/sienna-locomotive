@@ -5,6 +5,7 @@
 #include <DbgHelp.h>
 #include <Psapi.h>
 #include <map>
+#include <set>
 #include <list>
 #include <string>
 #include <algorithm>
@@ -26,19 +27,21 @@ typedef unsigned __int64 QWORD;
 
 class Injector {
 public:
-	Injector(HANDLE hProcess, LPVOID lpBaseOfImage, std::string dllName, std::map<std::string, std::string> hookMap) : 
+	Injector(HANDLE hProcess, LPVOID lpBaseOfImage, std::string dllName, std::map<std::string, std::string> hookMap) :
 		hProcess(hProcess), lpBaseOfImage(lpBaseOfImage), dllName(dllName), hookMap(hookMap) { };
 	DWORD Inject(DWORD runId);
+	DWORD Inject();
 	LPVOID BaseOfInjected();
-	std::list<std::string> MissingModules();
+	std::set<std::string> MissingModules();
 	DWORD ResolveImports(std::map<std::string, LPVOID> loadedMap);
+	std::string DllName();
 
 private:
 	HANDLE hProcess;
 	LPVOID lpBaseOfImage;
 	std::string dllName;
 	std::map<std::string, std::string> hookMap;
-	std::list<std::string> missingModules;
+	std::set<std::string> missingModules;
 	LPVOID injectedBase;
 
 	DWORD HandleRelocations(PIMAGE_NT_HEADERS pNtHeaders);

@@ -373,17 +373,58 @@ UINT64 Tracer::trace(HANDLE hProcess, PVOID address, DWORD runId) {
 DWORD traceHandleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId) {
 	std::map<std::string, std::string> hookMap;
 	hookMap["ReadFileHook"] = "ReadFile";
-	Injector injector(cpdi.hProcess, cpdi.lpBaseOfImage, "injectable.dll", hookMap);
-	injector.Inject(runId);
+	Injector *injector = new Injector(cpdi.hProcess, cpdi.lpBaseOfImage, "injectable.dll", hookMap);
+	injector->Inject(runId);
 
-	// TODO: 
-	// while have missing
-	// get map<base, missing modules>
-	// search for dlls
-	// load each
-	// add child missing to map
-	// fixup
-	// ALT: recursion?
+	std::set<std::string> missingModules = injector->MissingModules();
+	/*if (injector->MissingModules().size() == 0) {
+	return 0;
+	}
+	*/
+	std::map<std::string, LPVOID> loadedModules;
+	std::set<Injector *> injectors;
+	injectors.insert(injector);
+
+	std::set<std::string> missingMaster;
+	printf("MISSING MASTER SIZE: %x\n", missingMaster.size());
+
+	missingMaster.insert(missingModules.begin(), missingModules.end());
+	std::map<std::string, std::string> emptyMap;
+	while (missingMaster.size() > 0) {
+		// TODO: add more intelligent search, maybe a dependencies folder
+		// open C:\Windows\System32\file.dll
+		std::string missing = *(missingMaster.begin());
+		std::string path = "C:\\Windows\\System32\\" + missing;
+
+		// inject
+		printf("INJECTING EXTRA: %s\n", missing.c_str());
+		injector = new Injector(cpdi.hProcess, cpdi.lpBaseOfImage, path, emptyMap);
+		injector->Inject();
+
+		// add injector to list
+		injectors.insert(injector);
+
+		// have missing?
+		missingModules = injector->MissingModules();
+		if (missingModules.size() > 0) {
+			// add missing to missing master
+			missingMaster.insert(missingModules.begin(), missingModules.end());
+		}
+
+		loadedModules[missing] = injector->BaseOfInjected();
+		std::set<Injector *>::iterator injectorIt;
+		// for injector in injectors
+		for (injectorIt = injectors.begin(); injectorIt != injectors.end(); injectorIt++) {
+			// missing newly injected?
+			missingModules = (*injectorIt)->MissingModules();
+			if (missingModules.size() == 0) {
+				continue;
+			}
+			(*injectorIt)->ResolveImports(loadedModules);
+		}
+
+		missingMaster.erase(missing);
+	}
 
 	return 0;
 }

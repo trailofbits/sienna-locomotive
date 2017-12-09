@@ -7,7 +7,7 @@ LPVOID Injector::BaseOfInjected() {
 	return this->injectedBase;
 }
 
-std::list<std::string> Injector::MissingModules() {
+std::set<std::string> Injector::MissingModules() {
 	return this->missingModules;
 }
 
@@ -218,7 +218,7 @@ DWORD Injector::HandleImports() {
 
 			if (!found) {
 				printf("WARN: address not found for %s\n", moduleName.c_str());
-				missingModules.push_back(moduleName);
+				missingModules.insert(moduleName);
 				continue;
 			}
 		}
@@ -266,10 +266,12 @@ DWORD Injector::ResolveImports(std::map<std::string, LPVOID> loadedMap) {
 		}
 
 		std::map<std::string, LPVOID>::iterator loadedMapIt;
-		if (loadedMap.find(moduleName) == loadedMap.end()) {
+		if (this->missingModules.find(moduleName) == this->missingModules.end() || loadedMap.find(moduleName) == loadedMap.end()) {
 			continue;
 		}
 
+		printf("INFO: resolving %s in %s\n", moduleName.c_str(), this->dllName.c_str());
+		missingModules.erase(moduleName);
 		// gather desired functions
 		std::list<std::string> functions;
 		while (1) {
@@ -302,6 +304,11 @@ DWORD Injector::ResolveImports(std::map<std::string, LPVOID> loadedMap) {
 	}
 
 	return 0;
+}
+
+std::string Injector::DllName()
+{
+	return this->dllName;
 }
 
 DWORD Injector::HandleHook() {
@@ -348,9 +355,10 @@ DWORD Injector::HandleRunId(DWORD runId) {
 	return 0;
 }
 
-DWORD Injector::Inject(DWORD runId) {
+DWORD Injector::Inject() {
 	// read in injectable
-	HANDLE hFile = CreateFile(L"injectable.dll", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	std::wstring wDllName(dllName.begin(), dllName.end());
+	HANDLE hFile = CreateFile(wDllName.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hFile == INVALID_HANDLE_VALUE) {
 		printf("ERROR: CreateFile (%x)\n", GetLastError());
 		exit(1);
@@ -407,7 +415,10 @@ DWORD Injector::Inject(DWORD runId) {
 	HandleImports();
 
 	HandleHook();
+}
 
+DWORD Injector::Inject(DWORD runId) {
+	Inject();
 	HandleRunId(runId);
 
 	return 0;
