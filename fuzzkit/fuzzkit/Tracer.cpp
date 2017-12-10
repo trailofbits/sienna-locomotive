@@ -76,7 +76,9 @@ DWORD Tracer::setBreak(HANDLE hProcess, UINT64 address) {
 	BYTE startByte;
 	ReadProcessMemory(hProcess, (LPVOID)address, &startByte, sizeof(BYTE), NULL);
 	WriteProcessMemory(hProcess, (LPVOID)address, &breakByte, sizeof(BYTE), NULL);
-	restoreBytes[(LPVOID)address] = startByte;
+	if (restoreBytes.find((LPVOID)address) == restoreBytes.end()) {
+		restoreBytes[(LPVOID)address] = startByte;
+	}
 	//printf("INFO: setBreak at %x\n", address);
 	return 0;
 }
@@ -173,7 +175,6 @@ HANDLE Tracer::tracerGetPipe() {
 }
 
 DWORD Tracer::traceInit(DWORD runId, HANDLE hProc, DWORD procId) {
-	printf("in init\n");
 	DWORD bytesRead;
 	DWORD bytesWritten;
 	HANDLE hPipe = tracerGetPipe();
@@ -310,11 +311,11 @@ UINT64 Tracer::trace(HANDLE hProcess, PVOID address, DWORD runId) {
 	struct BasicBlock bb;
 	std::list<struct Instruction> insnList;
 	if (cache.HasBB((UINT64)address)) {
-		//printf("HIT: found bb at %x\n", address);
+		// printf("[T] HIT: %x\n", address);
 		bb = cache.FetchBB((UINT64)address);
 	}
 	else {
-		//printf("MISS: new bb at %x\n", address);
+		// printf("[T] MISS: %x\n", address);
 		bb.head = (UINT64)address;
 		
 		xed_decoded_inst_t xedd;
@@ -331,6 +332,11 @@ UINT64 Tracer::trace(HANDLE hProcess, PVOID address, DWORD runId) {
 			xed_decoded_inst_zero(&xedd);
 			xed_decoded_inst_set_mode(&xedd, XED_MACHINE_MODE_LONG_64, XED_ADDRESS_WIDTH_64b);
 			xed_err = xed_decode(&xedd, insn.bytes, 15);
+			
+			// CHAR buf[1000] = { 0 };
+			// xed_format_context(XED_SYNTAX_INTEL, &xedd, buf, 1000, 0, 0, 0);
+			// printf("[T] %x\t%s\n", currAddr, buf);
+
 			insn.length = xedd._decoded_length;
 			insnList.push_back(insn);
 			
@@ -365,6 +371,7 @@ UINT64 Tracer::trace(HANDLE hProcess, PVOID address, DWORD runId) {
 
 	//DWORD bytesWritten;
 	//WriteFile(hTraceFile, bb.bbTrace, bb.traceSize, &bytesWritten, NULL);
+	//printf("TRACED FROM: %x to %x\n", bb.head, bb.tail);
 	traceInsn(runId, bb.head, bb.traceSize, bb.bbTrace);
 	return bb.tail;
 }
@@ -373,7 +380,7 @@ UINT64 Tracer::trace(HANDLE hProcess, PVOID address, DWORD runId) {
 DWORD traceHandleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId) {
 	std::map<std::string, std::string> hookMap;
 	hookMap["ReadFileHook"] = "ReadFile";
-	Injector *injector = new Injector(cpdi.hProcess, cpdi.lpBaseOfImage, "injectable.dll", hookMap);
+	Injector *injector = new Injector(cpdi.hProcess, cpdi.lpBaseOfImage, "C:\\Users\\dgoddard\\Documents\\GitHub\\sienna-locomotive\\fuzzkit\\x64\\Release\\injectable.dll", hookMap);
 	injector->Inject(runId);
 
 	std::set<std::string> missingModules = injector->MissingModules();
@@ -397,7 +404,7 @@ DWORD traceHandleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId) {
 		std::string path = "C:\\Windows\\System32\\" + missing;
 
 		// inject
-		printf("INJECTING EXTRA: %s\n", missing.c_str());
+		//printf("INJECTING EXTRA: %s\n", missing.c_str());
 		injector = new Injector(cpdi.hProcess, cpdi.lpBaseOfImage, path, emptyMap);
 		injector->Inject();
 
@@ -458,7 +465,7 @@ DWORD Tracer::TraceMainLoop(DWORD runId) {
 				break;
 			case EXCEPTION_BREAKPOINT:
 				crashed = false;
-				//printf("BREAK AT %x\n", address);
+				// printf("[B] BREAK AT %x\n", address);
 				if (address == cpdi.lpStartAddress) {
 					crashed = false;
 					printf("!!! AT START: %x\n", address);
@@ -470,14 +477,18 @@ DWORD Tracer::TraceMainLoop(DWORD runId) {
 
 					tail = trace(cpdi.hProcess, address, runId);
 					if (tail == (UINT64)address) {
+						// printf("[.] SINGLE STEPPING\n");
 						singleStep(threadMap[dbgev.dwThreadId]);
 					}
 					else {
+						// printf("[.] BREAK SET %x\n", tail);
 						setBreak(cpdi.hProcess, tail);
 					}
 				}
 				else {
 					if (restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId])) {
+						// printf("[B] TAIL HIT %x\n", address);
+						// printf("[B] SINGLE STEPPING\n");
 						crashed = false;
 						singleStep(threadMap[dbgev.dwThreadId]);
 					}
@@ -489,9 +500,13 @@ DWORD Tracer::TraceMainLoop(DWORD runId) {
 				crashed = false;
 				tail = trace(cpdi.hProcess, address, runId);
 				if (tail == (UINT64)address) {
+					// printf("[S] HEAD / TAIL HIT %x\n", address);
+					// printf("[S] SINGLE STEPPING\n");
 					singleStep(threadMap[dbgev.dwThreadId]);
 				}
 				else {
+					// printf("[S] HEAD HIT %x\n", address);
+					// printf("[S] BREAK SET %x\n", tail);
 					setBreak(cpdi.hProcess, tail);
 				}
 				break;

@@ -46,7 +46,7 @@ int walk_imports(HANDLE hProcess, PVOID lpBaseOfImage) {
 DWORD handleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId) {
 	std::map<std::string, std::string> hookMap;
 	hookMap["ReadFileHook"] = "ReadFile";
-	Injector *injector = new Injector(cpdi.hProcess, cpdi.lpBaseOfImage, "injectable.dll", hookMap);
+	Injector *injector = new Injector(cpdi.hProcess, cpdi.lpBaseOfImage, "C:\\Users\\dgoddard\\Documents\\GitHub\\sienna-locomotive\\fuzzkit\\x64\\Release\\injectable.dll", hookMap);
 	injector->Inject(runId);
 
 	std::set<std::string> missingModules = injector->MissingModules();
@@ -68,7 +68,7 @@ DWORD handleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId) {
 		std::string path = "C:\\Windows\\System32\\" + missing;
 		
 		// inject
-		printf("INJECTING EXTRA: %s\n", missing.c_str());
+		//printf("INJECTING EXTRA: %s\n", missing.c_str());
 		injector = new Injector(cpdi.hProcess, cpdi.lpBaseOfImage, path, emptyMap);
 		injector->Inject();
 
@@ -191,8 +191,10 @@ BOOL debug_main_loop(DWORD runId) {
 			}
 			break;
 		case CREATE_THREAD_DEBUG_EVENT:
+			printf("CREATE THREAD\n");
 			break;
 		case CREATE_PROCESS_DEBUG_EVENT:
+			printf("CREATE PROC\n");
 			cpdi = dbgev.u.CreateProcessInfo;
 			//printf("START ADDR %x\n", cpdi.lpStartAddress);
 			DebugBreakProcess(cpdi.hProcess);
@@ -233,8 +235,10 @@ DWORD getRunInfo(HANDLE hPipe, DWORD runId, LPCTSTR *targetName, LPTSTR *targetA
 	
 	DWORD size = 0;
 	ReadFile(hPipe, &size, sizeof(DWORD), &bytesRead, NULL);
+	printf("SIZE: %x\n", size);
 	*targetName = (LPCTSTR)HeapAlloc(hHeap, HEAP_ZERO_MEMORY, size + sizeof(TCHAR));
 	ReadFile(hPipe, (LPVOID)*targetName, size, &bytesRead, NULL);
+	printf("NAME: %S\n", *targetName);
 
 	size = 0;
 	ReadFile(hPipe, &size, sizeof(DWORD), &bytesRead, NULL);
@@ -333,7 +337,8 @@ int main()
 			printUsage(argv);
 			exit(1);
 		}
-
+		
+		printf("RUNID: %x\n", runId);
 		getRunInfo(hPipe, runId, &targetName, &targetArgs);
 
 		// use high bit of runId to indicate replay in injectable
@@ -350,6 +355,9 @@ int main()
 		runId = getRunID(hPipe, targetName, targetArgs);
 	}
 	CloseHandle(hPipe);
+
+	printf("%S\n", targetName);
+	printf("%S\n", targetArgs);
 
 	STARTUPINFO si;
 	ZeroMemory(&si, sizeof(si));
@@ -372,7 +380,7 @@ int main()
 	);
 
 	if (!success) {
-		printf("ERROR: CreateProcess (%x)\n", GetLastError());
+		printf("ERROR: Main CreateProcess (%x)\n", GetLastError());
 		return 1;
 	}
 

@@ -217,7 +217,7 @@ DWORD Injector::HandleImports() {
 			}
 
 			if (!found) {
-				printf("WARN: address not found for %s\n", moduleName.c_str());
+				//printf("WARN: address not found for %s\n", moduleName.c_str());
 				missingModules.insert(moduleName);
 				continue;
 			}
@@ -245,9 +245,9 @@ DWORD Injector::HandleImports() {
 				break;
 			}
 
-			if (exportAddresses.find(functionName) == exportAddresses.end()) {
+			/*if (exportAddresses.find(functionName) == exportAddresses.end()) {
 				printf("WARN: Could not resolve %s", functionName.c_str());
-			}
+			}*/
 
 			UINT64 addr = exportAddresses[functionName];
 			injectableImportHandler.RewriteFunctionAddr(addr);
@@ -270,7 +270,7 @@ DWORD Injector::ResolveImports(std::map<std::string, LPVOID> loadedMap) {
 			continue;
 		}
 
-		printf("INFO: resolving %s in %s\n", moduleName.c_str(), this->dllName.c_str());
+		//printf("INFO: resolving %s in %s\n", moduleName.c_str(), this->dllName.c_str());
 		missingModules.erase(moduleName);
 		// gather desired functions
 		std::list<std::string> functions;
@@ -294,9 +294,9 @@ DWORD Injector::ResolveImports(std::map<std::string, LPVOID> loadedMap) {
 				break;
 			}
 
-			if (exportAddresses.find(functionName) == exportAddresses.end()) {
+			/*if (exportAddresses.find(functionName) == exportAddresses.end()) {
 				printf("WARN: Could not resolve %s", functionName.c_str());
-			}
+			}*/
 
 			UINT64 addr = exportAddresses[functionName];
 			injectableImportHandler.RewriteFunctionAddr(addr);
