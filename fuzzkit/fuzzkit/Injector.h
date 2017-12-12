@@ -1,6 +1,5 @@
 #pragma once
 
-#include "stdafx.h"
 #include <Windows.h>
 #include <DbgHelp.h>
 #include <Psapi.h>
@@ -12,16 +11,8 @@
 
 #include "ImportHandler.h"
 #include "ExportHandler.h"
-/*
-	Handle to target process
-	Target process base address
-	File to inject
-	Map of functions to hook
-	
-	Out:
-		Base address of injected
-		List of dependencies to be loaded
-*/
+
+#include "loguru.hpp"
 
 typedef unsigned __int64 QWORD;
 

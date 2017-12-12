@@ -3,6 +3,7 @@
 #include <Windows.h>
 #include <string>
 #include <algorithm>
+#include "loguru.hpp"
 
 class ImportHandler {
 public:

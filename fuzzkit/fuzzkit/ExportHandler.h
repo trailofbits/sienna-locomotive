@@ -7,6 +7,8 @@
 #include <list>
 #include <map>
 
+#include "loguru.hpp"
+
 class ExportHandler {
 public:
 	HANDLE hProcess;

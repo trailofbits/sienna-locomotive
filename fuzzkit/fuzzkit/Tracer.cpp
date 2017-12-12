@@ -1,4 +1,3 @@
-#include "stdafx.h"
 #include "Tracer.h"
 
 /*
@@ -63,7 +62,7 @@ DWORD Tracer::singleStep(HANDLE hThread) {
 	context.EFlags = context.EFlags | (1 << 8);
 
 	if (!SetThreadContext(hThread, &context)) {
-		printf("ERROR: SetThreadContext (%x)\n", GetLastError());
+		LOG_F(ERROR, "SetThreadContext (%x)", GetLastError());
 		return 1;
 	}
 
@@ -79,7 +78,6 @@ DWORD Tracer::setBreak(HANDLE hProcess, UINT64 address) {
 	if (restoreBytes.find((LPVOID)address) == restoreBytes.end()) {
 		restoreBytes[(LPVOID)address] = startByte;
 	}
-	//printf("INFO: setBreak at %x\n", address);
 	return 0;
 }
 
@@ -87,12 +85,11 @@ BOOL Tracer::restoreBreak(HANDLE hProcess, HANDLE hThread) {
 	CONTEXT context;
 	context.ContextFlags = CONTEXT_ALL;
 	GetThreadContext(hThread, &context);
-	//printf("RIP: %x\n", context.Rip);
 	
 	context.Rip -= 1;
 
 	if (restoreBytes.find((LPVOID)context.Rip) == restoreBytes.end()) {
-		printf("ERROR: restoreBytes miss at %x\n", context.Rip);
+		LOG_F(WARNING, "restoreBytes miss at %llx", context.Rip);
 		return false;
 	}
 		
@@ -160,7 +157,7 @@ HANDLE Tracer::tracerGetPipe() {
 
 	if (hPipe == INVALID_HANDLE_VALUE) {
 		// TODO: fallback mutations?
-		printf("ERROR: trc could not connect to server\n");
+		LOG_F(ERROR, "Could not connect to server");
 		exit(1);
 	}
 
@@ -206,7 +203,7 @@ DWORD Tracer::traceInit(DWORD runId, HANDLE hProc, DWORD procId) {
 
 HANDLE Tracer::tracerGetPipeInsn(DWORD runId) {
 	if (hPipeInsn == INVALID_HANDLE_VALUE) {
-		printf("NEW INSN PIPE\n");
+		LOG_F(INFO, "Creating new pipe for insn tracing");
 		hPipeInsn = CreateFile(
 			L"\\\\.\\pipe\\fuzz_server",
 			GENERIC_READ | GENERIC_WRITE,
@@ -218,7 +215,7 @@ HANDLE Tracer::tracerGetPipeInsn(DWORD runId) {
 
 		if (hPipeInsn == INVALID_HANDLE_VALUE) {
 			DWORD err = GetLastError();
-			printf("ERROR: insn trc could not connect to server (%x)\n", err);
+			LOG_F(ERROR, "Could not connect to server (instruction) (%x)", err);
 			exit(1);
 		}
 
@@ -264,7 +261,6 @@ DWORD Tracer::traceInsn(DWORD runId, UINT64 addr, UINT64 traceSize, BYTE *trace)
 }
 
 DWORD Tracer::traceCrash(DWORD runId, UINT64 exceptionAddr, DWORD exceptionCode) {
-	printf("in crash\n");
 	DWORD bytesRead;
 	DWORD bytesWritten;
 
@@ -292,30 +288,12 @@ DWORD Tracer::traceCrash(DWORD runId, UINT64 exceptionAddr, DWORD exceptionCode)
 }
 
 UINT64 Tracer::trace(HANDLE hProcess, PVOID address, DWORD runId) {
-	/* 
-	trace format
-		in tracer::trace:
-			bb head addr
-			insn size, insn
-		in injectable:
-			taint size, buf addr
-		in fuzzkit (on crash):
-			crash addr
-			crash type
-	*/
-
-	// check cache
-	//If have address:
-	//	Set break on end of bb
-	//	Record trace (bb)
 	struct BasicBlock bb;
 	std::list<struct Instruction> insnList;
 	if (cache.HasBB((UINT64)address)) {
-		// printf("[T] HIT: %x\n", address);
 		bb = cache.FetchBB((UINT64)address);
 	}
 	else {
-		// printf("[T] MISS: %x\n", address);
 		bb.head = (UINT64)address;
 		
 		xed_decoded_inst_t xedd;
@@ -332,10 +310,6 @@ UINT64 Tracer::trace(HANDLE hProcess, PVOID address, DWORD runId) {
 			xed_decoded_inst_zero(&xedd);
 			xed_decoded_inst_set_mode(&xedd, XED_MACHINE_MODE_LONG_64, XED_ADDRESS_WIDTH_64b);
 			xed_err = xed_decode(&xedd, insn.bytes, 15);
-			
-			// CHAR buf[1000] = { 0 };
-			// xed_format_context(XED_SYNTAX_INTEL, &xedd, buf, 1000, 0, 0, 0);
-			// printf("[T] %x\t%s\n", currAddr, buf);
 
 			insn.length = xedd._decoded_length;
 			insnList.push_back(insn);
@@ -363,15 +337,7 @@ UINT64 Tracer::trace(HANDLE hProcess, PVOID address, DWORD runId) {
 		bb.tail = currAddr;
 		cache.AddBB(bb);
 	}
-	//Don't have address:
-	//	Walk forward through memory until control flow insn
-	//	Set break on end of bb
-	//	Store bb by address
-	//	Record trace (bb)
 
-	//DWORD bytesWritten;
-	//WriteFile(hTraceFile, bb.bbTrace, bb.traceSize, &bytesWritten, NULL);
-	//printf("TRACED FROM: %x to %x\n", bb.head, bb.tail);
 	traceInsn(runId, bb.head, bb.traceSize, bb.bbTrace);
 	return bb.tail;
 }
@@ -394,7 +360,6 @@ UINT64 traceHandleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId) {
 	injectors.insert(injector);
 
 	std::set<std::string> missingMaster;
-	printf("MISSING MASTER SIZE: %x\n", missingMaster.size());
 
 	missingMaster.insert(missingModules.begin(), missingModules.end());
 	std::map<std::string, std::string> emptyMap;
@@ -463,69 +428,62 @@ DWORD Tracer::TraceMainLoop(DWORD runId) {
 			code = dbgev.u.Exception.ExceptionRecord.ExceptionCode;
 			switch (code)
 			{
-			case EXCEPTION_ACCESS_VIOLATION:
-				printf("SEGGY AT %x\n", address);
-				break;
-			case EXCEPTION_BREAKPOINT:
-				crashed = false;
-				// printf("[B] BREAK AT %x\n", address);
-				if (address == cpdi.lpStartAddress) {
+				case EXCEPTION_BREAKPOINT:
 					crashed = false;
-					printf("!!! AT START: %x\n", address);
-					printf("!!! THREAD: %x\n", dbgev.dwThreadId);
-					restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId]);
+					// printf("[B] BREAK AT %x\n", address);
+					if (address == cpdi.lpStartAddress) {
+						crashed = false;
+						LOG_F(INFO, "At start address %llx", address);
+						LOG_F(INFO, "In thread %x", dbgev.dwThreadId);
+						restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId]);
 
-					taintAddr = traceHandleInjection(cpdi, runId);
-					printf("!!! BREAKING ON %X\n", taintAddr);
-					setBreak(cpdi.hProcess, taintAddr);
-				}
-				else if ((UINT64)address == taintAddr) {
-					printf("::: AT TAINT %x\n", address);
-					printf("::: IN THREAD %x\n", dbgev.dwThreadId);
+						taintAddr = traceHandleInjection(cpdi, runId);
+						LOG_F(INFO, "Setting taint break on %llx", taintAddr);
+						setBreak(cpdi.hProcess, taintAddr);
+					}
+					else if ((UINT64)address == taintAddr) {
+						LOG_F(INFO, "Taint break point %llx", address);
+						crashed = false;
+						restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId]);
+						LOG_F(INFO, "Beginning trace");
+
+						traceInit(runId, cpdi.hProcess, dbgev.dwProcessId);
+
+						tail = trace(cpdi.hProcess, address, runId);
+						if (tail == (UINT64)address) {
+							// printf("[.] SINGLE STEPPING\n");
+							singleStep(threadMap[dbgev.dwThreadId]);
+						}
+						else {
+							// printf("[.] BREAK SET %x\n", tail);
+							setBreak(cpdi.hProcess, tail);
+						}
+					}
+					else {
+						if (restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId])) {
+							// printf("[B] TAIL HIT %x\n", address);
+							// printf("[B] SINGLE STEPPING\n");
+							crashed = false;
+							singleStep(threadMap[dbgev.dwThreadId]);
+						}
+					}
+					break;
+				case EXCEPTION_SINGLE_STEP:
 					crashed = false;
-					restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId]);
-
-					traceInit(runId, cpdi.hProcess, dbgev.dwProcessId);
-
 					tail = trace(cpdi.hProcess, address, runId);
 					if (tail == (UINT64)address) {
-						// printf("[.] SINGLE STEPPING\n");
+						// printf("[S] HEAD / TAIL HIT %x\n", address);
+						// printf("[S] SINGLE STEPPING\n");
 						singleStep(threadMap[dbgev.dwThreadId]);
 					}
 					else {
-						// printf("[.] BREAK SET %x\n", tail);
+						// printf("[S] HEAD HIT %x\n", address);
+						// printf("[S] BREAK SET %x\n", tail);
 						setBreak(cpdi.hProcess, tail);
 					}
-				}
-				else {
-					if (restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId])) {
-						// printf("[B] TAIL HIT %x\n", address);
-						// printf("[B] SINGLE STEPPING\n");
-						crashed = false;
-						singleStep(threadMap[dbgev.dwThreadId]);
-					}
-				}
-				break;
-			case EXCEPTION_DATATYPE_MISALIGNMENT:
-				break;
-			case EXCEPTION_SINGLE_STEP:
-				crashed = false;
-				tail = trace(cpdi.hProcess, address, runId);
-				if (tail == (UINT64)address) {
-					// printf("[S] HEAD / TAIL HIT %x\n", address);
-					// printf("[S] SINGLE STEPPING\n");
-					singleStep(threadMap[dbgev.dwThreadId]);
-				}
-				else {
-					// printf("[S] HEAD HIT %x\n", address);
-					// printf("[S] BREAK SET %x\n", tail);
-					setBreak(cpdi.hProcess, tail);
-				}
-				break;
-			case DBG_CONTROL_C:
-				break;
-			default:
-				break;
+					break;
+				default:
+					break;
 			}
 
 			if (crashed) {
@@ -534,21 +492,20 @@ DWORD Tracer::TraceMainLoop(DWORD runId) {
 			}
 			break;
 		case CREATE_THREAD_DEBUG_EVENT:
+			LOG_F(INFO, "Thread started with id %x", dbgev.dwThreadId);
 			threadMap[dbgev.dwThreadId] = dbgev.u.CreateThread.hThread;
-			//trap_card(threadMap);
-			printf("CREATE THREAD\n");
 			break;
 		case CREATE_PROCESS_DEBUG_EVENT:
-			printf("CREATE PROC\n");
+			LOG_F(INFO, "Process started with id %x", dbgev.dwProcessId);
 			cpdi = dbgev.u.CreateProcessInfo;
 			setBreak(cpdi.hProcess, (UINT64)cpdi.lpStartAddress);
 			break;
 		case EXIT_THREAD_DEBUG_EVENT:
-			printf("EXIT THREAD\n");
+			LOG_F(INFO, "Thread exited with id %x", dbgev.dwThreadId);
 			threadMap.erase(dbgev.dwThreadId);
 			break;
 		case EXIT_PROCESS_DEBUG_EVENT:
-			printf("EXIT PROC\n");
+			LOG_F(INFO, "Process exited with id %x", dbgev.dwProcessId);
 			EXIT_PROCESS_DEBUG_INFO epdi = dbgev.u.ExitProcess;
 			return 0;
 			break;
@@ -577,9 +534,4 @@ DWORD Tracer::addThread(DWORD dwThreadId, HANDLE hThread) {
 Tracer::Tracer() {
 	hHeap = GetProcessHeap();
 	hPipeInsn = INVALID_HANDLE_VALUE;
-	/*hTraceFile = CreateFile(traceName, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (hTraceFile == INVALID_HANDLE_VALUE) {
-		printf("ERROR: CreateFile (%x)\n", GetLastError());
-		exit(1);
-	}*/
 }

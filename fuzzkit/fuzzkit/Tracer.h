@@ -5,9 +5,13 @@
 #include <map>
 #include "Cache.h"
 #include "Injector.h"
+
+
 extern "C" {
 #include "xed-interface.h"
 }
+
+#include "loguru.hpp"
 
 class Tracer {
 public:
@@ -16,7 +20,6 @@ public:
 	DWORD Tracer::addThread(DWORD dwThreadId, HANDLE hThread);
 private:
 	std::unordered_map<LPVOID, BYTE> restoreBytes;
-	//HANDLE hTraceFile;
 	Cache cache;
 	HANDLE hHeap;
 	std::unordered_map<DWORD, HANDLE> threadMap;

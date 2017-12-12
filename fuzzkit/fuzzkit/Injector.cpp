@@ -1,7 +1,6 @@
-#include "stdafx.h"
 #include "Injector.h"
 
-#define IFNERR(call) if(!call) { printf("ERROR: %s:%d %d\n", __FILE__, __LINE__, GetLastError()); exit(1); }
+#define IFNERR(call) if(!call) { LOG_F(ERROR, "%x", GetLastError()); exit(1); }
 
 LPVOID Injector::BaseOfInjected() {
 	return this->injectedBase;
@@ -195,7 +194,7 @@ DWORD Injector::HandleImports() {
 
 			if (itHints != hints.end()) {
 				// get base from hint
-				//printf("WARNING: using hint %x\n", itHints->second);
+				LOG_F(WARNING, "Using hint %x for %s", itHints->second, itHints->first.c_str());
 				UINT64 hintPage = (UINT64)itHints->second & 0xFFFFFFFFFFFFF000;
 				BYTE magic[2];
 
@@ -217,7 +216,7 @@ DWORD Injector::HandleImports() {
 			}
 
 			if (!found) {
-				//printf("WARN: address not found for %s\n", moduleName.c_str());
+				LOG_F(WARNING, "Address not found for %s", moduleName.c_str());
 				missingModules.insert(moduleName);
 				continue;
 			}
@@ -245,9 +244,9 @@ DWORD Injector::HandleImports() {
 				break;
 			}
 
-			/*if (exportAddresses.find(functionName) == exportAddresses.end()) {
-				printf("WARN: Could not resolve %s", functionName.c_str());
-			}*/
+			if (exportAddresses.find(functionName) == exportAddresses.end()) {
+				LOG_F(WARNING, "Could not resolve %s", functionName.c_str());
+			}
 
 			UINT64 addr = exportAddresses[functionName];
 			injectableImportHandler.RewriteFunctionAddr(addr);
@@ -270,7 +269,7 @@ DWORD Injector::ResolveImports(std::map<std::string, LPVOID> loadedMap) {
 			continue;
 		}
 
-		//printf("INFO: resolving %s in %s\n", moduleName.c_str(), this->dllName.c_str());
+		LOG_F(INFO, "Resolving %s in %s", moduleName.c_str(), this->dllName.c_str());
 		missingModules.erase(moduleName);
 		// gather desired functions
 		std::list<std::string> functions;
@@ -294,9 +293,9 @@ DWORD Injector::ResolveImports(std::map<std::string, LPVOID> loadedMap) {
 				break;
 			}
 
-			/*if (exportAddresses.find(functionName) == exportAddresses.end()) {
-				printf("WARN: Could not resolve %s", functionName.c_str());
-			}*/
+			if (exportAddresses.find(functionName) == exportAddresses.end()) {
+				LOG_F(WARNING, "Could not resolve %s", functionName.c_str());
+			}
 
 			UINT64 addr = exportAddresses[functionName];
 			injectableImportHandler.RewriteFunctionAddr(addr);
@@ -320,9 +319,8 @@ DWORD Injector::HandleHook() {
 		std::string origFn = hookMapIt->second;
 		ExportHandler injectedExportHandler(this->hProcess, this->injectedBase);
 		UINT64 address = injectedExportHandler.GetFunctionAddress(hookFn);
-		printf("SETTING %s: %x\n", hookFn, address);
+		LOG_F(INFO, "Setting %s: %x", hookFn.c_str(), address);
 		hookAddrMap[hookFn] = address;
-		printf("CHECK %s: %x\n", hookFn, hookAddrMap[hookFn]);
 
 		ImportHandler importHandler(this->hProcess, this->lpBaseOfImage);
 		while (1) {
@@ -352,7 +350,7 @@ DWORD Injector::HandleRunId(DWORD runId) {
 	UINT64 address = exportHandler.GetFunctionAddress("runId");
 
 	if (!WriteProcessMemory(this->hProcess, (LPVOID)address, &runId, sizeof(DWORD), NULL)) {
-		printf("ERROR: WriteProcessMemory (%x)\n", GetLastError());
+		LOG_F(ERROR, "Could not write run id to injected DLL (%x)", GetLastError());
 		return 1;
 	}
 	return 0;
@@ -363,33 +361,33 @@ DWORD Injector::Inject() {
 	std::wstring wDllName(dllName.begin(), dllName.end());
 	HANDLE hFile = CreateFile(wDllName.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hFile == INVALID_HANDLE_VALUE) {
-		printf("ERROR: CreateFile (%x)\n", GetLastError());
+		LOG_F(ERROR, "Could not open injectable file (%x)", GetLastError());
 		exit(1);
 	}
 
 	DWORD highSize = 0;
 	DWORD lowSize = GetFileSize(hFile, &highSize);
 	if (highSize) {
-		printf("ERROR: injectable exceeds 4GB\n");
+		LOG_F(ERROR, "Injectable exceeds 4GB?");
 		exit(1);
 	}
 
 	PBYTE buf = (PBYTE)VirtualAlloc(NULL, lowSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 	if (!buf) {
-		printf("ERROR: VirtualAlloc (%x)\n", GetLastError());
+		LOG_F(ERROR, "Could not allocate mem for injectable (%x)\n", GetLastError());
 		exit(1);
 	}
 
 	DWORD bytes_read;
 	if (!ReadFile(hFile, buf, lowSize, &bytes_read, NULL) || bytes_read != lowSize) {
-		printf("ERROR: ReadFile (ms_buf) (%x)\n", GetLastError());
+		LOG_F(ERROR, "Could not read injectable (%x)\n", GetLastError());
 		exit(1);
 	}
 
 	// get nt headers
 	PIMAGE_NT_HEADERS pNtHeaders = ImageNtHeader(buf);
 	if (!pNtHeaders) {
-		printf("ERROR: ImageNtHeader (%x)\n", GetLastError());
+		LOG_F(ERROR, "Could not get NT Headers from injectable (%x)\n", GetLastError());
 		exit(1);
 	}
 

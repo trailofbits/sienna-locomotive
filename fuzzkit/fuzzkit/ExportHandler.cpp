@@ -1,4 +1,3 @@
-#include "stdafx.h"
 #include "ExportHandler.h"
 
 ExportHandler::ExportHandler(HANDLE hProcess, LPVOID lpvBaseOfImage) {
@@ -12,7 +11,7 @@ ExportHandler::ExportHandler(HANDLE hProcess, LPVOID lpvBaseOfImage) {
 
 		LPVOID lpvScratch = (LPVOID)((uintptr_t)this->lpvBaseOfImage + this->dosHeader.e_lfanew + 4);
 		if (!ReadProcessMemory(hProcess, (PVOID)((uintptr_t)lpvScratch), &(this->machine), sizeof(WORD), &bytesRead) || bytesRead != sizeof(WORD)) {
-			printf("ERROR: ReadProcessMemory(machine) (%x) (%x)\n", GetLastError(), bytesRead);
+			LOG_F(ERROR, "ReadProcessMemory (machine) (%x)", GetLastError(), bytesRead);
 			return;
 		}
 
@@ -20,7 +19,7 @@ ExportHandler::ExportHandler(HANDLE hProcess, LPVOID lpvBaseOfImage) {
 		if (this->machine == IMAGE_FILE_MACHINE_AMD64) {
 			IMAGE_NT_HEADERS64 ntHeaders = { 0 };
 			if (!ReadProcessMemory(hProcess, lpvScratch, &ntHeaders, sizeof(IMAGE_NT_HEADERS64), &bytesRead)) {
-				printf("ERROR: ReadProcessMemory(ntHeaders) (%x)\n", GetLastError());
+				LOG_F(ERROR, "ReadProcessMemory (ntHeaders) (%x)", GetLastError());
 				return;
 			}
 
@@ -30,7 +29,7 @@ ExportHandler::ExportHandler(HANDLE hProcess, LPVOID lpvBaseOfImage) {
 		else if (this->machine == IMAGE_FILE_MACHINE_I386) {
 			IMAGE_NT_HEADERS32 ntHeaders = { 0 };
 			if (!ReadProcessMemory(hProcess, lpvScratch, &ntHeaders, sizeof(IMAGE_NT_HEADERS32), &bytesRead)) {
-				printf("ERROR: ReadProcessMemory(ntHeaders) (%x)\n", GetLastError());
+				LOG_F(ERROR, "ReadProcessMemory (ntHeaders) (%x)", GetLastError());
 				return;
 			}
 
@@ -52,7 +51,7 @@ std::map<std::string, UINT64> ExportHandler::GetFunctionAddresses(std::list<std:
 	DWORD nameTableRVA = ied.AddressOfNames;
 
 	if (numFunctions != ied.NumberOfNames) {
-		printf("WARNING: numFunctions != numNames\n");
+		LOG_F(WARNING, "numFunctions != numNames");
 	}
 
 	for (int i = 0; i < numFunctions; i++) {
@@ -93,7 +92,7 @@ UINT64 ExportHandler::GetFunctionAddress(std::string targetName)
 	DWORD nameTableRVA = ied.AddressOfNames;
 
 	if (numFunctions != ied.NumberOfNames) {
-		printf("WARNING: numFunctions != numNames\n");
+		LOG_F(WARNING, "numFunctions != numNames");
 	}
 
 	for (int i = 0; i < numFunctions; i++) {

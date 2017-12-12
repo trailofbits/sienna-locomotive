@@ -1,8 +1,8 @@
 // injectable.cpp : Defines the exported functions for the DLL application.
 //
 
-#include "stdafx.h"
 #include <stdio.h>
+#include <Windows.h>
 
 extern "C" __declspec(dllexport) DWORD runId;
 __declspec(dllexport) DWORD runId;

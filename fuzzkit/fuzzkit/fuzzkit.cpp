@@ -1,7 +1,6 @@
 // fuzzkit.cpp : Defines the entry point for the console application.
 //
-
-#include "stdafx.h"
+#define NOMINMAX
 #include <Windows.h>
 #include <winternl.h>
 #include <DbgHelp.h>
@@ -17,31 +16,12 @@
 #include "Injector.h"
 #include "Tracer.h"
 
+#define LOGURU_IMPLEMENTATION 1
+#include "loguru.hpp"
+
+
 // TODO: check return of every call
 // TODO: support 32bit
-
-#define IFNERR(call) if(!call) { printf("ERROR: %s:%d %d\n", __FILE__, __LINE__, GetLastError()); exit(1); }
-
-int walk_imports(HANDLE hProcess, PVOID lpBaseOfImage) {
-	ImportHandler importHandler(hProcess, lpBaseOfImage);
-	while (1) {
-		std::string moduleName = importHandler.GetNextModule();
-		if (moduleName == "") {
-			break;
-		}
-		printf("%s\n", moduleName.c_str());
-
-		while (1) {
-			std::string functionName = importHandler.GetNextFunction();
-			if (functionName == "") {
-				break;
-			}
-
-			printf("\t%x\t%s\n", importHandler.GetFunctionAddr(), functionName.c_str());
-		}
-	}
-	return 0;
-}
 
 DWORD handleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId) {
 	std::map<std::string, std::string> hookMap;
@@ -68,7 +48,7 @@ DWORD handleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId) {
 		std::string path = "C:\\Windows\\System32\\" + missing;
 		
 		// inject
-		//printf("INJECTING EXTRA: %s\n", missing.c_str());
+		LOG_F(INFO, "Injecting dependency: %s", missing.c_str());
 		injector = new Injector(cpdi.hProcess, cpdi.lpBaseOfImage, path, emptyMap);
 		injector->Inject();
 
@@ -109,7 +89,6 @@ BOOL debug_main_loop(DWORD runId) {
 		DEBUG_EVENT dbgev;
 
 		WaitForDebugEvent(&dbgev, INFINITE);
-		//printf("DEBUG EVENT: %d\n", dbgev.dwDebugEventCode);
 		BOOL crashed = true;
 
 		switch (dbgev.dwDebugEventCode)
@@ -120,68 +99,69 @@ BOOL debug_main_loop(DWORD runId) {
 			switch (dbgev.u.Exception.ExceptionRecord.ExceptionCode)
 			{
 				case EXCEPTION_ACCESS_VIOLATION:
-					printf("EXCEPTION_ACCESS_VIOLATION\n");
+					LOG_F(INFO, "EXCEPTION_ACCESS_VIOLATION");
 					// TODO: log crash
 					exit(1);
 					break;
 				case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
-					printf("EXCEPTION_ARRAY_BOUNDS_EXCEEDED\n");
+					LOG_F(INFO, "EXCEPTION_ARRAY_BOUNDS_EXCEEDED");
 					break;
 				case EXCEPTION_BREAKPOINT:
-					printf("EXCEPTION_BREAKPOINT\n");
+					LOG_F(INFO, "EXCEPTION_BREAKPOINT");
+					LOG_F(INFO, "Injecting hook dll into process");
 					handleInjection(cpdi, runId);
 					crashed = false;
 					break;
 				case EXCEPTION_DATATYPE_MISALIGNMENT:
-					printf("EXCEPTION_DATATYPE_MISALIGNMENT\n");
+					LOG_F(INFO, "EXCEPTION_DATATYPE_MISALIGNMENT");
 					break;
 				case EXCEPTION_FLT_DENORMAL_OPERAND:
-					printf("EXCEPTION_FLT_DENORMAL_OPERAND\n");
+					LOG_F(INFO, "EXCEPTION_FLT_DENORMAL_OPERAND");
 					break;
 				case EXCEPTION_FLT_DIVIDE_BY_ZERO:
-					printf("EXCEPTION_FLT_DIVIDE_BY_ZERO\n");
+					LOG_F(INFO, "EXCEPTION_FLT_DIVIDE_BY_ZERO");
 					break;
 				case EXCEPTION_FLT_INEXACT_RESULT:
-					printf("EXCEPTION_FLT_INEXACT_RESULT\n");
+					LOG_F(INFO, "EXCEPTION_FLT_INEXACT_RESULT");
 					break;
 				case EXCEPTION_FLT_INVALID_OPERATION:
-					printf("EXCEPTION_FLT_INVALID_OPERATION\n");
+					LOG_F(INFO, "EXCEPTION_FLT_INVALID_OPERATION");
 					break;
 				case EXCEPTION_FLT_OVERFLOW:
-					printf("EXCEPTION_FLT_OVERFLOW\n");
+					LOG_F(INFO, "EXCEPTION_FLT_OVERFLOW");
 					break;
 				case EXCEPTION_FLT_STACK_CHECK:
-					printf("EXCEPTION_FLT_STACK_CHECK\n");
+					LOG_F(INFO, "EXCEPTION_FLT_STACK_CHECK");
 					break;
 				case EXCEPTION_FLT_UNDERFLOW:
-					printf("EXCEPTION_FLT_UNDERFLOW\n");
+					LOG_F(INFO, "EXCEPTION_FLT_UNDERFLOW");
 					break;
 				case EXCEPTION_ILLEGAL_INSTRUCTION:
-					printf("EXCEPTION_ILLEGAL_INSTRUCTION\n");
+					LOG_F(INFO, "EXCEPTION_ILLEGAL_INSTRUCTION");
 					break;
 				case EXCEPTION_IN_PAGE_ERROR:
-					printf("EXCEPTION_IN_PAGE_ERROR\n");
+					LOG_F(INFO, "EXCEPTION_IN_PAGE_ERROR");
 					break;
 				case EXCEPTION_INT_DIVIDE_BY_ZERO:
-					printf("EXCEPTION_INT_DIVIDE_BY_ZERO\n");
+					LOG_F(INFO, "EXCEPTION_INT_DIVIDE_BY_ZERO");
 					break;
 				case EXCEPTION_INT_OVERFLOW:
-					printf("EXCEPTION_INT_OVERFLOW\n");
+					LOG_F(INFO, "EXCEPTION_INT_OVERFLOW");
 					break;
 				case EXCEPTION_INVALID_DISPOSITION:
-					printf("EXCEPTION_INVALID_DISPOSITION\n");
+					LOG_F(INFO, "EXCEPTION_INVALID_DISPOSITION");
 					break;
 				case EXCEPTION_NONCONTINUABLE_EXCEPTION:
-					printf("EXCEPTION_NONCONTINUABLE_EXCEPTION\n");
+					LOG_F(INFO, "EXCEPTION_NONCONTINUABLE_EXCEPTION");
 					break;
 				case EXCEPTION_PRIV_INSTRUCTION:
-					printf("EXCEPTION_PRIV_INSTRUCTION\n");
+					LOG_F(INFO, "EXCEPTION_PRIV_INSTRUCTION");
 					break;
 				case EXCEPTION_SINGLE_STEP:
-					printf("EXCEPTION_SINGLE_STEP\n");
+					LOG_F(INFO, "EXCEPTION_SINGLE_STEP");
 					break;
 				case EXCEPTION_STACK_OVERFLOW:
-					printf("EXCEPTION_STACK_OVERFLOW\n");
+					LOG_F(INFO, "EXCEPTION_STACK_OVERFLOW");
 					break;
 				default:
 					break;
@@ -191,20 +171,20 @@ BOOL debug_main_loop(DWORD runId) {
 			}
 			break;
 		case CREATE_THREAD_DEBUG_EVENT:
-			printf("CREATE THREAD\n");
+			LOG_F(INFO, "Thread started with id %x", dbgev.dwThreadId);
 			break;
 		case CREATE_PROCESS_DEBUG_EVENT:
-			printf("CREATE PROC\n");
+			LOG_F(INFO, "Process started with id %x", dbgev.dwProcessId);
 			cpdi = dbgev.u.CreateProcessInfo;
-			//printf("START ADDR %x\n", cpdi.lpStartAddress);
 			DebugBreakProcess(cpdi.hProcess);
 			break;
 		case EXIT_THREAD_DEBUG_EVENT:
+			LOG_F(INFO, "Thread exited with id %x", dbgev.dwThreadId);
 			break;
 		case EXIT_PROCESS_DEBUG_EVENT:
 			EXIT_PROCESS_DEBUG_INFO epdi = dbgev.u.ExitProcess;
 			// TODO: exit when all processes have exited
-			printf("PROCESS EXITED\n");
+			LOG_F(INFO, "Process exited with id %x", dbgev.dwProcessId);
 			return false;
 			break;
 		case LOAD_DLL_DEBUG_EVENT:
@@ -235,10 +215,8 @@ DWORD getRunInfo(HANDLE hPipe, DWORD runId, LPCTSTR *targetName, LPTSTR *targetA
 	
 	DWORD size = 0;
 	ReadFile(hPipe, &size, sizeof(DWORD), &bytesRead, NULL);
-	printf("SIZE: %x\n", size);
 	*targetName = (LPCTSTR)HeapAlloc(hHeap, HEAP_ZERO_MEMORY, size + sizeof(TCHAR));
 	ReadFile(hPipe, (LPVOID)*targetName, size, &bytesRead, NULL);
-	printf("NAME: %S\n", *targetName);
 
 	size = 0;
 	ReadFile(hPipe, &size, sizeof(DWORD), &bytesRead, NULL);
@@ -279,7 +257,7 @@ HANDLE getPipe() {
 
 	if (hPipe == INVALID_HANDLE_VALUE) {
 		// TODO: fallback mutations?
-		printf("ERROR: could not connect to server\n");
+		LOG_F(ERROR, "Could not connect to server");
 		exit(1);
 	}
 
@@ -294,9 +272,9 @@ HANDLE getPipe() {
 }
 
 DWORD printUsage(LPWSTR *argv) {
-	printf("USAGE:");
-	printf("\trun: \t%S TARGET_PROGRAM.EXE \"[TARGET_PROGRAM.EXE ARGUMENTS]\"\n", argv[0]);
-	printf("\treplay: \t%S [-r ID]\n", argv[0]);
+	LOG_F(INFO, "USAGE:");
+	LOG_F(INFO, "\trun: \t%S TARGET_PROGRAM.EXE \"[TARGET_PROGRAM.EXE ARGUMENTS]\"\n", argv[0]);
+	LOG_F(INFO, "\treplay: \t%S [-r ID]\n", argv[0]);
 	return 0;
 }
 
@@ -311,9 +289,11 @@ DWORD finalize(HANDLE hPipe, DWORD runId, BOOL crashed) {
 	return 0;
 }
 
-int main()
+int main(int mArgc, char **mArgv)
 {
-	printf("Welcome to fuzzkit!\n");
+	loguru::init(mArgc, mArgv);
+	loguru::add_file("log\\fuzzkit.log", loguru::Append, loguru::Verbosity_MAX);
+	LOG_F(INFO, "Fuzzkit started!");
 
 	BOOL replay = false;
 	DWORD runId = 0;
@@ -338,7 +318,7 @@ int main()
 			exit(1);
 		}
 		
-		printf("RUNID: %x\n", runId);
+		LOG_F(INFO, "Run id: %x", runId);
 		getRunInfo(hPipe, runId, &targetName, &targetArgs);
 
 		// use high bit of runId to indicate replay in injectable
@@ -356,8 +336,8 @@ int main()
 	}
 	CloseHandle(hPipe);
 
-	printf("%S\n", targetName);
-	printf("%S\n", targetArgs);
+	LOG_F(INFO, "Target name: %S", targetName);
+	LOG_F(INFO, "Target args: %S", targetArgs);
 
 	STARTUPINFO si;
 	ZeroMemory(&si, sizeof(si));
@@ -380,7 +360,7 @@ int main()
 	);
 
 	if (!success) {
-		printf("ERROR: Main CreateProcess (%x)\n", GetLastError());
+		LOG_F(ERROR, "Could not start process (%x)", GetLastError());
 		return 1;
 	}
 

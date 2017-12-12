@@ -1,4 +1,3 @@
-#include "stdafx.h"
 #include "Crash.h"
 
 BOOL Crash::xed_at(xed_decoded_inst_t *xedd) {

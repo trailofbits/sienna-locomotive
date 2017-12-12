@@ -1,5 +1,4 @@
 #pragma once
-#include "stdafx.h"
 #include <Windows.h>
 #include <unordered_map>
 #include <list>

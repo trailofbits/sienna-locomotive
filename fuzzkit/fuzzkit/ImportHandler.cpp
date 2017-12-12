@@ -1,4 +1,3 @@
-#include "stdafx.h"
 #include "ImportHandler.h"
 
 ImportHandler::ImportHandler(HANDLE hProcess, LPVOID lpvBaseOfImage) {
@@ -12,14 +11,14 @@ ImportHandler::ImportHandler(HANDLE hProcess, LPVOID lpvBaseOfImage) {
 
 		LPVOID lpvScratch = (LPVOID)((uintptr_t)this->lpvBaseOfImage + this->dosHeader.e_lfanew + 4);
 		if (!ReadProcessMemory(hProcess, (PVOID)((uintptr_t)lpvScratch), &(this->machine), sizeof(WORD), &bytesRead) || bytesRead != sizeof(WORD)) {
-			printf("ERROR: ReadProcessMemory(machine) (%x) (%x)\n", GetLastError(), bytesRead);
+			LOG_F(ERROR, "ReadProcessMemory (machine) (%x) (%x)", GetLastError(), bytesRead);
 		}
 
 		lpvScratch = (LPVOID)((uintptr_t)this->lpvBaseOfImage + this->dosHeader.e_lfanew);
 		if (this->machine == IMAGE_FILE_MACHINE_AMD64) {
 			IMAGE_NT_HEADERS64 ntHeaders = { 0 };
 			if (!ReadProcessMemory(hProcess, lpvScratch, &ntHeaders, sizeof(IMAGE_NT_HEADERS64), &bytesRead)) {
-				printf("ERROR: ReadProcessMemory(ntHeaders) (%x)\n", GetLastError());
+				LOG_F(ERROR, "ReadProcessMemory (ntHeaders64) (%x)", GetLastError());
 				return;
 			}
 
@@ -29,7 +28,7 @@ ImportHandler::ImportHandler(HANDLE hProcess, LPVOID lpvBaseOfImage) {
 		else if (this->machine == IMAGE_FILE_MACHINE_I386) {
 			IMAGE_NT_HEADERS32 ntHeaders = { 0 };
 			if (!ReadProcessMemory(hProcess, lpvScratch, &ntHeaders, sizeof(IMAGE_NT_HEADERS32), &bytesRead)) {
-				printf("ERROR: ReadProcessMemory(ntHeaders) (%x)\n", GetLastError());
+				LOG_F(ERROR, "ReadProcessMemory (ntHeaders32) (%x)", GetLastError());
 				return;
 			}
 
@@ -95,7 +94,6 @@ std::string ImportHandler::GetNextFunction() {
 			// ordinal 
 			// TODO: return #N
 			return "!ORDINAL";
-			//printf("\t%x\t%x (ord)\n", iatFirstThunkAddr, itd_orig.u1.Ordinal & 0x7FFFFFFF);
 		}
 		else {
 			PBYTE dst = pFuncName;
@@ -179,13 +177,20 @@ BOOL ImportHandler::RewriteFunctionAddr(UINT64 addr) {
 		if (!WriteProcessMemory(this->hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint64_t), &bytesWritten)) {
 			MEMORY_BASIC_INFORMATION mbi;
 			VirtualQueryEx(this->hProcess, lpvScratch, &mbi, sizeof(MEMORY_BASIC_INFORMATION));
-			//printf("ERROR: RewriteFunctionAddr %x %x\n", bytesWritten, GetLastError());
+			LOG_F(WARNING, "Could not hook function first try (%x) (%x)", bytesWritten, GetLastError());
+			
 			// TODO: do this intelligently
 			DWORD old;
 			VirtualProtectEx(this->hProcess, mbi.BaseAddress, mbi.RegionSize, PAGE_EXECUTE_READWRITE, &old);
-			WriteProcessMemory(this->hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint64_t), &bytesWritten);
+
+			if (!WriteProcessMemory(this->hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint64_t), &bytesWritten)) {
+				LOG_F(ERROR, "Could not hook function second try (%x) (%x)", bytesWritten, GetLastError());
+				return false;
+			}
+			
+			LOG_F(INFO, "Don't worry, second try was successful");
 			VirtualProtectEx(this->hProcess, mbi.BaseAddress, mbi.RegionSize, mbi.Protect, &old);
-			return false;
+			return true;
 		}
 		return true;
 	}
