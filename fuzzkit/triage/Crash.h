@@ -3,6 +3,7 @@
 #include <set>
 #include <utility>
 #include <string>
+#define NOMINMAX
 #include <Windows.h>
 
 #include "rapidjson/prettywriter.h"
@@ -14,6 +15,8 @@
 extern "C" {
 #include "xed-interface.h"
 }
+
+#include "loguru.hpp"
 
 class Crash {
 public:

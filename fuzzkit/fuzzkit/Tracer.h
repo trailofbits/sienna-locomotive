@@ -27,7 +27,7 @@ private:
 
 	HANDLE tracerGetPipeInsn(DWORD runId);
 	DWORD traceInit(DWORD runId, HANDLE hProc, DWORD procId);
-	DWORD traceInsn(DWORD runId, UINT64 addr, UINT64 traceSize, BYTE * trace);
+	DWORD traceInsn(DWORD runId, UINT64 addr, DWORD traceSize, BYTE * trace);
 	DWORD traceCrash(DWORD runId, UINT64 exceptionAddr, DWORD exceptionCode);
 	UINT64 trace(HANDLE hProcess, PVOID address, DWORD runId);
 	DWORD singleStep(HANDLE hThread);

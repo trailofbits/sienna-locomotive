@@ -73,7 +73,7 @@ Crash::Crash(triton::API &api, triton::arch::Instruction *insn, UINT8 insnBytes[
 	: insn(insn), insnLength(insnLength), exceptionAddr(exceptionAddr), exceptionCode(exceptionCode)
 {
 	if (insnLength > 15) {
-		printf("ERROR: initialization with insn length > buf size\n");
+		LOG_F(ERROR, "Initialization with insn length > buf size");
 		exit(1);
 	}
 	
@@ -350,4 +350,5 @@ VOID Crash::dumpInfo() {
 	std::cout << "#### BEGIN CRASH DATA JSON" << std::endl;
 	std::cout << s.GetString() << std::endl;
 	std::cout << "#### END CRASH DATA JSON" << std::endl;
+	LOG_F(INFO, s.GetString());
 }

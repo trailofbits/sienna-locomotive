@@ -45,7 +45,7 @@ DWORD Injector::HandleRelocations(PIMAGE_NT_HEADERS pNtHeaders) {
 		uintptr_t imageBaseInt = pNtHeaders->OptionalHeader.ImageBase;
 		uintptr_t injectedBaseInt = (uintptr_t)this->injectedBase;
 
-		for (int i = 0; i < blockCount; i++) {
+		for (DWORD i = 0; i < blockCount; i++) {
 			// get reloc type, offset
 			WORD relocationBlock;
 			IFNERR(ReadProcessMemory(this->hProcess, relocVA, &relocationBlock, sizeof(WORD), &bytesRead))
@@ -64,32 +64,32 @@ DWORD Injector::HandleRelocations(PIMAGE_NT_HEADERS pNtHeaders) {
 				switch (type) {
 				case IMAGE_REL_BASED_HIGH:
 					IFNERR(ReadProcessMemory(this->hProcess, targetVA, &target16, sizeof(WORD), &bytesRead))
-						target16 -= imageBaseInt >> 16;
+					target16 -= imageBaseInt >> 16;
 					target16 += injectedBaseInt >> 16;
 					IFNERR(WriteProcessMemory(this->hProcess, targetVA, &target16, sizeof(WORD), &bytesWritten))
 						break;
 				case IMAGE_REL_BASED_LOW:
 					IFNERR(ReadProcessMemory(this->hProcess, targetVA, &target16, sizeof(WORD), &bytesRead))
-						target16 -= imageBaseInt & 0xFFFF;
+					target16 -= imageBaseInt & 0xFFFF;
 					target16 += injectedBaseInt & 0xFFFF;
 					IFNERR(WriteProcessMemory(this->hProcess, targetVA, &target16, sizeof(WORD), &bytesWritten))
 						break;
 				case IMAGE_REL_BASED_HIGHLOW:
 					IFNERR(ReadProcessMemory(this->hProcess, targetVA, &target32, sizeof(DWORD), &bytesRead))
-						target32 -= imageBaseInt;
+					target32 -= imageBaseInt;
 					target32 += injectedBaseInt;
 					IFNERR(WriteProcessMemory(this->hProcess, targetVA, &target32, sizeof(DWORD), &bytesWritten))
 						break;
 				case IMAGE_REL_BASED_HIGHADJ:
 					// who the fuck designed this bullshit?
 					IFNERR(ReadProcessMemory(this->hProcess, targetVA, &target16, sizeof(WORD), &bytesRead))
-						highAdj = target16 << 16;
+					highAdj = target16 << 16;
 					highAdjVA = targetVA;
 					processHighAdj = true;
 					break;
 				case IMAGE_REL_BASED_DIR64:
 					IFNERR(ReadProcessMemory(this->hProcess, targetVA, &target64, sizeof(QWORD), &bytesRead))
-						target64 -= imageBaseInt;
+					target64 -= imageBaseInt;
 					target64 += injectedBaseInt;
 					IFNERR(WriteProcessMemory(this->hProcess, targetVA, &target64, sizeof(QWORD), &bytesWritten))
 						break;
@@ -416,6 +416,8 @@ DWORD Injector::Inject() {
 	HandleImports();
 
 	HandleHook();
+
+	return 0;
 }
 
 DWORD Injector::Inject(DWORD runId) {

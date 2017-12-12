@@ -236,7 +236,7 @@ HANDLE Tracer::tracerGetPipeInsn(DWORD runId) {
 	return hPipeInsn;
 }
 
-DWORD Tracer::traceInsn(DWORD runId, UINT64 addr, UINT64 traceSize, BYTE *trace) {
+DWORD Tracer::traceInsn(DWORD runId, UINT64 addr, DWORD traceSize, BYTE *trace) {
 	DWORD bytesRead;
 	DWORD bytesWritten;
 	HANDLE hPipe = tracerGetPipeInsn(runId);
@@ -245,7 +245,7 @@ DWORD Tracer::traceInsn(DWORD runId, UINT64 addr, UINT64 traceSize, BYTE *trace)
 	WriteFile(hPipe, &addr, sizeof(UINT64), &bytesWritten, NULL);
 
 	// send trace size to server
-	WriteFile(hPipe, &traceSize, sizeof(UINT64), &bytesWritten, NULL);
+	WriteFile(hPipe, &traceSize, sizeof(DWORD), &bytesWritten, NULL);
 
 	//printf("%x, %x, %x\t", runId, addr, traceSize);
 	//for (int i = 0; i < traceSize; i++) {

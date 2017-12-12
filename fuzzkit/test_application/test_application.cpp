@@ -36,7 +36,7 @@ int main()
 	printf("BUF: %s\n", buf);
 
 	int *crashPtr = *(int **)buf;
-	printf("CRASH PTR: %x\n", crashPtr);
+	printf("CRASH PTR: %p\n", crashPtr);
 	printf("*CRASH PTR: %x\n", *crashPtr);
 	
 	CloseHandle(file);
