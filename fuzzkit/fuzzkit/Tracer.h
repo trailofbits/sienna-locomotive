@@ -11,7 +11,7 @@ extern "C" {
 
 class Tracer {
 public:
-	Tracer(LPCTSTR traceName);
+	Tracer();
 	DWORD TraceMainLoop(DWORD runId);
 	DWORD Tracer::addThread(DWORD dwThreadId, HANDLE hThread);
 private:
@@ -28,7 +28,7 @@ private:
 	DWORD traceCrash(DWORD runId, UINT64 exceptionAddr, DWORD exceptionCode);
 	UINT64 trace(HANDLE hProcess, PVOID address, DWORD runId);
 	DWORD singleStep(HANDLE hThread);
-	DWORD setBreak(HANDLE hProcess, UINT64 address);
+	DWORD setBreak(HANDLE hThread, UINT64 address);
 	BOOL restoreBreak(HANDLE hProcess, HANDLE hThread);
 	BOOL isTerminator(xed_decoded_inst_t xedd);
 	HANDLE tracerGetPipe();

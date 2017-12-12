@@ -320,6 +320,9 @@ DWORD Injector::HandleHook() {
 		std::string origFn = hookMapIt->second;
 		ExportHandler injectedExportHandler(this->hProcess, this->injectedBase);
 		UINT64 address = injectedExportHandler.GetFunctionAddress(hookFn);
+		printf("SETTING %s: %x\n", hookFn, address);
+		hookAddrMap[hookFn] = address;
+		printf("CHECK %s: %x\n", hookFn, hookAddrMap[hookFn]);
 
 		ImportHandler importHandler(this->hProcess, this->lpBaseOfImage);
 		while (1) {

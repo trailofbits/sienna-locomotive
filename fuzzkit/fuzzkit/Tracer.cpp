@@ -377,10 +377,11 @@ UINT64 Tracer::trace(HANDLE hProcess, PVOID address, DWORD runId) {
 }
 
 // TODO: deduplicate this from fuzzkit
-DWORD traceHandleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId) {
+UINT64 traceHandleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId) {
 	std::map<std::string, std::string> hookMap;
 	hookMap["ReadFileHook"] = "ReadFile";
-	Injector *injector = new Injector(cpdi.hProcess, cpdi.lpBaseOfImage, "C:\\Users\\dgoddard\\Documents\\GitHub\\sienna-locomotive\\fuzzkit\\x64\\Release\\injectable.dll", hookMap);
+	Injector *origInjector = new Injector(cpdi.hProcess, cpdi.lpBaseOfImage, "C:\\Users\\dgoddard\\Documents\\GitHub\\sienna-locomotive\\fuzzkit\\x64\\Release\\injectable.dll", hookMap);
+	Injector *injector = origInjector;
 	injector->Inject(runId);
 
 	std::set<std::string> missingModules = injector->MissingModules();
@@ -433,13 +434,15 @@ DWORD traceHandleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId) {
 		missingMaster.erase(missing);
 	}
 
-	return 0;
+	return origInjector->hookAddrMap["ReadFileHook"];
 }
 
 DWORD Tracer::TraceMainLoop(DWORD runId) {
 	DWORD dwContinueStatus = DBG_CONTINUE;
 	CREATE_PROCESS_DEBUG_INFO cpdi;
 	xed_tables_init();
+	UINT64 taintAddr = 0;
+
 	for (;;)
 	{
 		DEBUG_EVENT dbgev;
@@ -472,7 +475,16 @@ DWORD Tracer::TraceMainLoop(DWORD runId) {
 					printf("!!! THREAD: %x\n", dbgev.dwThreadId);
 					restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId]);
 
-					traceHandleInjection(cpdi, runId);
+					taintAddr = traceHandleInjection(cpdi, runId);
+					printf("!!! BREAKING ON %X\n", taintAddr);
+					setBreak(cpdi.hProcess, taintAddr);
+				}
+				else if ((UINT64)address == taintAddr) {
+					printf("::: AT TAINT %x\n", address);
+					printf("::: IN THREAD %x\n", dbgev.dwThreadId);
+					crashed = false;
+					restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId]);
+
 					traceInit(runId, cpdi.hProcess, dbgev.dwProcessId);
 
 					tail = trace(cpdi.hProcess, address, runId);
@@ -562,7 +574,7 @@ DWORD Tracer::addThread(DWORD dwThreadId, HANDLE hThread) {
 	return 0;
 }
 
-Tracer::Tracer(LPCTSTR traceName) {
+Tracer::Tracer() {
 	hHeap = GetProcessHeap();
 	hPipeInsn = INVALID_HANDLE_VALUE;
 	/*hTraceFile = CreateFile(traceName, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);

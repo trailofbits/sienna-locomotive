@@ -113,7 +113,9 @@ extern "C" __declspec(dllexport) BOOL WINAPI ReadFileHook(
 
 	taint(lpBuffer, nNumberOfBytesToRead);
 
-	*lpNumberOfBytesRead = nNumberOfBytesToRead;
+	if (lpNumberOfBytesRead != NULL) {
+		*lpNumberOfBytesRead = nNumberOfBytesToRead;
+	}
 
 	return true;
 }

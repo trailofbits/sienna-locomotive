@@ -393,7 +393,7 @@ int main()
 		CloseHandle(hPipe);
 	}
 	else {
-		Tracer tracer(L"trace.bin");
+		Tracer tracer;
 		tracer.addThread(pi.dwThreadId, pi.hThread);
 		tracer.TraceMainLoop(runId);
 	}

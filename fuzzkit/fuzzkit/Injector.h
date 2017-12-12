@@ -35,6 +35,7 @@ public:
 	std::set<std::string> MissingModules();
 	DWORD ResolveImports(std::map<std::string, LPVOID> loadedMap);
 	std::string DllName();
+	std::map<std::string, UINT64> hookAddrMap;
 
 private:
 	HANDLE hProcess;
