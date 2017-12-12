@@ -37,7 +37,9 @@ int main()
 
 	int *crashPtr = *(int **)buf;
 	printf("CRASH PTR: %p\n", crashPtr);
-	printf("*CRASH PTR: %x\n", *crashPtr);
+	if ((UINT64)crashPtr > 0x4947464544434241) {
+		printf("*CRASH PTR: %x\n", *crashPtr);
+	}
 	
 	CloseHandle(file);
     return 0;

@@ -100,8 +100,6 @@ BOOL debug_main_loop(DWORD runId) {
 			{
 				case EXCEPTION_ACCESS_VIOLATION:
 					LOG_F(INFO, "EXCEPTION_ACCESS_VIOLATION");
-					// TODO: log crash
-					exit(1);
 					break;
 				case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
 					LOG_F(INFO, "EXCEPTION_ARRAY_BOUNDS_EXCEEDED");
@@ -227,6 +225,7 @@ DWORD getRunInfo(HANDLE hPipe, DWORD runId, LPCTSTR *targetName, LPTSTR *targetA
 }
 
 DWORD getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs) {
+	LOG_F(INFO, "Requesting run id");
 	DWORD bytesRead = 0;
 	DWORD bytesWritten = 0;
 	
@@ -242,23 +241,37 @@ DWORD getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs) {
 	WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL);
 	WriteFile(hPipe, targetArgs, size, &bytesWritten, NULL);
 
+	LOG_F(INFO, "Run id %x", runId);
+
 	return runId;
 }
 
 HANDLE getPipe() {
-	HANDLE hPipe = CreateFile(
-		L"\\\\.\\pipe\\fuzz_server",
-		GENERIC_READ | GENERIC_WRITE,
-		0,
-		NULL,
-		OPEN_EXISTING,
-		0,
-		NULL);
+	HANDLE hPipe;
+	while (1) {
+		hPipe = CreateFile(
+			L"\\\\.\\pipe\\fuzz_server",
+			GENERIC_READ | GENERIC_WRITE,
+			0,
+			NULL,
+			OPEN_EXISTING,
+			0,
+			NULL);
 
-	if (hPipe == INVALID_HANDLE_VALUE) {
-		// TODO: fallback mutations?
-		LOG_F(ERROR, "Could not connect to server");
-		exit(1);
+		if (hPipe != INVALID_HANDLE_VALUE) {
+			// TODO: fallback mutations?
+			break;
+		}
+
+		DWORD err = GetLastError();
+		if (err != ERROR_PIPE_BUSY) {
+			LOG_F(ERROR, "Could not open pipe (%x)", err);
+			return hPipe;
+		}
+		
+		if (!WaitNamedPipe(L"\\\\.\\pipe\\fuzz_server", 5000)) {
+			LOG_F(ERROR, "Could not connect, timeout");
+		}
 	}
 
 	DWORD readMode = PIPE_READMODE_MESSAGE;
@@ -279,6 +292,9 @@ DWORD printUsage(LPWSTR *argv) {
 }
 
 DWORD finalize(HANDLE hPipe, DWORD runId, BOOL crashed) {
+	if (crashed) {
+		LOG_F(INFO, "Crash found for run id %x!", runId);
+	}
 	DWORD bytesWritten;
 	BYTE eventId = 4;
 	
@@ -291,6 +307,7 @@ DWORD finalize(HANDLE hPipe, DWORD runId, BOOL crashed) {
 
 int main(int mArgc, char **mArgv)
 {
+	loguru::g_stderr_verbosity = loguru::Verbosity_ERROR;
 	loguru::init(mArgc, mArgv);
 	loguru::add_file("log\\fuzzkit.log", loguru::Append, loguru::Verbosity_MAX);
 	LOG_F(INFO, "Fuzzkit started!");
@@ -307,8 +324,8 @@ int main(int mArgc, char **mArgv)
 		exit(1);
 	}
 
-	HANDLE hPipe = getPipe();
 	if (lstrcmp(argv[1], L"-r") == 0) {
+		HANDLE hPipe = getPipe();
 		replay = true;
 		if (argc > 2) {
 			runId = wcstoul(argv[2], NULL, NULL);
@@ -323,7 +340,8 @@ int main(int mArgc, char **mArgv)
 
 		// use high bit of runId to indicate replay in injectable
 		runId |= 1 << 31;
-	} 
+		CloseHandle(hPipe);
+	}
 	else {
 		targetName = argv[1];
 		targetArgs = argv[1];
@@ -331,55 +349,65 @@ int main(int mArgc, char **mArgv)
 		if (argc > 2) {
 			targetArgs = argv[2];
 		}
-
-		runId = getRunID(hPipe, targetName, targetArgs);
 	}
-	CloseHandle(hPipe);
 
 	LOG_F(INFO, "Target name: %S", targetName);
 	LOG_F(INFO, "Target args: %S", targetArgs);
 
-	STARTUPINFO si;
-	ZeroMemory(&si, sizeof(si));
-	si.cb = sizeof(si);
+	for(DWORD i=0; i<100; i++) {
+		if (!replay) {
+			HANDLE hPipe = getPipe();
+			if (hPipe == INVALID_HANDLE_VALUE) {
+				continue;
+			}
+			runId = getRunID(hPipe, targetName, targetArgs);
+			CloseHandle(hPipe);
+		}
 
-	PROCESS_INFORMATION pi;
-	ZeroMemory(&pi, sizeof(pi));
-	
-	BOOL success = CreateProcess(
-		targetName,
-		targetArgs,
-		NULL,
-		NULL,
-		FALSE,
-		DEBUG_PROCESS | CREATE_SUSPENDED,
-		NULL,
-		NULL,
-		&si,
-		&pi
-	);
+		STARTUPINFO si;
+		ZeroMemory(&si, sizeof(si));
+		si.cb = sizeof(si);
 
-	if (!success) {
-		LOG_F(ERROR, "Could not start process (%x)", GetLastError());
-		return 1;
+		PROCESS_INFORMATION pi;
+		ZeroMemory(&pi, sizeof(pi));
+
+		BOOL success = CreateProcess(
+			targetName,
+			targetArgs,
+			NULL,
+			NULL,
+			FALSE,
+			DEBUG_PROCESS | CREATE_SUSPENDED,
+			NULL,
+			NULL,
+			&si,
+			&pi
+		);
+
+		if (!success) {
+			LOG_F(ERROR, "Could not start process (%x)", GetLastError());
+			return 1;
+		}
+
+		ResumeThread(pi.hThread);
+
+		if (!replay) {
+			BOOL crashed = debug_main_loop(runId);
+			HANDLE hPipe = getPipe();
+			finalize(hPipe, runId, crashed);
+			CloseHandle(hPipe);
+		}
+		else {
+			Tracer tracer;
+			tracer.addThread(pi.dwThreadId, pi.hThread);
+			tracer.TraceMainLoop(runId);
+			break;
+		}
+
+		CloseHandle(pi.hProcess);
+		CloseHandle(pi.hThread);
+		LOG_F(INFO, "Iteration complete");
 	}
-
-	ResumeThread(pi.hThread);
-
-	if (!replay) {
-		BOOL crashed = debug_main_loop(runId);
-		hPipe = getPipe();
-		finalize(hPipe, runId, crashed);
-		CloseHandle(hPipe);
-	}
-	else {
-		Tracer tracer;
-		tracer.addThread(pi.dwThreadId, pi.hThread);
-		tracer.TraceMainLoop(runId);
-	}
-	
-	CloseHandle(pi.hProcess);
-	CloseHandle(pi.hThread);
     return 0;
 }
 
