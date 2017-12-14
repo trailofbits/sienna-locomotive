@@ -372,7 +372,7 @@ DWORD finalize(HANDLE hPipe, DWORD runId, BOOL crashed) {
 
 int main(int mArgc, char **mArgv)
 {
-	loguru::g_stderr_verbosity = loguru::Verbosity_ERROR;
+	loguru::g_stderr_verbosity = loguru::Verbosity_WARNING;
 	loguru::init(mArgc, mArgv);
 	loguru::add_file("log\\fuzzkit.log", loguru::Append, loguru::Verbosity_MAX);
 	LOG_F(INFO, "Fuzzkit started!");

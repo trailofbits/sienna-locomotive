@@ -57,24 +57,45 @@
 DWORD Tracer::singleStep(HANDLE hThread) {
 	CONTEXT context;
 	context.ContextFlags = CONTEXT_CONTROL;
-	SuspendThread(hThread);
-	GetThreadContext(hThread, &context);
+	if (SuspendThread(hThread) == -1) {
+		LOG_F(ERROR, "SingleStep (%x)", GetLastError());
+		exit(1);
+	}
+
+	if(!GetThreadContext(hThread, &context)) {
+		LOG_F(ERROR, "SingleStep (%x)", GetLastError());
+		exit(1);
+	}
+
 	context.EFlags = context.EFlags | (1 << 8);
 
 	if (!SetThreadContext(hThread, &context)) {
-		LOG_F(ERROR, "SetThreadContext (%x)", GetLastError());
-		return 1;
+		LOG_F(ERROR, "SingleStep (%x)", GetLastError());
+		exit(1);
 	}
 
-	ResumeThread(hThread);
+	if (ResumeThread(hThread) == -1) {
+		LOG_F(ERROR, "SingleStep (%x)", GetLastError());
+		exit(1);
+	}
+
 	return 0;
 }
 
 DWORD Tracer::setBreak(HANDLE hProcess, UINT64 address) {
 	BYTE breakByte = 0xCC;
 	BYTE startByte;
-	ReadProcessMemory(hProcess, (LPVOID)address, &startByte, sizeof(BYTE), NULL);
-	WriteProcessMemory(hProcess, (LPVOID)address, &breakByte, sizeof(BYTE), NULL);
+	
+	if(!ReadProcessMemory(hProcess, (LPVOID)address, &startByte, sizeof(BYTE), NULL)) {
+		LOG_F(ERROR, "SetBreak (%x)", GetLastError());
+		exit(1);
+	}
+
+	if(!WriteProcessMemory(hProcess, (LPVOID)address, &breakByte, sizeof(BYTE), NULL)) {
+		LOG_F(ERROR, "SetBreak (%x)", GetLastError());
+		exit(1);
+	}
+
 	if (restoreBytes.find((LPVOID)address) == restoreBytes.end()) {
 		restoreBytes[(LPVOID)address] = startByte;
 	}
@@ -84,7 +105,10 @@ DWORD Tracer::setBreak(HANDLE hProcess, UINT64 address) {
 BOOL Tracer::restoreBreak(HANDLE hProcess, HANDLE hThread) {
 	CONTEXT context;
 	context.ContextFlags = CONTEXT_ALL;
-	GetThreadContext(hThread, &context);
+	if (!GetThreadContext(hThread, &context)) {
+		LOG_F(ERROR, "RestoreBreak (%x)", GetLastError());
+		exit(1);
+	}
 	
 	context.Rip -= 1;
 
@@ -93,8 +117,15 @@ BOOL Tracer::restoreBreak(HANDLE hProcess, HANDLE hThread) {
 		return false;
 	}
 		
-	SetThreadContext(hThread, &context);
-	WriteProcessMemory(hProcess, (LPVOID)context.Rip, &restoreBytes[(LPVOID)context.Rip], sizeof(BYTE), NULL);
+	if(!SetThreadContext(hThread, &context)) {
+		LOG_F(ERROR, "RestoreBreak (%x)", GetLastError());
+		exit(1);
+	}
+
+	if(!WriteProcessMemory(hProcess, (LPVOID)context.Rip, &restoreBytes[(LPVOID)context.Rip], sizeof(BYTE), NULL)) {
+		LOG_F(ERROR, "RestoreBreak (%x)", GetLastError());
+		exit(1);
+	}
 	
 	return true;
 }
@@ -162,11 +193,10 @@ HANDLE Tracer::tracerGetPipe() {
 	}
 
 	DWORD readMode = PIPE_READMODE_MESSAGE;
-	SetNamedPipeHandleState(
-		hPipe,
-		&readMode,
-		NULL,
-		NULL);
+	if (!SetNamedPipeHandleState(hPipe, &readMode, NULL, NULL)) {
+		LOG_F(ERROR, "Could not connect to server");
+		exit(1);
+	}
 
 	return hPipe;
 }
@@ -177,27 +207,55 @@ DWORD Tracer::traceInit(DWORD runId, HANDLE hProc, DWORD procId) {
 	HANDLE hPipe = tracerGetPipe();
 	
 	BYTE eventId = 5;
-	WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL);
+	if(!WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL)) {
+		LOG_F(ERROR, "TraceInit (%x)", GetLastError());
+		exit(1);
+	}
 
-	WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL);
+	if(!WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL)) {
+		LOG_F(ERROR, "TraceInit (%x)", GetLastError());
+		exit(1);
+	}
 
 	DWORD size = 0;
-	ReadFile(hPipe, &size, sizeof(DWORD), &bytesRead, NULL);
+	if(!ReadFile(hPipe, &size, sizeof(DWORD), &bytesRead, NULL)) {
+		LOG_F(ERROR, "TraceInit (%x)", GetLastError());
+		exit(1);
+	}
 	
 	// get minidump path
 	HANDLE hHeap = GetProcessHeap();
 	WCHAR *minidumpPath = (WCHAR *)HeapAlloc(hHeap, NULL, size);
-	ReadFile(hPipe, minidumpPath, size, &bytesRead, NULL);
+	if(!ReadFile(hPipe, minidumpPath, size, &bytesRead, NULL)) {
+		LOG_F(ERROR, "TraceInit (%x)", GetLastError());
+		exit(1);
+	}
 
 	// open file
 	HANDLE minidumpFile = CreateFile(minidumpPath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
+	if (minidumpFile == INVALID_HANDLE_VALUE) {
+		LOG_F(ERROR, "TraceInit (%x)", GetLastError());
+		exit(1);
+	}
+
 	// write minidump
 	DWORD type = MiniDumpWithFullMemory | MiniDumpWithFullMemoryInfo;
-	MiniDumpWriteDump(hProc, procId, minidumpFile, (MINIDUMP_TYPE)type, NULL, NULL, NULL);
+	if(!MiniDumpWriteDump(hProc, procId, minidumpFile, (MINIDUMP_TYPE)type, NULL, NULL, NULL)) {
+		LOG_F(ERROR, "TraceInit (%x)", GetLastError());
+		exit(1);
+	}
 
-	HeapFree(hHeap, NULL, minidumpPath);
-	CloseHandle(hPipe);
+	if(!HeapFree(hHeap, NULL, minidumpPath)) {
+		LOG_F(ERROR, "TraceInit (%x)", GetLastError());
+		exit(1);
+	}
+
+	if(!CloseHandle(hPipe)) {
+		LOG_F(ERROR, "TraceInit (%x)", GetLastError());
+		exit(1);
+	}
+
 	return 0;
 }
 
@@ -220,17 +278,22 @@ HANDLE Tracer::tracerGetPipeInsn(DWORD runId) {
 		}
 
 		DWORD readMode = PIPE_READMODE_MESSAGE;
-		SetNamedPipeHandleState(
-			hPipeInsn,
-			&readMode,
-			NULL,
-			NULL);
+		if(!SetNamedPipeHandleState(hPipeInsn, &readMode, NULL, NULL)) {
+			LOG_F(ERROR, "TracerGetPipeInsn (%x)", GetLastError());
+			exit(1);
+		}
 
 		BYTE eventId = 6;
 		DWORD bytesWritten;
-		WriteFile(hPipeInsn, &eventId, sizeof(BYTE), &bytesWritten, NULL);
+		if(!WriteFile(hPipeInsn, &eventId, sizeof(BYTE), &bytesWritten, NULL)) {
+			LOG_F(ERROR, "TracerGetPipeInsn (%x)", GetLastError());
+			exit(1);
+		}
 
-		WriteFile(hPipeInsn, &runId, sizeof(DWORD), &bytesWritten, NULL);
+		if(!WriteFile(hPipeInsn, &runId, sizeof(DWORD), &bytesWritten, NULL)) {
+			LOG_F(ERROR, "TracerGetPipeInsn (%x)", GetLastError());
+			exit(1);
+		}
 	}
 
 	return hPipeInsn;
@@ -242,10 +305,16 @@ DWORD Tracer::traceInsn(DWORD runId, UINT64 addr, DWORD traceSize, BYTE *trace) 
 	HANDLE hPipe = tracerGetPipeInsn(runId);
 
 	// send head address to server
-	WriteFile(hPipe, &addr, sizeof(UINT64), &bytesWritten, NULL);
+	if(!WriteFile(hPipe, &addr, sizeof(UINT64), &bytesWritten, NULL)) {
+		LOG_F(ERROR, "TraceInsn (%x)", GetLastError());
+		exit(1);
+	}
 
 	// send trace size to server
-	WriteFile(hPipe, &traceSize, sizeof(DWORD), &bytesWritten, NULL);
+	if(!WriteFile(hPipe, &traceSize, sizeof(DWORD), &bytesWritten, NULL)) {
+		LOG_F(ERROR, "TraceInsn (%x)", GetLastError());
+		exit(1);
+	}
 
 	//printf("%x, %x, %x\t", runId, addr, traceSize);
 	//for (int i = 0; i < traceSize; i++) {
@@ -255,7 +324,10 @@ DWORD Tracer::traceInsn(DWORD runId, UINT64 addr, DWORD traceSize, BYTE *trace) 
 
 	// send trace to server
 	BYTE nullByte = 0;
-	TransactNamedPipe(hPipe, trace, traceSize, &nullByte, sizeof(BYTE), &bytesRead, NULL);
+	if(!TransactNamedPipe(hPipe, trace, traceSize, &nullByte, sizeof(BYTE), &bytesRead, NULL)) {
+		LOG_F(ERROR, "TraceInsn (%x)", GetLastError());
+		exit(1);
+	}
 
 	return 0;
 }
@@ -266,23 +338,46 @@ DWORD Tracer::traceCrash(DWORD runId, UINT64 exceptionAddr, DWORD exceptionCode)
 
 	HANDLE hInsnPipe = tracerGetPipeInsn(runId);
 	UINT64 zero = 0;
-	WriteFile(hInsnPipe, &zero, sizeof(UINT64), &bytesWritten, NULL);
-	WriteFile(hInsnPipe, &zero, sizeof(UINT64), &bytesWritten, NULL);
+	if(!WriteFile(hInsnPipe, &zero, sizeof(UINT64), &bytesWritten, NULL)) {
+		LOG_F(ERROR, "TraceInsn (%x)", GetLastError());
+		exit(1);
+	}
+
+	if(!WriteFile(hInsnPipe, &zero, sizeof(UINT64), &bytesWritten, NULL)) {
+		LOG_F(ERROR, "TraceInsn (%x)", GetLastError());
+		exit(1);
+	}
 
 	HANDLE hPipe = tracerGetPipe();
 
 	BYTE eventId = 8;
-	WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL);
+	if(!WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL)) {
+		LOG_F(ERROR, "TraceInsn (%x)", GetLastError());
+		exit(1);
+	}
 
-	WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL);
+	if(!WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL)) {
+		LOG_F(ERROR, "TraceInsn (%x)", GetLastError());
+		exit(1);
+	}
 
 	// send crash addr to server
-	WriteFile(hPipe, &exceptionAddr, sizeof(UINT64), &bytesWritten, NULL);
+	if(!WriteFile(hPipe, &exceptionAddr, sizeof(UINT64), &bytesWritten, NULL)) {
+		LOG_F(ERROR, "TraceInsn (%x)", GetLastError());
+		exit(1);
+	}
 
 	// send crash type to server
 	BYTE nullByte = 0;
-	TransactNamedPipe(hPipe, &exceptionCode, sizeof(DWORD), &nullByte, sizeof(BYTE), &bytesRead, NULL);
-	CloseHandle(hPipe);
+	if(!TransactNamedPipe(hPipe, &exceptionCode, sizeof(DWORD), &nullByte, sizeof(BYTE), &bytesRead, NULL)) {
+		LOG_F(ERROR, "TraceInsn (%x)", GetLastError());
+		exit(1);
+	}
+
+	if(!CloseHandle(hPipe)) {
+		LOG_F(ERROR, "TraceInsn (%x)", GetLastError());
+		exit(1);
+	}
 
 	return 0;
 }
@@ -310,6 +405,11 @@ UINT64 Tracer::trace(HANDLE hProcess, PVOID address, DWORD runId) {
 			xed_decoded_inst_zero(&xedd);
 			xed_decoded_inst_set_mode(&xedd, XED_MACHINE_MODE_LONG_64, XED_ADDRESS_WIDTH_64b);
 			xed_err = xed_decode(&xedd, insn.bytes, 15);
+
+			if (xed_err != XED_ERROR_NONE) {
+				LOG_F(ERROR, "Trace xed_err (%x)", xed_err);
+				exit(1);
+			}
 
 			insn.length = xedd._decoded_length;
 			insnList.push_back(insn);
