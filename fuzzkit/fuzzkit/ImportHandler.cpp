@@ -7,19 +7,23 @@ ImportHandler::ImportHandler(HANDLE hProcess, LPVOID lpvBaseOfImage) {
 	SIZE_T bytesRead;
 
 	if (this->lpvBaseOfImage != 0) {
-		ReadProcessMemory(hProcess, this->lpvBaseOfImage, &(this->dosHeader), sizeof(IMAGE_DOS_HEADER), &bytesRead);
+		if(!ReadProcessMemory(hProcess, this->lpvBaseOfImage, &(this->dosHeader), sizeof(IMAGE_DOS_HEADER), &bytesRead)) {
+			LOG_F(ERROR, "ImportHandler constructor (%x)", GetLastError());
+			exit(1);
+		}
 
 		LPVOID lpvScratch = (LPVOID)((uintptr_t)this->lpvBaseOfImage + this->dosHeader.e_lfanew + 4);
 		if (!ReadProcessMemory(hProcess, (PVOID)((uintptr_t)lpvScratch), &(this->machine), sizeof(WORD), &bytesRead) || bytesRead != sizeof(WORD)) {
-			LOG_F(ERROR, "ReadProcessMemory (machine) (%x) (%x)", GetLastError(), bytesRead);
+			LOG_F(ERROR, "ImportHandler constructor (%x)", GetLastError());
+			exit(1);
 		}
 
 		lpvScratch = (LPVOID)((uintptr_t)this->lpvBaseOfImage + this->dosHeader.e_lfanew);
 		if (this->machine == IMAGE_FILE_MACHINE_AMD64) {
 			IMAGE_NT_HEADERS64 ntHeaders = { 0 };
 			if (!ReadProcessMemory(hProcess, lpvScratch, &ntHeaders, sizeof(IMAGE_NT_HEADERS64), &bytesRead)) {
-				LOG_F(ERROR, "ReadProcessMemory (ntHeaders64) (%x)", GetLastError());
-				return;
+				LOG_F(ERROR, "ImportHandler constructor (%x)", GetLastError());
+				exit(1);
 			}
 
 			IMAGE_DATA_DIRECTORY importEntry = ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
@@ -28,8 +32,8 @@ ImportHandler::ImportHandler(HANDLE hProcess, LPVOID lpvBaseOfImage) {
 		else if (this->machine == IMAGE_FILE_MACHINE_I386) {
 			IMAGE_NT_HEADERS32 ntHeaders = { 0 };
 			if (!ReadProcessMemory(hProcess, lpvScratch, &ntHeaders, sizeof(IMAGE_NT_HEADERS32), &bytesRead)) {
-				LOG_F(ERROR, "ReadProcessMemory (ntHeaders32) (%x)", GetLastError());
-				return;
+				LOG_F(ERROR, "ImportHandler constructor (%x)", GetLastError());
+				exit(1);
 			}
 
 			IMAGE_DATA_DIRECTORY importEntry = ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
@@ -45,7 +49,12 @@ std::string ImportHandler::GetNextModule() {
 
 	SIZE_T bytesRead;
 	LPVOID lpvScratch = (PVOID)((uintptr_t)this->lpvBaseOfImage + this->importEntryVA + sizeof(IMAGE_IMPORT_DESCRIPTOR)*this->iidIndex);
-	ReadProcessMemory(this->hProcess, lpvScratch, &(this->iid), sizeof(IMAGE_IMPORT_DESCRIPTOR), &bytesRead);
+	
+	if(!ReadProcessMemory(this->hProcess, lpvScratch, &(this->iid), sizeof(IMAGE_IMPORT_DESCRIPTOR), &bytesRead)) {
+		LOG_F(ERROR, "GetNextModule (%x)", GetLastError());
+		exit(1);
+	}
+
 	this->iidIndex++;
 
 	if (this->iidIndex != 0 && this->iid.Characteristics == 0) {
@@ -58,7 +67,10 @@ std::string ImportHandler::GetNextModule() {
 
 	DWORD nameIndex = 0;
 	do {
-		ReadProcessMemory(this->hProcess, lpvScratch, pModName + nameIndex, sizeof(BYTE), &bytesRead);
+		if(!ReadProcessMemory(this->hProcess, lpvScratch, pModName + nameIndex, sizeof(BYTE), &bytesRead)) {
+			LOG_F(ERROR, "GetNextModule (%x)", GetLastError());
+			exit(1);
+		}
 		nameIndex++;
 		lpvScratch = (LPVOID)((uintptr_t)lpvScratch + 1);
 	} while (pModName[nameIndex - 1] != 0 && nameIndex < MAX_PATH);
@@ -83,7 +95,10 @@ std::string ImportHandler::GetNextFunction() {
 
 	if (this->machine == IMAGE_FILE_MACHINE_AMD64) {
 		lpvScratch = (LPVOID)((uintptr_t)this->lpvBaseOfImage + this->iid.OriginalFirstThunk + this->itdIndex * sizeof(IMAGE_THUNK_DATA64));
-		ReadProcessMemory(this->hProcess, lpvScratch, &(this->itdOrig), sizeof(IMAGE_THUNK_DATA64), &bytesRead);
+		if(!ReadProcessMemory(this->hProcess, lpvScratch, &(this->itdOrig), sizeof(IMAGE_THUNK_DATA64), &bytesRead)) {
+			LOG_F(ERROR, "GetNextFunction (%x)", GetLastError());
+			exit(1);
+		}
 
 		if (this->itdOrig.u1.AddressOfData == 0) {
 			return "";
@@ -101,7 +116,11 @@ std::string ImportHandler::GetNextFunction() {
 
 			DWORD nameIndex = 0;
 			do {
-				ReadProcessMemory(this->hProcess, lpvScratch, pFuncName + nameIndex, sizeof(BYTE), &bytesRead);
+				if(!ReadProcessMemory(this->hProcess, lpvScratch, pFuncName + nameIndex, sizeof(BYTE), &bytesRead)) {
+					LOG_F(ERROR, "GetNextFunction (%x)", GetLastError());
+					exit(1);
+				}
+
 				nameIndex++;
 				lpvScratch = (LPVOID)((uintptr_t)lpvScratch + 1);
 			} while (pFuncName[nameIndex - 1] != 0 && nameIndex < MAX_PATH);
@@ -112,7 +131,10 @@ std::string ImportHandler::GetNextFunction() {
 	}
 	else if (this->machine == IMAGE_FILE_MACHINE_I386) {
 		lpvScratch = (LPVOID)((uintptr_t)this->lpvBaseOfImage + this->iid.OriginalFirstThunk + this->itdIndex * sizeof(IMAGE_THUNK_DATA32));
-		ReadProcessMemory(this->hProcess, lpvScratch, &(this->itdOrig), sizeof(IMAGE_THUNK_DATA32), &bytesRead);
+		if(!ReadProcessMemory(this->hProcess, lpvScratch, &(this->itdOrig), sizeof(IMAGE_THUNK_DATA32), &bytesRead)) {
+			LOG_F(ERROR, "GetNextFunction (%x)", GetLastError());
+			exit(1);
+		}
 
 		if (this->itdOrig.u1.AddressOfData == 0) {
 			return "";
@@ -130,7 +152,10 @@ std::string ImportHandler::GetNextFunction() {
 
 			DWORD nameIndex = 0;
 			do {
-				ReadProcessMemory(this->hProcess, lpvScratch, pFuncName + nameIndex, sizeof(BYTE), &bytesRead);
+				if(!ReadProcessMemory(this->hProcess, lpvScratch, pFuncName + nameIndex, sizeof(BYTE), &bytesRead)) {
+					LOG_F(ERROR, "GetNextFunction (%x)", GetLastError());
+					exit(1);
+				}
 				nameIndex++;
 				lpvScratch = (LPVOID)((uintptr_t)lpvScratch + 1);
 			} while (pFuncName[nameIndex - 1] != 0 && nameIndex < MAX_PATH);
@@ -154,13 +179,23 @@ UINT64 ImportHandler::GetFunctionAddr() {
 	if (this->machine == IMAGE_FILE_MACHINE_AMD64) {
 		uint64_t iatFirstThunkAddr;
 		lpvScratch = (LPVOID)((uintptr_t)this->lpvBaseOfImage + this->iid.FirstThunk + (this->itdIndex - 1) * sizeof(uint64_t));
-		ReadProcessMemory(this->hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint64_t), &bytesRead);
+		
+		if(!ReadProcessMemory(this->hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint64_t), &bytesRead)) {
+			LOG_F(ERROR, "GetFunctionAddr (%x)", GetLastError());
+			exit(1);
+		}
+
 		return iatFirstThunkAddr;
 	}
 	else if (machine == IMAGE_FILE_MACHINE_I386) {
 		uint32_t iatFirstThunkAddr;
 		lpvScratch = (LPVOID)((uintptr_t)this->lpvBaseOfImage + this->iid.FirstThunk + (this->itdIndex - 1) * sizeof(uint32_t));
-		ReadProcessMemory(this->hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint32_t), &bytesRead);
+		
+		if(!ReadProcessMemory(this->hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint32_t), &bytesRead)) {
+			LOG_F(ERROR, "GetFunctionAddr (%x)", GetLastError());
+			exit(1);
+		}
+
 		return iatFirstThunkAddr;
 	}
 
@@ -174,32 +209,68 @@ BOOL ImportHandler::RewriteFunctionAddr(UINT64 addr) {
 	if (this->machine == IMAGE_FILE_MACHINE_AMD64) {
 		uint64_t iatFirstThunkAddr = addr;
 		lpvScratch = (LPVOID)((uintptr_t)this->lpvBaseOfImage + this->iid.FirstThunk + (this->itdIndex-1) * sizeof(uint64_t));
-		if (!WriteProcessMemory(this->hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint64_t), &bytesWritten)) {
-			MEMORY_BASIC_INFORMATION mbi;
-			VirtualQueryEx(this->hProcess, lpvScratch, &mbi, sizeof(MEMORY_BASIC_INFORMATION));
-			LOG_F(WARNING, "Could not hook function first try (%x) (%x)", bytesWritten, GetLastError());
-			
-			// TODO: do this intelligently
-			DWORD old;
-			VirtualProtectEx(this->hProcess, mbi.BaseAddress, mbi.RegionSize, PAGE_EXECUTE_READWRITE, &old);
 
-			if (!WriteProcessMemory(this->hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint64_t), &bytesWritten)) {
-				LOG_F(ERROR, "Could not hook function second try (%x) (%x)", bytesWritten, GetLastError());
-				return false;
-			}
-			
-			LOG_F(INFO, "Don't worry, second try was successful");
-			VirtualProtectEx(this->hProcess, mbi.BaseAddress, mbi.RegionSize, mbi.Protect, &old);
-			return true;
+		MEMORY_BASIC_INFORMATION mbi;
+		if (!VirtualQueryEx(this->hProcess, lpvScratch, &mbi, sizeof(MEMORY_BASIC_INFORMATION))) {
+			LOG_F(ERROR, "Could retrieve memory permissions (%x)", GetLastError());
+			exit(1);
 		}
+
+		DWORD old;
+		if (mbi.Protect == PAGE_EXECUTE_READ || mbi.Protect == PAGE_READONLY) {
+			if (!VirtualProtectEx(this->hProcess, mbi.BaseAddress, mbi.RegionSize, PAGE_EXECUTE_READWRITE, &old)) {
+				LOG_F(ERROR, "Could not change memory permissions (%x)", GetLastError());
+				exit(1);
+			}
+		}
+
+		if (!WriteProcessMemory(this->hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint64_t), &bytesWritten)) {
+			LOG_F(ERROR, "Could not hook function (%x) (%x)", GetLastError());
+			exit(1);
+		}
+
+		if (mbi.Protect == PAGE_EXECUTE_READ || mbi.Protect == PAGE_READONLY) {
+			if(!VirtualProtectEx(this->hProcess, mbi.BaseAddress, mbi.RegionSize, mbi.Protect, &old)) {
+				LOG_F(ERROR, "Could reset memory permissions (%x)", GetLastError());
+				exit(1);
+			}
+		}
+
 		return true;
 	}
 	else if (machine == IMAGE_FILE_MACHINE_I386) {
 		uint32_t iatFirstThunkAddr = (uint32_t)addr;
 		lpvScratch = (LPVOID)((uintptr_t)this->lpvBaseOfImage + this->iid.FirstThunk + (this->itdIndex-1) * sizeof(uint32_t));
-		WriteProcessMemory(this->hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint32_t), &bytesWritten);
+
+		MEMORY_BASIC_INFORMATION mbi;
+		if (!VirtualQueryEx(this->hProcess, lpvScratch, &mbi, sizeof(MEMORY_BASIC_INFORMATION))) {
+			LOG_F(ERROR, "Could retrieve memory permissions (%x)", GetLastError());
+			exit(1);
+		}
+
+		DWORD old;
+		if (mbi.Protect == PAGE_EXECUTE_READ || mbi.Protect == PAGE_READONLY) {
+			if (!VirtualProtectEx(this->hProcess, mbi.BaseAddress, mbi.RegionSize, PAGE_EXECUTE_READWRITE, &old)) {
+				LOG_F(ERROR, "Could not change memory permissions (%x)", GetLastError());
+				exit(1);
+			}
+		}
+
+		if (!WriteProcessMemory(this->hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint32_t), &bytesWritten)) {
+			LOG_F(ERROR, "Could not hook function (%x) (%x)", GetLastError());
+			exit(1);
+		}
+
+		if (mbi.Protect == PAGE_EXECUTE_READ || mbi.Protect == PAGE_READONLY) {
+			if (!VirtualProtectEx(this->hProcess, mbi.BaseAddress, mbi.RegionSize, mbi.Protect, &old)) {
+				LOG_F(ERROR, "Could reset memory permissions (%x)", GetLastError());
+				exit(1);
+			}
+		}
+
 		return true;
 	}
 
-	return false;
+	LOG_F(ERROR, "Invalid machine!");
+	exit(1);
 }

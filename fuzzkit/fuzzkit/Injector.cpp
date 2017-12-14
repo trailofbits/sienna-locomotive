@@ -1,7 +1,5 @@
 #include "Injector.h"
 
-#define IFNERR(call) if(!call) { LOG_F(ERROR, "%x", GetLastError()); exit(1); }
-
 LPVOID Injector::BaseOfInjected() {
 	return this->injectedBase;
 }
@@ -25,10 +23,13 @@ DWORD Injector::HandleRelocations(PIMAGE_NT_HEADERS pNtHeaders) {
 	while (consumed < relocDir.Size) {
 		SIZE_T bytesRead;
 		IMAGE_BASE_RELOCATION relocBase;
-		IFNERR(ReadProcessMemory(this->hProcess, relocVA, &relocBase, sizeof(IMAGE_BASE_RELOCATION), &bytesRead))
+		if (!ReadProcessMemory(this->hProcess, relocVA, &relocBase, sizeof(IMAGE_BASE_RELOCATION), &bytesRead)) {
+			LOG_F(ERROR, "HandleRelocations (%x)", GetLastError()); 
+			exit(1);
+		}
 
-			// calculate this->injectedBase + pageRVA
-			LPVOID pageBase = (LPVOID)((uintptr_t)this->injectedBase + relocBase.VirtualAddress);
+		// calculate this->injectedBase + pageRVA
+		LPVOID pageBase = (LPVOID)((uintptr_t)this->injectedBase + relocBase.VirtualAddress);
 
 		// consume relocBase
 		consumed += 8;
@@ -48,9 +49,12 @@ DWORD Injector::HandleRelocations(PIMAGE_NT_HEADERS pNtHeaders) {
 		for (DWORD i = 0; i < blockCount; i++) {
 			// get reloc type, offset
 			WORD relocationBlock;
-			IFNERR(ReadProcessMemory(this->hProcess, relocVA, &relocationBlock, sizeof(WORD), &bytesRead))
+			if(!ReadProcessMemory(this->hProcess, relocVA, &relocationBlock, sizeof(WORD), &bytesRead)) {
+				LOG_F(ERROR, "HandleRelocations (%x)", GetLastError());
+				exit(1);
+			}
 
-				WORD type = relocationBlock >> 12;
+			WORD type = relocationBlock >> 12;
 			WORD offset = relocationBlock & 0xFFF;
 
 			LPVOID targetVA = (LPVOID)((uintptr_t)pageBase + offset);
@@ -63,36 +67,64 @@ DWORD Injector::HandleRelocations(PIMAGE_NT_HEADERS pNtHeaders) {
 				// switch reloc type
 				switch (type) {
 				case IMAGE_REL_BASED_HIGH:
-					IFNERR(ReadProcessMemory(this->hProcess, targetVA, &target16, sizeof(WORD), &bytesRead))
+					if(!ReadProcessMemory(this->hProcess, targetVA, &target16, sizeof(WORD), &bytesRead)) {
+						LOG_F(ERROR, "HandleRelocations (%x)", GetLastError());
+						exit(1);
+					}
+
 					target16 -= imageBaseInt >> 16;
 					target16 += injectedBaseInt >> 16;
-					IFNERR(WriteProcessMemory(this->hProcess, targetVA, &target16, sizeof(WORD), &bytesWritten))
-						break;
+					if(!WriteProcessMemory(this->hProcess, targetVA, &target16, sizeof(WORD), &bytesWritten)) {
+						LOG_F(ERROR, "HandleRelocations (%x)", GetLastError());
+						exit(1);
+					}
+					break;
 				case IMAGE_REL_BASED_LOW:
-					IFNERR(ReadProcessMemory(this->hProcess, targetVA, &target16, sizeof(WORD), &bytesRead))
+					if(!ReadProcessMemory(this->hProcess, targetVA, &target16, sizeof(WORD), &bytesRead)) {
+						LOG_F(ERROR, "HandleRelocations (%x)", GetLastError());
+						exit(1);
+					}
 					target16 -= imageBaseInt & 0xFFFF;
 					target16 += injectedBaseInt & 0xFFFF;
-					IFNERR(WriteProcessMemory(this->hProcess, targetVA, &target16, sizeof(WORD), &bytesWritten))
-						break;
+					if(!WriteProcessMemory(this->hProcess, targetVA, &target16, sizeof(WORD), &bytesWritten)) {
+						LOG_F(ERROR, "HandleRelocations (%x)", GetLastError());
+						exit(1);
+					}
+					break;
 				case IMAGE_REL_BASED_HIGHLOW:
-					IFNERR(ReadProcessMemory(this->hProcess, targetVA, &target32, sizeof(DWORD), &bytesRead))
+					if(!ReadProcessMemory(this->hProcess, targetVA, &target32, sizeof(DWORD), &bytesRead)) {
+						LOG_F(ERROR, "HandleRelocations (%x)", GetLastError());
+						exit(1);
+					}
 					target32 -= imageBaseInt;
 					target32 += injectedBaseInt;
-					IFNERR(WriteProcessMemory(this->hProcess, targetVA, &target32, sizeof(DWORD), &bytesWritten))
-						break;
+					if(!WriteProcessMemory(this->hProcess, targetVA, &target32, sizeof(DWORD), &bytesWritten)) {
+						LOG_F(ERROR, "HandleRelocations (%x)", GetLastError());
+						exit(1);
+					}
+					break;
 				case IMAGE_REL_BASED_HIGHADJ:
 					// who the fuck designed this bullshit?
-					IFNERR(ReadProcessMemory(this->hProcess, targetVA, &target16, sizeof(WORD), &bytesRead))
+					if(!ReadProcessMemory(this->hProcess, targetVA, &target16, sizeof(WORD), &bytesRead)) {
+						LOG_F(ERROR, "HandleRelocations (%x)", GetLastError());
+						exit(1);
+					}
 					highAdj = target16 << 16;
 					highAdjVA = targetVA;
 					processHighAdj = true;
 					break;
 				case IMAGE_REL_BASED_DIR64:
-					IFNERR(ReadProcessMemory(this->hProcess, targetVA, &target64, sizeof(QWORD), &bytesRead))
+					if(!ReadProcessMemory(this->hProcess, targetVA, &target64, sizeof(QWORD), &bytesRead)) {
+						LOG_F(ERROR, "HandleRelocations (%x)", GetLastError());
+						exit(1);
+					}
 					target64 -= imageBaseInt;
 					target64 += injectedBaseInt;
-					IFNERR(WriteProcessMemory(this->hProcess, targetVA, &target64, sizeof(QWORD), &bytesWritten))
-						break;
+					if(!WriteProcessMemory(this->hProcess, targetVA, &target64, sizeof(QWORD), &bytesWritten)) {
+						LOG_F(ERROR, "HandleRelocations (%x)", GetLastError());
+						exit(1);
+					}
+					break;
 				default:
 					break;
 				}
@@ -103,9 +135,12 @@ DWORD Injector::HandleRelocations(PIMAGE_NT_HEADERS pNtHeaders) {
 				highAdj -= imageBaseInt & 0xFFFF0000;
 				highAdj += injectedBaseInt & 0xFFFF0000;
 				target16 = highAdj >> 16;
-				IFNERR(WriteProcessMemory(this->hProcess, highAdjVA, &target16, sizeof(WORD), &bytesWritten))
+				if(!WriteProcessMemory(this->hProcess, highAdjVA, &target16, sizeof(WORD), &bytesWritten)) {
+					LOG_F(ERROR, "HandleRelocations (%x)", GetLastError());
+					exit(1);
+				}
 
-					highAdj = 0;
+				highAdj = 0;
 				highAdjVA = 0;
 				processHighAdj = false;
 			}
@@ -129,24 +164,34 @@ DWORD Injector::HandleImports() {
 	DWORD cbNeeded;
 
 	// TODO: use EnumProcessModulesEx for 32 bit compatibility
-	IFNERR(EnumProcessModules(this->hProcess, hMods, sizeof(HMODULE) * 1024, &cbNeeded))
+	if(!EnumProcessModules(this->hProcess, hMods, sizeof(HMODULE) * 1024, &cbNeeded)) {
+		LOG_F(ERROR, "HandleImports (%x)", GetLastError());
+		exit(1);
+	}
 
-		DWORD modCount = cbNeeded / sizeof(HMODULE);
+	DWORD modCount = cbNeeded / sizeof(HMODULE);
 	if (modCount > 1024) {
 		modCount = 1024;
 	}
 
 	for (DWORD i = 0; i < modCount; i++) {
 		TCHAR nameW[MAX_PATH];
-		IFNERR(GetModuleBaseName(this->hProcess, hMods[i], nameW, MAX_PATH))
+		if(!GetModuleBaseName(this->hProcess, hMods[i], nameW, MAX_PATH)) {
+			LOG_F(ERROR, "HandleImports (%x)", GetLastError());
+			exit(1);
+		}
 
-			CHAR nameC[MAX_PATH];
+		CHAR nameC[MAX_PATH];
 		SIZE_T ret;
 		wcstombs_s(&ret, nameC, MAX_PATH, nameW, MAX_PATH);
 
 		MODULEINFO modinfo;
-		IFNERR(GetModuleInformation(this->hProcess, hMods[i], &modinfo, sizeof(modinfo)))
-			std::string name(nameC);
+		if(!GetModuleInformation(this->hProcess, hMods[i], &modinfo, sizeof(modinfo))) {
+			LOG_F(ERROR, "HandleImports (%x)", GetLastError());
+			exit(1);
+		}
+
+		std::string name(nameC);
 		std::transform(name.begin(), name.end(), name.begin(), ::tolower);
 		bases[name] = modinfo.lpBaseOfDll;
 	}
@@ -194,16 +239,19 @@ DWORD Injector::HandleImports() {
 
 			if (itHints != hints.end()) {
 				// get base from hint
-				LOG_F(WARNING, "Using hint %x for %s", itHints->second, itHints->first.c_str());
+				LOG_F(INFO, "Using hint %x for %s", itHints->second, itHints->first.c_str());
 				UINT64 hintPage = (UINT64)itHints->second & 0xFFFFFFFFFFFFF000;
 				BYTE magic[2];
 
 				for (int i = 0; i < 20; i++) {
-					IFNERR(ReadProcessMemory(this->hProcess, (LPVOID)hintPage, magic, sizeof(BYTE) * 2, &bytesRead))
+					if(!ReadProcessMemory(this->hProcess, (LPVOID)hintPage, magic, sizeof(BYTE) * 2, &bytesRead)) {
+						LOG_F(ERROR, "HandleImports (%x)", GetLastError());
+						exit(1);
+					}
 
-						if (bytesRead == 0) {
-							break;
-						}
+					if (bytesRead == 0) {
+						break;
+					}
 
 					if (magic[0] == 0x4D && magic[1] == 0x5A) {
 						bases[moduleName] = (LPVOID)hintPage;
@@ -393,6 +441,11 @@ DWORD Injector::Inject() {
 
 	// allocate mem in target process
 	this->injectedBase = VirtualAllocEx(this->hProcess, NULL, pNtHeaders->OptionalHeader.SizeOfImage, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+	
+	if(this->injectedBase == NULL) {
+		LOG_F(ERROR, "Inject (%x)", GetLastError());
+		exit(1);
+	}
 
 	// get dos and section headers
 	PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)buf;
@@ -400,7 +453,10 @@ DWORD Injector::Inject() {
 
 	// write headers
 	SIZE_T bytesWritten;
-	IFNERR(WriteProcessMemory(this->hProcess, this->injectedBase, buf, pSectionHeader->PointerToRawData, &bytesWritten))
+	if(!WriteProcessMemory(this->hProcess, this->injectedBase, buf, pSectionHeader->PointerToRawData, &bytesWritten)) {
+		LOG_F(ERROR, "Inject (%x)", GetLastError());
+		exit(1);
+	}
 
 		// loop write sections
 		WORD sectionCount = pNtHeaders->FileHeader.NumberOfSections;
@@ -408,7 +464,10 @@ DWORD Injector::Inject() {
 		pSectionHeader = (PIMAGE_SECTION_HEADER)(buf + pDosHeader->e_lfanew + sizeof(IMAGE_NT_HEADERS) + sizeof(IMAGE_SECTION_HEADER) * i);
 
 		LPVOID remoteVA = (LPVOID)((uintptr_t)this->injectedBase + pSectionHeader->VirtualAddress);
-		IFNERR(WriteProcessMemory(this->hProcess, remoteVA, buf + pSectionHeader->PointerToRawData, pSectionHeader->SizeOfRawData, &bytesWritten))
+		if(!WriteProcessMemory(this->hProcess, remoteVA, buf + pSectionHeader->PointerToRawData, pSectionHeader->SizeOfRawData, &bytesWritten)) {
+			LOG_F(ERROR, "Inject (%x)", GetLastError());
+			exit(1);
+		}
 	}
 
 	HandleRelocations(pNtHeaders);
