@@ -164,9 +164,11 @@ BOOL debug_main_loop(DWORD runId) {
 				default:
 					break;
 			}
+
 			if (crashed) {
 				return crashed;
 			}
+
 			break;
 		case CREATE_THREAD_DEBUG_EVENT:
 			LOG_F(INFO, "Thread started with id %x", dbgev.dwThreadId);
@@ -195,7 +197,8 @@ BOOL debug_main_loop(DWORD runId) {
 			break;
 		}
 
-		ContinueDebugEvent(dbgev.dwProcessId,
+		ContinueDebugEvent(
+			dbgev.dwProcessId,
 			dbgev.dwThreadId,
 			dwContinueStatus);
 	}
@@ -208,18 +211,51 @@ DWORD getRunInfo(HANDLE hPipe, DWORD runId, LPCTSTR *targetName, LPTSTR *targetA
 	HANDLE hHeap = GetProcessHeap();
 
 	BYTE eventId = 3;
-	WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL);
-	WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL);
+	if (!WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL)) {
+		LOG_F(ERROR, "Error getting run info (%x)", GetLastError());
+		exit(1);
+	}
+
+	if(!WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL)) {
+		LOG_F(ERROR, "Error getting run info (%x)", GetLastError());
+		exit(1);
+	}
 	
 	DWORD size = 0;
-	ReadFile(hPipe, &size, sizeof(DWORD), &bytesRead, NULL);
+	
+	if(!ReadFile(hPipe, &size, sizeof(DWORD), &bytesRead, NULL)) {
+		LOG_F(ERROR, "Error getting run info (%x)", GetLastError());
+		exit(1);
+	}
+	
 	*targetName = (LPCTSTR)HeapAlloc(hHeap, HEAP_ZERO_MEMORY, size + sizeof(TCHAR));
-	ReadFile(hPipe, (LPVOID)*targetName, size, &bytesRead, NULL);
+	if(*targetName == NULL) {
+		LOG_F(ERROR, "Error getting run info (%x)", GetLastError());
+		exit(1);
+	}
+	
+	if(!ReadFile(hPipe, (LPVOID)*targetName, size, &bytesRead, NULL)) {
+		LOG_F(ERROR, "Error getting run info (%x)", GetLastError());
+		exit(1);
+	}
 
 	size = 0;
-	ReadFile(hPipe, &size, sizeof(DWORD), &bytesRead, NULL);
+	if(!ReadFile(hPipe, &size, sizeof(DWORD), &bytesRead, NULL)) {
+		LOG_F(ERROR, "Error getting run info (%x)", GetLastError());
+		exit(1);
+	}
+
 	*targetArgs = (LPTSTR)HeapAlloc(hHeap, HEAP_ZERO_MEMORY, size + sizeof(TCHAR));
-	ReadFile(hPipe, (LPVOID)*targetArgs, size, &bytesRead, NULL);
+
+	if (*targetArgs == NULL) {
+		LOG_F(ERROR, "Error getting run info (%x)", GetLastError());
+		exit(1);
+	}
+	
+	if(!ReadFile(hPipe, (LPVOID)*targetArgs, size, &bytesRead, NULL)) {
+		LOG_F(ERROR, "Error getting run info (%x)", GetLastError());
+		exit(1);
+	}
 
 	return runId;
 }
@@ -228,18 +264,35 @@ DWORD getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs) {
 	LOG_F(INFO, "Requesting run id");
 	DWORD bytesRead = 0;
 	DWORD bytesWritten = 0;
-	
+
 	BYTE eventId = 0;
 	DWORD runId = 0;
-	TransactNamedPipe(hPipe, &eventId, sizeof(BYTE), &runId, sizeof(DWORD), &bytesRead, NULL);
-	
+	if (!TransactNamedPipe(hPipe, &eventId, sizeof(BYTE), &runId, sizeof(DWORD), &bytesRead, NULL)) {
+		LOG_F(ERROR, "Error getting run id (%x)", GetLastError());
+		exit(1);
+	}
+
 	DWORD size = lstrlen(targetName) * sizeof(TCHAR);
-	WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL);
-	WriteFile(hPipe, targetName, size, &bytesWritten, NULL);
-	
+	if (!WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL)) {
+		LOG_F(ERROR, "Error getting run id (%x)", GetLastError());
+		exit(1);
+	}
+
+	if (!WriteFile(hPipe, targetName, size, &bytesWritten, NULL)) {
+		LOG_F(ERROR, "Error getting run id (%x)", GetLastError());
+		exit(1);
+	}
+
 	size = lstrlen(targetArgs) * sizeof(TCHAR);
-	WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL);
-	WriteFile(hPipe, targetArgs, size, &bytesWritten, NULL);
+	if (!WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL)) {
+		LOG_F(ERROR, "Error getting run id (%x)", GetLastError());
+		exit(1);
+	}
+
+	if(!WriteFile(hPipe, targetArgs, size, &bytesWritten, NULL)) {
+		LOG_F(ERROR, "Error getting run id (%x)", GetLastError());
+		exit(1);
+	}
 
 	LOG_F(INFO, "Run id %x", runId);
 
@@ -259,7 +312,6 @@ HANDLE getPipe() {
 			NULL);
 
 		if (hPipe != INVALID_HANDLE_VALUE) {
-			// TODO: fallback mutations?
 			break;
 		}
 
@@ -271,6 +323,8 @@ HANDLE getPipe() {
 		
 		if (!WaitNamedPipe(L"\\\\.\\pipe\\fuzz_server", 5000)) {
 			LOG_F(ERROR, "Could not connect, timeout");
+			// TODO: fallback mutations?
+			exit(1);
 		}
 	}
 
@@ -298,9 +352,20 @@ DWORD finalize(HANDLE hPipe, DWORD runId, BOOL crashed) {
 	DWORD bytesWritten;
 	BYTE eventId = 4;
 	
-	WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL);
-	WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL);
-	WriteFile(hPipe, &crashed, sizeof(BOOL), &bytesWritten, NULL);
+	if(!WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL)) {
+		LOG_F(ERROR, "Error finalizing (%x)", GetLastError());
+		exit(1);
+	}
+
+	if(!WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL)) {
+		LOG_F(ERROR, "Error finalizing (%x)", GetLastError());
+		exit(1);
+	}
+
+	if(!WriteFile(hPipe, &crashed, sizeof(BOOL), &bytesWritten, NULL)) {
+		LOG_F(ERROR, "Error finalizing (%x)", GetLastError());
+		exit(1);
+	}
 
 	return 0;
 }
