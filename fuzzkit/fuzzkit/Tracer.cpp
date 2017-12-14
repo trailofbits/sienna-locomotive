@@ -337,45 +337,49 @@ DWORD Tracer::traceCrash(DWORD runId, UINT64 exceptionAddr, DWORD exceptionCode)
 	DWORD bytesWritten;
 
 	HANDLE hInsnPipe = tracerGetPipeInsn(runId);
-	UINT64 zero = 0;
-	if(!WriteFile(hInsnPipe, &zero, sizeof(UINT64), &bytesWritten, NULL)) {
-		LOG_F(ERROR, "TraceInsn (%x)", GetLastError());
+	UINT64 u64Zero = 0;
+	if(!WriteFile(hInsnPipe, &u64Zero, sizeof(UINT64), &bytesWritten, NULL)) {
+		LOG_F(ERROR, "TraceCrash (%x)", GetLastError());
 		exit(1);
 	}
 
-	if(!WriteFile(hInsnPipe, &zero, sizeof(UINT64), &bytesWritten, NULL)) {
-		LOG_F(ERROR, "TraceInsn (%x)", GetLastError());
+	DWORD dwZero = 0;
+	if(!WriteFile(hInsnPipe, &dwZero, sizeof(DWORD), &bytesWritten, NULL)) {
+		LOG_F(ERROR, "TraceCrash (%x)", GetLastError());
 		exit(1);
 	}
+
+	LOG_F(INFO, "Insn trace pipe closed");
+	hPipeInsn = INVALID_HANDLE_VALUE;
 
 	HANDLE hPipe = tracerGetPipe();
 
 	BYTE eventId = 8;
 	if(!WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL)) {
-		LOG_F(ERROR, "TraceInsn (%x)", GetLastError());
+		LOG_F(ERROR, "TraceCrash (%x)", GetLastError());
 		exit(1);
 	}
 
 	if(!WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL)) {
-		LOG_F(ERROR, "TraceInsn (%x)", GetLastError());
+		LOG_F(ERROR, "TraceCrash (%x)", GetLastError());
 		exit(1);
 	}
 
 	// send crash addr to server
 	if(!WriteFile(hPipe, &exceptionAddr, sizeof(UINT64), &bytesWritten, NULL)) {
-		LOG_F(ERROR, "TraceInsn (%x)", GetLastError());
+		LOG_F(ERROR, "TraceCrash (%x)", GetLastError());
 		exit(1);
 	}
 
 	// send crash type to server
 	BYTE nullByte = 0;
 	if(!TransactNamedPipe(hPipe, &exceptionCode, sizeof(DWORD), &nullByte, sizeof(BYTE), &bytesRead, NULL)) {
-		LOG_F(ERROR, "TraceInsn (%x)", GetLastError());
+		LOG_F(ERROR, "TraceCrash (%x)", GetLastError());
 		exit(1);
 	}
 
 	if(!CloseHandle(hPipe)) {
-		LOG_F(ERROR, "TraceInsn (%x)", GetLastError());
+		LOG_F(ERROR, "TraceCrash (%x)", GetLastError());
 		exit(1);
 	}
 

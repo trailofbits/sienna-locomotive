@@ -9,9 +9,8 @@ BOOL Crash::xed_at(xed_decoded_inst_t *xedd) {
 
 	xed_decoded_inst_zero_set_mode(xedd, &dstate);
 
-	xed_error_enum_t xed_code = xed_decode(xedd, insnBytes, insnLength);
-	BOOL xed_ok = (xed_code == XED_ERROR_NONE);
-	if (xed_ok) {
+	xed_error_enum_t xed_err = xed_decode(xedd, insnBytes, insnLength);
+	if (xed_err == XED_ERROR_NONE) {
 		char buf[2048];
 
 		// set the runtime adddress for disassembly 
