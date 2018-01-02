@@ -340,7 +340,7 @@ HANDLE getPipe() {
 
 DWORD printUsage(LPWSTR *argv) {
 	LOG_F(INFO, "USAGE:");
-	LOG_F(INFO, "\trun: \t%S TARGET_PROGRAM.EXE \"[TARGET_PROGRAM.EXE ARGUMENTS]\"\n", argv[0]);
+	LOG_F(INFO, "\trun: \t%S TARGET_PROGRAM.EXE [ARGUMENTS, ...]\n", argv[0]);
 	LOG_F(INFO, "\treplay: \t%S [-r ID]\n", argv[0]);
 	return 0;
 }
@@ -381,6 +381,7 @@ int main(int mArgc, char **mArgv)
 	DWORD runId = 0;
 	LPCTSTR targetName;
 	LPTSTR targetArgs;
+	HANDLE hHeap = GetProcessHeap();
 
 	int argc;
 	LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
@@ -412,7 +413,22 @@ int main(int mArgc, char **mArgv)
 		targetArgs = argv[1];
 
 		if (argc > 2) {
-			targetArgs = argv[2];
+			DWORD size = 0;
+			for (DWORD i = 1; i < argc; i++) {
+				size += lstrlenW(argv[i]);
+				size += 1; // space or null
+			}
+			printf("SIZE: %x\n", size);
+			targetArgs = (LPTSTR)HeapAlloc(hHeap, NULL, size * sizeof(TCHAR));
+			
+			DWORD pos = 0;
+			for (DWORD i = 1; i < argc; i++) {
+				DWORD length = lstrlenW(argv[i]);
+				lstrcpynW(targetArgs + pos, argv[i], length+1);
+				*(targetArgs + pos + length) = 0x20;
+				pos += length + 1;
+			}
+			*(targetArgs + size) = 0;
 		}
 	}
 
