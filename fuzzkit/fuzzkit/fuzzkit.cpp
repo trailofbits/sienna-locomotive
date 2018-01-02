@@ -48,7 +48,7 @@ DWORD handleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId) {
 		std::string path = "C:\\Windows\\System32\\" + missing;
 		
 		// inject
-		LOG_F(INFO, "Injecting dependency: %s", missing.c_str());
+		LOG_F(1, "Injecting dependency: %s", missing.c_str());
 		injector = new Injector(cpdi.hProcess, cpdi.lpBaseOfImage, path, emptyMap);
 		injector->Inject();
 
@@ -83,6 +83,7 @@ DWORD handleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId) {
 BOOL debug_main_loop(DWORD runId) {
 	DWORD dwContinueStatus = DBG_CONTINUE;
 	CREATE_PROCESS_DEBUG_INFO cpdi;
+	BOOL injected = false;
 
 	for (;;)
 	{
@@ -106,9 +107,12 @@ BOOL debug_main_loop(DWORD runId) {
 					break;
 				case EXCEPTION_BREAKPOINT:
 					LOG_F(INFO, "EXCEPTION_BREAKPOINT");
-					LOG_F(INFO, "Injecting hook dll into process");
-					handleInjection(cpdi, runId);
-					crashed = false;
+					if (!injected) {
+						LOG_F(1, "Injecting hook dll into process");
+						handleInjection(cpdi, runId);
+						crashed = false;
+						injected = true;
+					}
 					break;
 				case EXCEPTION_DATATYPE_MISALIGNMENT:
 					LOG_F(INFO, "EXCEPTION_DATATYPE_MISALIGNMENT");
@@ -171,7 +175,7 @@ BOOL debug_main_loop(DWORD runId) {
 
 			break;
 		case CREATE_THREAD_DEBUG_EVENT:
-			LOG_F(INFO, "Thread started with id %x", dbgev.dwThreadId);
+			LOG_F(1, "Thread started with id %x", dbgev.dwThreadId);
 			break;
 		case CREATE_PROCESS_DEBUG_EVENT:
 			LOG_F(INFO, "Process started with id %x", dbgev.dwProcessId);
@@ -179,7 +183,7 @@ BOOL debug_main_loop(DWORD runId) {
 			DebugBreakProcess(cpdi.hProcess);
 			break;
 		case EXIT_THREAD_DEBUG_EVENT:
-			LOG_F(INFO, "Thread exited with id %x", dbgev.dwThreadId);
+			LOG_F(1, "Thread exited with id %x", dbgev.dwThreadId);
 			break;
 		case EXIT_PROCESS_DEBUG_EVENT:
 			EXIT_PROCESS_DEBUG_INFO epdi = dbgev.u.ExitProcess;
@@ -347,7 +351,7 @@ DWORD printUsage(LPWSTR *argv) {
 
 DWORD finalize(HANDLE hPipe, DWORD runId, BOOL crashed) {
 	if (crashed) {
-		LOG_F(INFO, "Crash found for run id %x!", runId);
+		LOG_F(INFO, "Crash found for run id %d!", runId);
 	}
 	DWORD bytesWritten;
 	BYTE eventId = 4;
@@ -435,7 +439,7 @@ int main(int mArgc, char **mArgv)
 	LOG_F(INFO, "Target name: %S", targetName);
 	LOG_F(INFO, "Target args: %S", targetArgs);
 
-	for(DWORD i=0; i<100; i++) {
+	for(DWORD i=0; i<1; i++) {
 		if (!replay) {
 			HANDLE hPipe = getPipe();
 			if (hPipe == INVALID_HANDLE_VALUE) {
@@ -487,7 +491,7 @@ int main(int mArgc, char **mArgv)
 
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
-		LOG_F(INFO, "Iteration complete");
+		LOG_F(1, "Iteration complete");
 	}
     return 0;
 }

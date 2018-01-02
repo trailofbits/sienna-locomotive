@@ -12,6 +12,7 @@ public:
 	IMAGE_DOS_HEADER dosHeader;
 	WORD machine;
 	uintptr_t importEntryVA;
+	DWORD importEntrySize;
 	IMAGE_IMPORT_DESCRIPTOR iid;
 	DWORD iidIndex = 0;
 

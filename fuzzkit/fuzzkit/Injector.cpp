@@ -264,7 +264,7 @@ DWORD Injector::HandleImports() {
 			}
 
 			if (!found) {
-				LOG_F(WARNING, "Address not found for %s", moduleName.c_str());
+				LOG_F(INFO, "Address not found for %s", moduleName.c_str());
 				missingModules.insert(moduleName);
 				continue;
 			}

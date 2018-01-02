@@ -28,6 +28,7 @@ ImportHandler::ImportHandler(HANDLE hProcess, LPVOID lpvBaseOfImage) {
 
 			IMAGE_DATA_DIRECTORY importEntry = ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
 			this->importEntryVA = importEntry.VirtualAddress;
+			this->importEntrySize = importEntry.Size;
 		}
 		else if (this->machine == IMAGE_FILE_MACHINE_I386) {
 			IMAGE_NT_HEADERS32 ntHeaders = { 0 };
@@ -38,25 +39,25 @@ ImportHandler::ImportHandler(HANDLE hProcess, LPVOID lpvBaseOfImage) {
 
 			IMAGE_DATA_DIRECTORY importEntry = ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
 			this->importEntryVA = importEntry.VirtualAddress;
+			this->importEntrySize = importEntry.Size;
 		}
 	}
 }
 
 std::string ImportHandler::GetNextModule() {
-	if (this->iidIndex != 0 && this->iid.Characteristics == 0) {
+	if (this->iidIndex != 0 && this->iid.Characteristics == 0 || this->importEntrySize == 0) {
 		return "";
 	}
 
 	SIZE_T bytesRead;
 	LPVOID lpvScratch = (PVOID)((uintptr_t)this->lpvBaseOfImage + this->importEntryVA + sizeof(IMAGE_IMPORT_DESCRIPTOR)*this->iidIndex);
-	
+
 	if(!ReadProcessMemory(this->hProcess, lpvScratch, &(this->iid), sizeof(IMAGE_IMPORT_DESCRIPTOR), &bytesRead)) {
 		LOG_F(ERROR, "GetNextModule (%x)", GetLastError());
 		exit(1);
 	}
 
 	this->iidIndex++;
-
 	if (this->iidIndex != 0 && this->iid.Characteristics == 0) {
 		return "";
 	}
@@ -74,7 +75,6 @@ std::string ImportHandler::GetNextModule() {
 		nameIndex++;
 		lpvScratch = (LPVOID)((uintptr_t)lpvScratch + 1);
 	} while (pModName[nameIndex - 1] != 0 && nameIndex < MAX_PATH);
-
 
 	this->itdIndex = 0;
 	return (CHAR *)pModName;
