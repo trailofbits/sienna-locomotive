@@ -8,7 +8,17 @@ extern "C" __declspec(dllexport) DWORD runId;
 __declspec(dllexport) DWORD runId;
 DWORD mutateCount = 0;
 
-VOID mutate(LPVOID buf, DWORD size) {
+BOOL mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
+	TCHAR filePath[MAX_PATH+1];
+
+	DWORD pathSize = GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, 0);
+
+	if (pathSize > MAX_PATH || pathSize == 0) {
+		return false;
+	}
+
+	filePath[pathSize] = 0;
+
 	HANDLE hPipe = CreateFile(
 		L"\\\\.\\pipe\\fuzz_server",
 		GENERIC_READ | GENERIC_WRITE,
@@ -19,8 +29,7 @@ VOID mutate(LPVOID buf, DWORD size) {
 		NULL);
 
 	if (hPipe == INVALID_HANDLE_VALUE) {
-		// TODO: fallback mutations?
-		return;
+		return false;
 	}
 
 	DWORD readMode = PIPE_READMODE_MESSAGE;
@@ -42,6 +51,11 @@ VOID mutate(LPVOID buf, DWORD size) {
 		WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL);
 		WriteFile(hPipe, &maskedRunId, sizeof(DWORD), &bytesWritten, NULL);
 		WriteFile(hPipe, &mutateCount, sizeof(DWORD), &bytesWritten, NULL);
+
+		WriteFile(hPipe, &pathSize, sizeof(DWORD), &bytesWritten, NULL);
+		WriteFile(hPipe, &filePath, pathSize * sizeof(TCHAR), &bytesWritten, NULL);
+
+		WriteFile(hPipe, &position, sizeof(DWORD64), &bytesWritten, NULL);
 		WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL);
 		TransactNamedPipe(hPipe, buf, size, buf, size, &bytesRead, NULL);
 	}
@@ -55,6 +69,8 @@ VOID mutate(LPVOID buf, DWORD size) {
 	}
 	CloseHandle(hPipe);
 	mutateCount++;
+
+	return true;
 }
 
 VOID taint(LPVOID buf, DWORD size) {
@@ -107,9 +123,16 @@ extern "C" __declspec(dllexport) BOOL WINAPI ReadFileHook(
 	LPDWORD      lpNumberOfBytesRead,
 	LPOVERLAPPED lpOverlapped) 
 {
+	LONG positionHigh = 0;
+	DWORD positionLow = SetFilePointer(hFile, 0, &positionHigh, FILE_CURRENT);
+	DWORD64 position = positionHigh;
+	position = (position << 32) | positionLow;
+
 	ReadFile(hFile, lpBuffer, nNumberOfBytesToRead, lpNumberOfBytesRead, lpOverlapped);
-	
-	mutate(lpBuffer, nNumberOfBytesToRead);
+
+	if (!mutate(hFile, position, lpBuffer, nNumberOfBytesToRead)) {
+		// TODO: fallback mutations?
+	}
 
 	taint(lpBuffer, nNumberOfBytesToRead);
 
