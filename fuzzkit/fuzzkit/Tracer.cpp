@@ -204,8 +204,9 @@ HANDLE Tracer::tracerGetPipe() {
 DWORD Tracer::traceInit(DWORD runId, HANDLE hProc, DWORD procId) {
 	DWORD bytesRead;
 	DWORD bytesWritten;
+
 	HANDLE hPipe = tracerGetPipe();
-	
+
 	BYTE eventId = 5;
 	if(!WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL)) {
 		LOG_F(ERROR, "TraceInit (%x)", GetLastError());
@@ -515,6 +516,9 @@ DWORD Tracer::TraceMainLoop(DWORD runId, DWORD flags) {
 	xed_tables_init();
 	UINT64 taintAddr = 0;
 
+	BOOL flagReplay = flags & 1;
+	BOOL flagTrace = flags >> 1 & 1;
+
 	for (;;)
 	{
 		DEBUG_EVENT dbgev;
@@ -545,8 +549,15 @@ DWORD Tracer::TraceMainLoop(DWORD runId, DWORD flags) {
 						restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId]);
 
 						taintAddr = traceHandleInjection(cpdi, runId, flags);
-						LOG_F(INFO, "Setting taint break on %llx", taintAddr);
-						setBreak(cpdi.hProcess, taintAddr);
+
+						if (flagTrace && !flagReplay) {
+							traceInit(runId, cpdi.hProcess, dbgev.dwProcessId);
+							singleStep(threadMap[dbgev.dwThreadId]);
+						}
+						else {
+							LOG_F(INFO, "Setting taint break on %llx", taintAddr);
+							setBreak(cpdi.hProcess, taintAddr);
+						}
 					}
 					else if ((UINT64)address == taintAddr) {
 						LOG_F(INFO, "Taint break point %llx", address);
@@ -554,7 +565,9 @@ DWORD Tracer::TraceMainLoop(DWORD runId, DWORD flags) {
 						restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId]);
 						LOG_F(INFO, "Beginning trace");
 
-						traceInit(runId, cpdi.hProcess, dbgev.dwProcessId);
+						if (flagTrace && flagReplay) {
+							traceInit(runId, cpdi.hProcess, dbgev.dwProcessId);
+						}
 
 						tail = trace(cpdi.hProcess, address, runId);
 						if (tail == (UINT64)address) {

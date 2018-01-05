@@ -485,6 +485,7 @@ int main(int mArgc, char **mArgv)
 			CloseHandle(hPipe);
 		}
 
+		printf("RUN ID: %d\n", runId);
 		STARTUPINFO si;
 		ZeroMemory(&si, sizeof(si));
 		si.cb = sizeof(si);
