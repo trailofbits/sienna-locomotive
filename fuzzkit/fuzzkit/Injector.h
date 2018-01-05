@@ -20,8 +20,9 @@ class Injector {
 public:
 	Injector(HANDLE hProcess, LPVOID lpBaseOfImage, std::string dllName, std::map<std::string, std::string> hookMap) :
 		hProcess(hProcess), lpBaseOfImage(lpBaseOfImage), dllName(dllName), hookMap(hookMap) { };
-	DWORD Inject(DWORD runId);
 	DWORD Inject();
+	DWORD Inject(DWORD runId);
+	DWORD Inject(DWORD runId, BOOL replay, BOOL trace);
 	LPVOID BaseOfInjected();
 	std::set<std::string> MissingModules();
 	DWORD ResolveImports(std::map<std::string, LPVOID> loadedMap);
@@ -40,4 +41,6 @@ private:
 	DWORD HandleImports();
 	DWORD HandleHook();
 	DWORD HandleRunId(DWORD runId);
+	DWORD HandleReplay(BOOL replay);
+	DWORD HandleTrace(BOOL trace);
 };

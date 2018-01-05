@@ -401,6 +401,31 @@ DWORD Injector::HandleRunId(DWORD runId) {
 		LOG_F(ERROR, "Could not write run id to injected DLL (%x)", GetLastError());
 		return 1;
 	}
+
+	return 0;
+}
+
+DWORD Injector::HandleReplay(BOOL replay) {
+	ExportHandler exportHandler(this->hProcess, this->injectedBase);
+	UINT64 address = exportHandler.GetFunctionAddress("replay");
+
+	if (!WriteProcessMemory(this->hProcess, (LPVOID)address, &replay, sizeof(BOOL), NULL)) {
+		LOG_F(ERROR, "Could not write replay to injected DLL (%x)", GetLastError());
+		return 1;
+	}
+
+	return 0;
+}
+
+DWORD Injector::HandleTrace(BOOL trace) {
+	ExportHandler exportHandler(this->hProcess, this->injectedBase);
+	UINT64 address = exportHandler.GetFunctionAddress("trace");
+
+	if (!WriteProcessMemory(this->hProcess, (LPVOID)address, &trace, sizeof(BOOL), NULL)) {
+		LOG_F(ERROR, "Could not write trace to injected DLL (%x)", GetLastError());
+		return 1;
+	}
+
 	return 0;
 }
 
@@ -482,6 +507,17 @@ DWORD Injector::Inject() {
 DWORD Injector::Inject(DWORD runId) {
 	Inject();
 	HandleRunId(runId);
+	HandleReplay(false);
+	HandleTrace(false);
+
+	return 0;
+}
+
+DWORD Injector::Inject(DWORD runId, BOOL replay, BOOL trace) {
+	Inject();
+	HandleRunId(runId);
+	HandleReplay(replay);
+	HandleTrace(trace);
 
 	return 0;
 }

@@ -169,14 +169,22 @@ VOID Crash::examine(triton::API &api) {
 
 	std::set<std::pair<triton::arch::MemoryAccess, triton::ast::AbstractNode *>> storeAccesses = insn->getStoreAccess();
 	for (memIt = storeAccesses.begin(); memIt != storeAccesses.end(); memIt++) {
-		if (api.isMemoryTainted(memIt->first)) {
+		if (api.isMemoryTainted(memIt->first) || 
+			api.isRegisterTainted(memIt->first.getConstBaseRegister()) || 
+			api.isRegisterTainted(memIt->first.getConstSegmentRegister()) || 
+			api.isRegisterTainted(memIt->first.getConstIndexRegister())) 
+		{
 			tainted = true;
 		}
 	}
 
 	std::set<std::pair<triton::arch::MemoryAccess, triton::ast::AbstractNode *>> loadAccesses = insn->getLoadAccess();
 	for (memIt = loadAccesses.begin(); memIt != loadAccesses.end(); memIt++) {
-		if (api.isMemoryTainted(memIt->first)) {
+		if (api.isMemoryTainted(memIt->first) ||
+			api.isRegisterTainted(memIt->first.getConstBaseRegister()) ||
+			api.isRegisterTainted(memIt->first.getConstSegmentRegister()) ||
+			api.isRegisterTainted(memIt->first.getConstIndexRegister())) 
+		{
 			tainted = true;
 		}
 	}

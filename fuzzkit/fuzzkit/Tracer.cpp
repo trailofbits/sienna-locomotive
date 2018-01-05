@@ -447,12 +447,15 @@ UINT64 Tracer::trace(HANDLE hProcess, PVOID address, DWORD runId) {
 }
 
 // TODO: deduplicate this from fuzzkit
-UINT64 traceHandleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId) {
+UINT64 traceHandleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId, DWORD flags) {
 	std::map<std::string, std::string> hookMap;
 	hookMap["ReadFileHook"] = "ReadFile";
 	Injector *origInjector = new Injector(cpdi.hProcess, cpdi.lpBaseOfImage, "C:\\Users\\dgoddard\\Documents\\GitHub\\sienna-locomotive\\fuzzkit\\x64\\Release\\injectable.dll", hookMap);
 	Injector *injector = origInjector;
-	injector->Inject(runId);
+
+	BOOL replay = flags & 1;
+	BOOL trace = flags >> 1 & 1;
+	injector->Inject(runId, replay, trace);
 
 	std::set<std::string> missingModules = injector->MissingModules();
 	/*if (injector->MissingModules().size() == 0) {
@@ -506,7 +509,7 @@ UINT64 traceHandleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId) {
 	return origInjector->hookAddrMap["ReadFileHook"];
 }
 
-DWORD Tracer::TraceMainLoop(DWORD runId) {
+DWORD Tracer::TraceMainLoop(DWORD runId, DWORD flags) {
 	DWORD dwContinueStatus = DBG_CONTINUE;
 	CREATE_PROCESS_DEBUG_INFO cpdi;
 	xed_tables_init();
@@ -541,7 +544,7 @@ DWORD Tracer::TraceMainLoop(DWORD runId) {
 						LOG_F(INFO, "In thread %x", dbgev.dwThreadId);
 						restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId]);
 
-						taintAddr = traceHandleInjection(cpdi, runId);
+						taintAddr = traceHandleInjection(cpdi, runId, flags);
 						LOG_F(INFO, "Setting taint break on %llx", taintAddr);
 						setBreak(cpdi.hProcess, taintAddr);
 					}

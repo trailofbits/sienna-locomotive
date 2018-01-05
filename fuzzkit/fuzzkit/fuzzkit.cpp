@@ -345,7 +345,8 @@ HANDLE getPipe() {
 DWORD printUsage(LPWSTR *argv) {
 	LOG_F(INFO, "USAGE:");
 	LOG_F(INFO, "\trun: \t%S TARGET_PROGRAM.EXE [ARGUMENTS, ...]\n", argv[0]);
-	LOG_F(INFO, "\treplay: \t%S [-r ID]\n", argv[0]);
+	LOG_F(INFO, "\treplay: \t%S -r ID\n", argv[0]);
+	LOG_F(INFO, "\trace: \t%S -t TARGET_PROGRAM.EXE [ARGUMENTS, ...]\n", argv[0]);
 	return 0;
 }
 
@@ -374,6 +375,11 @@ DWORD finalize(HANDLE hPipe, DWORD runId, BOOL crashed) {
 	return 0;
 }
 
+enum InjectFlags {
+	REPLAY = 1,
+	TRACE = 2
+};
+
 int main(int mArgc, char **mArgv)
 {
 	loguru::g_stderr_verbosity = loguru::Verbosity_WARNING;
@@ -382,7 +388,9 @@ int main(int mArgc, char **mArgv)
 	LOG_F(INFO, "Fuzzkit started!");
 
 	BOOL replay = false;
+	BOOL trace = false;
 	DWORD runId = 0;
+	DWORD flags = 0;
 	LPCTSTR targetName;
 	LPTSTR targetArgs;
 	HANDLE hHeap = GetProcessHeap();
@@ -397,6 +405,8 @@ int main(int mArgc, char **mArgv)
 	if (lstrcmp(argv[1], L"-r") == 0) {
 		HANDLE hPipe = getPipe();
 		replay = true;
+		trace = true;
+
 		if (argc > 2) {
 			runId = wcstoul(argv[2], NULL, NULL);
 		}
@@ -408,9 +418,35 @@ int main(int mArgc, char **mArgv)
 		LOG_F(INFO, "Run id: %x", runId);
 		getRunInfo(hPipe, runId, &targetName, &targetArgs);
 
-		// use high bit of runId to indicate replay in injectable
-		runId |= 1 << 31;
+		flags |= InjectFlags::REPLAY | InjectFlags::TRACE;
 		CloseHandle(hPipe);
+	}
+	else if (lstrcmp(argv[1], L"-t") == 0) {
+		targetName = argv[2];
+		targetArgs = argv[2];
+		
+		trace = true;
+
+		if (argc > 3) {
+			DWORD size = 0;
+			for (DWORD i = 2; i < argc; i++) {
+				size += lstrlenW(argv[i]);
+				size += 1; // space or null
+			}
+			printf("SIZE: %x\n", size);
+			targetArgs = (LPTSTR)HeapAlloc(hHeap, NULL, size * sizeof(TCHAR));
+
+			DWORD pos = 0;
+			for (DWORD i = 2; i < argc; i++) {
+				DWORD length = lstrlenW(argv[i]);
+				lstrcpynW(targetArgs + pos, argv[i], length + 1);
+				*(targetArgs + pos + length) = 0x20;
+				pos += length + 1;
+			}
+			*(targetArgs + size) = 0;
+		}
+		
+		flags |= InjectFlags::TRACE;
 	}
 	else {
 		targetName = argv[1];
@@ -476,7 +512,7 @@ int main(int mArgc, char **mArgv)
 
 		ResumeThread(pi.hThread);
 
-		if (!replay) {
+		if (!replay && !trace) {
 			BOOL crashed = debug_main_loop(runId);
 			HANDLE hPipe = getPipe();
 			finalize(hPipe, runId, crashed);
@@ -485,7 +521,7 @@ int main(int mArgc, char **mArgv)
 		else {
 			Tracer tracer;
 			tracer.addThread(pi.dwThreadId, pi.hThread);
-			tracer.TraceMainLoop(runId);
+			tracer.TraceMainLoop(runId, flags);
 			break;
 		}
 

@@ -16,7 +16,7 @@ extern "C" {
 class Tracer {
 public:
 	Tracer();
-	DWORD TraceMainLoop(DWORD runId);
+	DWORD TraceMainLoop(DWORD runId, DWORD flags);
 	DWORD Tracer::addThread(DWORD dwThreadId, HANDLE hThread);
 private:
 	std::unordered_map<LPVOID, BYTE> restoreBytes;
