@@ -387,6 +387,54 @@ DWORD Tracer::traceCrash(DWORD runId, UINT64 exceptionAddr, DWORD exceptionCode)
 	return 0;
 }
 
+UINT64 Tracer::traceSingle(HANDLE hProcess, PVOID address, DWORD runId) {
+	struct BasicBlock bb;
+	bb.head = (UINT64)address;
+
+	xed_decoded_inst_t xedd;
+	xedd._decoded_length = 0;
+	UINT64 currAddr = (UINT64)address;
+	DWORD traceSize = 0;
+
+	struct Instruction insn;
+	xed_error_enum_t xed_err;
+	ReadProcessMemory(hProcess, (LPVOID)currAddr, insn.bytes, 15, NULL);
+
+	xed_decoded_inst_zero(&xedd);
+	xed_decoded_inst_set_mode(&xedd, XED_MACHINE_MODE_LONG_64, XED_ADDRESS_WIDTH_64b);
+	xed_err = xed_decode(&xedd, insn.bytes, 15);
+
+	if (xed_err != XED_ERROR_NONE) {
+		LOG_F(ERROR, "Trace xed_err (%x)", xed_err);
+		exit(1);
+	}
+
+	insn.length = xedd._decoded_length;
+
+	std::list<struct Instruction> insnList;
+	insnList.push_back(insn);
+
+	traceSize += 1;
+	traceSize += insn.length;
+
+	bb.bbTrace = (BYTE *)HeapAlloc(hHeap, NULL, traceSize);
+	bb.traceSize = traceSize;
+	DWORD pos = 0;
+	std::list<struct Instruction>::iterator insnIt;
+	for (insnIt = insnList.begin(); insnIt != insnList.end(); insnIt++) {
+		bb.bbTrace[pos] = insnIt->length;
+		pos += 1;
+		memcpy(bb.bbTrace + pos, insnIt->bytes, insnIt->length);
+		pos += insnIt->length;
+	}
+
+	bb.tail = currAddr;
+	cache.AddBB(bb);
+
+	traceInsn(runId, bb.head, bb.traceSize, bb.bbTrace);
+	return bb.tail;
+}
+
 UINT64 Tracer::trace(HANDLE hProcess, PVOID address, DWORD runId) {
 	struct BasicBlock bb;
 	std::list<struct Instruction> insnList;
@@ -518,6 +566,7 @@ DWORD Tracer::TraceMainLoop(DWORD runId, DWORD flags) {
 
 	BOOL flagReplay = flags & 1;
 	BOOL flagTrace = flags >> 1 & 1;
+	BOOL traceInitialized = false;
 
 	for (;;)
 	{
@@ -548,16 +597,11 @@ DWORD Tracer::TraceMainLoop(DWORD runId, DWORD flags) {
 						LOG_F(INFO, "In thread %x", dbgev.dwThreadId);
 						restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId]);
 
+						// TODO: multiple taint addrs
 						taintAddr = traceHandleInjection(cpdi, runId, flags);
 
-						if (flagTrace && !flagReplay) {
-							traceInit(runId, cpdi.hProcess, dbgev.dwProcessId);
-							singleStep(threadMap[dbgev.dwThreadId]);
-						}
-						else {
-							LOG_F(INFO, "Setting taint break on %llx", taintAddr);
-							setBreak(cpdi.hProcess, taintAddr);
-						}
+						LOG_F(INFO, "Setting taint break on %llx", taintAddr);
+						setBreak(cpdi.hProcess, taintAddr);
 					}
 					else if ((UINT64)address == taintAddr) {
 						LOG_F(INFO, "Taint break point %llx", address);
@@ -565,8 +609,9 @@ DWORD Tracer::TraceMainLoop(DWORD runId, DWORD flags) {
 						restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId]);
 						LOG_F(INFO, "Beginning trace");
 
-						if (flagTrace && flagReplay) {
+						if (!traceInitialized) {
 							traceInit(runId, cpdi.hProcess, dbgev.dwProcessId);
+							traceInitialized = true;
 						}
 
 						tail = trace(cpdi.hProcess, address, runId);
@@ -607,6 +652,11 @@ DWORD Tracer::TraceMainLoop(DWORD runId, DWORD flags) {
 			}
 
 			if (crashed) {
+				if (!traceInitialized) {
+					traceInit(runId, cpdi.hProcess, dbgev.dwProcessId);
+					traceInitialized = true;
+					traceSingle(cpdi.hProcess, address, runId);
+				}
 				traceCrash(runId, (UINT64)address, code);
 				return 0;
 			}
