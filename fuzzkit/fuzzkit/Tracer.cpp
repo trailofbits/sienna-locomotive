@@ -624,13 +624,11 @@ DWORD Tracer::TraceMainLoop(DWORD runId, DWORD flags) {
 							setBreak(cpdi.hProcess, tail);
 						}
 					}
-					else {
-						if (restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId])) {
-							// printf("[B] TAIL HIT %x\n", address);
-							// printf("[B] SINGLE STEPPING\n");
-							crashed = false;
-							singleStep(threadMap[dbgev.dwThreadId]);
-						}
+					else if (restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId])) {
+						// printf("[B] TAIL HIT %x\n", address);
+						// printf("[B] SINGLE STEPPING\n");
+						crashed = false;
+						singleStep(threadMap[dbgev.dwThreadId]);
 					}
 					break;
 				case EXCEPTION_SINGLE_STEP:

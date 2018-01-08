@@ -1,0 +1,1 @@
+{"score": 50, "reason": "write with no taint", "exception": "EXCEPTION_ACCESS_VIOLATION", "location": 140702424831919, "disassembly": "mov qword ptr [rax], r9", "tainted_regs": ["r8"], "tainted_addrs": [{"start": 968577317024, "size": 8}]}
