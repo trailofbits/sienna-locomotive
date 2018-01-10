@@ -177,19 +177,32 @@ BOOL Tracer::isTerminator(xed_decoded_inst_t xedd) {
 }
 
 HANDLE Tracer::tracerGetPipe() {
-	HANDLE hPipe = CreateFile(
-		L"\\\\.\\pipe\\fuzz_server",
-		GENERIC_READ | GENERIC_WRITE,
-		0,
-		NULL,
-		OPEN_EXISTING,
-		0,
-		NULL);
+	HANDLE hPipe = INVALID_HANDLE_VALUE;
+	while (1) {
+		hPipe = CreateFile(
+			L"\\\\.\\pipe\\fuzz_server",
+			GENERIC_READ | GENERIC_WRITE,
+			0,
+			NULL,
+			OPEN_EXISTING,
+			0,
+			NULL);
 
-	if (hPipe == INVALID_HANDLE_VALUE) {
-		// TODO: fallback mutations?
-		LOG_F(ERROR, "Could not connect to server");
-		exit(1);
+		if (hPipe != INVALID_HANDLE_VALUE) {
+			break;
+		}
+
+		DWORD err = GetLastError();
+		if (err != ERROR_PIPE_BUSY) {
+			LOG_F(ERROR, "Could not open pipe (%x)", err);
+			return hPipe;
+		}
+
+		if (!WaitNamedPipe(L"\\\\.\\pipe\\fuzz_server", 5000)) {
+			LOG_F(ERROR, "Could not connect, timeout");
+			// TODO: fallback mutations?
+			exit(1);
+		}
 	}
 
 	DWORD readMode = PIPE_READMODE_MESSAGE;
@@ -602,6 +615,21 @@ DWORD Tracer::TraceMainLoop(DWORD runId, DWORD flags) {
 
 						LOG_F(INFO, "Setting taint break on %llx", taintAddr);
 						setBreak(cpdi.hProcess, taintAddr);
+						if (!traceInitialized && !flagReplay && flagTrace) {
+							printf("Initializing\n");
+							traceInit(runId, cpdi.hProcess, dbgev.dwProcessId);
+							traceInitialized = true;
+
+							tail = trace(cpdi.hProcess, address, runId);
+							if (tail == (UINT64)address) {
+								// printf("[.] SINGLE STEPPING\n");
+								singleStep(threadMap[dbgev.dwThreadId]);
+							}
+							else {
+								// printf("[.] BREAK SET %x\n", tail);
+								setBreak(cpdi.hProcess, tail);
+							}
+						}
 					}
 					else if ((UINT64)address == taintAddr) {
 						LOG_F(INFO, "Taint break point %llx", address);

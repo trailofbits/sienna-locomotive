@@ -472,6 +472,10 @@ int main(int mArgc, char **mArgv)
 		}
 	}
 
+	TCHAR cwd[MAX_PATH];
+	GetCurrentDirectory(MAX_PATH, cwd);
+	printf("Current dir: %S\n", cwd);
+
 	LOG_F(INFO, "Target name: %S", targetName);
 	LOG_F(INFO, "Target args: %S", targetArgs);
 	printf("Target args: %S\n", targetArgs);

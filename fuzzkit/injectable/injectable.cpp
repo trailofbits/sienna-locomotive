@@ -13,6 +13,9 @@ __declspec(dllexport) BOOL replay;
 extern "C" __declspec(dllexport) BOOL trace;
 __declspec(dllexport) BOOL trace;
 
+extern "C" __declspec(dllexport) VOID asm_trace();
+__declspec(dllexport) VOID asm_trace();
+
 DWORD mutateCount = 0;
 
 BOOL mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
@@ -113,6 +116,10 @@ VOID taint(LPVOID buf, DWORD size) {
 	BYTE nullByte = 0;
 	TransactNamedPipe(hPipe, &taintSize, sizeof(UINT64), &nullByte, sizeof(BYTE), &bytesRead, NULL);
 	CloseHandle(hPipe);
+}
+
+extern "C" __declspec(dllexport) VOID traceSelf(UINT64 returnAddr) {
+	return;
 }
 
 extern "C" __declspec(dllexport) BOOL WINAPI ReadFileHook(
