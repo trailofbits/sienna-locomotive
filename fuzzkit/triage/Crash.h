@@ -21,7 +21,7 @@ extern "C" {
 class Crash {
 public:
 	Crash(triton::API &api, triton::arch::Instruction *insn, UINT8 insnBytes[], BYTE insnLength, UINT64 exceptionAddr, DWORD exceptionCode);
-	VOID dumpInfo();
+	std::string dumpInfo();
 private:
 	triton::arch::Instruction *insn;
 	UINT8 insnBytes[15] = { 0 };

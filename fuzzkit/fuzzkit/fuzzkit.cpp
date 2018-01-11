@@ -476,7 +476,7 @@ int main(int mArgc, char **mArgv)
 	LOG_F(INFO, "Target args: %S", targetArgs);
 	printf("Target args: %S\n", targetArgs);
 
-	for(DWORD i=0; i<1; i++) {
+	for(DWORD i=0; i<100; i++) {
 		if (!replay) {
 			HANDLE hPipe = getPipe();
 			if (hPipe == INVALID_HANDLE_VALUE) {
@@ -519,6 +519,11 @@ int main(int mArgc, char **mArgv)
 			HANDLE hPipe = getPipe();
 			finalize(hPipe, runId, crashed);
 			CloseHandle(hPipe);
+			if (crashed) {
+				CloseHandle(pi.hProcess);
+				CloseHandle(pi.hThread);
+				break;
+			}
 		}
 		else {
 			Tracer tracer;

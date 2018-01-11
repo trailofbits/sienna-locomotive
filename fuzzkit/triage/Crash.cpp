@@ -289,7 +289,7 @@ std::string Crash::exceptionToString() {
 	return exceptionStr;
 }
 
-VOID Crash::dumpInfo() {
+std::string Crash::dumpInfo() {
 	rapidjson::StringBuffer s;
 	rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(s);
 
@@ -358,4 +358,5 @@ VOID Crash::dumpInfo() {
 	std::cout << s.GetString() << std::endl;
 	std::cout << "#### END CRASH DATA JSON" << std::endl;
 	LOG_F(INFO, s.GetString());
+	return s.GetString();
 }
