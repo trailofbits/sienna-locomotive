@@ -69,7 +69,7 @@ DWORD Tracer::singleStep(HANDLE hThread) {
 		exit(1);
 	}
 	
-	//printf("in singleStep for address %llx\n", context.Rip);
+	printf("in singleStep for address %llx\n", context.Rip);
 	context.EFlags = context.EFlags | (1 << 8);
 
 	if (!SetThreadContext(hThread, &context)) {
@@ -86,7 +86,7 @@ DWORD Tracer::singleStep(HANDLE hThread) {
 }
 
 DWORD Tracer::setBreakWPM(HANDLE hProcess, UINT64 address) {
-	//printf("in setBreakWPM for address %llx\n", address);
+	printf("in setBreakWPM for address %llx\n", address);
 	BYTE breakByte = 0xCC;
 	BYTE startByte;
 
@@ -107,7 +107,7 @@ DWORD Tracer::setBreakWPM(HANDLE hProcess, UINT64 address) {
 
 
 DWORD Tracer::setBreak(HANDLE hProcess, HANDLE hThread, UINT64 address) {
-	//printf("in setBreak for address %llx\n", address);
+	printf("in setBreak for address %llx\n", address);
 	BYTE breakByte = 0xCC;
 	BYTE startByte;
 	
@@ -138,7 +138,7 @@ std::unordered_map<DWORD64, struct RestoreInfo *> registerRestoreMap;
 UINT64 writeMemAddr;
 
 BOOL Tracer::writeMem(HANDLE hProcess, HANDLE hThread, UINT64 address, BYTE value, BOOL singleStep) {
-	//printf("in write mem for address %llx\n", address);
+	printf("in write mem for address %llx\n", address);
 	CONTEXT context;
 	context.ContextFlags = CONTEXT_ALL;
 	if (!GetThreadContext(hThread, &context)) {
@@ -162,12 +162,7 @@ BOOL Tracer::writeMem(HANDLE hProcess, HANDLE hThread, UINT64 address, BYTE valu
 
 	struct RestoreInfo *restoreInfo = new RestoreInfo();
 	restoreInfo->oldMem = old;
-	if (singleStep) {
-		restoreInfo->Rip = context.Rip - 1;
-	}
-	else {
-		restoreInfo->Rip = context.Rip;
-	}
+	restoreInfo->Rip = context.Rip - 1;
 	restoreInfo->Rax = context.Rax;
 	restoreInfo->Rbx = context.Rbx;
 	restoreInfo->Rcx = context.Rcx;
@@ -181,12 +176,6 @@ BOOL Tracer::writeMem(HANDLE hProcess, HANDLE hThread, UINT64 address, BYTE valu
 	context.Rax = address;
 	context.Rbx = value;
 	context.Rdx = singleStep;
-	
-	/*printf("RCX: %llx\n", context.Rcx);
-	printf("RIP: %llx\n", context.Rip);
-	printf("RAX: %llx\n", context.Rax);
-	printf("RBX: %llx\n", context.Rbx);
-	printf("RDX: %llx\n", context.Rdx);*/
 
 	if (!SetThreadContext(hThread, &context)) {
 		LOG_F(ERROR, "RestoreBreak (%x)", GetLastError());
@@ -205,8 +194,8 @@ BOOL Tracer::restoreBreak(HANDLE hProcess, HANDLE hThread) {
 	}
 	
 	context.Rip -= 1;
-	//printf("in restoreBreak for address %llx\n", context.Rip);
-	//printf("hit breakpoint %llx\n", context.Rip);
+	printf("in restoreBreak for address %llx\n", context.Rip);
+	printf("hit breakpoint %llx\n", context.Rip);
 	if (restoreBytes.find((LPVOID)context.Rip) == restoreBytes.end()) {
 		LOG_F(WARNING, "restoreBytes miss at %llx", context.Rip);
 		return false;
@@ -230,7 +219,7 @@ UINT64 Tracer::resumeExecution(HANDLE hProcess, HANDLE hThread) {
 		return 0;
 	}
 
-	//printf("in resumeExecution for address %llx\n", context.Rcx);
+	printf("in resumeExecution for address %llx\n", context.Rcx);
 
 	struct RestoreInfo *restoreInfo = registerRestoreMap[context.Rcx];
 	context.Rip = restoreInfo->Rip;
@@ -589,7 +578,7 @@ UINT64 Tracer::traceSingle(HANDLE hProcess, PVOID address, DWORD runId) {
 }
 
 UINT64 Tracer::trace(HANDLE hProcess, PVOID address, DWORD runId) {
-	//printf("in trace for address %llx\n", address);
+	printf("in trace for address %llx\n", address);
 	struct BasicBlock bb;
 	std::list<struct Instruction> insnList;
 	if (cache.HasBB((UINT64)address)) {
@@ -760,34 +749,23 @@ DWORD Tracer::TraceMainLoop(DWORD runId, DWORD flags) {
 				case EXCEPTION_BREAKPOINT:
 					if ((UINT64)address == (writeMemAddr + 2)) {
 						crashed = false;
-						//printf("in break write_mem %llx\n", address);
+						printf("in break write_mem %llx\n", address);
 						// restore registers and set single step
 						UINT64 resumeAddr = resumeExecution(cpdi.hProcess, cpdi.hThread);
-						if (resumeAddr == taintAddr) {
-							traceInit(runId, cpdi.hProcess, dbgev.dwProcessId);
-							traceInitialized = true;
+						if (resumeAddr == startAddress) {
 							tail = trace(cpdi.hProcess, cpdi.lpStartAddress, runId);
 							setBreakWPM(cpdi.hProcess, tail);
 						}
 					}
 					else {
-<<<<<<< HEAD
-						//printf("in break code %llx\n", address);
+						printf("in break code %llx\n", address);
 						crashed = false;
 						if (address == (PVOID)startAddress) {
 							taintAddr = traceHandleInjection(cpdi, runId, flags);
-							setBreakWPM(cpdi.hProcess, taintAddr);
+							traceInit(runId, cpdi.hProcess, dbgev.dwProcessId);
+							traceInitialized = true;
 						}
-						
 						restoreBreak(cpdi.hProcess, cpdi.hThread);
-=======
-						if (restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId])) {
-							// printf("[B] TAIL HIT %x\n", address);
-							// printf("[B] SINGLE STEPPING\n");
-							crashed = false;
-							singleStep(threadMap[dbgev.dwThreadId]);
-						}
->>>>>>> parent of e83355d... Add test data.
 					}
 					//crashed = false;
 					// printf("[B] BREAK AT %x\n", address);
@@ -847,7 +825,7 @@ DWORD Tracer::TraceMainLoop(DWORD runId, DWORD flags) {
 					//}
 					break;
 				case EXCEPTION_SINGLE_STEP:
-					//printf("in single step %llx\n", address);
+					printf("in single step %llx\n", address);
 					if ((UINT64)address == 0x7fffaec671b8) {
 						crashed = false;
 						break;
@@ -866,13 +844,13 @@ DWORD Tracer::TraceMainLoop(DWORD runId, DWORD flags) {
 			}
 
 			if (crashed) {
-				//printf("crashed at address %llx (%x)\n", address, code);
+				printf("crashed at address %llx (%x)\n", address, code);
 				if (!traceInitialized) {
 					traceInit(runId, cpdi.hProcess, dbgev.dwProcessId);
 					traceInitialized = true;
 					traceSingle(cpdi.hProcess, address, runId);
 				}
-				//dumpRegs(cpdi.hThread);
+				dumpRegs(cpdi.hThread);
 				traceCrash(runId, (UINT64)address, code);
 				return 0;
 			}
@@ -886,7 +864,7 @@ DWORD Tracer::TraceMainLoop(DWORD runId, DWORD flags) {
 			cpdi = dbgev.u.CreateProcessInfo;
 			setBreakWPM(cpdi.hProcess, (UINT64)cpdi.lpStartAddress);
 			startAddress = (UINT64)cpdi.lpStartAddress;
-			//printf("set break at start %llx\n", startAddress);
+			printf("set break at start %llx\n", startAddress);
 			break;
 		case EXIT_THREAD_DEBUG_EVENT:
 			LOG_F(INFO, "Thread exited with id %x", dbgev.dwThreadId);

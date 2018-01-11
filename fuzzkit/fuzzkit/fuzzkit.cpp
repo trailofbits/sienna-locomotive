@@ -478,6 +478,7 @@ int main(int mArgc, char **mArgv)
 
 	LOG_F(INFO, "Target name: %S", targetName);
 	LOG_F(INFO, "Target args: %S", targetArgs);
+	printf("Target args: %S\n", targetArgs);
 
 	for(DWORD i=0; i<1; i++) {
 		if (!replay) {

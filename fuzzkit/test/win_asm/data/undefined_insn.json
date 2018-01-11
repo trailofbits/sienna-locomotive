@@ -1,0 +1,1 @@
+{"score": 100, "reason": "illegal instruction", "exception": "EXCEPTION_ILLEGAL_INSTRUCTION", "location": 140702424832153, "disassembly": "ud2", "tainted_regs": [], "tainted_addrs": []}

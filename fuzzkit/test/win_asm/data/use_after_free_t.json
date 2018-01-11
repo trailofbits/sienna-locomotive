@@ -1,0 +1,1 @@
+{"score": 25, "reason": "branching", "exception": "EXCEPTION_ACCESS_VIOLATION", "location": 140702424832427, "disassembly": "call qword ptr [rdi]", "tainted_regs": [], "tainted_addrs": [{"start": 40, "size": 8}, {"start": 945968184128, "size": 8}, {"start": 18446744073709549864, "size": 8}, {"start": 18446744073709549914, "size": 2}, {"start": 18446744073709549918, "size": 2}]}

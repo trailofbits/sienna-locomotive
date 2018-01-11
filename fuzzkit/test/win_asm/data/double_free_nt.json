@@ -1,0 +1,1 @@
+{"score": 25, "reason": "branching", "exception": "UNKNOWN", "location": 140736125761375, "disassembly": "jmp 0x7fffaec87761", "tainted_regs": [], "tainted_addrs": []}

@@ -1,0 +1,1 @@
+{"score": 100, "reason": "return with taint", "exception": "EXCEPTION_ACCESS_VIOLATION", "location": 140702424832078, "disassembly": "ret", "tainted_regs": ["rax", "rsp"], "tainted_addrs": [{"start": 1057566291920, "size": 8}]}
