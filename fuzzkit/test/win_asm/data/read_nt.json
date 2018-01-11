@@ -1,1 +1,0 @@
-{"score": 25, "reason": "read with no taint", "exception": "EXCEPTION_ACCESS_VIOLATION", "location": 140702424831012, "disassembly": "mov rbx, qword ptr [rax]", "tainted_regs": [], "tainted_addrs": []}

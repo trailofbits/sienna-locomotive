@@ -771,6 +771,7 @@ DWORD Tracer::TraceMainLoop(DWORD runId, DWORD flags) {
 						}
 					}
 					else {
+<<<<<<< HEAD
 						//printf("in break code %llx\n", address);
 						crashed = false;
 						if (address == (PVOID)startAddress) {
@@ -779,6 +780,14 @@ DWORD Tracer::TraceMainLoop(DWORD runId, DWORD flags) {
 						}
 						
 						restoreBreak(cpdi.hProcess, cpdi.hThread);
+=======
+						if (restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId])) {
+							// printf("[B] TAIL HIT %x\n", address);
+							// printf("[B] SINGLE STEPPING\n");
+							crashed = false;
+							singleStep(threadMap[dbgev.dwThreadId]);
+						}
+>>>>>>> parent of e83355d... Add test data.
 					}
 					//crashed = false;
 					// printf("[B] BREAK AT %x\n", address);

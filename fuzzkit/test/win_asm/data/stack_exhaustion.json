@@ -1,1 +1,0 @@
-{"score": 25, "reason": "branching", "exception": "EXCEPTION_STACK_OVERFLOW", "location": 140702424832122, "disassembly": "call 0x7ff7d60d1867", "tainted_regs": [], "tainted_addrs": []}

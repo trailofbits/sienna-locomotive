@@ -1,1 +1,0 @@
-{"score": 25, "reason": "branching", "exception": "EXCEPTION_ACCESS_VIOLATION", "location": 140702424831377, "disassembly": "jmp rax", "tainted_regs": [], "tainted_addrs": []}
