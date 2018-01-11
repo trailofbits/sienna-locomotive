@@ -54,6 +54,8 @@
                                            `+mMMMMMMMyo-`           `-oyMMMMMMMm+`.cpp          
 */
 
+UINT64 startAddress;
+
 DWORD Tracer::singleStep(HANDLE hThread) {
 	CONTEXT context;
 	context.ContextFlags = CONTEXT_CONTROL;
@@ -66,7 +68,8 @@ DWORD Tracer::singleStep(HANDLE hThread) {
 		LOG_F(ERROR, "SingleStep (%x)", GetLastError());
 		exit(1);
 	}
-
+	
+	printf("in singleStep for address %llx\n", context.Rip);
 	context.EFlags = context.EFlags | (1 << 8);
 
 	if (!SetThreadContext(hThread, &context)) {
@@ -82,7 +85,29 @@ DWORD Tracer::singleStep(HANDLE hThread) {
 	return 0;
 }
 
-DWORD Tracer::setBreak(HANDLE hProcess, UINT64 address) {
+DWORD Tracer::setBreakWPM(HANDLE hProcess, UINT64 address) {
+	printf("in setBreakWPM for address %llx\n", address);
+	BYTE breakByte = 0xCC;
+	BYTE startByte;
+
+	if (!ReadProcessMemory(hProcess, (LPVOID)address, &startByte, sizeof(BYTE), NULL)) {
+		LOG_F(ERROR, "SetBreak (%x)", GetLastError());
+		exit(1);
+	}
+
+	if (!WriteProcessMemory(hProcess, (LPVOID)address, &breakByte, sizeof(BYTE), NULL)) {
+		LOG_F(ERROR, "SetBreak (%x)", GetLastError());
+		exit(1);
+	}
+
+	if (restoreBytes.find((LPVOID)address) == restoreBytes.end()) {
+		restoreBytes[(LPVOID)address] = startByte;
+	}
+}
+
+
+DWORD Tracer::setBreak(HANDLE hProcess, HANDLE hThread, UINT64 address) {
+	printf("in setBreak for address %llx\n", address);
 	BYTE breakByte = 0xCC;
 	BYTE startByte;
 	
@@ -91,15 +116,73 @@ DWORD Tracer::setBreak(HANDLE hProcess, UINT64 address) {
 		exit(1);
 	}
 
-	if(!WriteProcessMemory(hProcess, (LPVOID)address, &breakByte, sizeof(BYTE), NULL)) {
-		LOG_F(ERROR, "SetBreak (%x)", GetLastError());
-		exit(1);
-	}
+	writeMem(hProcess, hThread, address, breakByte, false);
 
 	if (restoreBytes.find((LPVOID)address) == restoreBytes.end()) {
 		restoreBytes[(LPVOID)address] = startByte;
 	}
 	return 0;
+}
+
+struct RestoreInfo {
+	DWORD64 Rip;
+	DWORD64 Rax;
+	DWORD64 Rbx;
+	DWORD64 Rcx;
+	DWORD64 Rdx;
+	DWORD EFlags;
+	DWORD oldMem;
+};
+
+std::unordered_map<DWORD64, struct RestoreInfo *> registerRestoreMap;
+UINT64 writeMemAddr;
+
+BOOL Tracer::writeMem(HANDLE hProcess, HANDLE hThread, UINT64 address, BYTE value, BOOL singleStep) {
+	printf("in write mem for address %llx\n", address);
+	CONTEXT context;
+	context.ContextFlags = CONTEXT_ALL;
+	if (!GetThreadContext(hThread, &context)) {
+		LOG_F(ERROR, "RestoreBreak (%x)", GetLastError());
+		exit(1);
+	}
+
+	MEMORY_BASIC_INFORMATION mbi;
+	if (!VirtualQueryEx(hProcess, (LPVOID)address, &mbi, sizeof(MEMORY_BASIC_INFORMATION))) {
+		LOG_F(ERROR, "Could retrieve memory permissions (%x)", GetLastError());
+		exit(1);
+	}
+
+	DWORD old = mbi.Protect;
+	if (mbi.Protect == PAGE_EXECUTE_READ || mbi.Protect == PAGE_READONLY) {
+		if (!VirtualProtectEx(hProcess, mbi.BaseAddress, mbi.RegionSize, PAGE_EXECUTE_READWRITE, &old)) {
+			LOG_F(ERROR, "Could not change memory permissions (%x)", GetLastError());
+			exit(1);
+		}
+	}
+
+	struct RestoreInfo *restoreInfo = new RestoreInfo();
+	restoreInfo->oldMem = old;
+	restoreInfo->Rip = context.Rip - 1;
+	restoreInfo->Rax = context.Rax;
+	restoreInfo->Rbx = context.Rbx;
+	restoreInfo->Rcx = context.Rcx;
+	restoreInfo->Rdx = context.Rdx;
+	restoreInfo->EFlags = context.EFlags;
+
+	registerRestoreMap[restoreInfo->Rip] = restoreInfo;
+
+	context.Rcx = restoreInfo->Rip;
+	context.Rip = writeMemAddr;
+	context.Rax = address;
+	context.Rbx = value;
+	context.Rdx = singleStep;
+
+	if (!SetThreadContext(hThread, &context)) {
+		LOG_F(ERROR, "RestoreBreak (%x)", GetLastError());
+		exit(1);
+	}
+
+	return true;
 }
 
 BOOL Tracer::restoreBreak(HANDLE hProcess, HANDLE hThread) {
@@ -111,23 +194,69 @@ BOOL Tracer::restoreBreak(HANDLE hProcess, HANDLE hThread) {
 	}
 	
 	context.Rip -= 1;
-
+	printf("in restoreBreak for address %llx\n", context.Rip);
+	printf("hit breakpoint %llx\n", context.Rip);
 	if (restoreBytes.find((LPVOID)context.Rip) == restoreBytes.end()) {
 		LOG_F(WARNING, "restoreBytes miss at %llx", context.Rip);
 		return false;
 	}
-		
-	if(!SetThreadContext(hThread, &context)) {
-		LOG_F(ERROR, "RestoreBreak (%x)", GetLastError());
+
+	writeMem(hProcess, hThread, context.Rip, restoreBytes[(LPVOID)context.Rip], true);
+	
+	return true;
+}
+
+UINT64 Tracer::resumeExecution(HANDLE hProcess, HANDLE hThread) {
+	CONTEXT context;
+	context.ContextFlags = CONTEXT_ALL;
+	if (!GetThreadContext(hThread, &context)) {
+		LOG_F(ERROR, "resumeExecution (%x)", GetLastError());
 		exit(1);
 	}
 
-	if(!WriteProcessMemory(hProcess, (LPVOID)context.Rip, &restoreBytes[(LPVOID)context.Rip], sizeof(BYTE), NULL)) {
-		LOG_F(ERROR, "RestoreBreak (%x)", GetLastError());
+	if (registerRestoreMap.find(context.Rcx) == registerRestoreMap.end()) {
+		LOG_F(WARNING, "restoreRegs miss at %llx", context.Rcx);
+		return 0;
+	}
+
+	printf("in resumeExecution for address %llx\n", context.Rcx);
+
+	struct RestoreInfo *restoreInfo = registerRestoreMap[context.Rcx];
+	context.Rip = restoreInfo->Rip;
+	context.Rax = restoreInfo->Rax;
+	context.Rbx = restoreInfo->Rbx;
+	context.Rcx = restoreInfo->Rcx;
+
+	// single step
+	if (context.Rdx && context.Rip != startAddress) {
+		context.EFlags = restoreInfo->EFlags | (1 << 8);
+	}
+	else {
+		context.EFlags = restoreInfo->EFlags;
+	}
+
+	context.Rdx = restoreInfo->Rdx;
+
+	if (!SetThreadContext(hThread, &context)) {
+		LOG_F(ERROR, "resumeExecution (%x)", GetLastError());
 		exit(1);
 	}
-	
-	return true;
+
+	MEMORY_BASIC_INFORMATION mbi;
+	if (!VirtualQueryEx(hProcess, (LPVOID)restoreInfo->Rip, &mbi, sizeof(MEMORY_BASIC_INFORMATION))) {
+		LOG_F(ERROR, "Could retrieve memory permissions (%x)", GetLastError());
+		exit(1);
+	}
+
+	DWORD old = restoreInfo->oldMem;
+	if (restoreInfo->oldMem == PAGE_EXECUTE_READ || restoreInfo->oldMem == PAGE_READONLY) {
+		if (!VirtualProtectEx(hProcess, mbi.BaseAddress, mbi.RegionSize, mbi.Protect, &old)) {
+			LOG_F(ERROR, "Could reset memory permissions (%x)", GetLastError());
+			exit(1);
+		}
+	}
+
+	return context.Rip;
 }
 
 BOOL Tracer::isTerminator(xed_decoded_inst_t xedd) {
@@ -449,6 +578,7 @@ UINT64 Tracer::traceSingle(HANDLE hProcess, PVOID address, DWORD runId) {
 }
 
 UINT64 Tracer::trace(HANDLE hProcess, PVOID address, DWORD runId) {
+	printf("in trace for address %llx\n", address);
 	struct BasicBlock bb;
 	std::list<struct Instruction> insnList;
 	if (cache.HasBB((UINT64)address)) {
@@ -567,8 +697,23 @@ UINT64 traceHandleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId, DWORD f
 
 		missingMaster.erase(missing);
 	}
-
+	
+	ExportHandler injectedExportHandler(origInjector->hProcess, origInjector->injectedBase);
+	writeMemAddr = injectedExportHandler.GetFunctionAddress("write_mem");
+	printf("set writeMemAddr %llx\n", writeMemAddr);
 	return origInjector->hookAddrMap["ReadFileHook"];
+}
+
+VOID dumpRegs(HANDLE hThread) {
+	CONTEXT context;
+	context.ContextFlags = CONTEXT_ALL;
+	if (!GetThreadContext(hThread, &context)) {
+		LOG_F(ERROR, "RestoreBreak (%x)", GetLastError());
+		exit(1);
+	}
+
+	printf("RAX: %llx\n", context.Rax);
+	printf("RBX: %llx\n", context.Rbx);
 }
 
 DWORD Tracer::TraceMainLoop(DWORD runId, DWORD flags) {
@@ -602,75 +747,96 @@ DWORD Tracer::TraceMainLoop(DWORD runId, DWORD flags) {
 			switch (code)
 			{
 				case EXCEPTION_BREAKPOINT:
-					crashed = false;
+					if ((UINT64)address == (writeMemAddr + 2)) {
+						crashed = false;
+						printf("in break write_mem %llx\n", address);
+						// restore registers and set single step
+						UINT64 resumeAddr = resumeExecution(cpdi.hProcess, cpdi.hThread);
+						if (resumeAddr == startAddress) {
+							tail = trace(cpdi.hProcess, cpdi.lpStartAddress, runId);
+							setBreakWPM(cpdi.hProcess, tail);
+						}
+					}
+					else {
+						printf("in break code %llx\n", address);
+						crashed = false;
+						if (address == (PVOID)startAddress) {
+							taintAddr = traceHandleInjection(cpdi, runId, flags);
+							traceInit(runId, cpdi.hProcess, dbgev.dwProcessId);
+							traceInitialized = true;
+						}
+						restoreBreak(cpdi.hProcess, cpdi.hThread);
+					}
+					//crashed = false;
 					// printf("[B] BREAK AT %x\n", address);
-					if (address == cpdi.lpStartAddress) {
-						crashed = false;
-						LOG_F(INFO, "At start address %llx", address);
-						LOG_F(INFO, "In thread %x", dbgev.dwThreadId);
-						restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId]);
+					//if (address == cpdi.lpStartAddress) {
+					//	crashed = false;
+					//	LOG_F(INFO, "At start address %llx", address);
+					//	LOG_F(INFO, "In thread %x", dbgev.dwThreadId);
+					//	restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId]);
 
-						// TODO: multiple taint addrs
-						taintAddr = traceHandleInjection(cpdi, runId, flags);
+					//	// TODO: multiple taint addrs
+					//	taintAddr = traceHandleInjection(cpdi, runId, flags);
 
-						LOG_F(INFO, "Setting taint break on %llx", taintAddr);
-						setBreak(cpdi.hProcess, taintAddr);
-						if (!traceInitialized && !flagReplay && flagTrace) {
-							printf("Initializing\n");
-							traceInit(runId, cpdi.hProcess, dbgev.dwProcessId);
-							traceInitialized = true;
+					//	LOG_F(INFO, "Setting taint break on %llx", taintAddr);
+					//	setBreak(cpdi.hProcess, cpdi.hThread, taintAddr);
+					//	if (!traceInitialized && !flagReplay && flagTrace) {
+					//		printf("Initializing\n");
+					//		traceInit(runId, cpdi.hProcess, dbgev.dwProcessId);
+					//		traceInitialized = true;
 
-							tail = trace(cpdi.hProcess, address, runId);
-							if (tail == (UINT64)address) {
-								// printf("[.] SINGLE STEPPING\n");
-								singleStep(threadMap[dbgev.dwThreadId]);
-							}
-							else {
-								// printf("[.] BREAK SET %x\n", tail);
-								setBreak(cpdi.hProcess, tail);
-							}
-						}
-					}
-					else if ((UINT64)address == taintAddr) {
-						LOG_F(INFO, "Taint break point %llx", address);
-						crashed = false;
-						restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId]);
-						LOG_F(INFO, "Beginning trace");
+					//		tail = trace(cpdi.hProcess, address, runId);
+					//		if (tail == (UINT64)address) {
+					//			// printf("[.] SINGLE STEPPING\n");
+					//			singleStep(threadMap[dbgev.dwThreadId]);
+					//		}
+					//		else {
+					//			// printf("[.] BREAK SET %x\n", tail);
+					//			setBreak(cpdi.hProcess, tail);
+					//		}
+					//	}
+					//}
+					//else if ((UINT64)address == taintAddr) {
+					//	LOG_F(INFO, "Taint break point %llx", address);
+					//	crashed = false;
+					//	restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId]);
+					//	LOG_F(INFO, "Beginning trace");
 
-						if (!traceInitialized) {
-							traceInit(runId, cpdi.hProcess, dbgev.dwProcessId);
-							traceInitialized = true;
-						}
+					//	if (!traceInitialized) {
+					//		traceInit(runId, cpdi.hProcess, dbgev.dwProcessId);
+					//		traceInitialized = true;
+					//	}
 
-						tail = trace(cpdi.hProcess, address, runId);
-						if (tail == (UINT64)address) {
-							// printf("[.] SINGLE STEPPING\n");
-							singleStep(threadMap[dbgev.dwThreadId]);
-						}
-						else {
-							// printf("[.] BREAK SET %x\n", tail);
-							setBreak(cpdi.hProcess, tail);
-						}
-					}
-					else if (restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId])) {
-						// printf("[B] TAIL HIT %x\n", address);
-						// printf("[B] SINGLE STEPPING\n");
-						crashed = false;
-						singleStep(threadMap[dbgev.dwThreadId]);
-					}
+					//	tail = trace(cpdi.hProcess, address, runId);
+					//	if (tail == (UINT64)address) {
+					//		// printf("[.] SINGLE STEPPING\n");
+					//		singleStep(threadMap[dbgev.dwThreadId]);
+					//	}
+					//	else {
+					//		// printf("[.] BREAK SET %x\n", tail);
+					//		setBreak(cpdi.hProcess, tail);
+					//	}
+					//}
+					//else if (restoreBreak(cpdi.hProcess, threadMap[dbgev.dwThreadId])) {
+					//	// printf("[B] TAIL HIT %x\n", address);
+					//	// printf("[B] SINGLE STEPPING\n");
+					//	crashed = false;
+					//	singleStep(threadMap[dbgev.dwThreadId]);
+					//}
 					break;
 				case EXCEPTION_SINGLE_STEP:
+					printf("in single step %llx\n", address);
+					if ((UINT64)address == 0x7fffaec671b8) {
+						crashed = false;
+						break;
+					}
 					crashed = false;
 					tail = trace(cpdi.hProcess, address, runId);
 					if (tail == (UINT64)address) {
-						// printf("[S] HEAD / TAIL HIT %x\n", address);
-						// printf("[S] SINGLE STEPPING\n");
 						singleStep(threadMap[dbgev.dwThreadId]);
 					}
 					else {
-						// printf("[S] HEAD HIT %x\n", address);
-						// printf("[S] BREAK SET %x\n", tail);
-						setBreak(cpdi.hProcess, tail);
+						setBreak(cpdi.hProcess, cpdi.hThread, tail);
 					}
 					break;
 				default:
@@ -678,11 +844,13 @@ DWORD Tracer::TraceMainLoop(DWORD runId, DWORD flags) {
 			}
 
 			if (crashed) {
+				printf("crashed at address %llx (%x)\n", address, code);
 				if (!traceInitialized) {
 					traceInit(runId, cpdi.hProcess, dbgev.dwProcessId);
 					traceInitialized = true;
 					traceSingle(cpdi.hProcess, address, runId);
 				}
+				dumpRegs(cpdi.hThread);
 				traceCrash(runId, (UINT64)address, code);
 				return 0;
 			}
@@ -694,7 +862,9 @@ DWORD Tracer::TraceMainLoop(DWORD runId, DWORD flags) {
 		case CREATE_PROCESS_DEBUG_EVENT:
 			LOG_F(INFO, "Process started with id %x", dbgev.dwProcessId);
 			cpdi = dbgev.u.CreateProcessInfo;
-			setBreak(cpdi.hProcess, (UINT64)cpdi.lpStartAddress);
+			setBreakWPM(cpdi.hProcess, (UINT64)cpdi.lpStartAddress);
+			startAddress = (UINT64)cpdi.lpStartAddress;
+			printf("set break at start %llx\n", startAddress);
 			break;
 		case EXIT_THREAD_DEBUG_EVENT:
 			LOG_F(INFO, "Thread exited with id %x", dbgev.dwThreadId);

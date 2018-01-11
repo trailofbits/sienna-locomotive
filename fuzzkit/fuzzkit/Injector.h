@@ -28,14 +28,14 @@ public:
 	DWORD ResolveImports(std::map<std::string, LPVOID> loadedMap);
 	std::string DllName();
 	std::map<std::string, UINT64> hookAddrMap;
+	HANDLE hProcess;
+	LPVOID injectedBase;
 
 private:
-	HANDLE hProcess;
 	LPVOID lpBaseOfImage;
 	std::string dllName;
 	std::map<std::string, std::string> hookMap;
 	std::set<std::string> missingModules;
-	LPVOID injectedBase;
 
 	DWORD HandleRelocations(PIMAGE_NT_HEADERS pNtHeaders);
 	DWORD HandleImports();

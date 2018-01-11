@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <Windows.h>
+#include <unordered_map>
 
 extern "C" __declspec(dllexport) DWORD runId;
 __declspec(dllexport) DWORD runId;
@@ -13,9 +14,7 @@ __declspec(dllexport) BOOL replay;
 extern "C" __declspec(dllexport) BOOL trace;
 __declspec(dllexport) BOOL trace;
 
-extern "C" __declspec(dllexport) VOID asm_trace();
-__declspec(dllexport) VOID asm_trace();
-
+std::unordered_map<UINT64, UINT64> restoreBytes;
 DWORD mutateCount = 0;
 
 BOOL mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
@@ -118,7 +117,59 @@ VOID taint(LPVOID buf, DWORD size) {
 	CloseHandle(hPipe);
 }
 
+UINT64 getBytesFromServer(UINT64 address) {
+	DWORD bytesRead = 0;
+	DWORD bytesWritten = 0;
+
+	HANDLE hPipe = CreateFile(
+		L"\\\\.\\pipe\\fuzz_server",
+		GENERIC_READ | GENERIC_WRITE,
+		0,
+		NULL,
+		OPEN_EXISTING,
+		0,
+		NULL);
+
+	if (hPipe == INVALID_HANDLE_VALUE) {
+		// TODO: fallback mutations?
+		return 0;
+	}
+
+	DWORD readMode = PIPE_READMODE_MESSAGE;
+	SetNamedPipeHandleState(
+		hPipe,
+		&readMode,
+		NULL,
+		NULL);
+	
+	BYTE eventId = -1;
+	UINT64 restore = 0;
+	TransactNamedPipe(hPipe, &address, sizeof(UINT64), &restore, sizeof(UINT64), &bytesRead, NULL);
+	CloseHandle(hPipe);
+
+	return restore;
+}
+
 extern "C" __declspec(dllexport) VOID traceSelf(UINT64 returnAddr) {
+	// get bytes
+	if (restoreBytes.find(returnAddr) == restoreBytes.end()) {
+		// don't have, ask server
+		UINT64 bytes = getBytesFromServer(returnAddr);
+		restoreBytes[returnAddr] = bytes;
+	}
+	
+	// restore bytes
+	UINT64 packed = restoreBytes[returnAddr];
+	BYTE *restoreAddr = (BYTE *)returnAddr;
+	restoreAddr[0] = (packed >> 0) & 0xFF;
+	restoreAddr[1] = (packed >> 8) & 0xFF;
+	restoreAddr[2] = (packed >> 16) & 0xFF;
+	restoreAddr[3] = (packed >> 24) & 0xFF;
+	restoreAddr[4] = (packed >> 32) & 0xFF;
+
+	// determine branch target
+	//write_mem();
+	// set new bytes
 	return;
 }
 

@@ -32,8 +32,11 @@ private:
 	UINT64 traceSingle(HANDLE hProcess, PVOID address, DWORD runId);
 	UINT64 trace(HANDLE hProcess, PVOID address, DWORD runId);
 	DWORD singleStep(HANDLE hThread);
-	DWORD setBreak(HANDLE hThread, UINT64 address);
+	DWORD setBreakWPM(HANDLE hProcess, UINT64 address);
+	DWORD setBreak(HANDLE hProcess, HANDLE hThread, UINT64 address);
+	BOOL writeMem(HANDLE hProcess, HANDLE hThread, UINT64 address, BYTE value, BOOL singleStep);
 	BOOL restoreBreak(HANDLE hProcess, HANDLE hThread);
+	UINT64 resumeExecution(HANDLE hProcess, HANDLE hThread);
 	BOOL isTerminator(xed_decoded_inst_t xedd);
 	HANDLE tracerGetPipe();
 };

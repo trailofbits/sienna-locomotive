@@ -1,9 +1,10 @@
-PUBLIC asm_trace
+PUBLIC write_mem
 
 EXTERN	traceSelf:		PROC
 
 .DATA
 	ret_addr	dq	0
+	flags		dq	0
 	stdout      dd	-11
 	hello		db	"Hello from ASM.",0Ah,0
 
@@ -59,7 +60,12 @@ ENDM
 ;	epilogue
 ; call_trace ENDP
 
-; CC FF D0
+; 9C 50 CC FF D0
+
+write_mem PROC
+	mov	[rax], bl
+	int 3
+write_mem ENDP
 
 asm_trace PROC
 	; restore rax cause caller can't
@@ -67,12 +73,12 @@ asm_trace PROC
 	; [rsp - 8]		ret_addr
 	pop		[ret_addr]
 	pop		rax
+	pop		[flags]
 	push	[ret_addr]
 	; prologue
 	push	rbp
 	mov		rbp, rsp
 	; save volatile registers
-	pushf
 	push	rax
 	push	rcx
 	push	rdx
@@ -85,7 +91,7 @@ asm_trace PROC
 	; fixup ret addr
 	; [rbp - 16]	ret_addr
 	; [rbp - 8]		old_rbp
-	sub		[ret_addr], 13	; compensate for 13 byte trampoline
+	sub		[ret_addr], 5	; compensate for 5 byte trampoline
 	mov		rbx, [ret_addr]
 	mov		[rbp - 16], rbx
 	; function body
@@ -101,10 +107,11 @@ asm_trace PROC
 	pop		rdx
 	pop		rcx
 	pop		rax
-	popf
 	; epilogue
 	mov		rsp, rbp
 	pop		rbp
+	push	[flags]
+	popf
 	ret
 asm_trace ENDP
 

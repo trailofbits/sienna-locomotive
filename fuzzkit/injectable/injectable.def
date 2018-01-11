@@ -1,0 +1,3 @@
+LIBRARY injectable
+EXPORTS
+write_mem

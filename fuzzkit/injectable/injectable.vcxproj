@@ -140,6 +140,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>false</GenerateDebugInformation>
+      <ModuleDefinitionFile>injectable.def</ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -164,6 +165,9 @@
   </ItemGroup>
   <ItemGroup>
     <MASM Include="trace64.asm" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="injectable.def" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

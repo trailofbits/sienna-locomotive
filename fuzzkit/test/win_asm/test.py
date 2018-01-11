@@ -4,15 +4,15 @@ import os
 
 '''
 TODO:
+xor_clear_nt - does not clear taint
 dep - check memory permissions (nx)
+stack exec 
+break points
 double free - can we detect these?
 use after free - can we detect these?
-stack exec 
-xor_clear_nt - does not clear taint
-break points - do these matter?
 '''
-
 skip = [b'break_point', b'dep', b'use_after_free', b'double_free', b'stack_exec', b'xor_clear_nt']
+
 
 crashes_path = '../../../corpus/win_asm/crashes.exe'
 fuzzkit_base = '../../x64/Release/'
