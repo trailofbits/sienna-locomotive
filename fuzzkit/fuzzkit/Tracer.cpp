@@ -499,7 +499,7 @@ UINT64 Tracer::trace(HANDLE hProcess, PVOID address, DWORD runId) {
 UINT64 traceHandleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId, DWORD flags) {
 	std::map<std::string, std::string> hookMap;
 	hookMap["ReadFileHook"] = "ReadFile";
-	Injector *origInjector = new Injector(cpdi.hProcess, cpdi.lpBaseOfImage, "C:\\Users\\dgoddard\\Documents\\GitHub\\sienna-locomotive\\fuzzkit\\x64\\Release\\injectable.dll", hookMap);
+	Injector *origInjector = new Injector(cpdi.hProcess, cpdi.lpBaseOfImage, "injectable.dll", hookMap);
 	Injector *injector = origInjector;
 
 	BOOL replay = flags & 1;
