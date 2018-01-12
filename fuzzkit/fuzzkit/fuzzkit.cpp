@@ -19,9 +19,22 @@
 #define LOGURU_IMPLEMENTATION 1
 #include "loguru.hpp"
 
-
-// TODO: check return of every call
+#include <ShlObj.h>
+#include <PathCch.h>
 // TODO: support 32bit
+
+WCHAR FUZZ_LOG[MAX_PATH] = L"";
+
+VOID initDirs() {
+	PWSTR roamingPath;
+	SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roamingPath);
+
+	SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roamingPath);
+	WCHAR logLocalPath[MAX_PATH] = L"Trail of Bits\\fuzzkit\\log\\fuzzkit.log";
+	PathCchCombine(FUZZ_LOG, MAX_PATH, roamingPath, logLocalPath);
+
+	CoTaskMemFree(roamingPath);
+}
 
 DWORD handleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId) {
 	std::map<std::string, std::string> hookMap;
@@ -382,9 +395,12 @@ enum InjectFlags {
 
 int main(int mArgc, char **mArgv)
 {
+	initDirs();
 	loguru::g_stderr_verbosity = loguru::Verbosity_WARNING;
 	loguru::init(mArgc, mArgv);
-	loguru::add_file("log\\fuzzkit.log", loguru::Append, loguru::Verbosity_MAX);
+	CHAR logLocalPathA[MAX_PATH];
+	wcstombs(logLocalPathA, FUZZ_LOG, MAX_PATH);
+	loguru::add_file(logLocalPathA, loguru::Append, loguru::Verbosity_MAX);
 	LOG_F(INFO, "Fuzzkit started!");
 
 	BOOL replay = false;
