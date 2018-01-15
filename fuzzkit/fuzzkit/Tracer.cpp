@@ -558,6 +558,30 @@ UINT64 traceHandleInjection(CREATE_PROCESS_DEBUG_INFO cpdi, DWORD runId, DWORD f
 	return origInjector->hookAddrMap["ReadFileHook"];
 }
 
+// map break address to thread ids
+std::unordered_map<UINT64, std::unordered_set<DWORD>> breakPointMap;
+
+/*
+	if breakpoint for any thread
+		if start addr
+			initialize taint
+			remove breakpoint
+		if taintAddr
+			start trace for thread
+	
+	if breakpoint for thread N
+		single step
+	else
+		single step and restore on next thread N event
+
+	if single step
+		if restore addr
+			restore previous breakpoint
+		if trace set for thread
+			do trace
+			set break on tail
+*/
+
 DWORD Tracer::TraceMainLoop(DWORD runId, DWORD flags) {
 	DWORD dwContinueStatus = DBG_CONTINUE;
 	CREATE_PROCESS_DEBUG_INFO cpdi;

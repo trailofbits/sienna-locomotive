@@ -1,0 +1,22 @@
+//------------------------------------------------
+//--- 010 Editor v8.0.1 Binary Template
+//
+//      File: Fuzzkit
+//   Authors: TACIXAT
+//   Version: 0.01
+//   Purpose: Parse the fuzzkit data files.
+//  Category: 
+// File Mask: 
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+
+struct FKT {
+    char magic[4];
+    uint type;
+    uint file_size;
+    wchar_t path[file_size];
+    uint64 position;
+    uint size;
+    uchar data[size];
+} fkt;

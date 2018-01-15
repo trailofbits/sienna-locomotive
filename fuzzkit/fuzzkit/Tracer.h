@@ -2,9 +2,9 @@
 #include <DbgHelp.h>
 #include <list>
 #include <unordered_map>
-#include <map>
 #include "Cache.h"
 #include "Injector.h"
+#include <unordered_set>
 
 
 extern "C" {
