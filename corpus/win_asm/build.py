@@ -1,4 +1,5 @@
-
+import json
+import subprocess
 
 template = '''
 main PROC
@@ -66,10 +67,20 @@ def main():
     with open(backup, 'w') as  f:
         f.write(original)
 
-    print 'Backup written to %s' % backup
+    print('Backup written to %s' % backup)
 
     with open('crashes.asm', 'w') as f:
         f.write(modified)
+
+    with open('config.json') as f:
+        config = json.loads(f.read())
+
+    proc = subprocess.Popen([
+        config['ml64'], "crashes.asm", "/link", 
+        "/subsystem:console", "/libpath:" + config['lib'],
+        "/defaultlib:kernel32.lib", "/entry:main"])
+
+    proc.wait()
 
 if __name__ == '__main__':
     main()
