@@ -1,4 +1,4 @@
-# Mighty Tasty Fuzzing and Crash Triage
+# Fuzzing and Crash Triage
 
 The primary goal is ease of use. That won't stop us from trying to make it faster and smarter than the competition too.
 
@@ -35,40 +35,60 @@ Triage
   Output score
 ```
 
+## Getting Started
+
+* Download and install `boost`
+* Copy `boost` headers to `sienna-locomotive/fuzzkit/triage/include`
+* Download and install `z3`
+* Copy `z3` headers to `sienna-locomotive/fuzzkit/triage/include`
+* Open `fuzzkit.sln`
+* Set build to `x64` and `Release`
+* Build (optional: update `README` with solutions to build problems)
+
+* Create the folders `%APPDATA%\Trail of Bits\fuzzkit\working` and `%APPDATA%\Trail of Bits\fuzzkit\log`
+* Run `fuzzkit.exe test_application.exe` from `x64\Release\`
+* Run `fuzzkit.exe -r [run_id]` for whatever run id was created for the crash (should be 0 or 1) 
+* (This should be in `%APPDATA%\Trail of Bits\fuzzkit\working\[run_id]`)
+* Run `triage.exe -r [run_id]` 
+
+* Build `corpus/win_asm`, you'll likely need to change the paths in there
+* (Come up with a good solution for this, maybe a config file and Python build script.)
+
 ## Research questions
 
 ```
 Fuzzkit
   Code coverage
     How fast can we make single stepping / breakpoints
-    How do our alternatives, QEMU, DynamoRIO, Pin
-  Standalone recursive injector / loader
-  Resetting executions
-    Restore memory and registers
-      Snapshotting?
-    Just spawn a new instance
+    How do our alternatives, QEMU, DynamoRIO, Pin perform
+      Can we ship these in a single installer?
+  Standalone recursive injector / loader (done!)
+  Resetting executions (this should be easy!)
+    Restore memory and registers (contexts)
+      Snapshotting? (memdump maybe?)
+    Just spawn a new instance (done!)
 
 Injectable
-  Should it contain its own mutation engine as a fallback
-  Does it need initialization (socket setup) 
+  Should it contain its own mutation engine as a fallback (talks to server!)
+  Does it need initialization (not so far) 
     Run DLLMain
-  Get run ID (maybe on DLLMain load?) for reproducibility
+  Get run ID (maybe on DLLMain load?) for reproducibility (done!)
 
 Mutation Server
   Ideally pluggable with smart stuff (mcore, ai)
-  What is the fastest method of interprocess communication
+  What is the fastest method of interprocess communication (using named pipes right now)
   Smart mutations, file format aware, or code aware
-  Needs some state for runs
+  Needs some state for runs (has input order and file position information)
 
 Tracer
   Fast tracing methods
     IntelPT (special hardware)
     Time travel debugging (no api)
-    QEMU (req custom modifications)
+    QEMU (requires custom modifications)
     Binary translation
   Identify branches, cache basic blocks for speed
-  Proving ground for instrumentation in fuzzkit
-  Be able to run in standalone mode
+  Proving ground for instrumentation in fuzzkit (too slow for this in its current state)
+  Be able to run in standalone mode (done!)
 
 Triage
   Really just a matter of implementing this
@@ -83,25 +103,5 @@ Code coverage / tracing   # problem 1
   DynamoRIO (can we use as a library?)
   Pin (can we use as a library?)
   VMill
-
-Fuzz server
-  Unique id per session
-    DLLMain to initialize variables / named pipe connection?
-    DLLMain could call out to fuzz server when complete which could notify fuzzkit to continue
-  Named pipe
-    Fork on connection?
-  Log data used for each call (reproducibility)
-    Per unique run
-  Replay mode with data to gather trace, to triage
-
-Taint tracking with Triton
-  In replay, at first taint
-    Minidump (includes registers?)
-    Can one process minidump another? Maybe use user defined exceptions
-  In replay, at any taint
-    Output buffer and size that is tainted
-  Replay trace between first taint and crash
-  Set initial register state
-  Use minidump for concrete memory values
 ```
 
