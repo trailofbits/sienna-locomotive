@@ -37,6 +37,8 @@ Triage
 
 ## Getting Started
 
+### Building 
+
 * Download and install `boost`
 * Copy `boost` headers to `sienna-locomotive/fuzzkit/triage/include`
 * Download and install `z3`
@@ -45,14 +47,21 @@ Triage
 * Set build to `x64` and `Release`
 * Build (optional: update `README` with solutions to build problems)
 
+### Running
+
 * Create the folders `%APPDATA%\Trail of Bits\fuzzkit\working` and `%APPDATA%\Trail of Bits\fuzzkit\log`
 * Run `fuzzkit.exe test_application.exe` from `x64\Release\`
 * Run `fuzzkit.exe -r [run_id]` for whatever run id was created for the crash (should be 0 or 1) 
 * (This should be in `%APPDATA%\Trail of Bits\fuzzkit\working\[run_id]`)
 * Run `triage.exe -r [run_id]` 
 
+### ASM Crash Corpus
+
 * Build `corpus/win_asm`, you'll likely need to change the paths in there
 * (Come up with a good solution for this, maybe a config file and Python build script.)
+* Run `fuzzkit.exe -t crashes.exe [arg]` for whatever crash you want to check (try 7 write_taint)
+* (The above traces without fuzzing for standalone triage)
+* Run `triage.exe -r [run_id]` for the run id that was created
 
 ## Research questions
 
