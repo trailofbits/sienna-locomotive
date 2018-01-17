@@ -46,10 +46,12 @@ Triage
 * Open `fuzzkit.sln`
 * Set build to `x64` and `Release`
 * Build (optional: update `README` with solutions to build problems)
+* Copy libz3.dll from lib\ to x64\Release\
 
 ### Running
 
 * Create the folders `%APPDATA%\Trail of Bits\fuzzkit\working` and `%APPDATA%\Trail of Bits\fuzzkit\log`
+* Run `server.exe`
 * Run `fuzzkit.exe test_application.exe` from `x64\Release\`
 * Run `fuzzkit.exe -r [run_id]` for whatever run id was created for the crash (should be 0 or 1) 
 * (This should be in `%APPDATA%\Trail of Bits\fuzzkit\working\[run_id]`)
