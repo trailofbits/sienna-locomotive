@@ -52,6 +52,7 @@ Triage
 
 * Create the folders `%APPDATA%\Trail of Bits\fuzzkit\working` and `%APPDATA%\Trail of Bits\fuzzkit\log`
 * Run `server.exe`
+* Create `sample.txt` in the `x64\Release\` directory with at least 8 characters in it
 * Run `fuzzkit.exe test_application.exe` from `x64\Release\`
 * Run `fuzzkit.exe -r [run_id]` for whatever run id was created for the crash (should be 0 or 1) 
 * (This should be in `%APPDATA%\Trail of Bits\fuzzkit\working\[run_id]`)
