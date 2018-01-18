@@ -123,8 +123,8 @@ BOOL debug_main_loop(DWORD runId) {
 					if (!injected) {
 						LOG_F(1, "Injecting hook dll into process");
 						handleInjection(cpdi, runId);
-						crashed = false;
 						injected = true;
+						crashed = false;
 					}
 					break;
 				case EXCEPTION_DATATYPE_MISALIGNMENT:
@@ -472,7 +472,7 @@ int main(int mArgc, char **mArgv)
 			DWORD size = 0;
 			for (DWORD i = 1; i < argc; i++) {
 				size += lstrlenW(argv[i]);
-				size += 5; // space or null
+				size += 3; // space or null
 			}
 			printf("SIZE: %x\n", size);
 			targetArgs = (LPTSTR)HeapAlloc(hHeap, NULL, size * sizeof(TCHAR));
@@ -480,13 +480,11 @@ int main(int mArgc, char **mArgv)
 			DWORD pos = 0;
 			for (DWORD i = 1; i < argc; i++) {
 				DWORD length = lstrlenW(argv[i]);
-				targetArgs[pos] = 0x5c; // '\'
-				targetArgs[pos+1] = 0x22; // '"'
-				lstrcpynW(targetArgs + pos + 2, argv[i], length+1);
-				*(targetArgs + pos + 2 + length) = 0x5c;
-				*(targetArgs + pos + 2 + length + 1) = 0x22;
-				*(targetArgs + pos + 2 + length + 2) = 0x20;
-				pos += length + 5;
+				targetArgs[pos] = 0x22; // double quote '"'
+				lstrcpynW(targetArgs + pos + 1, argv[i], length+1);
+				*(targetArgs + pos + 1 + length) = 0x22;
+				*(targetArgs + pos + 1 + length + 1) = 0x20; // space ' '
+				pos += length + 3;
 			}
 			*(targetArgs + size) = 0;
 		}
