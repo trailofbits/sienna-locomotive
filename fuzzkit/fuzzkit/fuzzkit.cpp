@@ -472,7 +472,7 @@ int main(int mArgc, char **mArgv)
 			DWORD size = 0;
 			for (DWORD i = 1; i < argc; i++) {
 				size += lstrlenW(argv[i]);
-				size += 1; // space or null
+				size += 5; // space or null
 			}
 			printf("SIZE: %x\n", size);
 			targetArgs = (LPTSTR)HeapAlloc(hHeap, NULL, size * sizeof(TCHAR));
@@ -480,9 +480,13 @@ int main(int mArgc, char **mArgv)
 			DWORD pos = 0;
 			for (DWORD i = 1; i < argc; i++) {
 				DWORD length = lstrlenW(argv[i]);
-				lstrcpynW(targetArgs + pos, argv[i], length+1);
-				*(targetArgs + pos + length) = 0x20;
-				pos += length + 1;
+				targetArgs[pos] = 0x5c; // '\'
+				targetArgs[pos+1] = 0x22; // '"'
+				lstrcpynW(targetArgs + pos + 2, argv[i], length+1);
+				*(targetArgs + pos + 2 + length) = 0x5c;
+				*(targetArgs + pos + 2 + length + 1) = 0x22;
+				*(targetArgs + pos + 2 + length + 2) = 0x20;
+				pos += length + 5;
 			}
 			*(targetArgs + size) = 0;
 		}
