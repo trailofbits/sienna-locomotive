@@ -1,0 +1,11 @@
+find_package(DynamoRIO)
+
+if (NOT DynamoRIO_FOUND)
+  message(FATAL_ERROR "DynamoRIO package required to build")
+endif(NOT DynamoRIO_FOUND)
+
+add_library(tracer SHARED tracer.cpp)
+
+configure_DynamoRIO_client(tracer)
+
+use_DynamoRIO_extension(tracer drmgr)
