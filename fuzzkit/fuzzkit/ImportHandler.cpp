@@ -105,9 +105,12 @@ std::string ImportHandler::GetNextFunction() {
 		}
 		
 		BYTE pFuncName[MAX_PATH];
-		if (this->itdOrig.u1.Ordinal & 0x80000000) {
+		// TODO: support 32 bit
+		if (this->itdOrig.u1.Ordinal & IMAGE_ORDINAL_FLAG64) {
 			// ordinal 
 			// TODO: return #N
+			UINT64 ord = this->itdOrig.u1.Ordinal;
+			this->itdIndex++;
 			return "!ORDINAL";
 		}
 		else {
@@ -116,6 +119,7 @@ std::string ImportHandler::GetNextFunction() {
 
 			DWORD nameIndex = 0;
 			do {
+				//LOG_F(ERROR, "nameIndex (%d)", nameIndex);
 				if(!ReadProcessMemory(this->hProcess, lpvScratch, pFuncName + nameIndex, sizeof(BYTE), &bytesRead)) {
 					LOG_F(ERROR, "GetNextFunction (%x)", GetLastError());
 					exit(1);
@@ -169,17 +173,21 @@ std::string ImportHandler::GetNextFunction() {
 }
 
 UINT64 ImportHandler::GetFunctionOrd() {
-	return this->itdOrig.u1.Ordinal & 0x7FFFFFFF;
+	return this->itdOrig.u1.Ordinal & 0xFFFF;
 }
 
 UINT64 ImportHandler::GetFunctionAddr() {
 	LPVOID lpvScratch;
 	SIZE_T bytesRead;
 
+	if (this->itdIndex < 1) {
+		LOG_F(ERROR, "GetFunctionAddr: Underflow on itdIndex", GetLastError());
+	}
+
 	if (this->machine == IMAGE_FILE_MACHINE_AMD64) {
 		uint64_t iatFirstThunkAddr;
 		lpvScratch = (LPVOID)((uintptr_t)this->lpvBaseOfImage + this->iid.FirstThunk + (this->itdIndex - 1) * sizeof(uint64_t));
-		
+
 		if(!ReadProcessMemory(this->hProcess, lpvScratch, &iatFirstThunkAddr, sizeof(uint64_t), &bytesRead)) {
 			LOG_F(ERROR, "GetFunctionAddr (%x)", GetLastError());
 			exit(1);
