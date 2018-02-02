@@ -40,8 +40,13 @@
 #endif
 
 file_t
-log_file_open(client_id_t id, void *drcontext,
-              const char *path, const char *name, uint flags)
+generic_file_open(
+    client_id_t id, 
+    void *drcontext,
+    const char *path, 
+    const char *name, 
+    const char *suffix, 
+    uint flags)
 {
     file_t log;
     char log_dir[MAXIMUM_PATH];
@@ -50,10 +55,15 @@ log_file_open(client_id_t id, void *drcontext,
     char *dirsep;
 
     DR_ASSERT(name != NULL);
-    len = dr_snprintf(log_dir, BUFFER_SIZE_ELEMENTS(log_dir), "%s",
-                      path == NULL ? dr_get_client_path(id) : path);
+    len = dr_snprintf(
+        log_dir, 
+        BUFFER_SIZE_ELEMENTS(log_dir), 
+        "%s",
+        path == NULL ? dr_get_client_path(id) : path);
+
     DR_ASSERT(len > 0);
     NULL_TERMINATE_BUFFER(log_dir);
+
     dirsep = log_dir + len - 1;
     if (path == NULL /* removing client lib */ ||
         /* path does not have a trailing / and is too large to add it */
@@ -71,9 +81,15 @@ log_file_open(client_id_t id, void *drcontext,
         *(dirsep + 1) = 0;
     NULL_TERMINATE_BUFFER(log_dir);
     /* we do not need call drx_init before using drx_open_unique_appid_file */
-    log = drx_open_unique_appid_file(log_dir, dr_get_process_id(),
-                                     name, "log", flags,
-                                     buf, BUFFER_SIZE_ELEMENTS(buf));
+    log = drx_open_unique_appid_file(
+        log_dir, 
+        dr_get_process_id(),
+        name, 
+        suffix, 
+        flags,
+        buf, 
+        BUFFER_SIZE_ELEMENTS(buf));
+    
     if (log != INVALID_FILE) {
         char msg[MAXIMUM_PATH];
         len = dr_snprintf(msg, BUFFER_SIZE_ELEMENTS(msg), "Data file %s created", buf);
@@ -91,6 +107,17 @@ log_file_open(client_id_t id, void *drcontext,
 #endif /* SHOW_RESULTS */
     }
     return log;
+}
+
+file_t
+log_file_open(
+    client_id_t id, 
+    void *drcontext,
+    const char *path, 
+    const char *name, 
+    uint flags)
+{
+    return generic_file_open(id, drcontext, path, name, "log", flags);
 }
 
 void

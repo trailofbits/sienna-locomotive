@@ -56,6 +56,15 @@
 # define IF_WINDOWS(x) /* nothing */
 #endif
 
+file_t
+generic_file_open(
+    client_id_t id, 
+    void *drcontext,
+    const char *path, 
+    const char *name, 
+    const char *suffix, 
+    uint flags);
+
 /* open a log file
  * - id:        client id for getting the client library path
  * - drcontext: DR's context for per-thread logging, pass NULL if global logging
