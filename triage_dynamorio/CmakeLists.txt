@@ -6,6 +6,10 @@ endif(NOT DynamoRIO_FOUND)
 
 add_library(tracer SHARED tracer.cpp utils.c)
 
+#include_directories(include include\z3 include\z3\c++)
+#find_library(TRITON_LIB triton HINTS lib)
+#target_link_libraries(tracer ${TRITON_LIB})
+
 configure_DynamoRIO_client(tracer)
 
 use_DynamoRIO_extension(tracer drmgr)
