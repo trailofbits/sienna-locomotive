@@ -64,6 +64,7 @@
 #include "dr_api.h"
 #include "drmgr.h"
 #include "drreg.h"
+#include "drwrap.h"
 extern "C" {
 #include "utils.h"
 }
@@ -551,6 +552,51 @@ onexception(void *drcontext, dr_exception_t *excpt) {
     return true;
 }
 
+static void
+wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
+    dr_fprintf(STDERR, "In wrap_pre_ReadFile\n");
+    
+    HANDLE hFile = drwrap_get_arg(wrapcxt, 0);
+    LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
+
+    void *drcontext = drwrap_get_drcontext(wrapcxt);
+    per_thread_t *data = (per_thread_t *)drmgr_get_tls_field(drcontext, tls_idx);
+
+    dr_printf("TAINTED %p\n", lpBuffer);
+
+    byte taintByte = 0x83;
+    fwrite(&taintByte, sizeof(byte), 1, data->logf);
+    fwrite(&lpBuffer, sizeof(LPVOID), 1, data->logf);
+
+}
+
+static void
+wrap_post_ReadFile(void *wrapcxt, void *user_data) {
+    dr_fprintf(STDERR, "In wrap_post_ReadFile\n");
+    HANDLE hFile =               (HANDLE)drwrap_get_arg(wrapcxt, 0);
+    LPVOID lpBuffer =            drwrap_get_arg(wrapcxt, 1);
+    DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
+    LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
+
+    BOOL ok = TRUE; 
+    drwrap_set_retval(wrapcxt, &ok); // FIXME
+}
+
+static void
+module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
+    app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, "ReadFile");
+    if (towrap != NULL) {
+        dr_flush_region(towrap, 0x1000);
+        bool ok = drwrap_wrap(towrap, wrap_pre_ReadFile, wrap_post_ReadFile);
+        // bool ok = false;
+        if (ok) {
+            dr_fprintf(STDERR, "<wrapped ReadFile @ 0x%p\n", towrap);
+        } else {
+            dr_fprintf(STDERR, "<FAILED to wrap ReadFile @ 0x%p: already wrapped?\n", towrap);
+        }
+    }
+}
+
 void tracer(client_id_t id, int argc, const char *argv[]) {
     /* TRACE TRACE TRACE TRACE TRACE 
     ** TRACE TRACE TRACE TRACE TRACE 
@@ -564,12 +610,13 @@ void tracer(client_id_t id, int argc, const char *argv[]) {
     drreg_options_t ops = {sizeof(ops), 3, false};
     dr_set_client_name("DynamoRIO Sample Client 'instrace'",
                        "http://dynamorio.org/issues");
-    if (!drmgr_init() || drreg_init(&ops) != DRREG_SUCCESS)
+    if (!drmgr_init() || drreg_init(&ops) != DRREG_SUCCESS || !drwrap_init())
         DR_ASSERT(false);
 
     dr_register_exit_event(event_exit_trace);
 
-    if (!drmgr_register_thread_init_event(event_thread_init) ||
+    if (!drmgr_register_module_load_event(module_load_event) ||
+        !drmgr_register_thread_init_event(event_thread_init) ||
         !drmgr_register_thread_exit_event(event_thread_exit) ||
         !drmgr_register_bb_instrumentation_event(NULL,
                                                  event_app_instruction,
@@ -591,45 +638,45 @@ void tracer(client_id_t id, int argc, const char *argv[]) {
     dr_log(NULL, LOG_ALL, 1, "Client 'instrace' initializing\n");
 }
 
-void coverage(client_id_t id, int argc, const char *argv[]) {
-    /* COVERAGE COVERAGE COVERAGE COVERAGE COVERAGE 
-    ** COVERAGE COVERAGE COVERAGE COVERAGE COVERAGE 
-    ** COVERAGE COVERAGE COVERAGE COVERAGE COVERAGE 
-    ** COVERAGE COVERAGE COVERAGE COVERAGE COVERAGE 
-    ** COVERAGE COVERAGE COVERAGE COVERAGE COVERAGE 
-    ** COVERAGE COVERAGE COVERAGE COVERAGE COVERAGE 
-    ** COVERAGE COVERAGE COVERAGE COVERAGE COVERAGE 
-    */
+// void coverage(client_id_t id, int argc, const char *argv[]) {
+//     /* COVERAGE COVERAGE COVERAGE COVERAGE COVERAGE 
+//     ** COVERAGE COVERAGE COVERAGE COVERAGE COVERAGE 
+//     ** COVERAGE COVERAGE COVERAGE COVERAGE COVERAGE 
+//     ** COVERAGE COVERAGE COVERAGE COVERAGE COVERAGE 
+//     ** COVERAGE COVERAGE COVERAGE COVERAGE COVERAGE 
+//     ** COVERAGE COVERAGE COVERAGE COVERAGE COVERAGE 
+//     ** COVERAGE COVERAGE COVERAGE COVERAGE COVERAGE 
+//     */
 
-    drreg_options_t ops = {sizeof(ops), 3, false};
-    dr_set_client_name("DynamoRIO Sample Client 'instrace'",
-                       "http://dynamorio.org/issues");
-    if (!drmgr_init() || drreg_init(&ops) != DRREG_SUCCESS)
-        DR_ASSERT(false);
+//     drreg_options_t ops = {sizeof(ops), 3, false};
+//     dr_set_client_name("DynamoRIO Sample Client 'instrace'",
+//                        "http://dynamorio.org/issues");
+//     if (!drmgr_init() || drreg_init(&ops) != DRREG_SUCCESS)
+//         DR_ASSERT(false);
 
-    dr_register_exit_event(event_exit_bb);
+//     dr_register_exit_event(event_exit_bb);
 
-    if (!drmgr_register_thread_init_event(event_thread_init) ||
-        !drmgr_register_thread_exit_event(event_thread_exit_cov) ||
-        !drmgr_register_bb_instrumentation_event(NULL,
-                                                 event_app_bb,
-                                                 NULL) ||
-        !drmgr_register_exception_event(onexception)) 
-    {
-        DR_ASSERT(false);
-    }
+//     if (!drmgr_register_thread_init_event(event_thread_init) ||
+//         !drmgr_register_thread_exit_event(event_thread_exit_cov) ||
+//         !drmgr_register_bb_instrumentation_event(NULL,
+//                                                  event_app_bb,
+//                                                  NULL) ||
+//         !drmgr_register_exception_event(onexception)) 
+//     {
+//         DR_ASSERT(false);
+//     }
 
-    client_id = id;
-    mutex = dr_mutex_create();
+//     client_id = id;
+//     mutex = dr_mutex_create();
 
-    tls_idx = drmgr_register_tls_field();
-    DR_ASSERT(tls_idx != -1);
+//     tls_idx = drmgr_register_tls_field();
+//     DR_ASSERT(tls_idx != -1);
 
-    if (!dr_raw_tls_calloc(&tls_seg, &tls_offs, INSTRACE_TLS_COUNT, 0))
-        DR_ASSERT(false);
+//     if (!dr_raw_tls_calloc(&tls_seg, &tls_offs, INSTRACE_TLS_COUNT, 0))
+//         DR_ASSERT(false);
 
-    dr_log(NULL, LOG_ALL, 1, "Client 'instrace' initializing\n");
-}
+//     dr_log(NULL, LOG_ALL, 1, "Client 'instrace' initializing\n");
+// }
 
 // concrete mem
 // concrete reg
