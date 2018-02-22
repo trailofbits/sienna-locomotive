@@ -65,9 +65,13 @@
 #include "drmgr.h"
 #include "drreg.h"
 #include "drwrap.h"
+#include "dr_ir_instr.h"
+
 extern "C" {
 #include "utils.h"
 }
+
+#include "Dbghelp.h"
 
 // #include "triton/api.hpp"
 // #include "triton/x86Specifications.hpp"
@@ -193,6 +197,374 @@ clean_call(void)
 {
     void *drcontext = dr_get_current_drcontext();
     instrace(drcontext);
+}
+
+std::set<reg_id_t> tainted_regs;
+std::set<app_pc> tainted_mems;
+
+static reg_id_t reg_to_full_width32(reg_id_t reg) {
+    switch(reg){
+        case DR_REG_AX:
+        case DR_REG_AH:
+        case DR_REG_AL:
+            return DR_REG_EAX;
+        case DR_REG_BX:
+        case DR_REG_BH:
+        case DR_REG_BL:
+            return DR_REG_EBX;
+        case DR_REG_CX:
+        case DR_REG_CH:
+        case DR_REG_CL:
+            return DR_REG_ECX;
+        case DR_REG_DX:
+        case DR_REG_DH:
+        case DR_REG_DL:
+            return DR_REG_EDX;
+        case DR_REG_SP:
+            return DR_REG_ESP;
+        case DR_REG_BP:
+            return DR_REG_EBP;
+        case DR_REG_SI:
+            return DR_REG_ESI;
+        case DR_REG_DI:
+            return DR_REG_EDI;
+        default:
+            return reg;
+    }
+}
+
+static reg_id_t reg_to_full_width64(reg_id_t reg) {
+    switch(reg){
+        case DR_REG_EAX:
+        case DR_REG_AX:
+        case DR_REG_AH:
+        case DR_REG_AL:
+            return DR_REG_RAX;
+        case DR_REG_EBX:
+        case DR_REG_BX:
+        case DR_REG_BH:
+        case DR_REG_BL:
+            return DR_REG_RBX;
+        case DR_REG_ECX:
+        case DR_REG_CX:
+        case DR_REG_CH:
+        case DR_REG_CL:
+            return DR_REG_RCX;
+        case DR_REG_EDX:
+        case DR_REG_DX:
+        case DR_REG_DH:
+        case DR_REG_DL:
+            return DR_REG_RDX;
+        case DR_REG_R8D:
+        case DR_REG_R8W:
+        case DR_REG_R8L:
+            return DR_REG_R8;
+        case DR_REG_R9D:
+        case DR_REG_R9W:
+        case DR_REG_R9L:
+            return DR_REG_R9;
+        case DR_REG_R10D:
+        case DR_REG_R10W:
+        case DR_REG_R10L:
+            return DR_REG_R10;
+        case DR_REG_R11D:
+        case DR_REG_R11W:
+        case DR_REG_R11L:
+            return DR_REG_R11;
+        case DR_REG_R12D:
+        case DR_REG_R12W:
+        case DR_REG_R12L:
+            return DR_REG_R12;
+        case DR_REG_R13D:
+        case DR_REG_R13W:
+        case DR_REG_R13L:
+            return DR_REG_R13;
+        case DR_REG_R14D:
+        case DR_REG_R14W:
+        case DR_REG_R14L:
+            return DR_REG_R14;
+        case DR_REG_R15D:
+        case DR_REG_R15W:
+        case DR_REG_R15L:
+            return DR_REG_R15;
+        case DR_REG_ESP:
+        case DR_REG_SP:
+            return DR_REG_RSP;
+        case DR_REG_EBP:
+        case DR_REG_BP:
+            return DR_REG_RBP;
+        case DR_REG_ESI:
+        case DR_REG_SI:
+            return DR_REG_RSI;
+        case DR_REG_EDI:
+        case DR_REG_DI:
+            return DR_REG_RDI;
+        default:
+            return reg;
+    }
+}
+
+static bool
+is_tainted(void *drcontext, opnd_t opnd) 
+{
+    if(opnd_is_reg(opnd)) {
+        reg_id_t reg = opnd_get_reg(opnd);
+        reg = reg_to_full_width64(reg);
+
+        // dr_get_thread_id
+
+        if(tainted_regs.find(reg) != tainted_regs.end()) {
+            return true;
+        }
+    } else if(opnd_is_memory_reference(opnd)) {
+        dr_mcontext_t mc = {sizeof(mc),DR_MC_ALL};
+        dr_get_mcontext(drcontext, &mc);
+        app_pc addr = opnd_compute_address(opnd, &mc);
+
+        opnd_size_t dr_size = opnd_get_size(opnd);
+        uint size = opnd_size_in_bytes(dr_size);
+        for(uint i=0; i<size; i++) {
+            if(tainted_mems.find(addr) != tainted_mems.end()) {
+                return true;
+            }
+        }
+
+    } 
+    // else if(opnd_is_pc(opnd)) {
+    //     opnd_get_pc(opnd);
+    // } else if(opnd_is_abs_addr(opnd)) {
+    //     opnd_get_addr(opnd);
+    // }
+    return false;
+}
+
+static void
+taint_mem(app_pc addr, uint size) {
+    for(uint i=0; i<size; i++) {
+        dr_printf("tainting: %llx\n", addr+i);
+        tainted_mems.insert(addr+i);
+    }
+}
+
+static bool
+untaint_mem(app_pc addr, uint size) {
+    bool untainted = false;
+    for(uint i=0; i<size; i++) {
+        size_t n = tainted_mems.erase(addr+i);
+        if(n) {
+            dr_printf("untainting: %llx\n", addr+i);
+            untainted = true;
+        }
+    }
+    return untainted;
+}
+
+static void
+taint(void *drcontext, opnd_t opnd) 
+{
+    if(opnd_is_reg(opnd)) {
+        reg_id_t reg = opnd_get_reg(opnd);
+        reg = reg_to_full_width64(reg);
+
+        tainted_regs.insert(reg);
+        
+        char buf[100];
+        opnd_disassemble_to_buffer(drcontext, opnd, buf, 100);
+        dr_printf("tainting: %s\n", buf);
+    } else if(opnd_is_memory_reference(opnd)) {
+        dr_mcontext_t mc = {sizeof(mc),DR_MC_ALL};
+        dr_get_mcontext(drcontext, &mc);
+        app_pc addr = opnd_compute_address(opnd, &mc);
+
+        // opnd get size
+        opnd_size_t dr_size = opnd_get_size(opnd);
+        // opnd size in bytes
+        uint size = opnd_size_in_bytes(dr_size);
+        // loop insert
+        taint_mem(addr, size);
+    } 
+    // else if(opnd_is_pc(opnd)) {
+    //     opnd_get_pc(opnd);
+    // } else if(opnd_is_abs_addr(opnd)) {
+    //     opnd_get_addr(opnd);
+    // }
+    
+    return;
+}
+
+static bool
+untaint(void *drcontext, opnd_t opnd) 
+{
+    bool untainted = false;
+    if(opnd_is_reg(opnd)) {
+        reg_id_t reg = opnd_get_reg(opnd);
+        reg = reg_to_full_width64(reg);
+
+        size_t n = tainted_regs.erase(reg);
+        if(n) {
+            char buf[100];
+            opnd_disassemble_to_buffer(drcontext, opnd, buf, 100);
+            dr_printf("untainting: %s\n", buf);
+            untainted = true;
+        }
+    } else if(opnd_is_memory_reference(opnd)) {
+        dr_mcontext_t mc = {sizeof(mc),DR_MC_ALL};
+        dr_get_mcontext(drcontext, &mc);
+        app_pc addr = opnd_compute_address(opnd, &mc);
+
+        // opnd get size
+        opnd_size_t dr_size = opnd_get_size(opnd);
+        // opnd size in bytes
+        uint size = opnd_size_in_bytes(dr_size);
+        // loop insert
+        untainted = untaint_mem(addr, size);
+    } 
+    // else if(opnd_is_pc(opnd)) {
+    //     opnd_get_pc(opnd);
+    // } else if(opnd_is_abs_addr(opnd)) {
+    //     opnd_get_addr(opnd);
+    // }
+    
+    return untainted;
+}
+
+
+static bool
+handle_xor(void *drcontext, instr_t *instr) {
+    bool result = false;
+    int src_count = instr_num_srcs(instr);
+
+    if(src_count == 2) {
+        opnd_t opnd_0 = instr_get_src(instr, 0);
+        opnd_t opnd_1 = instr_get_src(instr, 1);
+
+        if(opnd_is_reg(opnd_0) && opnd_is_reg(opnd_1)) {
+            reg_id_t reg_0 = opnd_get_reg(opnd_0);
+            reg_id_t reg_1 = opnd_get_reg(opnd_1);
+
+            if(reg_0 == reg_1) {
+                size_t n = tainted_regs.erase(reg_0);
+                if(n) {
+                    char buf[100];
+                    opnd_disassemble_to_buffer(drcontext, opnd_0, buf, 100);
+                    dr_printf("untainting: %s\n", buf);
+                }
+                result = true;
+            }
+        }
+    }
+
+    return result;
+}
+
+static void
+handle_pop(void *drcontext, instr_t *instr) {
+    int src_count = instr_num_srcs(instr);
+    bool tainted = false;
+
+    for(int i=0; i<src_count && !tainted; i++) {
+        opnd_t opnd = instr_get_src(instr, i);
+        tainted |= is_tainted(drcontext, opnd);
+    }
+
+    int dst_count = instr_num_dsts(instr);
+
+    for(int i=0; i<dst_count && tainted; i++) {
+        opnd_t opnd = instr_get_dst(instr, i);
+
+        if(opnd_is_reg(opnd)) {
+            reg_id_t reg = opnd_get_reg(opnd);
+            reg = reg_to_full_width64(reg);
+            if(reg == DR_REG_RSP) {
+                continue;
+            }
+        }
+
+        taint(drcontext, opnd);
+    }
+
+    bool untainted = false;
+    for(int i=0; i<dst_count && !tainted; i++) {
+        opnd_t opnd = instr_get_dst(instr, i);
+
+        if(opnd_is_reg(opnd)) {
+            reg_id_t reg = opnd_get_reg(opnd);
+            reg = reg_to_full_width64(reg);
+            if(reg == DR_REG_RSP) {
+                continue;
+            }
+        }
+
+        untainted |= untaint(drcontext, opnd);
+    }
+
+    if(tainted | untainted) {
+        int opcode = instr_get_opcode(instr);
+        char buf[100];
+        instr_disassemble_to_buffer(drcontext, instr, buf, 100);
+        dr_printf("INS: (%d) %s\n", opcode, buf);
+    }
+}
+
+static bool
+handle_specific(void *drcontext, instr_t *instr) {
+    int opcode = instr_get_opcode(instr);
+    bool result = false;
+
+    switch(opcode) {
+        // pop
+        case 20:
+            handle_pop(drcontext, instr);
+            return true;
+        // xor
+        case 12:
+            result = handle_xor(drcontext, instr);
+            return result;
+        default:
+            return false;
+    }
+
+}
+
+static void
+propagate_taint(app_pc pc) 
+{
+    void *drcontext = dr_get_current_drcontext();
+    instr_t instr;
+    instr_init(drcontext, &instr);
+    decode(drcontext, pc, &instr);
+
+    if(handle_specific(drcontext, &instr)) {
+        return;
+    }
+
+    int src_count = instr_num_srcs(&instr);
+    bool tainted = false;
+
+    for(int i=0; i<src_count && !tainted; i++) {
+        opnd_t opnd = instr_get_src(&instr, i);
+        tainted |= is_tainted(drcontext, opnd);
+    }
+
+    int dst_count = instr_num_dsts(&instr);
+
+    for(int i=0; i<dst_count && tainted; i++) {
+        opnd_t opnd = instr_get_dst(&instr, i);
+        taint(drcontext, opnd);
+    }
+
+    bool untainted = false;
+    for(int i=0; i<dst_count && !tainted; i++) {
+        opnd_t opnd = instr_get_dst(&instr, i);
+        untainted |= untaint(drcontext, opnd);
+    }
+
+    if(tainted | untainted) {
+        int opcode = instr_get_opcode(&instr);
+        char buf[100];
+        instr_disassemble_to_buffer(drcontext, &instr, buf, 100);
+        dr_printf("INS: (%d) %s\n", opcode, buf);
+    }
 }
 
 static void
@@ -347,18 +719,13 @@ event_app_instruction(
     instrument_instr(drcontext, bb, instr);
 
     if (drmgr_is_first_instr(drcontext, instr)
-        /* XXX i#1698: there are constraints for code between ldrex/strex pairs,
-         * so we minimize the instrumentation in between by skipping the clean call.
-         * We're relying a bit on the typical code sequence with either ldrex..strex
-         * in the same bb, in which case our call at the start of the bb is fine,
-         * or with a branch in between and the strex at the start of the next bb.
-         * However, there is still a chance that the instrumentation code may clear the
-         * exclusive monitor state.
-         * Using a fault to handle a full buffer should be more robust, and the
-         * forthcoming buffer filling API (i#513) will provide that.
-         */
         IF_AARCHXX(&& !instr_is_exclusive_store(instr)))
+    {
         dr_insert_clean_call(drcontext, bb, instr, (void *)clean_call, false, 0);
+    }
+
+    dr_insert_clean_call(drcontext, bb, instr, propagate_taint, false, 1, 
+                OPND_CREATE_INTPTR(instr_get_app_pc(instr)));
 
     return DR_EMIT_DEFAULT;
 }
@@ -400,6 +767,7 @@ event_thread_init(void *drcontext)
         DR_MEMPROT_READ | DR_MEMPROT_WRITE,
         NULL);
     DR_ASSERT(data->seg_base != NULL && data->buf_base != NULL);
+
     /* put buf_base to TLS as starting buf_ptr */
     BUF_PTR(data->seg_base) = data->buf_base;
 
@@ -407,11 +775,6 @@ event_thread_init(void *drcontext)
 
     data->prev_loc = 0;
 
-    /* We're going to dump our data to a per-thread file.
-     * On Windows we need an absolute path so we place it in
-     * the same directory as our library. We could also pass
-     * in a path as a client argument.
-     */
     data->log = log_file_open(
         client_id, 
         drcontext, 
@@ -423,22 +786,6 @@ event_thread_init(void *drcontext)
         DR_FILE_ALLOW_LARGE);
 
     data->logf = log_stream_from_file(data->log);
-
-    // fprintf(data->logf, "edges = {}\n");
-    // fprintf(data->logf, "def EDGE(edge_id):\n");
-    // fprintf(data->logf, "    if edge_id not in edges:\n");
-    // fprintf(data->logf, "        edges[edge_id] = 0\n");
-    // fprintf(data->logf, "    edges[edge_id] += 1\n");
-    // fprintf(data->logf, "\n");
-    // fprintf(data->logf, "def INS(addr, len, bytes):\n");
-    // fprintf(data->logf, "    return\n");
-    // fprintf(data->logf, "\n");
-    // fprintf(data->logf, "bbs = {}\n");
-    // fprintf(data->logf, "def BB(addr):\n");
-    // fprintf(data->logf, "    if addr not in bbs:\n");
-    // fprintf(data->logf, "        bbs[addr] = 0\n");
-    // fprintf(data->logf, "    bbs[addr] += 1\n");
-    // fprintf(data->logf, "\n");
 }
 
 static void
@@ -558,15 +905,43 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     
     HANDLE hFile = drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
+    DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
+    LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
 
     void *drcontext = drwrap_get_drcontext(wrapcxt);
     per_thread_t *data = (per_thread_t *)drmgr_get_tls_field(drcontext, tls_idx);
 
+
     dr_printf("TAINTED %p\n", lpBuffer);
 
-    byte taintByte = 0x83;
+    byte taintByte = 0x81;
     fwrite(&taintByte, sizeof(byte), 1, data->logf);
     fwrite(&lpBuffer, sizeof(LPVOID), 1, data->logf);
+    uint64 size = 0;
+    size = nNumberOfBytesToRead;
+    fwrite(&size, sizeof(uint64), 1, data->logf);
+
+    taint_mem((app_pc)lpBuffer, size);
+//     // This throws some errors that make me think it won't work in DR
+//     file_t dump_f = generic_file_open(
+//         client_id, 
+//         drcontext, 
+//         NULL /* using client lib path */,
+//         "instrace",
+//         "dump",
+// #ifndef WINDOWS
+//         DR_FILE_CLOSE_ON_FORK |
+// #endif
+//         DR_FILE_ALLOW_LARGE);
+
+//     // write minidump
+//     HANDLE hProc = GetCurrentProcess();    
+//     DWORD procId = GetCurrentProcessId();
+//     DWORD type = MiniDumpWithFullMemory | MiniDumpWithFullMemoryInfo;
+//     if(!MiniDumpWriteDump(hProc, procId, dump_f, (MINIDUMP_TYPE)type, NULL, NULL, NULL)) {
+//         dr_printf("minidump failed :(\n");
+//         exit(1);
+//     }
 
 }
 
