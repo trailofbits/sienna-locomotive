@@ -83,15 +83,7 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
 /* from wrap.cpp sample code */
 static void
 event_exit(void) {
-    //char msg[256];
-    //int len;
-    //len = dr_snprintf(msg, sizeof(msg)/sizeof(msg[0]),
-	//	    "<Largest ReadFile request: %d>\n",
-	//	    max_ReadFile);
-    //DR_ASSERT(len > 0);
-    //NULL_TERMINATE(msg);
-    //DISPLAY_STRING(msg);
-
+    
     drwrap_exit();
     drmgr_exit();
 }
@@ -108,59 +100,37 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     LPVOID lpBuffer =      drwrap_get_arg(wrapcxt, 1);
     nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
     lpNumberOfBytesRead =  (LPDWORD)drwrap_get_arg(wrapcxt, 3);
-    //if (max_ReadFile < nNumberOfBytesToRead) {
-    //    max_ReadFile = nNumberOfBytesToRead;
-    //}
+    
     *user_data = lpBuffer;
-
+    
     LONG positionHigh = 0;
-
-    // we may need to go lower-level than just calling windows api?
-    //DWORD positionLow = SetFilePointer(hFile, 0, &positionHigh, FILE_CURRENT);
-    //DWORD64 position = positionHigh;
-    //position = (position << 32) | positionLow;
+    DWORD positionLow = SetFilePointer(hFile, 0, &positionHigh, FILE_CURRENT);
+    DWORD64 position = positionHigh;
+    position = (position << 32) | positionLow;
 }
 
 static void
 wrap_post_ReadFile(void *wrapcxt, void *user_data) {
     LPVOID lpBuffer = user_data;
-    DWORD nNumberOfBytesToRead;
 	if (lpNumberOfBytesRead) {
         nNumberOfBytesToRead = *lpNumberOfBytesRead;
     }
     
-    //dr_fprintf(STDERR, "In wrap_post_ReadFile (%d)\n", hFile);
-    //dr_printf("post- lpBuffer %p: %s\n", lpBuffer, lpBuffer);
-   
     if (!replay && !trace || replay) {
-        //if (!mutate(hFile, position, lpBuffer, nNumberOfBytesToRead)) {
-        if (!mutate(hFile, position, lpBuffer, *lpNumberOfBytesRead)) {
+        if (!mutate(hFile, position, lpBuffer, nNumberOfBytesToRead)) {
             // TODO: fallback mutations?
-            dr_printf("failed to mutate lpBuffer\n");
+            //TCHAR *new_buf = (TCHAR *)lpBuffer;
+            //for(DWORD i = 0; i < nNumberOfBytesToRead; ++i) {
+            //    new_buf[i] = (TCHAR)'A';
+            //}
         }
     }
-    
-    //TCHAR *new_buf = (TCHAR *)lpBuffer;
-    //for(DWORD i = 0; i < nNumberOfBytesToRead; ++i) {
-    //    if (isprint(new_buf[i])) {
-    //        dr_printf("%c", new_buf[i]);
-    //    }
-    //    else {
-    //        dr_printf(".");
-    //    }
-    //    new_buf[i] = (TCHAR)'A';
-    //    dr_printf("%c", new_buf[i]);
-    //}
-
-    //dr_printf("mutated lpBuffer %p: %s", lpBuffer, lpBuffer);
 
     if (lpNumberOfBytesRead != NULL) {
         *lpNumberOfBytesRead = nNumberOfBytesToRead;
     }
     
-    //dr_printf("lpNumberOfBytesRead = %d\n", *lpNumberOfBytesRead);
-
-    drwrap_set_mcontext(wrapcxt);
+    drwrap_set_mcontext(wrapcxt); // is this necessary?
 
     BOOL ok = TRUE; 
     drwrap_set_retval(wrapcxt, &ok); // FIXME
@@ -170,23 +140,15 @@ static DWORD mutateCount = 0;
 static BOOL mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
 	TCHAR filePath[MAX_PATH+1];
     TCHAR *new_buf = (TCHAR *)buf;
-    
-    for(DWORD i = 0; i < size; ++i) {
-        if (isprint(new_buf[i])) {
-            dr_printf("%c", new_buf[i]);
-        }
-        else {
-            dr_printf(".");
-        }
-        new_buf[i] = (TCHAR)'A';
-        dr_printf("%c", new_buf[i]);
+
+    if (hFile == INVALID_HANDLE_VALUE) {
+        return false;
     }
 
-    /*
 	DWORD pathSize = GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, 0);
 
 	if (pathSize > MAX_PATH || pathSize == 0) {
-		return false;
+        return false;
 	}
 
 	filePath[pathSize] = 0;
@@ -201,7 +163,7 @@ static BOOL mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
 		NULL);
 
 	if (hPipe == INVALID_HANDLE_VALUE) {
-		return false;
+        return false;
 	}
 
 	DWORD readMode = PIPE_READMODE_MESSAGE;
@@ -236,9 +198,9 @@ static BOOL mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
 		WriteFile(hPipe, &mutateCount, sizeof(DWORD), &bytesWritten, NULL);
 		TransactNamedPipe(hPipe, &size, sizeof(DWORD), buf, size, &bytesRead, NULL);
 	}
+
 	CloseHandle(hPipe);
-	
-    */
+    
     mutateCount++;
 
 	return true;
