@@ -502,14 +502,168 @@ handle_pop(void *drcontext, instr_t *instr) {
         int opcode = instr_get_opcode(instr);
         char buf[100];
         instr_disassemble_to_buffer(drcontext, instr, buf, 100);
-        dr_printf("INS: (%d) %s\n", opcode, buf);
+        dr_printf("POP: (%d) %s\n", opcode, buf);
     }
 }
+
+static bool
+handle_xchg(void *drcontext, instr_t *instr) {
+    bool result = false;
+    int src_count = instr_num_srcs(instr);
+
+    if(src_count == 2) {
+        opnd_t opnd_0 = instr_get_src(instr, 0);
+        opnd_t opnd_1 = instr_get_src(instr, 1);
+
+        if(opnd_is_reg(opnd_0) && opnd_is_reg(opnd_1)) {
+            reg_id_t reg_0 = opnd_get_reg(opnd_0);
+            reg_id_t reg_1 = opnd_get_reg(opnd_1);
+
+
+            bool reg_0_tainted = tainted_regs.find(reg_0) != tainted_regs.end();
+            bool reg_1_tainted = tainted_regs.find(reg_1) != tainted_regs.end();
+
+            if(reg_0_tainted && !reg_1_tainted) {
+                tainted_regs.erase(reg_0);
+                tainted_regs.insert(reg_1);
+                dr_printf("untainting: %s\n", get_register_name(reg_0));
+                dr_printf("tainting: %s\n", get_register_name(reg_1));
+                result = true;
+            } else if(reg_1_tainted && !reg_0_tainted) {
+                tainted_regs.erase(reg_1);
+                tainted_regs.insert(reg_0);
+                dr_printf("untainting: %s\n", get_register_name(reg_1));
+                dr_printf("tainting: %s\n", get_register_name(reg_0));
+                result = true;
+            }
+        }
+    }
+
+    return result;
+}
+
+static bool
+handle_branches(void *drcontext, instr_t *instr) {
+
+    bool is_ret = instr_is_return(instr);
+    bool is_direct = instr_is_ubr(instr) || instr_is_cbr(instr) || instr_is_call_direct(instr);
+    bool is_indirect = instr_is_mbr(instr);
+    bool is_call = instr_is_call(instr);
+
+    if(!is_ret && !is_direct && !is_indirect && !is_call) {
+        return false;
+    }
+
+    // int opcode = instr_get_opcode(instr);
+    // char buf[100];
+    // instr_disassemble_to_buffer(drcontext, instr, buf, 100);
+    // dr_printf("(%d) %s\n", opcode, buf);
+
+    reg_id_t reg_pc = reg_to_full_width64(DR_REG_NULL);
+    reg_id_t reg_stack = reg_to_full_width64(DR_REG_ESP);
+    bool pc_tainted = tainted_regs.find(reg_pc) != tainted_regs.end();
+
+    bool result = false;
+    int src_count = instr_num_srcs(instr);
+    int dst_count = instr_num_dsts(instr);
+
+    // call
+    if(is_call) {
+        if(pc_tainted) {
+            // taint mem at rsp
+            for(int i=0; i<dst_count; i++) {
+                opnd_t opnd = instr_get_dst(instr, i);
+                if(opnd_is_memory_reference(opnd)) {
+                    taint(drcontext, opnd);
+                    break;
+                }
+            }
+        }
+    }
+
+    // direct branch or call
+    if(is_direct) {
+        if(pc_tainted) {
+            // untaint pc
+            tainted_regs.erase(reg_pc);
+        }
+    }
+
+    // indirect branch or call
+    if(is_indirect) {
+        for(int i=0; i<src_count; i++) {
+            opnd_t opnd = instr_get_src(instr, i);
+
+            if(opnd_is_reg(opnd)) {
+                reg_id_t reg = opnd_get_reg(opnd);
+                if(reg != reg_stack && tainted_regs.find(reg) != tainted_regs.end()) {
+                    // taint pc
+                    tainted_regs.insert(reg_pc);
+                }
+            }
+        }
+    }
+
+    // ret
+    if(is_ret) {
+        bool tainted = false;
+        for(int i=0; i<src_count; i++) {
+            opnd_t opnd = instr_get_src(instr, i);
+            if(is_tainted(drcontext, opnd)) {
+                tainted = true;
+                break;
+            }
+        }
+
+        if(tainted){
+            // taint pc
+            tainted_regs.insert(reg_pc);
+        } else {
+            // untaint pc
+            tainted_regs.erase(reg_pc);
+        }
+    }
+
+    return true;
+}
+
+/* 
+    // call
+    if(is_call) {
+        if pc is tainted
+            taint mem at rsp
+    }
+
+    // direct branch or call
+    if(is_direct) {
+        if pc is tainted
+            untaint pc
+    }
+
+    // indirect branch or call
+    if(is_indirect) {
+        if reg_s != stack && reg_s is tainted
+            taint pc
+    }
+
+    // ret
+    if(is_ret) {
+        if rsp is tainted or mem at rsp is tainted
+            taint pc
+        else
+            untaint pc
+    }
+*/
 
 static bool
 handle_specific(void *drcontext, instr_t *instr) {
     int opcode = instr_get_opcode(instr);
     bool result = false;
+
+    // indirect call
+    if(handle_branches(drcontext, instr)) {
+        return true;
+    }
 
     switch(opcode) {
         // pop
@@ -519,6 +673,10 @@ handle_specific(void *drcontext, instr_t *instr) {
         // xor
         case 12:
             result = handle_xor(drcontext, instr);
+            return result;
+        // xchg
+        case 62:
+            result = handle_xchg(drcontext, instr);
             return result;
         default:
             return false;
@@ -716,13 +874,13 @@ event_app_instruction(
     if (!instr_is_app(instr))
         return DR_EMIT_DEFAULT;
 
-    instrument_instr(drcontext, bb, instr);
+    // instrument_instr(drcontext, bb, instr);
 
-    if (drmgr_is_first_instr(drcontext, instr)
-        IF_AARCHXX(&& !instr_is_exclusive_store(instr)))
-    {
-        dr_insert_clean_call(drcontext, bb, instr, (void *)clean_call, false, 0);
-    }
+    // if (drmgr_is_first_instr(drcontext, instr)
+    //     IF_AARCHXX(&& !instr_is_exclusive_store(instr)))
+    // {
+    //     dr_insert_clean_call(drcontext, bb, instr, (void *)clean_call, false, 0);
+    // }
 
     dr_insert_clean_call(drcontext, bb, instr, propagate_taint, false, 1, 
                 OPND_CREATE_INTPTR(instr_get_app_pc(instr)));
@@ -893,6 +1051,11 @@ onexception(void *drcontext, dr_exception_t *excpt) {
         fwrite(&crashByte, sizeof(byte), 1, data->logf);
         fwrite(&exception_code, sizeof(exception_code), 1, data->logf);
         fwrite(&(excpt->record->ExceptionAddress), sizeof(excpt->record->ExceptionAddress), 1, data->logf);
+
+        std::set<reg_id_t>::iterator reg_it;
+        for(reg_it = tainted_regs.begin(); reg_it != tainted_regs.end(); reg_it++) {
+            dr_printf("crash tainted: %s\n", get_register_name(*reg_it));
+        }
 
         dr_exit_process(1);
     }
