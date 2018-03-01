@@ -36,7 +36,8 @@ extern "C" __declspec(dllexport) BOOL trace;
 __declspec(dllexport) BOOL trace;
 static BOOL replay;
 
-/* from wrap.cpp sample code */
+/* From wrap.cpp sample code. Called on application library load and unload.
+   Responsible for registering pre and post callbacks for ReadFile. */
 static void
 module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, "ReadFile");
@@ -59,7 +60,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     }
 }
 
-
+/* Runs after process initialization. Initializes DynamoRIO and registers module load callback*/
 DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
     dr_set_client_name("Sienna-Locomotive Fuzzer",
                        "https://github.com/trailofbits/sienna-locomotive/issues");
@@ -93,7 +94,8 @@ DWORD64 position = 0;
 DWORD   nNumberOfBytesToRead;
 LPDWORD lpNumberOfBytesRead;
 HANDLE  hFile;
-/* from wrap.cpp sample code */
+/* from wrap.cpp sample code. Runs before ReadFile is called. Records arguments to
+   ReadFile and stores them in probably thread-unsafe variables above. */
 static void
 wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     hFile =                drwrap_get_arg(wrapcxt, 0);
@@ -109,6 +111,8 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     position = (position << 32) | positionLow;
 }
 
+/* Called after ReadFile returns. Calls `mutate` on the bytes that ReadFile
+   wrote into the program's memory. */
 static void
 wrap_post_ReadFile(void *wrapcxt, void *user_data) {
     LPVOID lpBuffer = user_data;
@@ -136,6 +140,7 @@ wrap_post_ReadFile(void *wrapcxt, void *user_data) {
     drwrap_set_retval(wrapcxt, &ok); // FIXME
 }
 
+/* Hands bytes off to the mutation server, gets mutated bytes, and writes them into memory. */
 static DWORD mutateCount = 0;
 static BOOL mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
 	TCHAR filePath[MAX_PATH+1];
@@ -163,6 +168,7 @@ static BOOL mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
 		NULL);
 
 	if (hPipe == INVALID_HANDLE_VALUE) {
+		dr_fprintf(STDERR, "Named Pipe is invalid! Is the mutation server running?\n");
         return false;
 	}
 
@@ -179,6 +185,7 @@ static BOOL mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
 	if (!replay) {
 		BYTE eventId = 1;
 
+		// Send state information to the fuzz server
 		WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL);
 		WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL);
 		WriteFile(hPipe, &mutateCount, sizeof(DWORD), &bytesWritten, NULL);
@@ -188,6 +195,8 @@ static BOOL mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
 
 		WriteFile(hPipe, &position, sizeof(DWORD64), &bytesWritten, NULL);
 		WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL);
+		
+		// Send current contents of buf to the server, overwrite them with its reply
 		TransactNamedPipe(hPipe, buf, size, buf, size, &bytesRead, NULL);
 	}
 	else {
