@@ -72,6 +72,7 @@ extern "C" {
 }
 
 #include "Dbghelp.h"
+#include "Windows.h"
 
 // #include "triton/api.hpp"
 // #include "triton/x86Specifications.hpp"
@@ -1051,10 +1052,116 @@ onexception(void *drcontext, dr_exception_t *excpt) {
         fwrite(&crashByte, sizeof(byte), 1, data->logf);
         fwrite(&exception_code, sizeof(exception_code), 1, data->logf);
         fwrite(&(excpt->record->ExceptionAddress), sizeof(excpt->record->ExceptionAddress), 1, data->logf);
+        app_pc exception_address = (app_pc)(excpt->record->ExceptionAddress);
 
         std::set<reg_id_t>::iterator reg_it;
         for(reg_it = tainted_regs.begin(); reg_it != tainted_regs.end(); reg_it++) {
             dr_printf("crash tainted: %s\n", get_register_name(*reg_it));
+        }
+
+        std::string reason = "unknown";
+        uint8_t score = 50;
+
+        // check exception code
+        if (exception_code == EXCEPTION_ILLEGAL_INSTRUCTION) {
+            reason = "illegal instruction";
+            score = 100;
+            dr_exit_process(1);
+        }
+
+        if (exception_code == EXCEPTION_INT_DIVIDE_BY_ZERO) {
+            reason = "floating point exception";
+            score = 0;
+            dr_exit_process(1);
+        }
+
+        if (exception_code == EXCEPTION_BREAKPOINT) {
+            reason = "breakpoint";
+            score = 25;
+            dr_exit_process(1);
+        }
+
+        // get crashing instruction
+        instr_t instr;
+        instr_init(drcontext, &instr);
+        decode(drcontext, exception_address, &instr);
+
+        bool is_ret = instr_is_return(&instr);
+        bool is_direct = instr_is_ubr(&instr) || instr_is_cbr(&instr) || instr_is_call_direct(&instr);
+        bool is_indirect = instr_is_mbr(&instr);
+        bool is_call = instr_is_call(&instr); // this might be covered in other flags
+
+        reg_id_t reg_pc = reg_to_full_width64(DR_REG_NULL);
+        reg_id_t reg_stack = reg_to_full_width64(DR_REG_ESP);
+        bool pc_tainted = tainted_regs.find(reg_pc) != tainted_regs.end();
+        bool stack_tainted = tainted_regs.find(reg_stack) != tainted_regs.end();
+
+        // check branch
+        if (is_direct || is_indirect || is_call) {
+            if (pc_tainted) {
+                reason = "branching tainted pc";
+                score = 75;
+            }
+            else {
+                reason = "branching";
+                score = 25;
+            }
+            dr_exit_process(1);
+        }
+
+        // check ret 
+        if (is_ret) {
+            if (pc_tainted || stack_tainted) {
+                score = 100;
+                reason = "return with taint";
+            }
+            else {
+                reason = "return";
+                score = 75;
+            }
+
+            dr_exit_process(1);
+        }
+
+        bool mem_write = instr_writes_memory(&instr);
+        bool mem_read = instr_reads_memory(&instr);
+        bool tainted_src = false;
+        bool tainted_dst = false;
+
+        int src_count = instr_num_srcs(&instr);
+        int dst_count = instr_num_dsts(&instr);
+
+
+        for(int i=0; i<src_count; i++) {
+            opnd_t opnd = instr_get_src(&instr, i);
+            tainted_src |= is_tainted(drcontext, opnd);
+        }
+
+        for(int i=0; i<dst_count; i++) {
+            opnd_t opnd = instr_get_dst(&instr, i);
+            tainted_dst |= is_tainted(drcontext, opnd);
+        }
+
+        if(mem_write) {
+            if(tainted_src || tainted_dst) {
+                reason = "tainted write";
+                score = 75;
+            } else {
+                reason = "write";
+                score = 50;
+            }
+            dr_exit_process(1);
+        }
+
+        if(mem_read) {
+            if(tainted_src) {
+                reason = "tainted read";
+                score = 75;
+            } else {
+                reason = "read";
+                score = 25;
+            }
+            dr_exit_process(1);
         }
 
         dr_exit_process(1);
