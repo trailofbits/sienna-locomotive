@@ -329,7 +329,26 @@ is_tainted(void *drcontext, opnd_t opnd)
                 return true;
             }
         }
+        if(opnd_is_base_disp(opnd)) {
+            reg_id_t reg_base = opnd_get_base(opnd);
+            reg_id_t reg_disp = opnd_get_disp(opnd);
+            reg_id_t reg_indx = opnd_get_index(opnd);
 
+            if(reg_base != NULL && tainted_regs.find(reg_base) != tainted_regs.end()) {
+                dr_printf("tainted base: %s\n", get_register_name(reg_base));
+                return true;
+            }
+
+            if(reg_disp != NULL && tainted_regs.find(reg_disp) != tainted_regs.end()) {
+                dr_printf("tainted disp: %s\n", get_register_name(reg_disp));
+                return true;
+            }
+            
+            if (reg_indx != NULL && tainted_regs.find(reg_indx) != tainted_regs.end()) {
+                dr_printf("tainted index: %s\n", get_register_name(reg_indx));
+                return true;
+            }
+        }
     } 
     // else if(opnd_is_pc(opnd)) {
     //     opnd_get_pc(opnd);
@@ -1036,6 +1055,13 @@ event_exit_trace(void)
     drmgr_exit();
 }
 
+static void
+dump_crash(std::string reason, uint8_t score) {
+    dr_printf("REASON: %s\n", reason.c_str());
+    dr_printf("SCORE: %d\n", score);
+    dr_exit_process(1);
+}
+
 static bool
 onexception(void *drcontext, dr_exception_t *excpt) {
     DWORD num_written;
@@ -1052,11 +1078,24 @@ onexception(void *drcontext, dr_exception_t *excpt) {
         fwrite(&crashByte, sizeof(byte), 1, data->logf);
         fwrite(&exception_code, sizeof(exception_code), 1, data->logf);
         fwrite(&(excpt->record->ExceptionAddress), sizeof(excpt->record->ExceptionAddress), 1, data->logf);
+
         app_pc exception_address = (app_pc)(excpt->record->ExceptionAddress);
+        instr_t instr;
+        instr_init(drcontext, &instr);
+        decode(drcontext, exception_address, &instr);
+
+        char buf[100];
+        instr_disassemble_to_buffer(drcontext, &instr, buf, 100);
+        dr_printf("==== CRASH: %s\n", buf);
 
         std::set<reg_id_t>::iterator reg_it;
         for(reg_it = tainted_regs.begin(); reg_it != tainted_regs.end(); reg_it++) {
-            dr_printf("crash tainted: %s\n", get_register_name(*reg_it));
+            dr_printf("TAINTED REGS: %s\n", get_register_name(*reg_it));
+        }
+
+        std::set<app_pc>::iterator mem_it;
+        for(mem_it = tainted_mems.begin(); mem_it != tainted_mems.end(); mem_it++) {
+            dr_printf("TAINTED MEMS: %llx\n", *mem_it);
         }
 
         std::string reason = "unknown";
@@ -1066,26 +1105,22 @@ onexception(void *drcontext, dr_exception_t *excpt) {
         if (exception_code == EXCEPTION_ILLEGAL_INSTRUCTION) {
             reason = "illegal instruction";
             score = 100;
-            dr_exit_process(1);
+            dump_crash(reason, score);
         }
 
         if (exception_code == EXCEPTION_INT_DIVIDE_BY_ZERO) {
             reason = "floating point exception";
             score = 0;
-            dr_exit_process(1);
+            dump_crash(reason, score);
         }
 
         if (exception_code == EXCEPTION_BREAKPOINT) {
             reason = "breakpoint";
             score = 25;
-            dr_exit_process(1);
+            dump_crash(reason, score);
         }
 
         // get crashing instruction
-        instr_t instr;
-        instr_init(drcontext, &instr);
-        decode(drcontext, exception_address, &instr);
-
         bool is_ret = instr_is_return(&instr);
         bool is_direct = instr_is_ubr(&instr) || instr_is_cbr(&instr) || instr_is_call_direct(&instr);
         bool is_indirect = instr_is_mbr(&instr);
@@ -1106,7 +1141,7 @@ onexception(void *drcontext, dr_exception_t *excpt) {
                 reason = "branching";
                 score = 25;
             }
-            dr_exit_process(1);
+            dump_crash(reason, score);
         }
 
         // check ret 
@@ -1120,7 +1155,7 @@ onexception(void *drcontext, dr_exception_t *excpt) {
                 score = 75;
             }
 
-            dr_exit_process(1);
+            dump_crash(reason, score);
         }
 
         bool mem_write = instr_writes_memory(&instr);
@@ -1150,7 +1185,7 @@ onexception(void *drcontext, dr_exception_t *excpt) {
                 reason = "write";
                 score = 50;
             }
-            dr_exit_process(1);
+            dump_crash(reason, score);
         }
 
         if(mem_read) {
@@ -1161,10 +1196,10 @@ onexception(void *drcontext, dr_exception_t *excpt) {
                 reason = "read";
                 score = 25;
             }
-            dr_exit_process(1);
+            dump_crash(reason, score);
         }
 
-        dr_exit_process(1);
+        dump_crash(reason, score);
     }
     return true;
 }
