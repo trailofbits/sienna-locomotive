@@ -147,12 +147,14 @@ static BOOL mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
     TCHAR *new_buf = (TCHAR *)buf;
 
     if (hFile == INVALID_HANDLE_VALUE) {
+		dr_fprintf(STDERR, "The file we're trying to write to doesn't appear to be valid\n");
         return false;
     }
 
 	DWORD pathSize = GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, 0);
 
 	if (pathSize > MAX_PATH || pathSize == 0) {
+		dr_fprintf(STDERR, "Pathsize %d is out of bounds\n", pathSize);
         return false;
 	}
 

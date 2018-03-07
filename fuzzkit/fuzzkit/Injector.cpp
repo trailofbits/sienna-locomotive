@@ -398,7 +398,7 @@ DWORD Injector::HandleRunId(DWORD runId) {
 	UINT64 address = exportHandler.GetFunctionAddress("runId");
 
 	if (!WriteProcessMemory(this->hProcess, (LPVOID)address, &runId, sizeof(DWORD), NULL)) {
-		LOG_F(ERROR, "Could not write run id to injected DLL (%x)", GetLastError());
+		LOG_F(ERROR, "Could not write run id to injected DLL at 0x%x (%x)", address, GetLastError());
 		return 1;
 	}
 
@@ -409,8 +409,10 @@ DWORD Injector::HandleReplay(BOOL replay) {
 	ExportHandler exportHandler(this->hProcess, this->injectedBase);
 	UINT64 address = exportHandler.GetFunctionAddress("replay");
 
+
+
 	if (!WriteProcessMemory(this->hProcess, (LPVOID)address, &replay, sizeof(BOOL), NULL)) {
-		LOG_F(ERROR, "Could not write replay to injected DLL (%x)", GetLastError());
+		LOG_F(ERROR, "Could not write replay to injected DLL at 0x%x (%x)", address, GetLastError());
 		return 1;
 	}
 
@@ -421,8 +423,22 @@ DWORD Injector::HandleTrace(BOOL trace) {
 	ExportHandler exportHandler(this->hProcess, this->injectedBase);
 	UINT64 address = exportHandler.GetFunctionAddress("trace");
 
+  MEMORY_BASIC_INFORMATION mbi;
+  if (!VirtualQueryEx(this->hProcess, (LPVOID)address, &mbi, sizeof(MEMORY_BASIC_INFORMATION))) {
+    LOG_F(ERROR, "Could retrieve memory permissions for 0x(%x) (%x)", address, GetLastError());
+    exit(1);
+  }
+
+  DWORD old;
+  if (mbi.Protect == PAGE_EXECUTE_READ || mbi.Protect == PAGE_READONLY) {
+    if (!VirtualProtectEx(this->hProcess, mbi.BaseAddress, mbi.RegionSize, PAGE_EXECUTE_READWRITE, &old)) {
+      LOG_F(ERROR, "Could not change memory permissions (%x)", GetLastError());
+      exit(1);
+    }
+  }
+
 	if (!WriteProcessMemory(this->hProcess, (LPVOID)address, &trace, sizeof(BOOL), NULL)) {
-		LOG_F(ERROR, "Could not write trace to injected DLL (%x)", GetLastError());
+		LOG_F(ERROR, "Could not write trace to injected DLL at 0x%x (Injected base 0x%x) (%x)", address, this->injectedBase, GetLastError());
 		return 1;
 	}
 
