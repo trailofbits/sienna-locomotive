@@ -11,5 +11,6 @@ corpus/win_asm/bak_crashes.asm
 corpus/win_asm/*.exe
 corpus/win_asm/*.lnk
 corpus/win_asm/*.obj
-fuzz_dynamorio/build
-fuzz_dynamorio/build32
+fuzzkit/fuzz_dynamorio/build
+fuzzkit/fuzz_dynamorio/dynamorio
+fuzzkit/fuzz_dynamorio/.vs
