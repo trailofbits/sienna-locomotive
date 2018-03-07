@@ -161,17 +161,14 @@ is_tainted(void *drcontext, opnd_t opnd)
             reg_id_t reg_indx = opnd_get_index(opnd);
 
             if(reg_base != NULL && tainted_regs.find(reg_base) != tainted_regs.end()) {
-                dr_printf("tainted base: %s\n", get_register_name(reg_base));
                 return true;
             }
 
             if(reg_disp != NULL && tainted_regs.find(reg_disp) != tainted_regs.end()) {
-                dr_printf("tainted disp: %s\n", get_register_name(reg_disp));
                 return true;
             }
             
             if (reg_indx != NULL && tainted_regs.find(reg_indx) != tainted_regs.end()) {
-                dr_printf("tainted index: %s\n", get_register_name(reg_indx));
                 return true;
             }
         }
@@ -187,7 +184,6 @@ is_tainted(void *drcontext, opnd_t opnd)
 static void
 taint_mem(app_pc addr, uint size) {
     for(uint i=0; i<size; i++) {
-        dr_printf("tainting: %llx\n", addr+i);
         tainted_mems.insert(addr+i);
     }
 }
@@ -198,7 +194,6 @@ untaint_mem(app_pc addr, uint size) {
     for(uint i=0; i<size; i++) {
         size_t n = tainted_mems.erase(addr+i);
         if(n) {
-            dr_printf("untainting: %llx\n", addr+i);
             untainted = true;
         }
     }
@@ -216,7 +211,6 @@ taint(void *drcontext, opnd_t opnd)
         
         char buf[100];
         opnd_disassemble_to_buffer(drcontext, opnd, buf, 100);
-        dr_printf("tainting: %s\n", buf);
     } else if(opnd_is_memory_reference(opnd)) {
         dr_mcontext_t mc = {sizeof(mc),DR_MC_ALL};
         dr_get_mcontext(drcontext, &mc);
@@ -250,7 +244,6 @@ untaint(void *drcontext, opnd_t opnd)
         if(n) {
             char buf[100];
             opnd_disassemble_to_buffer(drcontext, opnd, buf, 100);
-            dr_printf("untainting: %s\n", buf);
             untainted = true;
         }
     } else if(opnd_is_memory_reference(opnd)) {
@@ -293,7 +286,6 @@ handle_xor(void *drcontext, instr_t *instr) {
                 if(n) {
                     char buf[100];
                     opnd_disassemble_to_buffer(drcontext, opnd_0, buf, 100);
-                    dr_printf("untainting: %s\n", buf);
                 }
                 result = true;
             }
@@ -348,7 +340,6 @@ handle_pop(void *drcontext, instr_t *instr) {
         int opcode = instr_get_opcode(instr);
         char buf[100];
         instr_disassemble_to_buffer(drcontext, instr, buf, 100);
-        dr_printf("POP: (%d) %s\n", opcode, buf);
     }
 }
 
@@ -372,14 +363,10 @@ handle_xchg(void *drcontext, instr_t *instr) {
             if(reg_0_tainted && !reg_1_tainted) {
                 tainted_regs.erase(reg_0);
                 tainted_regs.insert(reg_1);
-                dr_printf("untainting: %s\n", get_register_name(reg_0));
-                dr_printf("tainting: %s\n", get_register_name(reg_1));
                 result = true;
             } else if(reg_1_tainted && !reg_0_tainted) {
                 tainted_regs.erase(reg_1);
                 tainted_regs.insert(reg_0);
-                dr_printf("untainting: %s\n", get_register_name(reg_1));
-                dr_printf("tainting: %s\n", get_register_name(reg_0));
                 result = true;
             }
         }
@@ -403,8 +390,7 @@ handle_branches(void *drcontext, instr_t *instr) {
     // int opcode = instr_get_opcode(instr);
     // char buf[100];
     // instr_disassemble_to_buffer(drcontext, instr, buf, 100);
-    // dr_printf("(%d) %s\n", opcode, buf);
-
+    //
     reg_id_t reg_pc = reg_to_full_width64(DR_REG_NULL);
     reg_id_t reg_stack = reg_to_full_width64(DR_REG_ESP);
     bool pc_tainted = tainted_regs.find(reg_pc) != tainted_regs.end();
@@ -567,7 +553,6 @@ propagate_taint(app_pc pc)
         int opcode = instr_get_opcode(&instr);
         char buf[100];
         instr_disassemble_to_buffer(drcontext, &instr, buf, 100);
-        dr_printf("INS: (%d) %s\n", opcode, buf);
     }
 }
 
@@ -639,12 +624,10 @@ dump_regs(void *drcontext, app_pc exception_address) {
 
     std::set<reg_id_t>::iterator reg_it;
     for(reg_it = tainted_regs.begin(); reg_it != tainted_regs.end(); reg_it++) {
-        dr_printf("TAINTED REGS: %s\n", get_register_name(*reg_it));
     }
 
     std::set<app_pc>::iterator mem_it;
     for(mem_it = tainted_mems.begin(); mem_it != tainted_mems.end(); mem_it++) {
-        dr_printf("TAINTED MEMS: %llx\n", *mem_it);
     }
 
     for(int i=0; i<16; i++) {
@@ -652,17 +635,13 @@ dump_regs(void *drcontext, app_pc exception_address) {
         dr_mcontext_t mc = {sizeof(mc),DR_MC_ALL};
         dr_get_mcontext(drcontext, &mc);
         if(tainted) {
-            dr_printf("%s*: %llx\n", get_register_name(regs[i]), reg_get_value(regs[i], &mc));
         } else {
-            dr_printf("%s: %llx\n", get_register_name(regs[i]), reg_get_value(regs[i], &mc));
         }
     }
 
     bool tainted = tainted_regs.find(DR_REG_NULL) != tainted_regs.end();
     if(tainted) {
-        dr_printf("rip*: %llx\n", exception_address);
     } else {
-        dr_printf("rip: %llx\n", exception_address);
     }
 }
 
@@ -738,9 +717,12 @@ exception_to_string(DWORD exceptionCode) {
 }
 
 std::string
-dump_json(void *drcontext, uint8_t score, std::string reason, DWORD exception_code, app_pc exception_address) {
+dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *excpt, std::string disassembly) {
+    DWORD exception_code = excpt->record->ExceptionCode;
+    app_pc exception_address = (app_pc)excpt->record->ExceptionAddress;
+
     rapidjson::StringBuffer s;
-    rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(s);
+    rapidjson::Writer<rapidjson::StringBuffer> writer(s);
 
     writer.StartObject();
 
@@ -755,6 +737,9 @@ dump_json(void *drcontext, uint8_t score, std::string reason, DWORD exception_co
 
     writer.Key("location");
     writer.Uint64((uint64)exception_address);
+
+    writer.Key("instruction");
+    writer.String(disassembly.c_str());
 
     writer.Key("tainted_regs");
     writer.StartArray();
@@ -779,14 +764,12 @@ dump_json(void *drcontext, uint8_t score, std::string reason, DWORD exception_co
 
     for(int i=0; i<16; i++) {
         bool tainted = tainted_regs.find(regs[i]) != tainted_regs.end();
-        dr_mcontext_t mc = {sizeof(mc),DR_MC_ALL};
-        dr_get_mcontext(drcontext, &mc);
 
         writer.StartObject();
         writer.Key("reg");
         writer.String(get_register_name(regs[i]));
         writer.Key("value");
-        writer.Uint64(reg_get_value(regs[i], &mc));
+        writer.Uint64(reg_get_value(regs[i], excpt->mcontext));
         writer.Key("tainted");
         writer.Bool(tainted);
         writer.EndObject();
@@ -843,10 +826,10 @@ dump_json(void *drcontext, uint8_t score, std::string reason, DWORD exception_co
 }
 
 static void
-dump_crash(void *drcontext, app_pc exception_address, DWORD exception_code, std::string reason, uint8_t score) {
-    std::string crash_json = dump_json(drcontext, score, reason, exception_code, exception_address);
-    
+dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t score, std::string disassembly) {
+    std::string crash_json = dump_json(drcontext, score, reason, excpt, disassembly);
     dr_printf("%s\n", crash_json.c_str());
+
     dr_exit_process(1);
 }
 
@@ -861,42 +844,42 @@ onexception(void *drcontext, dr_exception_t *excpt) {
        (exception_code == EXCEPTION_STACK_OVERFLOW)) 
     {
         app_pc exception_address = (app_pc)(excpt->record->ExceptionAddress);
-    dr_printf("In exception %llx\n", exception_address);
         std::string reason = "unknown";
         uint8_t score = 50;
-
-        // check exception code
-        if (exception_code == EXCEPTION_ILLEGAL_INSTRUCTION) {
-            reason = "illegal instruction";
-            score = 100;
-            dump_crash(drcontext, exception_address, exception_code, reason, score);
-        }
-
-        if (exception_code == EXCEPTION_INT_DIVIDE_BY_ZERO) {
-            reason = "floating point exception";
-            score = 0;
-            dump_crash(drcontext, exception_address, exception_code, reason, score);
-        }
-
-        if (exception_code == EXCEPTION_BREAKPOINT) {
-            reason = "breakpoint";
-            score = 25;
-            dump_crash(drcontext, exception_address, exception_code, reason, score);
-        }
+        std::string disassembly = "";
 
         if(IsBadReadPtr(exception_address, 1)) {
             reason = "oob execution";
             score = 100;
-            dump_crash(drcontext, exception_address, exception_code, reason, score);
+            dump_crash(drcontext, excpt, reason, score, disassembly);
         }
 
         instr_t instr;
         instr_init(drcontext, &instr);
         decode(drcontext, exception_address, &instr);
-
         char buf[100];
         instr_disassemble_to_buffer(drcontext, &instr, buf, 100);
-        dr_printf("==== CRASH: %s\n", buf);
+        
+        disassembly = buf;
+        
+        // check exception code
+        if (exception_code == EXCEPTION_ILLEGAL_INSTRUCTION) {
+            reason = "illegal instruction";
+            score = 100;
+            dump_crash(drcontext, excpt, reason, score, disassembly);
+        }
+
+        if (exception_code == EXCEPTION_INT_DIVIDE_BY_ZERO) {
+            reason = "floating point exception";
+            score = 0;
+            dump_crash(drcontext, excpt, reason, score, disassembly);
+        }
+
+        if (exception_code == EXCEPTION_BREAKPOINT) {
+            reason = "breakpoint";
+            score = 25;
+            dump_crash(drcontext, excpt, reason, score, disassembly);
+        }
 
         // get crashing instruction
         bool is_ret = instr_is_return(&instr);
@@ -919,7 +902,7 @@ onexception(void *drcontext, dr_exception_t *excpt) {
                 reason = "branching";
                 score = 25;
             }
-            dump_crash(drcontext, exception_address, exception_code, reason, score);
+            dump_crash(drcontext, excpt, reason, score, disassembly);
         }
 
         // check ret 
@@ -933,7 +916,7 @@ onexception(void *drcontext, dr_exception_t *excpt) {
                 score = 75;
             }
 
-            dump_crash(drcontext, exception_address, exception_code, reason, score);
+            dump_crash(drcontext, excpt, reason, score, disassembly);
         }
 
         bool mem_write = instr_writes_memory(&instr);
@@ -963,7 +946,7 @@ onexception(void *drcontext, dr_exception_t *excpt) {
                 reason = "write";
                 score = 50;
             }
-            dump_crash(drcontext, exception_address, exception_code, reason, score);
+            dump_crash(drcontext, excpt, reason, score, disassembly);
         }
 
         if(mem_read) {
@@ -974,10 +957,10 @@ onexception(void *drcontext, dr_exception_t *excpt) {
                 reason = "read";
                 score = 25;
             }
-            dump_crash(drcontext, exception_address, exception_code, reason, score);
+            dump_crash(drcontext, excpt, reason, score, disassembly);
         }
 
-        dump_crash(drcontext, exception_address, exception_code, reason, score);
+        dump_crash(drcontext, excpt, reason, score, disassembly);
     }
     return true;
 }
@@ -991,7 +974,6 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
     
-    dr_printf("TAINTED %p\n", lpBuffer);
     taint_mem((app_pc)lpBuffer, nNumberOfBytesToRead);
 }
 
@@ -1024,15 +1006,6 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
 }
 
 void tracer(client_id_t id, int argc, const char *argv[]) {
-    /* TRACE TRACE TRACE TRACE TRACE 
-    ** TRACE TRACE TRACE TRACE TRACE 
-    ** TRACE TRACE TRACE TRACE TRACE 
-    ** TRACE TRACE TRACE TRACE TRACE 
-    ** TRACE TRACE TRACE TRACE TRACE 
-    ** TRACE TRACE TRACE TRACE TRACE 
-    ** TRACE TRACE TRACE TRACE TRACE 
-    */
-
     drreg_options_t ops = {sizeof(ops), 3, false};
     dr_set_client_name("DynamoRIO Sample Client 'instrace'",
                        "http://dynamorio.org/issues");
@@ -1052,130 +1025,11 @@ void tracer(client_id_t id, int argc, const char *argv[]) {
         DR_ASSERT(false);
     }
 
-
     dr_log(NULL, LOG_ALL, 1, "Client 'instrace' initializing\n");
 }
-
-// void coverage(client_id_t id, int argc, const char *argv[]) {
-//     /* COVERAGE COVERAGE COVERAGE COVERAGE COVERAGE 
-//     ** COVERAGE COVERAGE COVERAGE COVERAGE COVERAGE 
-//     ** COVERAGE COVERAGE COVERAGE COVERAGE COVERAGE 
-//     ** COVERAGE COVERAGE COVERAGE COVERAGE COVERAGE 
-//     ** COVERAGE COVERAGE COVERAGE COVERAGE COVERAGE 
-//     ** COVERAGE COVERAGE COVERAGE COVERAGE COVERAGE 
-//     ** COVERAGE COVERAGE COVERAGE COVERAGE COVERAGE 
-//     */
-
-//     drreg_options_t ops = {sizeof(ops), 3, false};
-//     dr_set_client_name("DynamoRIO Sample Client 'instrace'",
-//                        "http://dynamorio.org/issues");
-//     if (!drmgr_init() || drreg_init(&ops) != DRREG_SUCCESS)
-//         DR_ASSERT(false);
-
-//     dr_register_exit_event(event_exit_bb);
-
-//     if (!drmgr_register_thread_init_event(event_thread_init) ||
-//         !drmgr_register_thread_exit_event(event_thread_exit_cov) ||
-//         !drmgr_register_bb_instrumentation_event(NULL,
-//                                                  event_app_bb,
-//                                                  NULL) ||
-//         !drmgr_register_exception_event(onexception)) 
-//     {
-//         DR_ASSERT(false);
-//     }
-
-//     client_id = id;
-//     mutex = dr_mutex_create();
-
-//     tls_idx = drmgr_register_tls_field();
-//     DR_ASSERT(tls_idx != -1);
-
-//     if (!dr_raw_tls_calloc(&tls_seg, &tls_offs, INSTRACE_TLS_COUNT, 0))
-//         DR_ASSERT(false);
-
-//     dr_log(NULL, LOG_ALL, 1, "Client 'instrace' initializing\n");
-// }
-
-// concrete mem
-// concrete reg
-// processing
-
-// void triage(client_id_t id, int argc, const char *argv[]) {
-//     /* TRIAGE TRIAGE TRIAGE TRIAGE TRIAGE 
-//     ** TRIAGE TRIAGE TRIAGE TRIAGE TRIAGE 
-//     ** TRIAGE TRIAGE TRIAGE TRIAGE TRIAGE 
-//     ** TRIAGE TRIAGE TRIAGE TRIAGE TRIAGE 
-//     ** TRIAGE TRIAGE TRIAGE TRIAGE TRIAGE 
-//     ** TRIAGE TRIAGE TRIAGE TRIAGE TRIAGE 
-//     ** TRIAGE TRIAGE TRIAGE TRIAGE TRIAGE 
-//     */
-
-//     drreg_options_t ops = {sizeof(ops), 3, false};
-//     dr_set_client_name("DynamoRIO Sample Client 'instrace'",
-//                        "http://dynamorio.org/issues");
-//     if (!drmgr_init() || drreg_init(&ops) != DRREG_SUCCESS)
-//         DR_ASSERT(false);
-
-//     triton::API api;
-//     api.setArchitecture(triton::arch::ARCH_X86_64);
-//     api.addCallback(getConcreteMemCallback);
-
-//     dr_register_exit_event(event_exit);
-
-//     if (!drmgr_register_thread_init_event(event_thread_init) ||
-//         !drmgr_register_thread_exit_event(EVENT_THREAD_EXIT) ||
-//         !drmgr_register_bb_instrumentation_event(NULL,
-//                                                  EVENT_APP,
-//                                                  NULL) ||
-//         !drmgr_register_exception_event(onexception)) 
-//     {
-//         DR_ASSERT(false);
-//     }
-
-//     client_id = id;
-//     mutex = dr_mutex_create();
-
-//     tls_idx = drmgr_register_tls_field();
-//     DR_ASSERT(tls_idx != -1);
-
-//     if (!dr_raw_tls_calloc(&tls_seg, &tls_offs, INSTRACE_TLS_COUNT, 0))
-//         DR_ASSERT(false);
-
-//     dr_log(NULL, LOG_ALL, 1, "Client 'instrace' initializing\n");
-// }
 
 DR_EXPORT void
 dr_client_main(client_id_t id, int argc, const char *argv[])
 {
     tracer(id, argc, argv);
-    // coverage(id, argc, argv);
-    // triage(id, argc, argv);
 }
-
-// DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
-//     dr_set_client_name(
-//      "Sienna-Locomotive Trace and Triage",
-//        "https://github.com/trailofbits/sienna-locomotive/issues");
-//     drmgr_init();
-
-//     drmgr_register_bb_instrumentation_event(NULL, bb_insertion, NULL);
-
-
-//     // instr_length
-
-//     // instr_get_raw_byte
-
-//     // drwrap hooked functions
-
-//     // instr_compute_address_ex
-
-//     // instr_reads_memory
-
-//     // instr_writes_memory
-
-//     // get operands for list of regs?
-
-//     // instr_writes_to_reg
-
-//     // instr_reads_from_reg
-// }
