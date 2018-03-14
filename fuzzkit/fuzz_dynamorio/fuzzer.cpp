@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include "Windows.h"
 
 #include "dr_api.h"
 #include "drmgr.h"
@@ -19,6 +18,7 @@
 
 #define NULL_TERMINATE(buf) buf[(sizeof(buf)/sizeof(buf[0])) - 1] = '\0'
 
+static bool onexception(void *drcontext, dr_exception_t *excpt);
 static void event_exit(void);
 static void wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data);
 static void wrap_post_ReadFile(void *wrapcxt, void *user_data);
@@ -28,13 +28,112 @@ static void *max_lock; /* sync writes to max_ReadFile */
 
 static BOOL mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size);
 
-extern "C" __declspec(dllexport) DWORD runId;
-__declspec(dllexport) DWORD runId;
-//extern "C" __declspec(dllexport) BOOL replay;
-//__declspec(dllexport) BOOL replay;
-extern "C" __declspec(dllexport) BOOL trace;
-__declspec(dllexport) BOOL trace;
-static BOOL replay;
+DWORD runId;
+BOOL crashed;
+
+//TODO: Fix logging 
+DWORD getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs) {
+  dr_log(NULL, LOG_ALL, ERROR, "Requesting run id");
+  DWORD bytesRead = 0;
+  DWORD bytesWritten = 0;
+
+  BYTE eventId = 0;
+  DWORD runId = 0;
+  if (!TransactNamedPipe(hPipe, &eventId, sizeof(BYTE), &runId, sizeof(DWORD), &bytesRead, NULL)) {
+    dr_log(NULL, LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
+    dr_exit_process(1);
+  }
+
+  DWORD size = lstrlen(targetName) * sizeof(TCHAR);
+  if (!WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL)) {
+    dr_log(NULL, LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
+    dr_exit_process(1);
+  }
+
+  if (!WriteFile(hPipe, targetName, size, &bytesWritten, NULL)) {
+    dr_log(NULL, LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
+    dr_exit_process(1);
+  }
+
+  size = lstrlen(targetArgs) * sizeof(TCHAR);
+  if (!WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL)) {
+    dr_log(NULL, LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
+    dr_exit_process(1);
+  }
+
+  if (!WriteFile(hPipe, targetArgs, size, &bytesWritten, NULL)) {
+    dr_log(NULL, LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
+    dr_exit_process(1);
+  }
+
+  dr_log(NULL, LOG_ALL, ERROR, "Run id %x", runId);
+
+  return runId;
+}
+
+HANDLE getPipe() {
+  HANDLE hPipe;
+  while (1) {
+    hPipe = CreateFile(
+      "\\\\.\\pipe\\fuzz_server",
+      GENERIC_READ | GENERIC_WRITE,
+      0,
+      NULL,
+      OPEN_EXISTING,
+      0,
+      NULL);
+
+    if (hPipe != INVALID_HANDLE_VALUE) {
+      break;
+    }
+
+    DWORD err = GetLastError();
+    if (err != ERROR_PIPE_BUSY) {
+      dr_log(NULL, LOG_ALL, ERROR, "Could not open pipe (%x)", err);
+      return hPipe;
+    }
+
+    if (!WaitNamedPipe("\\\\.\\pipe\\fuzz_server", 5000)) {
+      dr_log(NULL, LOG_ALL, ERROR, "Could not connect, timeout");
+      // TODO: fallback mutations?
+      dr_exit_process(1);
+    }
+  }
+
+  DWORD readMode = PIPE_READMODE_MESSAGE;
+  SetNamedPipeHandleState(
+    hPipe,
+    &readMode,
+    NULL,
+    NULL);
+
+  return hPipe;
+}
+
+DWORD finalize(HANDLE hPipe, DWORD runId, BOOL crashed) {
+  if (crashed) {
+    dr_log(NULL, LOG_ALL, ERROR, "Crash found for run id %d!", runId);
+  }
+  DWORD bytesWritten;
+  BYTE eventId = 4;
+
+  if (!WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL)) {
+    dr_log(NULL, LOG_ALL, ERROR, "Error finalizing (%x)", GetLastError());
+    dr_exit_process(1);
+  }
+
+  if (!WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL)) {
+    dr_log(NULL, LOG_ALL, ERROR, "Error finalizing (%x)", GetLastError());
+    dr_exit_process(1);
+  }
+
+  if (!WriteFile(hPipe, &crashed, sizeof(BOOL), &bytesWritten, NULL)) {
+    dr_log(NULL, LOG_ALL, ERROR, "Error finalizing (%x)", GetLastError());
+    dr_exit_process(1);
+  }
+
+  return 0;
+}
 
 /* From wrap.cpp sample code. Called on application library load and unload.
    Responsible for registering pre and post callbacks for ReadFile. */
@@ -44,18 +143,18 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     if (towrap != NULL) {
 	    bool ok = drwrap_wrap(towrap, wrap_pre_ReadFile, wrap_post_ReadFile);
 	    if (ok) {
-		    dr_fprintf(STDERR, "<wrapped ReadFile @ 0x%p\n", towrap);
+		    dr_log(NULL, LOG_ALL, ERROR, "<wrapped ReadFile @ 0x%p\n", towrap);
 	    } else {
-		    dr_fprintf(STDERR, "<FAILED to wrap ReadFile @ 0x%p: already wrapped?\n", towrap);
+		    dr_log(NULL, LOG_ALL, ERROR, "<FAILED to wrap ReadFile @ 0x%p: already wrapped?\n", towrap);
 	    }
     }
     towrap = (app_pc) dr_get_proc_address(mod->handle, "ReadFileEx");
     if (towrap != NULL) {
 	    bool ok = drwrap_wrap(towrap, wrap_pre_ReadFile, wrap_post_ReadFile);
 	    if (ok) {
-		    dr_fprintf(STDERR, "<wrapped ReadFileEx @ 0x%p\n", towrap);
+		    dr_log(NULL, LOG_ALL, ERROR, "<wrapped ReadFileEx @ 0x%p\n", towrap);
 	    } else {
-		    dr_fprintf(STDERR, "<FAILED to wrap ReadFileEx @ 0x%p: already wrapped?\n", towrap);
+		    dr_log(NULL, LOG_ALL, ERROR, "<FAILED to wrap ReadFileEx @ 0x%p: already wrapped?\n", towrap);
 	    }
     }
 }
@@ -66,25 +165,48 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
                        "https://github.com/trailofbits/sienna-locomotive/issues");
     dr_log(NULL, LOG_ALL, 1, "DR client 'SL Fuzzer' initializing\n");
     if (dr_is_notify_on()) {
-#ifdef WINDOWS
-	dr_enable_console_printing();
-#endif
-	dr_fprintf(STDERR, "Client SL Fuzzer is running\n");
+      #ifdef WINDOWS
+	      dr_enable_console_printing();
+      #endif
+	  dr_log(NULL, LOG_ALL, ERROR, "Client SL Fuzzer is running\n");
     }
+
+    //TODO: support multiple passes over one binary without re-running drrun
+
+    // TODO: get arguments to target binary
+    // see: https://github.com/DynamoRIO/dynamorio/issues/2662
+    LPTSTR targetArgs;
+
+    HANDLE hPipe = getPipe();
+    runId = getRunID(hPipe, dr_get_application_name(), targetArgs);
+    CloseHandle(hPipe);
 
     drmgr_init();
     drwrap_init();
     
     max_ReadFile = 0;
-    
+
+    drmgr_register_exception_event(onexception);
     dr_register_exit_event(event_exit);
     drmgr_register_module_load_event(module_load_event);
+}
+
+static bool
+onexception(void *drcontext, dr_exception_t *excpt) {
+  //TODO: handle individual exception cases
+  dr_log(NULL, LOG_ALL, ERROR, "Exception occurred!\n");
+  crashed = true;
+  return true;
 }
 
 /* from wrap.cpp sample code */
 static void
 event_exit(void) {
-    
+  HANDLE hPipe = getPipe();
+  finalize(hPipe, runId, crashed);
+  CloseHandle(hPipe);
+
+  dr_log(NULL, LOG_ALL, ERROR, "Dynamorio Exiting\n");
     drwrap_exit();
     drmgr_exit();
 }
@@ -116,18 +238,16 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
 static void
 wrap_post_ReadFile(void *wrapcxt, void *user_data) {
     LPVOID lpBuffer = user_data;
-	if (lpNumberOfBytesRead) {
+	  if (lpNumberOfBytesRead) {
         nNumberOfBytesToRead = *lpNumberOfBytesRead;
     }
     
-    if (!replay && !trace || replay) {
-        if (!mutate(hFile, position, lpBuffer, nNumberOfBytesToRead)) {
-            // TODO: fallback mutations?
-            //TCHAR *new_buf = (TCHAR *)lpBuffer;
-            //for(DWORD i = 0; i < nNumberOfBytesToRead; ++i) {
-            //    new_buf[i] = (TCHAR)'A';
-            //}
-        }
+    if (!mutate(hFile, position, lpBuffer, nNumberOfBytesToRead)) {
+        // TODO: fallback mutations?
+        //TCHAR *new_buf = (TCHAR *)lpBuffer;
+        //for(DWORD i = 0; i < nNumberOfBytesToRead; ++i) {
+        //    new_buf[i] = (TCHAR)'A';
+        //}
     }
 
     if (lpNumberOfBytesRead != NULL) {
@@ -147,68 +267,39 @@ static BOOL mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
     TCHAR *new_buf = (TCHAR *)buf;
 
     if (hFile == INVALID_HANDLE_VALUE) {
-		dr_fprintf(STDERR, "The file we're trying to write to doesn't appear to be valid\n");
+		dr_log(NULL, LOG_ALL, ERROR, "The file we're trying to write to doesn't appear to be valid\n");
         return false;
     }
 
 	DWORD pathSize = GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, 0);
 
 	if (pathSize > MAX_PATH || pathSize == 0) {
-		dr_fprintf(STDERR, "Pathsize %d is out of bounds\n", pathSize);
+		dr_log(NULL, LOG_ALL, ERROR, "Pathsize %d is out of bounds\n", pathSize);
         return false;
 	}
 
 	filePath[pathSize] = 0;
 
-	HANDLE hPipe = CreateFile(
-		TEXT("\\\\.\\pipe\\fuzz_server"),
-		GENERIC_READ | GENERIC_WRITE,
-		0,
-		NULL,
-		OPEN_EXISTING,
-		0,
-		NULL);
-
-	if (hPipe == INVALID_HANDLE_VALUE) {
-		dr_fprintf(STDERR, "Named Pipe is invalid! Is the mutation server running?\n");
-        return false;
-	}
-
-	DWORD readMode = PIPE_READMODE_MESSAGE;
-	SetNamedPipeHandleState(
-		hPipe,
-		&readMode,
-		NULL,
-		NULL);
+  HANDLE hPipe = getPipe();
 
 	DWORD bytesRead = 0;
 	DWORD bytesWritten = 0;
 
-	if (!replay) {
-		BYTE eventId = 1;
+	BYTE eventId = 1;
 
-		// Send state information to the fuzz server
-		WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL);
-		WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL);
-		WriteFile(hPipe, &mutateCount, sizeof(DWORD), &bytesWritten, NULL);
+	// Send state information to the fuzz server
+	WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL);
+	WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL);
+	WriteFile(hPipe, &mutateCount, sizeof(DWORD), &bytesWritten, NULL);
 
-		WriteFile(hPipe, &pathSize, sizeof(DWORD), &bytesWritten, NULL);
-		WriteFile(hPipe, &filePath, pathSize * sizeof(TCHAR), &bytesWritten, NULL);
+	WriteFile(hPipe, &pathSize, sizeof(DWORD), &bytesWritten, NULL);
+	WriteFile(hPipe, &filePath, pathSize * sizeof(TCHAR), &bytesWritten, NULL);
 
-		WriteFile(hPipe, &position, sizeof(DWORD64), &bytesWritten, NULL);
-		WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL);
+	WriteFile(hPipe, &position, sizeof(DWORD64), &bytesWritten, NULL);
+	WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL);
 		
-		// Send current contents of buf to the server, overwrite them with its reply
-		TransactNamedPipe(hPipe, buf, size, buf, size, &bytesRead, NULL);
-	}
-	else {
-		BYTE eventId = 2;
-
-		WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL);
-		WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL);
-		WriteFile(hPipe, &mutateCount, sizeof(DWORD), &bytesWritten, NULL);
-		TransactNamedPipe(hPipe, &size, sizeof(DWORD), buf, size, &bytesRead, NULL);
-	}
+	// Send current contents of buf to the server, overwrite them with its reply
+	TransactNamedPipe(hPipe, buf, size, buf, size, &bytesRead, NULL);
 
 	CloseHandle(hPipe);
     
