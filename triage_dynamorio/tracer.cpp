@@ -296,17 +296,19 @@ handle_xor(void *drcontext, instr_t *instr) {
 }
 
 static void
-handle_pop(void *drcontext, instr_t *instr) {
+handle_push_pop(void *drcontext, instr_t *instr) {
     int src_count = instr_num_srcs(instr);
     bool tainted = false;
 
+    // check sources for taint
     for(int i=0; i<src_count && !tainted; i++) {
         opnd_t opnd = instr_get_src(instr, i);
         tainted |= is_tainted(drcontext, opnd);
     }
 
+    // if tainted
+    // taint destinations that aren't rsp
     int dst_count = instr_num_dsts(instr);
-
     for(int i=0; i<dst_count && tainted; i++) {
         opnd_t opnd = instr_get_dst(instr, i);
 
@@ -321,6 +323,8 @@ handle_pop(void *drcontext, instr_t *instr) {
         taint(drcontext, opnd);
     }
 
+    // if not tainted
+    // untaint destinations that aren't rsp
     bool untainted = false;
     for(int i=0; i<dst_count && !tainted; i++) {
         opnd_t opnd = instr_get_dst(instr, i);
@@ -336,6 +340,7 @@ handle_pop(void *drcontext, instr_t *instr) {
         untainted |= untaint(drcontext, opnd);
     }
 
+    // 
     if(tainted | untainted) {
         int opcode = instr_get_opcode(instr);
         char buf[100];
@@ -387,10 +392,6 @@ handle_branches(void *drcontext, instr_t *instr) {
         return false;
     }
 
-    // int opcode = instr_get_opcode(instr);
-    // char buf[100];
-    // instr_disassemble_to_buffer(drcontext, instr, buf, 100);
-    //
     reg_id_t reg_pc = reg_to_full_width64(DR_REG_NULL);
     reg_id_t reg_stack = reg_to_full_width64(DR_REG_ESP);
     bool pc_tainted = tainted_regs.find(reg_pc) != tainted_regs.end();
@@ -459,34 +460,6 @@ handle_branches(void *drcontext, instr_t *instr) {
     return true;
 }
 
-/* 
-    // call
-    if(is_call) {
-        if pc is tainted
-            taint mem at rsp
-    }
-
-    // direct branch or call
-    if(is_direct) {
-        if pc is tainted
-            untaint pc
-    }
-
-    // indirect branch or call
-    if(is_indirect) {
-        if reg_s != stack && reg_s is tainted
-            taint pc
-    }
-
-    // ret
-    if(is_ret) {
-        if rsp is tainted or mem at rsp is tainted
-            taint pc
-        else
-            untaint pc
-    }
-*/
-
 static bool
 handle_specific(void *drcontext, instr_t *instr) {
     int opcode = instr_get_opcode(instr);
@@ -498,9 +471,11 @@ handle_specific(void *drcontext, instr_t *instr) {
     }
 
     switch(opcode) {
+        // push
+        case 18:
         // pop
         case 20:
-            handle_pop(drcontext, instr);
+            handle_push_pop(drcontext, instr);
             return true;
         // xor
         case 12:
@@ -828,7 +803,9 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
 static void
 dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t score, std::string disassembly) {
     std::string crash_json = dump_json(drcontext, score, reason, excpt, disassembly);
+    dr_printf("#### BEGIN CRASH DATA JSON\n");
     dr_printf("%s\n", crash_json.c_str());
+    dr_printf("#### END CRASH DATA JSON\n");
 
     dr_exit_process(1);
 }
@@ -838,137 +815,140 @@ onexception(void *drcontext, dr_exception_t *excpt) {
     DWORD num_written;
     DWORD exception_code = excpt->record->ExceptionCode;
 
-    if((exception_code == EXCEPTION_ACCESS_VIOLATION) ||
-       (exception_code == EXCEPTION_ILLEGAL_INSTRUCTION) ||
-       (exception_code == EXCEPTION_PRIV_INSTRUCTION) ||
-       (exception_code == EXCEPTION_STACK_OVERFLOW)) 
-    {
-        app_pc exception_address = (app_pc)(excpt->record->ExceptionAddress);
-        std::string reason = "unknown";
-        uint8_t score = 50;
-        std::string disassembly = "";
+    reg_id_t reg_pc = reg_to_full_width64(DR_REG_NULL);
+    reg_id_t reg_stack = reg_to_full_width64(DR_REG_ESP);
+    bool pc_tainted = tainted_regs.find(reg_pc) != tainted_regs.end();
+    bool stack_tainted = tainted_regs.find(reg_stack) != tainted_regs.end();
 
-        if(IsBadReadPtr(exception_address, 1)) {
+    app_pc exception_address = (app_pc)(excpt->record->ExceptionAddress);
+    std::string reason = "unknown";
+    uint8_t score = 50;
+    std::string disassembly = "";
+
+    if(IsBadReadPtr(exception_address, 1)) {
+        if(pc_tainted) {
+            reason = "oob execution tainted pc";
+            score = 100;
+        } else {
             reason = "oob execution";
-            score = 100;
-            dump_crash(drcontext, excpt, reason, score, disassembly);
+            score = 50;
         }
+        dump_crash(drcontext, excpt, reason, score, disassembly);
+    }
 
-        instr_t instr;
-        instr_init(drcontext, &instr);
-        decode(drcontext, exception_address, &instr);
-        char buf[100];
-        instr_disassemble_to_buffer(drcontext, &instr, buf, 100);
-        
-        disassembly = buf;
-        
-        // check exception code
-        if (exception_code == EXCEPTION_ILLEGAL_INSTRUCTION) {
+    instr_t instr;
+    instr_init(drcontext, &instr);
+    decode(drcontext, exception_address, &instr);
+    char buf[100];
+    instr_disassemble_to_buffer(drcontext, &instr, buf, 100);
+    
+    disassembly = buf;
+    
+    // check exception code
+    if (exception_code == EXCEPTION_ILLEGAL_INSTRUCTION) {
+        if(pc_tainted) {
+            reason = "illegal instruction tainted pc";
+            score = 100;
+        } else {
             reason = "illegal instruction";
-            score = 100;
-            dump_crash(drcontext, excpt, reason, score, disassembly);
+            score = 50;
         }
+        dump_crash(drcontext, excpt, reason, score, disassembly);
+    }
 
-        if (exception_code == EXCEPTION_INT_DIVIDE_BY_ZERO) {
-            reason = "floating point exception";
-            score = 0;
-            dump_crash(drcontext, excpt, reason, score, disassembly);
+    if (exception_code == EXCEPTION_INT_DIVIDE_BY_ZERO) {
+        reason = "floating point exception";
+        score = 0;
+        dump_crash(drcontext, excpt, reason, score, disassembly);
+    }
+
+    if (exception_code == EXCEPTION_BREAKPOINT) {
+        reason = "breakpoint";
+        score = 25;
+        dump_crash(drcontext, excpt, reason, score, disassembly);
+    }
+
+    // get crashing instruction
+    bool is_ret = instr_is_return(&instr);
+    bool is_direct = instr_is_ubr(&instr) || instr_is_cbr(&instr) || instr_is_call_direct(&instr);
+    bool is_indirect = instr_is_mbr(&instr);
+    bool is_call = instr_is_call(&instr); // this might be covered in other flags
+
+    // check branch
+    if (is_direct || is_indirect || is_call) {
+        if (pc_tainted) {
+            reason = "branching tainted pc";
+            score = 75;
         }
-
-        if (exception_code == EXCEPTION_BREAKPOINT) {
-            reason = "breakpoint";
+        else {
+            reason = "branching";
             score = 25;
-            dump_crash(drcontext, excpt, reason, score, disassembly);
         }
+        dump_crash(drcontext, excpt, reason, score, disassembly);
+    }
 
-        // get crashing instruction
-        bool is_ret = instr_is_return(&instr);
-        bool is_direct = instr_is_ubr(&instr) || instr_is_cbr(&instr) || instr_is_call_direct(&instr);
-        bool is_indirect = instr_is_mbr(&instr);
-        bool is_call = instr_is_call(&instr); // this might be covered in other flags
-
-        reg_id_t reg_pc = reg_to_full_width64(DR_REG_NULL);
-        reg_id_t reg_stack = reg_to_full_width64(DR_REG_ESP);
-        bool pc_tainted = tainted_regs.find(reg_pc) != tainted_regs.end();
-        bool stack_tainted = tainted_regs.find(reg_stack) != tainted_regs.end();
-
-        // check branch
-        if (is_direct || is_indirect || is_call) {
-            if (pc_tainted) {
-                reason = "branching tainted pc";
-                score = 75;
-            }
-            else {
-                reason = "branching";
-                score = 25;
-            }
-            dump_crash(drcontext, excpt, reason, score, disassembly);
+    // check ret 
+    if (is_ret) {
+        if (pc_tainted || stack_tainted) {
+            score = 100;
+            reason = "return with taint";
         }
-
-        // check ret 
-        if (is_ret) {
-            if (pc_tainted || stack_tainted) {
-                score = 100;
-                reason = "return with taint";
-            }
-            else {
-                reason = "return";
-                score = 75;
-            }
-
-            dump_crash(drcontext, excpt, reason, score, disassembly);
-        }
-
-        bool mem_write = instr_writes_memory(&instr);
-        bool mem_read = instr_reads_memory(&instr);
-        bool tainted_src = false;
-        bool tainted_dst = false;
-
-        int src_count = instr_num_srcs(&instr);
-        int dst_count = instr_num_dsts(&instr);
-
-
-        for(int i=0; i<src_count; i++) {
-            opnd_t opnd = instr_get_src(&instr, i);
-            tainted_src |= is_tainted(drcontext, opnd);
-        }
-
-        for(int i=0; i<dst_count; i++) {
-            opnd_t opnd = instr_get_dst(&instr, i);
-            tainted_dst |= is_tainted(drcontext, opnd);
-        }
-
-        if(mem_write) {
-            if(tainted_src || tainted_dst) {
-                reason = "tainted write";
-                score = 75;
-            } else {
-                reason = "write";
-                score = 50;
-            }
-            dump_crash(drcontext, excpt, reason, score, disassembly);
-        }
-
-        if(mem_read) {
-            if(tainted_src) {
-                reason = "tainted read";
-                score = 75;
-            } else {
-                reason = "read";
-                score = 25;
-            }
-            dump_crash(drcontext, excpt, reason, score, disassembly);
+        else {
+            reason = "return";
+            score = 75;
         }
 
         dump_crash(drcontext, excpt, reason, score, disassembly);
     }
+
+    bool mem_write = instr_writes_memory(&instr);
+    bool mem_read = instr_reads_memory(&instr);
+    bool tainted_src = false;
+    bool tainted_dst = false;
+
+    int src_count = instr_num_srcs(&instr);
+    int dst_count = instr_num_dsts(&instr);
+
+
+    for(int i=0; i<src_count; i++) {
+        opnd_t opnd = instr_get_src(&instr, i);
+        tainted_src |= is_tainted(drcontext, opnd);
+    }
+
+    for(int i=0; i<dst_count; i++) {
+        opnd_t opnd = instr_get_dst(&instr, i);
+        tainted_dst |= is_tainted(drcontext, opnd);
+    }
+
+    if(mem_write) {
+        if(tainted_src || tainted_dst) {
+            reason = "tainted write";
+            score = 75;
+        } else {
+            reason = "write";
+            score = 50;
+        }
+        dump_crash(drcontext, excpt, reason, score, disassembly);
+    }
+
+    if(mem_read) {
+        if(tainted_src) {
+            reason = "tainted read";
+            score = 75;
+        } else {
+            reason = "read";
+            score = 25;
+        }
+        dump_crash(drcontext, excpt, reason, score, disassembly);
+    }
+
+    dump_crash(drcontext, excpt, reason, score, disassembly);
+
     return true;
 }
 
 static void
 wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
-    dr_fprintf(STDERR, "In wrap_pre_ReadFile\n");
-    
     HANDLE hFile = drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -979,7 +959,6 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_post_ReadFile(void *wrapcxt, void *user_data) {
-    dr_fprintf(STDERR, "In wrap_post_ReadFile\n");
     HANDLE hFile =               (HANDLE)drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer =            drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
