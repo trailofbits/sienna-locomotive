@@ -25,6 +25,11 @@ extern "C" {
 #include "Dbghelp.h"
 #include "Windows.h"
 
+void *mutatex;
+bool replay;
+bool mutate_count;
+UINT64 run_id;
+
 std::set<reg_id_t> tainted_regs;
 std::set<app_pc> tainted_mems;
 
@@ -621,74 +626,74 @@ dump_regs(void *drcontext, app_pc exception_address) {
 }
 
 std::string
-exception_to_string(DWORD exceptionCode) {
-    std::string exceptionStr = "UNKNOWN";
-    switch (exceptionCode) {
+exception_to_string(DWORD exception_code) {
+    std::string exception_str = "UNKNOWN";
+    switch (exception_code) {
         case EXCEPTION_ACCESS_VIOLATION:
-            exceptionStr = "EXCEPTION_ACCESS_VIOLATION";
+            exception_str = "EXCEPTION_ACCESS_VIOLATION";
             break;
         case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
-            exceptionStr = "EXCEPTION_ARRAY_BOUNDS_EXCEEDED";
+            exception_str = "EXCEPTION_ARRAY_BOUNDS_EXCEEDED";
             break;
         case EXCEPTION_BREAKPOINT:
-            exceptionStr = "EXCEPTION_BREAKPOINT";
+            exception_str = "EXCEPTION_BREAKPOINT";
             break;
         case EXCEPTION_DATATYPE_MISALIGNMENT:
-            exceptionStr = "EXCEPTION_DATATYPE_MISALIGNMENT";
+            exception_str = "EXCEPTION_DATATYPE_MISALIGNMENT";
             break;
         case EXCEPTION_FLT_DENORMAL_OPERAND:
-            exceptionStr = "EXCEPTION_FLT_DENORMAL_OPERAND";
+            exception_str = "EXCEPTION_FLT_DENORMAL_OPERAND";
             break;
         case EXCEPTION_FLT_DIVIDE_BY_ZERO:
-            exceptionStr = "EXCEPTION_FLT_DIVIDE_BY_ZERO";
+            exception_str = "EXCEPTION_FLT_DIVIDE_BY_ZERO";
             break;
         case EXCEPTION_FLT_INEXACT_RESULT:
-            exceptionStr = "EXCEPTION_FLT_INEXACT_RESULT";
+            exception_str = "EXCEPTION_FLT_INEXACT_RESULT";
             break;
         case EXCEPTION_FLT_INVALID_OPERATION:
-            exceptionStr = "EXCEPTION_FLT_INVALID_OPERATION";
+            exception_str = "EXCEPTION_FLT_INVALID_OPERATION";
             break;
         case EXCEPTION_FLT_OVERFLOW:
-            exceptionStr = "EXCEPTION_FLT_OVERFLOW";
+            exception_str = "EXCEPTION_FLT_OVERFLOW";
             break;
         case EXCEPTION_FLT_STACK_CHECK:
-            exceptionStr = "EXCEPTION_FLT_STACK_CHECK";
+            exception_str = "EXCEPTION_FLT_STACK_CHECK";
             break;
         case EXCEPTION_FLT_UNDERFLOW:
-            exceptionStr = "EXCEPTION_FLT_UNDERFLOW";
+            exception_str = "EXCEPTION_FLT_UNDERFLOW";
             break;
         case EXCEPTION_ILLEGAL_INSTRUCTION:
-            exceptionStr = "EXCEPTION_ILLEGAL_INSTRUCTION";
+            exception_str = "EXCEPTION_ILLEGAL_INSTRUCTION";
             break;
         case EXCEPTION_IN_PAGE_ERROR:
-            exceptionStr = "EXCEPTION_IN_PAGE_ERROR";
+            exception_str = "EXCEPTION_IN_PAGE_ERROR";
             break;
         case EXCEPTION_INT_DIVIDE_BY_ZERO:
-            exceptionStr = "EXCEPTION_INT_DIVIDE_BY_ZERO";
+            exception_str = "EXCEPTION_INT_DIVIDE_BY_ZERO";
             break;
         case EXCEPTION_INT_OVERFLOW:
-            exceptionStr = "EXCEPTION_INT_OVERFLOW";
+            exception_str = "EXCEPTION_INT_OVERFLOW";
             break;
         case EXCEPTION_INVALID_DISPOSITION:
-            exceptionStr = "EXCEPTION_INVALID_DISPOSITION";
+            exception_str = "EXCEPTION_INVALID_DISPOSITION";
             break;
         case EXCEPTION_NONCONTINUABLE_EXCEPTION:
-            exceptionStr = "EXCEPTION_NONCONTINUABLE_EXCEPTION";
+            exception_str = "EXCEPTION_NONCONTINUABLE_EXCEPTION";
             break;
         case EXCEPTION_PRIV_INSTRUCTION:
-            exceptionStr = "EXCEPTION_PRIV_INSTRUCTION";
+            exception_str = "EXCEPTION_PRIV_INSTRUCTION";
             break;
         case EXCEPTION_SINGLE_STEP:
-            exceptionStr = "EXCEPTION_SINGLE_STEP";
+            exception_str = "EXCEPTION_SINGLE_STEP";
             break;
         case EXCEPTION_STACK_OVERFLOW:
-            exceptionStr = "EXCEPTION_STACK_OVERFLOW";
+            exception_str = "EXCEPTION_STACK_OVERFLOW";
             break;
         default:
             break;
     }
 
-    return exceptionStr;
+    return exception_str;
 }
 
 std::string
@@ -964,6 +969,39 @@ wrap_post_ReadFile(void *wrapcxt, void *user_data) {
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
 
+    if(replay) {
+        dr_mutex_lock(mutatex);
+        HANDLE h_pipe = CreateFile(
+            "\\\\.\\pipe\\fuzz_server",
+            GENERIC_READ | GENERIC_WRITE,
+            0,
+            NULL,
+            OPEN_EXISTING,
+            0,
+            NULL);
+
+        if (h_pipe != INVALID_HANDLE_VALUE) {
+            DWORD read_mode = PIPE_READMODE_MESSAGE;
+            SetNamedPipeHandleState(
+                h_pipe,
+                &read_mode,
+                NULL,
+                NULL);
+
+            DWORD bytes_read = 0;
+            DWORD bytes_written = 0;
+
+            BYTE event_id = 2;
+
+            WriteFile(h_pipe, &event_id, sizeof(BYTE), &bytes_written, NULL);
+            WriteFile(h_pipe, &run_id, sizeof(DWORD), &bytes_written, NULL);
+            WriteFile(h_pipe, &mutate_count, sizeof(DWORD), &bytes_written, NULL);
+            TransactNamedPipe(h_pipe, &nNumberOfBytesToRead, sizeof(DWORD), lpBuffer, nNumberOfBytesToRead, &bytes_read, NULL);
+            mutate_count++;
+            CloseHandle(h_pipe);
+            dr_mutex_unlock(mutatex);
+        }
+    }
 
     BOOL ok = TRUE; 
     drwrap_set_retval(wrapcxt, &ok); // FIXME
@@ -988,8 +1026,38 @@ void tracer(client_id_t id, int argc, const char *argv[]) {
     drreg_options_t ops = {sizeof(ops), 3, false};
     dr_set_client_name("DynamoRIO Sample Client 'instrace'",
                        "http://dynamorio.org/issues");
+
     if (!drmgr_init() || drreg_init(&ops) != DRREG_SUCCESS || !drwrap_init())
         DR_ASSERT(false);
+
+    replay = false;
+    mutate_count = 0;
+
+    UINT64 run_id = -1;
+    bool next = false;
+    for(int i = 0; i < argc; i++) {
+        if(next) {
+            run_id = _strtoui64(argv[i], (char **)NULL, 10);
+        }
+        
+        next = false;
+        
+        if(strcmp(argv[i], "-r") == 0) {
+            replay = true;
+            next = true;
+        }
+    }
+
+    if(run_id == (1<<64)-1) {
+        replay = false;
+    }
+    
+    dr_printf("replay: %d\n", replay);
+    dr_printf("run_id: %llu\n", run_id);
+
+    mutatex = dr_mutex_create();
+
+    exit(0);
 
     dr_register_exit_event(event_exit_trace);
 
