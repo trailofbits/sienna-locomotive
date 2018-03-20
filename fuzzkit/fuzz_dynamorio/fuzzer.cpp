@@ -29,7 +29,7 @@ static void *max_lock; /* sync writes to max_ReadFile */
 static BOOL mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size);
 
 DWORD runId;
-BOOL crashed;
+BOOL crashed = false;
 
 //TODO: Fix logging 
 DWORD getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs) {
@@ -175,6 +175,7 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
 
     // TODO: get arguments to target binary
     // see: https://github.com/DynamoRIO/dynamorio/issues/2662
+    // alternatively: https://wj32.org/wp/2009/01/24/howto-get-the-command-line-of-processes/
     LPTSTR targetArgs;
 
     HANDLE hPipe = getPipe();
@@ -193,9 +194,78 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
 
 static bool
 onexception(void *drcontext, dr_exception_t *excpt) {
-  //TODO: handle individual exception cases
   dr_log(NULL, LOG_ALL, ERROR, "Exception occurred!\n");
+
   crashed = true;
+  DWORD exceptionCode = excpt->record->ExceptionCode;
+
+  switch (exceptionCode){
+    case EXCEPTION_ACCESS_VIOLATION:
+      dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_ACCESS_VIOLATION");
+      break;
+    case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+      dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_ARRAY_BOUNDS_EXCEEDED");
+      break;
+    case EXCEPTION_BREAKPOINT:
+      dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_BREAKPOINT");
+      crashed = false;
+      //TODO: double check that this is correct
+      break;
+    case EXCEPTION_DATATYPE_MISALIGNMENT:
+      dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_DATATYPE_MISALIGNMENT");
+      break;
+    case EXCEPTION_FLT_DENORMAL_OPERAND:
+      dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_FLT_DENORMAL_OPERAND");
+      break;
+    case EXCEPTION_FLT_DIVIDE_BY_ZERO:
+      dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_FLT_DIVIDE_BY_ZERO");
+      break;
+    case EXCEPTION_FLT_INEXACT_RESULT:
+      dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_FLT_INEXACT_RESULT");
+      break;
+    case EXCEPTION_FLT_INVALID_OPERATION:
+      dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_FLT_INVALID_OPERATION");
+      break;
+    case EXCEPTION_FLT_OVERFLOW:
+      dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_FLT_OVERFLOW");
+      break;
+    case EXCEPTION_FLT_STACK_CHECK:
+      dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_FLT_STACK_CHECK");
+      break;
+    case EXCEPTION_FLT_UNDERFLOW:
+      dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_FLT_UNDERFLOW");
+      break;
+    case EXCEPTION_ILLEGAL_INSTRUCTION:
+      dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_ILLEGAL_INSTRUCTION");
+      break;
+    case EXCEPTION_IN_PAGE_ERROR:
+      dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_IN_PAGE_ERROR");
+      break;
+    case EXCEPTION_INT_DIVIDE_BY_ZERO:
+      dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_INT_DIVIDE_BY_ZERO");
+      break;
+    case EXCEPTION_INT_OVERFLOW:
+      dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_INT_OVERFLOW");
+      break;
+    case EXCEPTION_INVALID_DISPOSITION:
+      dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_INVALID_DISPOSITION");
+      break;
+    case EXCEPTION_NONCONTINUABLE_EXCEPTION:
+      dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_NONCONTINUABLE_EXCEPTION");
+      break;
+    case EXCEPTION_PRIV_INSTRUCTION:
+      dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_PRIV_INSTRUCTION");
+      break;
+    case EXCEPTION_SINGLE_STEP:
+      dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_SINGLE_STEP");
+      break;
+    case EXCEPTION_STACK_OVERFLOW:
+      dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_STACK_OVERFLOW");
+      break;
+    default:
+      break;
+  }
+
   return true;
 }
 
