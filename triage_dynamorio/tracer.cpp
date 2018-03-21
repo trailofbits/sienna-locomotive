@@ -22,8 +22,10 @@ extern "C" {
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
 
-#include "Dbghelp.h"
-#include "Windows.h"
+#include <Dbghelp.h>
+#include <Windows.h>
+#include <winsock2.h>
+#include <winhttp.h>
 
 void *mutatex;
 bool replay;
@@ -953,8 +955,19 @@ onexception(void *drcontext, dr_exception_t *excpt) {
 }
 
 static void
-wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
-    HANDLE hFile = drwrap_get_arg(wrapcxt, 0);
+wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
+    HINTERNET hRequest = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
+    PVOID pvBuffer = drwrap_get_arg(wrapcxt, 1);
+    DWORD dwBufferLength = (DWORD)drwrap_get_arg(wrapcxt, 2);
+    PDWORD pdwBytesRead = (PDWORD)drwrap_get_arg(wrapcxt, 3);
+    WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE)(int)drwrap_get_arg(wrapcxt, 3);
+    
+    taint_mem((app_pc)pvBuffer, dwBufferLength);
+}
+
+static void
+wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
+    HINTERNET hRequest = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
@@ -963,11 +976,38 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
 }
 
 static void
-wrap_post_ReadFile(void *wrapcxt, void *user_data) {
-    HANDLE hFile =               (HANDLE)drwrap_get_arg(wrapcxt, 0);
-    LPVOID lpBuffer =            drwrap_get_arg(wrapcxt, 1);
+wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
+    SOCKET s = (SOCKET)drwrap_get_arg(wrapcxt, 0);
+    char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
+    int len = (int)drwrap_get_arg(wrapcxt, 2);
+    int flags = (int)drwrap_get_arg(wrapcxt, 3);
+    
+    taint_mem((app_pc)buf, len);
+}
+
+struct read_info {
+    LPVOID lpBuffer;
+    DWORD nNumberOfBytesToRead;
+};
+
+static void
+wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
+    HANDLE hFile = drwrap_get_arg(wrapcxt, 0);
+    LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
+    
+    taint_mem((app_pc)lpBuffer, nNumberOfBytesToRead);
+    *user_data = malloc(sizeof(read_info));
+    ((read_info *)*user_data)->lpBuffer = lpBuffer;
+    ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
+}
+
+static void
+wrap_post_ReadFile(void *wrapcxt, void *user_data) {
+    LPVOID lpBuffer = ((read_info *)user_data)->lpBuffer;
+    DWORD nNumberOfBytesToRead = ((read_info *)user_data)->nNumberOfBytesToRead;
+    free(user_data);
 
     if(replay) {
         dr_mutex_lock(mutatex);
