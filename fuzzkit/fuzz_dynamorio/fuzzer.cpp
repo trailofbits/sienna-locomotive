@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <Windows.h>
+#include <Winternl.h>
 
 #include "dr_api.h"
 #include "drmgr.h"
@@ -135,6 +137,35 @@ DWORD finalize(HANDLE hPipe, DWORD runId, BOOL crashed) {
   return 0;
 }
 
+static LPTSTR get_target_command_line() {
+  // see: https://github.com/DynamoRIO/dynamorio/issues/2662
+  // alternatively: https://wj32.org/wp/2009/01/24/howto-get-the-command-line-of-processes/
+  _PEB * clientPEB = (_PEB *) dr_get_app_PEB();
+  _RTL_USER_PROCESS_PARAMETERS parameterBlock;
+  size_t byte_counter;
+
+  if (!dr_safe_read(clientPEB->ProcessParameters, sizeof(_RTL_USER_PROCESS_PARAMETERS), &parameterBlock, &byte_counter)) {
+    dr_log(NULL, LOG_ALL, ERROR, "Could not read process parameter block");
+    dr_exit_process(1);
+  }
+
+  WCHAR * commandLineContents = (WCHAR *)dr_global_alloc(parameterBlock.CommandLine.Length);
+  char * mbsCommandLineContents;
+
+  if (dr_safe_read(parameterBlock.CommandLine.Buffer, parameterBlock.CommandLine.Length, commandLineContents, &byte_counter)) {
+    size_t outSize = wcstombs(NULL, commandLineContents, parameterBlock.CommandLine.Length);
+    mbsCommandLineContents = (char *)dr_global_alloc(outSize);
+    byte_counter = wcstombs(mbsCommandLineContents, commandLineContents, outSize);
+    dr_global_free(commandLineContents, parameterBlock.CommandLine.Length);
+  }
+  else {
+    dr_log(NULL, LOG_ALL, ERROR, "Could not read command line buffer");
+    dr_exit_process(1);
+  }
+
+  return mbsCommandLineContents;
+}
+
 /* From wrap.cpp sample code. Called on application library load and unload.
    Responsible for registering pre and post callbacks for ReadFile. */
 static void
@@ -173,13 +204,8 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
 
     //TODO: support multiple passes over one binary without re-running drrun
 
-    // TODO: get arguments to target binary
-    // see: https://github.com/DynamoRIO/dynamorio/issues/2662
-    // alternatively: https://wj32.org/wp/2009/01/24/howto-get-the-command-line-of-processes/
-    LPTSTR targetArgs;
-
     HANDLE hPipe = getPipe();
-    runId = getRunID(hPipe, dr_get_application_name(), targetArgs);
+    runId = getRunID(hPipe, dr_get_application_name(), get_target_command_line());
     CloseHandle(hPipe);
 
     drmgr_init();
