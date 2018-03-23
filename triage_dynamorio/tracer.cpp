@@ -955,6 +955,34 @@ onexception(void *drcontext, dr_exception_t *excpt) {
 }
 
 static void
+wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
+    HANDLE hEventLog = (HANDLE)drwrap_get_arg(wrapcxt, 0);
+    DWORD  dwReadFlags = (DWORD)drwrap_get_arg(wrapcxt, 1);
+    DWORD  dwRecordOffset = (DWORD)drwrap_get_arg(wrapcxt, 2);
+    LPVOID lpBuffer = (LPVOID)drwrap_get_arg(wrapcxt, 3);
+    DWORD  nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 4);
+    DWORD  *pnBytesRead = (DWORD)drwrap_get_arg(wrapcxt, 5);
+    DWORD  *pnMinNumberOfBytesNeeded = (DWORD)drwrap_get_arg(wrapcxt, 6);
+    
+    taint_mem((app_pc)lpBuffer, nNumberOfBytesToRead);
+}
+
+
+static void
+wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
+    HKEY    hKey = (HKEY)drwrap_get_arg(wrapcxt, 0);
+    LPCTSTR lpValueName = (LPCTSTR)drwrap_get_arg(wrapcxt, 1);
+    LPDWORD lpReserved = (LPDWORD)drwrap_get_arg(wrapcxt, 2);
+    LPDWORD lpType = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
+    LPBYTE  lpData = (LPBYTE)drwrap_get_arg(wrapcxt, 4);
+    LPDWORD lpcbData = (LPDWORD)drwrap_get_arg(wrapcxt, 5);
+
+    if(lpData != NULL && lpcbData != NULL) {
+        taint_mem((app_pc)lpData, *lpcdData);
+    }
+}
+
+static void
 wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
     HINTERNET hRequest = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     PVOID pvBuffer = drwrap_get_arg(wrapcxt, 1);
@@ -963,6 +991,16 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
     WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE)(int)drwrap_get_arg(wrapcxt, 3);
     
     taint_mem((app_pc)pvBuffer, dwBufferLength);
+}
+
+static void
+wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
+    HINTERNET hFile = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
+    LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
+    DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
+    LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
+    
+    taint_mem((app_pc)lpBuffer, nNumberOfBytesToRead);
 }
 
 static void
