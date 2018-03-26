@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-add_executable(test_application test_application.cpp)
+add_executable(test_application test_application.cpp internet_read_file.cpp winsock_recv.cpp win_http_read_data.cpp)
 target_compile_definitions(test_application PRIVATE -DUNICODE)
 add_executable(socket_server socket_server.cpp)
 target_compile_definitions(test_application PRIVATE -DUNICODE)
