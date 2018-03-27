@@ -67,7 +67,8 @@ int test_WinHttpReadData() {
       {
         // Read the data.
         ZeroMemory( pszOutBuffer, dwSize+1 );
-
+        printf("pszOutBuffer: %p\n", pszOutBuffer);
+        printf("dwSize: %x\n", dwSize);
         if(!WinHttpReadData(hRequest, (LPVOID)pszOutBuffer, dwSize, &dwDownloaded)) {
           printf( "Error %u in WinHttpReadData.\n", GetLastError( ) );
         }
@@ -75,8 +76,9 @@ int test_WinHttpReadData() {
           // printf( "%s\n", pszOutBuffer );
           if(dwDownloaded >= 8) {
             int *crashPtr = *(int **)pszOutBuffer;
+            printf("CRASH PTR PTR: %p\n", pszOutBuffer);
             printf("CRASH PTR: %p\n", crashPtr);
-            printf("*CRASH PTR: %x\n", *crashPtr);
+            printf("*CRASH: %x\n", *crashPtr);
           }
         }
 

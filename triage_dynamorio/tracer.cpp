@@ -154,10 +154,15 @@ is_tainted(void *drcontext, opnd_t opnd)
         dr_get_mcontext(drcontext, &mc);
         app_pc addr = opnd_compute_address(opnd, &mc);
 
+        if(tainted_mems.size() > 0) {
+            dr_printf("checking taint for: %p\n", addr);
+        }
+
         opnd_size_t dr_size = opnd_get_size(opnd);
         uint size = opnd_size_in_bytes(dr_size);
         for(uint i=0; i<size; i++) {
-            if(tainted_mems.find(addr) != tainted_mems.end()) {
+            if(tainted_mems.find(addr+i) != tainted_mems.end()) {
+                dr_printf("is tainted: %p\n", addr+i);
                 return true;
             }
         }
@@ -191,17 +196,27 @@ is_tainted(void *drcontext, opnd_t opnd)
 static void
 taint_mem(app_pc addr, uint size) {
     for(uint i=0; i<size; i++) {
+        dr_printf("tainting addr: %p\n", addr+i);
         tainted_mems.insert(addr+i);
     }
 }
 
 static bool
 untaint_mem(app_pc addr, uint size) {
+    /* TODO: 
+        this seems to be off by 1 on (goes into a tainted buffer):
+        rep movs %ds:(%rsi)[1byte] %rsi %rdi %rcx -> %es:(%rdi)[1byte] %rsi %rdi %rcx
+        see WinHttpReadData test
+    */
     bool untainted = false;
     for(uint i=0; i<size; i++) {
         size_t n = tainted_mems.erase(addr+i);
         if(n) {
+            dr_printf("untainting addr: %p\n", addr+i);
             untainted = true;
+        }
+        if(untainted) {
+            dr_printf("tried untainting addr: %p\n", addr+i);
         }
     }
     return untainted;
@@ -213,11 +228,12 @@ taint(void *drcontext, opnd_t opnd)
     if(opnd_is_reg(opnd)) {
         reg_id_t reg = opnd_get_reg(opnd);
         reg = reg_to_full_width64(reg);
+        dr_printf("TAINTING: %s\n", get_register_name(reg));
 
         tainted_regs.insert(reg);
         
-        char buf[100];
-        opnd_disassemble_to_buffer(drcontext, opnd, buf, 100);
+        // char buf[100];
+        // opnd_disassemble_to_buffer(drcontext, opnd, buf, 100);
     } else if(opnd_is_memory_reference(opnd)) {
         dr_mcontext_t mc = {sizeof(mc),DR_MC_ALL};
         dr_get_mcontext(drcontext, &mc);
@@ -249,8 +265,8 @@ untaint(void *drcontext, opnd_t opnd)
 
         size_t n = tainted_regs.erase(reg);
         if(n) {
-            char buf[100];
-            opnd_disassemble_to_buffer(drcontext, opnd, buf, 100);
+            // char buf[100];
+            // opnd_disassemble_to_buffer(drcontext, opnd, buf, 100);
             untainted = true;
         }
     } else if(opnd_is_memory_reference(opnd)) {
@@ -290,10 +306,10 @@ handle_xor(void *drcontext, instr_t *instr) {
 
             if(reg_0 == reg_1) {
                 size_t n = tainted_regs.erase(reg_0);
-                if(n) {
-                    char buf[100];
-                    opnd_disassemble_to_buffer(drcontext, opnd_0, buf, 100);
-                }
+                // if(n) {
+                //     char buf[100];
+                //     opnd_disassemble_to_buffer(drcontext, opnd_0, buf, 100);
+                // }
                 result = true;
             }
         }
@@ -350,8 +366,8 @@ handle_push_pop(void *drcontext, instr_t *instr) {
     // 
     if(tainted | untainted) {
         int opcode = instr_get_opcode(instr);
-        char buf[100];
-        instr_disassemble_to_buffer(drcontext, instr, buf, 100);
+        // char buf[100];
+        // instr_disassemble_to_buffer(drcontext, instr, buf, 100);
     }
 }
 
@@ -506,6 +522,12 @@ propagate_taint(app_pc pc)
     instr_init(drcontext, &instr);
     decode(drcontext, pc, &instr);
 
+    if(tainted_mems.size() > 0) {
+        char buf[100];
+        instr_disassemble_to_buffer(drcontext, &instr, buf, 100);
+        dr_printf("%s\n", buf);
+    }
+
     if(handle_specific(drcontext, &instr)) {
         return;
     }
@@ -533,8 +555,6 @@ propagate_taint(app_pc pc)
 
     if(tainted | untainted) {
         int opcode = instr_get_opcode(&instr);
-        char buf[100];
-        instr_disassemble_to_buffer(drcontext, &instr, buf, 100);
     }
 }
 
@@ -956,13 +976,14 @@ onexception(void *drcontext, dr_exception_t *excpt) {
 
 static void
 wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
+    dr_fprintf(STDERR, "<in wrap_pre_ReadEventLog>\n");
     HANDLE hEventLog = (HANDLE)drwrap_get_arg(wrapcxt, 0);
     DWORD  dwReadFlags = (DWORD)drwrap_get_arg(wrapcxt, 1);
     DWORD  dwRecordOffset = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPVOID lpBuffer = (LPVOID)drwrap_get_arg(wrapcxt, 3);
     DWORD  nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 4);
-    DWORD  *pnBytesRead = (DWORD)drwrap_get_arg(wrapcxt, 5);
-    DWORD  *pnMinNumberOfBytesNeeded = (DWORD)drwrap_get_arg(wrapcxt, 6);
+    DWORD  *pnBytesRead = (DWORD *)drwrap_get_arg(wrapcxt, 5);
+    DWORD  *pnMinNumberOfBytesNeeded = (DWORD *)drwrap_get_arg(wrapcxt, 6);
     
     taint_mem((app_pc)lpBuffer, nNumberOfBytesToRead);
 }
@@ -970,6 +991,7 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
+    dr_fprintf(STDERR, "<in wrap_pre_RegQueryValueEx>\n");
     HKEY    hKey = (HKEY)drwrap_get_arg(wrapcxt, 0);
     LPCTSTR lpValueName = (LPCTSTR)drwrap_get_arg(wrapcxt, 1);
     LPDWORD lpReserved = (LPDWORD)drwrap_get_arg(wrapcxt, 2);
@@ -978,12 +1000,13 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
     LPDWORD lpcbData = (LPDWORD)drwrap_get_arg(wrapcxt, 5);
 
     if(lpData != NULL && lpcbData != NULL) {
-        taint_mem((app_pc)lpData, *lpcdData);
+        taint_mem((app_pc)lpData, *lpcbData);
     }
 }
 
 static void
 wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
+    dr_fprintf(STDERR, "<in wrap_pre_WinHttpWebSocketReceive>\n");
     HINTERNET hRequest = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     PVOID pvBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD dwBufferLength = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -995,6 +1018,7 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
+    dr_fprintf(STDERR, "<in wrap_pre_InternetReadFile>\n");
     HINTERNET hFile = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -1005,16 +1029,20 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
+    dr_fprintf(STDERR, "<in wrap_pre_WinHttpReadData>\n");
     HINTERNET hRequest = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
     
+    dr_printf("lpBuffer: %p\n", lpBuffer);
+    dr_printf("nNumberOfBytesToRead: %x\n", nNumberOfBytesToRead);
     taint_mem((app_pc)lpBuffer, nNumberOfBytesToRead);
 }
 
 static void
 wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
+    dr_fprintf(STDERR, "<in wrap_pre_recv>\n");
     SOCKET s = (SOCKET)drwrap_get_arg(wrapcxt, 0);
     char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
     int len = (int)drwrap_get_arg(wrapcxt, 2);
@@ -1030,6 +1058,7 @@ struct read_info {
 
 static void
 wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
+    dr_fprintf(STDERR, "<in wrap_pre_ReadFile>\n");
     HANDLE hFile = drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -1087,15 +1116,44 @@ wrap_post_ReadFile(void *wrapcxt, void *user_data) {
 
 static void
 module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
-    app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, "ReadFile");
-    if (towrap != NULL) {
-        dr_flush_region(towrap, 0x1000);
-        bool ok = drwrap_wrap(towrap, wrap_pre_ReadFile, wrap_post_ReadFile);
-        // bool ok = false;
-        if (ok) {
-            dr_fprintf(STDERR, "<wrapped ReadFile @ 0x%p\n", towrap);
-        } else {
-            dr_fprintf(STDERR, "<FAILED to wrap ReadFile @ 0x%p: already wrapped?\n", towrap);
+    // void(__cdecl *)(void *, OUT void **)
+#define PREPROTO void(__cdecl *)(void *, void **)
+#define POSTPROTO void(__cdecl *)(void *, void *)
+
+    std::map<char *, PREPROTO> toHookPre;
+    toHookPre["ReadEventLog"] = wrap_pre_ReadEventLog;
+    toHookPre["RegQueryValueEx"] = wrap_pre_RegQueryValueEx;
+    toHookPre["WinHttpWebSocketReceive"] = wrap_pre_WinHttpWebSocketReceive;
+    toHookPre["InternetReadFile"] = wrap_pre_InternetReadFile;
+    toHookPre["WinHttpReadData"] = wrap_pre_WinHttpReadData;
+    toHookPre["recv"] = wrap_pre_recv;
+    toHookPre["ReadFile"] = wrap_pre_ReadFile;
+    
+    std::map<char *, POSTPROTO> toHookPost;
+    toHookPost["ReadFile"] = wrap_post_ReadFile;
+
+    std::map<char *, PREPROTO>::iterator it;
+    for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
+        char *functionName = it->first;
+        void(__cdecl *hookFunctionPre)(void *, void **);
+        hookFunctionPre = it->second;
+        void(__cdecl *hookFunctionPost)(void *, void *);
+        hookFunctionPost = NULL;
+
+        if(toHookPost.find(functionName) != toHookPost.end()) {
+            hookFunctionPost = toHookPost[functionName];
+        }
+
+        app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
+        if (towrap != NULL) {
+            dr_flush_region(towrap, 0x1000);
+            bool ok = drwrap_wrap(towrap, hookFunctionPre, hookFunctionPost);
+            // bool ok = false;
+            if (ok) {
+                dr_fprintf(STDERR, "<wrapped %s @ 0x%p\n", functionName, towrap);
+            } else {
+                dr_fprintf(STDERR, "<FAILED to wrap %s @ 0x%p: already wrapped?\n", functionName, towrap);
+            }
         }
     }
 }
@@ -1134,9 +1192,6 @@ void tracer(client_id_t id, int argc, const char *argv[]) {
     dr_printf("run_id: %llu\n", run_id);
 
     mutatex = dr_mutex_create();
-
-    exit(0);
-
     dr_register_exit_event(event_exit_trace);
 
     if (!drmgr_register_module_load_event(module_load_event) ||

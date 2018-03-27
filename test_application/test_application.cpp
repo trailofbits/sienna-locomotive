@@ -9,10 +9,6 @@
 // cmake -G"Visual Studio 15 Win64" ..
 // cmake --build . --config Release
 
-/*
-    ReadEventLog
-*/
-
 // RegQueryValueEx
 int test_RegQueryValueEx() {
     BYTE buf[4096];
