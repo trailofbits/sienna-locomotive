@@ -4,14 +4,50 @@
 #include "internet_read_file.h"
 #include "win_http_read_data.h"
 #include "winsock_recv.h"
+#include "win_http_web_socket_receive.h"
 
 // cmake -G"Visual Studio 15 Win64" ..
 // cmake --build . --config Release
 
 /*
     ReadEventLog
-    RegQueryValueEx
 */
+
+// RegQueryValueEx
+int test_RegQueryValueEx() {
+    BYTE buf[4096];
+    DWORD size = 4096;
+
+    HKEY key;
+    DWORD err = RegOpenKeyEx(
+        HKEY_CURRENT_USER, 
+        L"Environment", 
+        NULL, 
+        KEY_READ, 
+        &key);
+
+    if(err != ERROR_SUCCESS) {
+        printf("Open key error: %x\n", err);
+        return 1;
+    }
+
+    err = RegQueryValueEx(
+        key,
+        L"Path", 
+        NULL, 
+        NULL, 
+        buf,
+        &size);
+
+    if(err != ERROR_SUCCESS || size < 8) {
+        printf("Query key error: %x\n", err);
+        return 1;
+    }
+
+    int *crashPtr = *(int **)buf;
+    printf("CRASH PTR: %p\n", crashPtr);
+    printf("*CRASH PTR: %x\n", *crashPtr);
+}
 
 // ReadFile
 int prep_read_file_test(LPWSTR name) {
@@ -92,6 +128,12 @@ int main()
             break;
         case 3:
             test_InternetReadFile();
+            break;
+        case 4:
+            test_RegQueryValueEx();
+            break;
+        case 5:
+            test_WinHttpWebSocketReceive();
             break;
         default:
             show_help(argv);

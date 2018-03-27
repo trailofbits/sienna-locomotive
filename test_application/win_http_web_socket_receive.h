@@ -1,0 +1,2 @@
+
+int test_WinHttpWebSocketReceive();

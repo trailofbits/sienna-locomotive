@@ -41,6 +41,9 @@ int test_InternetReadFile()
 
         buf[bytesRead] = 0;
         printf("%s", buf);
+        int *crashPtr = *(int **)buf;
+        printf("CRASH PTR: %p\n", crashPtr);
+        printf("*CRASH PTR: %x\n", *crashPtr);
     }
     else {
         printf("Error reading: %d\n", GetLastError());
