@@ -1,0 +1,16 @@
+fuzzkit/.vs/*
+fuzzkit/x64/*/
+fuzzkit/fuzzkit/x64/*/
+fuzzkit/injectable/x64/*/
+fuzzkit/triage/x64/*/
+fuzzkit/test_application/x64/*/
+fuzzkit/server/x64/*/
+fuzzkit/triage/include/boost/*
+fuzzkit/triage/include/z3/*
+corpus/win_asm/bak_crashes.asm
+corpus/win_asm/*.exe
+corpus/win_asm/*.lnk
+corpus/win_asm/*.obj
+fuzzkit/fuzz_dynamorio/build
+fuzzkit/fuzz_dynamorio/dynamorio
+fuzzkit/fuzz_dynamorio/.vs
