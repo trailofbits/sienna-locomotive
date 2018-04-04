@@ -96,6 +96,11 @@ int show_help(LPWSTR *argv) {
     printf("USAGE: %S [OPTION]\n", argv[0]);
     printf("OPTIONS:\n");
     printf("\t0: read_file_test\n");
+    printf("\t1: test_recv\n");
+    printf("\t2: test_WinHttpReadData\n");
+    printf("\t3: test_InternetReadFile\n");
+    printf("\t4: test_RegQueryValueEx\n");
+    printf("\t5: test_WinHttpWebSocketReceive\n");
     return 0;
 }
 

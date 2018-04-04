@@ -1,0 +1,15 @@
+find_package(DynamoRIO)
+
+if (NOT DynamoRIO_FOUND)
+  message(FATAL_ERROR "DynamoRIO package required to build")
+endif(NOT DynamoRIO_FOUND)
+
+add_library(wizard SHARED wizard.cpp)
+
+configure_DynamoRIO_client(wizard)
+
+use_DynamoRIO_extension(wizard drmgr)
+use_DynamoRIO_extension(wizard drreg)
+use_DynamoRIO_extension(wizard drwrap)
+use_DynamoRIO_extension(wizard drx)
+use_DynamoRIO_extension(wizard droption)
