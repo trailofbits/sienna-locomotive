@@ -10,6 +10,7 @@
 #define BUFSIZE 100000
 #include <ShlObj.h>
 #include <PathCch.h>
+#pragma comment(lib, "Pathcch.lib")
 
 CRITICAL_SECTION critId;
 CRITICAL_SECTION critTrace;
