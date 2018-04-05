@@ -38,6 +38,10 @@ while(1) {
         Printf("TAINT AT %x\n", FTell());
         uint64 taint_address;
         uint64 taint_size;
+    } else if(size == 0x82) {
+        Printf("CRASH AT %x\n", FTell());
+        uint32 exception_code;
+        uint64 exception_address;
     } else {
         INSN insn;
     }

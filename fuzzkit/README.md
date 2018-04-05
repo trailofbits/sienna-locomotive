@@ -2,6 +2,43 @@
 
 The primary goal is ease of use. That won't stop us from trying to make it faster and smarter than the competition too.
 
+## File Formats
+
+### Trace Format
+
+This is an execution and event trace file.
+
+Repeating elements, one of -
+
+`byte size`, `byte insn_bytes[size]`
+
+`byte 0x80`, `uint64 basic_block_address`
+
+`byte 0x81`, `uint64 taint_address`, `uint64 taint_size`,
+
+`byte 0x82`, `uint32 exception_code`, `uint64 exception_address`,
+
+### FKT Format
+
+This format is for recording mutation events for later replay.
+
+`char magic[4] == 'FKT\x00'`
+
+`uint type`, `1 == file`
+
+Variable based on type.
+
+`uint file_size`
+
+`wchar_t path[file_size]`
+
+`uint64 position`
+
+`uint size`
+
+`uchar data[size]`
+
+
 ## High level architecture
 
 ```
