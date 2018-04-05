@@ -1,3 +1,3 @@
 #include <stdio.h>
 
-int test_recv();
+int test_recv(bool fuzzing);

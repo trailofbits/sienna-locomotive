@@ -1,3 +1,3 @@
 #include <stdio.h>
 
-int test_InternetReadFile();
+int test_InternetReadFile(bool fuzzing);

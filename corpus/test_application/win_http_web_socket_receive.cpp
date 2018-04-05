@@ -13,7 +13,7 @@
 
 // WinHttpWebSocketReceive
 
-int test_WinHttpWebSocketReceive()
+int test_WinHttpWebSocketReceive(bool fuzzing)
 {
     DWORD dwError = ERROR_SUCCESS;
     BOOL fStatus = FALSE;
@@ -189,7 +189,15 @@ int test_WinHttpWebSocketReceive()
     wprintf(L"Received message from the server: '%.*s'\n", dwBufferLength, (WCHAR*)rgbBuffer);
     int *crashPtr = *(int **)rgbBuffer;
     printf("CRASH PTR: %p\n", crashPtr);
-    printf("*CRASH PTR: %x\n", *crashPtr);
+    // 006C006C00650048
+    if (fuzzing) {
+        if((UINT64)crashPtr > 0x007f006C00650048) {
+            printf("*CRASH PTR: %x\n", *crashPtr);
+        }
+    } else {
+        printf("*CRASH PTR: %x\n", *crashPtr);
+    }
+    
     //
     // Gracefully close the connection.
     //
