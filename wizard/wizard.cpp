@@ -20,10 +20,6 @@ bool replay;
 bool mutate_count;
 UINT64 run_id;
 
-/* 
-C:\Users\dgoddard\Documents\work\DynamoRIO\bin64\drrun.exe -c C:\Users\dgoddard\Documents\GitHub\sienna-locomotive\wizard\build\Debug\wizard.dll -- C:\Users\dgoddard\Documents\GitHub\sienna-locomotive\test_application\build\Release\test_application.exe 0
-*/
-
 static droption_t<std::string> op_include
 (DROPTION_SCOPE_CLIENT, "i", "", "include",
  "Functions to be included in hooking.");

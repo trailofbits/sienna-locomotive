@@ -6,9 +6,6 @@
 #include "winsock_recv.h"
 #include "win_http_web_socket_receive.h"
 
-// cmake -G"Visual Studio 15 Win64" ..
-// cmake --build . --config Release
-
 // RegQueryValueEx
 int test_RegQueryValueEx() {
     BYTE buf[4096];
@@ -87,6 +84,14 @@ int read_file_test() {
     int *crashPtr = *(int **)buf;
     printf("CRASH PTR: %p\n", crashPtr);
     printf("*CRASH PTR: %x\n", *crashPtr);
+
+    // for the fuzzer
+    
+    // int *crashPtr = *(int **)buf;
+    // printf("CRASH PTR: %p\n", crashPtr);
+    // if ((UINT64)crashPtr > 0x4947464544434241) {
+    //     printf("*CRASH PTR: %x\n", *crashPtr);
+    // }
     
     CloseHandle(file);
     return 0;
