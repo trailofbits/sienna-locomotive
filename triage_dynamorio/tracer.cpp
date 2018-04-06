@@ -14,6 +14,7 @@
 #include "drreg.h"
 #include "drwrap.h"
 #include "dr_ir_instr.h"
+#include "droption.h"
 
 extern "C" {
 #include "utils.h"
@@ -1181,6 +1182,11 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     }
 }
 
+#define NO_REPLAY 0xFFFFFFFFFFFFFFFF
+static droption_t<unsigned int> op_replay
+(DROPTION_SCOPE_CLIENT, "r", NO_REPLAY, "replay",
+ "The run id for a crash to replay.");
+
 void tracer(client_id_t id, int argc, const char *argv[]) {
     drreg_options_t ops = {sizeof(ops), 3, false};
     dr_set_client_name("DynamoRIO Sample Client 'instrace'",
@@ -1192,23 +1198,9 @@ void tracer(client_id_t id, int argc, const char *argv[]) {
     replay = false;
     mutate_count = 0;
 
-    UINT64 run_id = -1;
-    bool next = false;
-    for(int i = 0; i < argc; i++) {
-        if(next) {
-            run_id = _strtoui64(argv[i], (char **)NULL, 10);
-        }
-        
-        next = false;
-        
-        if(strcmp(argv[i], "-r") == 0) {
-            replay = true;
-            next = true;
-        }
-    }
-
-    if(run_id == (1<<64)-1) {
-        replay = false;
+    run_id = op_replay.get_value();
+    if(run_id != NO_REPLAY) {
+        replay = true;
     }
     
     dr_printf("replay: %d\n", replay);
@@ -1234,5 +1226,12 @@ void tracer(client_id_t id, int argc, const char *argv[]) {
 DR_EXPORT void
 dr_client_main(client_id_t id, int argc, const char *argv[])
 {
+    std::string parse_err;
+    int last_idx = 0;
+    if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
+        dr_fprintf(STDERR, "Usage error: %s", parse_err.c_str());
+        dr_abort();
+    }
+
     tracer(id, argc, argv);
 }
