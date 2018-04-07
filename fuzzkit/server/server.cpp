@@ -29,6 +29,7 @@ WCHAR FUZZ_WORKING_FMT_FMT[MAX_PATH] = L"";
 WCHAR FUZZ_WORKING_FMT_EXECUTION[MAX_PATH] = L"";
 WCHAR FUZZ_WORKING_FMT_MEM[MAX_PATH] = L"";
 WCHAR FUZZ_WORKING_FMT_CRASH[MAX_PATH] = L"";
+WCHAR FUZZ_WORKING_FMT_JSON[MAX_PATH] = L"";
 WCHAR FUZZ_LOG[MAX_PATH] = L"";
 
 VOID initDirs() {
@@ -48,6 +49,7 @@ VOID initDirs() {
 	PathCchCombine(FUZZ_WORKING_FMT_EXECUTION, MAX_PATH, FUZZ_WORKING_FMT, L"execution.trc");
 	PathCchCombine(FUZZ_WORKING_FMT_MEM, MAX_PATH, FUZZ_WORKING_FMT, L"mem.dmp");
 	PathCchCombine(FUZZ_WORKING_FMT_CRASH, MAX_PATH, FUZZ_WORKING_FMT, L"execution.csh");
+    PathCchCombine(FUZZ_WORKING_FMT_JSON, MAX_PATH, FUZZ_WORKING_FMT, L"crash.json");
 
 	SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roamingPath);
 	WCHAR logLocalPath[MAX_PATH] = L"Trail of Bits\\fuzzkit\\log\\server.log";
@@ -839,6 +841,33 @@ DWORD handleLog(HANDLE hPipe) {
 	return 0;
 }
 
+
+DWORD crashPath(HANDLE hPipe) {
+	DWORD dwBytesRead = 0;
+	DWORD dwBytesWritten = 0;
+	
+	EnterCriticalSection(&critTrace);
+
+	DWORD runId = 0;
+	if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
+		LOG_F(ERROR, "TraceInit (%x)", GetLastError());
+		exit(1);
+	}
+
+	WCHAR targetFile[MAX_PATH + 1] = { 0 };
+	int len = wsprintf(targetFile, FUZZ_WORKING_FMT_JSON, runId);
+	DWORD size = (wcslen(targetFile) + 1) * sizeof(WCHAR);
+
+	if(!WriteFile(hPipe, &targetFile, size, &dwBytesWritten, NULL)) {
+		LOG_F(ERROR, "TraceInit (%x)", GetLastError());
+		exit(1);
+	}
+
+	LeaveCriticalSection(&critTrace);
+	return 0;
+}
+
+// TODO: check then delete all the tracing stuff
 enum Event {
 	EVT_RUN_ID,				// 0
 	EVT_MUTATION,			// 1
@@ -849,6 +878,7 @@ enum Event {
 	EVT_TRACE_INSNS,		// 6
 	EVT_TRACE_TAINT,		// 7
 	EVT_TRACE_CRASH_INFO,	// 8
+	EVT_CRASH_PATH,			// 9
 };
 
 DWORD WINAPI threadHandler(LPVOID lpvPipe) {
@@ -890,6 +920,9 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe) {
 			break;
 		case EVT_TRACE_CRASH_INFO:
 			traceCrash(hPipe);
+			break;
+		case EVT_CRASH_PATH:
+			crashPath(hPipe);
 			break;
 		default:
 			// TODO: log error

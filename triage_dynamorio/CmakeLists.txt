@@ -5,10 +5,9 @@ if (NOT DynamoRIO_FOUND)
 endif(NOT DynamoRIO_FOUND)
 
 add_library(tracer SHARED tracer.cpp utils.c)
+target_compile_definitions(tracer PRIVATE -DUNICODE)
 
 include_directories(include)
-#find_library(TRITON_LIB triton HINTS lib)
-#target_link_libraries(tracer ${TRITON_LIB})
 
 target_link_libraries(tracer Dbghelp)
 

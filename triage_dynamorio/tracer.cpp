@@ -822,6 +822,51 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
 static void
 dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t score, std::string disassembly) {
     std::string crash_json = dump_json(drcontext, score, reason, excpt, disassembly);
+
+    WCHAR targetFile[MAX_PATH + 1] = { 0 };
+    ZeroMemory(targetFile, sizeof(WCHAR) * (MAX_PATH + 1));
+    
+    if(replay) {
+        HANDLE h_pipe = CreateFile(
+            L"\\\\.\\pipe\\fuzz_server",
+            GENERIC_READ | GENERIC_WRITE,
+            0,
+            NULL,
+            OPEN_EXISTING,
+            0,
+            NULL);
+
+        if (h_pipe != INVALID_HANDLE_VALUE) {
+            DWORD read_mode = PIPE_READMODE_MESSAGE;
+            SetNamedPipeHandleState(
+                h_pipe,
+                &read_mode,
+                NULL,
+                NULL);
+
+            DWORD bytes_read = 0;
+            DWORD bytes_written = 0;
+
+            BYTE event_id = 9;
+
+            WriteFile(h_pipe, &event_id, sizeof(BYTE), &bytes_written, NULL);
+            TransactNamedPipe(h_pipe, &run_id, sizeof(DWORD), targetFile, MAX_PATH + 1, &bytes_read, NULL);
+            CloseHandle(h_pipe);
+
+            HANDLE hCrashFile = CreateFile(targetFile, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+            if (hCrashFile == INVALID_HANDLE_VALUE) {
+                dr_fprintf(STDERR, "Could not open crash file json (%x)", GetLastError());
+                exit(1);
+            }
+
+            DWORD bytesWritten;
+            if (!WriteFile(hCrashFile, crash_json.c_str(), crash_json.length(), &bytesWritten, NULL)) {
+                dr_fprintf(STDERR, "Could not write crash file json (%x)", GetLastError());
+                exit(1);
+            }
+        }
+    }
+        
     dr_printf("#### BEGIN CRASH DATA JSON\n");
     dr_printf("%s\n", crash_json.c_str());
     dr_printf("#### END CRASH DATA JSON\n");
@@ -1095,7 +1140,7 @@ wrap_post_ReadFile(void *wrapcxt, void *user_data) {
     if(replay) {
         dr_mutex_lock(mutatex);
         HANDLE h_pipe = CreateFile(
-            "\\\\.\\pipe\\fuzz_server",
+            L"\\\\.\\pipe\\fuzz_server",
             GENERIC_READ | GENERIC_WRITE,
             0,
             NULL,
