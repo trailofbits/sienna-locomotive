@@ -1227,7 +1227,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     }
 }
 
-#define NO_REPLAY 0xFFFFFFFFFFFFFFFF
+#define NO_REPLAY 0xFFFFFFF
 static droption_t<unsigned int> op_replay
 (DROPTION_SCOPE_CLIENT, "r", NO_REPLAY, "replay",
  "The run id for a crash to replay.");
