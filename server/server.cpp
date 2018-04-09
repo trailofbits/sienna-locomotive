@@ -638,8 +638,20 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe) {
 	return 0;
 }
 
+HANDLE hProcessMutex = INVALID_HANDLE_VALUE;
+
+void lockProcess() {
+	hProcessMutex = CreateMutex(NULL, FALSE, L"fuzz_server_mutex");
+	DWORD result = WaitForSingleObject(hProcessMutex, 0);
+	if(result != WAIT_OBJECT_0) {
+		LOG_F(ERROR, "Could not get process lock");
+		exit(1);
+	}
+}
+
 int main(int mArgc, char **mArgv)
 {
+	lockProcess();
 	initDirs();
 	
 	loguru::init(mArgc, mArgv);
@@ -647,7 +659,6 @@ int main(int mArgc, char **mArgv)
 	wcstombs(logLocalPathA, FUZZ_LOG, MAX_PATH);
 	loguru::add_file(logLocalPathA, loguru::Append, loguru::Verbosity_MAX);
 	LOG_F(INFO, "Server started!");
-
 
 	InitializeCriticalSection(&critId);
 	InitializeCriticalSection(&critLog);
@@ -700,6 +711,8 @@ int main(int mArgc, char **mArgv)
 	}
 
 	// TODO: stop gracefully?
+	ReleaseMutex(hProcessMutex);
+	CloseHandle(hProcessMutex);
 	DeleteCriticalSection(&critId);
 	DeleteCriticalSection(&critLog);
     return 0;

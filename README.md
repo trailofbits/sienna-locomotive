@@ -6,11 +6,33 @@ The primary goal is ease of use. That won't stop us from trying to make it faste
 
 ### Building 
 
-`Pending changes...`
+```
+mkdir build
+cd build
+cmake -G"Visual Studio 15 Win64" -DDynamoRIO_DIR=C:\path\to\DynamoRIO\cmake ..
+cmake --build .
+```
 
 ### Running
 
-`Pending changes...`
+From the root of the project - 
+
+```
+# triage
+C:\path\to\DynamoRIO\bin64\drrun.exe -c build\triage_dynamorio\Debug\tracer.dll -- corpus\win_asm\crashes.exe 7
+
+# wizard 
+C:\path\to\DynamoRIO\bin64\drrun.exe -c build\wizard\Debug\wizard.dll -- build\corpus\test_application\Debug\test_application.exe 0
+
+# server
+build\server\Debug\server.exe
+
+# fuzzer
+C:\path\to\DynamoRIO\bin64\drrun.exe -c build\fuzz_dynamorio\Debug\fuzzer.dll -- build\corpus\test_application\Debug\test_application.exe 0 -f
+
+# triage crash
+C:\path\to\DynamoRIO\bin64\drrun.exe -c sienna-locomotive\build\triage_dynamorio\Debug\tracer.dll -r [RUN_ID] -- build\corpus\test_application\Debug\test_application.exe 0 -f
+```
 
 ## File Formats
 
