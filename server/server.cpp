@@ -642,23 +642,30 @@ HANDLE hProcessMutex = INVALID_HANDLE_VALUE;
 
 void lockProcess() {
 	hProcessMutex = CreateMutex(NULL, FALSE, L"fuzz_server_mutex");
+	if(!hProcessMutex || hProcessMutex == INVALID_HANDLE_VALUE) {
+		LOG_F(ERROR, "Could not get process lock (handle)");
+		exit(1);
+	}
+
 	DWORD result = WaitForSingleObject(hProcessMutex, 0);
 	if(result != WAIT_OBJECT_0) {
-		LOG_F(ERROR, "Could not get process lock");
+		LOG_F(ERROR, "Could not get process lock (lock)");
 		exit(1);
 	}
 }
 
 int main(int mArgc, char **mArgv)
 {
-	lockProcess();
 	initDirs();
 	
 	loguru::init(mArgc, mArgv);
 	CHAR logLocalPathA[MAX_PATH];
 	wcstombs(logLocalPathA, FUZZ_LOG, MAX_PATH);
 	loguru::add_file(logLocalPathA, loguru::Append, loguru::Verbosity_MAX);
+	
 	LOG_F(INFO, "Server started!");
+
+	lockProcess();
 
 	InitializeCriticalSection(&critId);
 	InitializeCriticalSection(&critLog);
