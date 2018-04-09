@@ -847,7 +847,7 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
             DWORD bytes_read = 0;
             DWORD bytes_written = 0;
 
-            BYTE event_id = 9;
+            BYTE event_id = 5;
 
             WriteFile(h_pipe, &event_id, sizeof(BYTE), &bytes_written, NULL);
             TransactNamedPipe(h_pipe, &run_id, sizeof(DWORD), targetFile, MAX_PATH + 1, &bytes_read, NULL);

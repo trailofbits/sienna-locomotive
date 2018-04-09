@@ -13,10 +13,8 @@
 #pragma comment(lib, "Pathcch.lib")
 
 CRITICAL_SECTION critId;
-CRITICAL_SECTION critTrace;
 CRITICAL_SECTION critLog;
 
-std::unordered_map<DWORD, HANDLE> traceFileMap;
 HANDLE hLog = INVALID_HANDLE_VALUE;
 
 WCHAR FUZZ_WORKING_STAR[MAX_PATH] = L"";
@@ -87,7 +85,7 @@ DWORD findUnusedId() {
 	WCHAR targetDir[MAX_PATH];
 	wsprintf(targetDir, FUZZ_WORKING_FMT, id);
 	if(!CreateDirectory(targetDir, NULL)) {
-		LOG_F(ERROR, "FindUnusedId (%x)", GetLastError());
+		LOG_F(ERROR, "FindUnusedId (0x%x)", GetLastError());
 		exit(1);
 	}
 
@@ -109,7 +107,7 @@ DWORD generateRunId(HANDLE hPipe) {
 	TCHAR commandLine[8192] = { 0 };
 	DWORD size = 0;
 	if(!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "GenerateRunId (%x)", GetLastError());
+		LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
 		exit(1);
 	}
 
@@ -119,7 +117,7 @@ DWORD generateRunId(HANDLE hPipe) {
 	}
 	
 	if(!ReadFile(hPipe, commandLine, size, &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "GenerateRunId (%x)", GetLastError());
+		LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
 		exit(1);
 	}
 
@@ -128,17 +126,17 @@ DWORD generateRunId(HANDLE hPipe) {
 	HANDLE hFile = CreateFile(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
 	if(hFile == INVALID_HANDLE_VALUE) {
-		LOG_F(ERROR, "GenerateRunId (%x)", GetLastError());
+		LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	if(!WriteFile(hFile, commandLine, size, &dwBytesWritten, NULL)) {
-		LOG_F(ERROR, "GenerateRunId (%x)", GetLastError());
+		LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	if(!CloseHandle(hFile)) {
-		LOG_F(ERROR, "GenerateRunId (%x)", GetLastError());
+		LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
 		exit(1);
 	}
 	
@@ -147,7 +145,7 @@ DWORD generateRunId(HANDLE hPipe) {
 	// get program arguments
 	size = 0;
 	if(!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "GenerateRunId (%x)", GetLastError());
+		LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
 		exit(1);
 	}
 
@@ -157,7 +155,7 @@ DWORD generateRunId(HANDLE hPipe) {
 	}
 	
 	if(!ReadFile(hPipe, commandLine, size, &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "GenerateRunId (%x)", GetLastError());
+		LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
 		exit(1);
 	}
 
@@ -166,17 +164,17 @@ DWORD generateRunId(HANDLE hPipe) {
 	hFile = CreateFile(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 	
 	if(hFile == INVALID_HANDLE_VALUE) {
-		LOG_F(ERROR, "GenerateRunId (%x)", GetLastError());
+		LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	if(!WriteFile(hFile, commandLine, size, &dwBytesWritten, NULL)) {
-		LOG_F(ERROR, "GenerateRunId (%x)", GetLastError());
+		LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	if(!CloseHandle(hFile)) {
-		LOG_F(ERROR, "GenerateRunId (%x)", GetLastError());
+		LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
 		exit(1);
 	}
 
@@ -212,44 +210,44 @@ DWORD writeFKT(HANDLE hFile, DWORD pathSize, TCHAR *filePath, DWORD64 position, 
 	DWORD dwBytesWritten = 0;
 
 	if (!WriteFile(hFile, "FKT\0", 4, &dwBytesWritten, NULL)) {
-		LOG_F(ERROR, "HandleMutation (%x)", GetLastError());
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	// only one type for right now, files
 	DWORD type = 1;
 	if (!WriteFile(hFile, &type, sizeof(DWORD), &dwBytesWritten, NULL)) {
-		LOG_F(ERROR, "HandleMutation (%x)", GetLastError());
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	if (!WriteFile(hFile, &pathSize, sizeof(DWORD), &dwBytesWritten, NULL)) {
-		LOG_F(ERROR, "HandleMutation (%x)", GetLastError());
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	if (!WriteFile(hFile, filePath, pathSize * sizeof(TCHAR), &dwBytesWritten, NULL)) {
-		LOG_F(ERROR, "HandleMutation (%x)", GetLastError());
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	if (!WriteFile(hFile, &position, sizeof(DWORD64), &dwBytesWritten, NULL)) {
-		LOG_F(ERROR, "HandleMutation (%x)", GetLastError());
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	if (!WriteFile(hFile, &size, sizeof(DWORD), &dwBytesWritten, NULL)) {
-		LOG_F(ERROR, "HandleMutation (%x)", GetLastError());
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	if (!WriteFile(hFile, buf, size, &dwBytesWritten, NULL)) {
-		LOG_F(ERROR, "HandleMutation (%x)", GetLastError());
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	if (!CloseHandle(hFile)) {
-		LOG_F(ERROR, "HandleMutation (%x)", GetLastError());
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
 
@@ -262,19 +260,19 @@ DWORD handleMutation(HANDLE hPipe) {
 
 	DWORD runId = 0;
 	if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "HandleMutation (%x)", GetLastError());
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	DWORD mutateCount = 0;
 	if(!ReadFile(hPipe, &mutateCount, sizeof(DWORD), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "HandleMutation (%x)", GetLastError());
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	DWORD pathSize = 0;
 	if (!ReadFile(hPipe, &pathSize, sizeof(DWORD), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "HandleMutation (%x)", GetLastError());
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
 
@@ -285,7 +283,7 @@ DWORD handleMutation(HANDLE hPipe) {
 
 	TCHAR filePath[MAX_PATH + 1];
 	if (!ReadFile(hPipe, &filePath, pathSize * sizeof(TCHAR), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "HandleMutation (%x)", GetLastError());
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
 
@@ -293,31 +291,31 @@ DWORD handleMutation(HANDLE hPipe) {
 
 	DWORD64 position = 0;
 	if (!ReadFile(hPipe, &position, sizeof(DWORD64), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "HandleMutation (%x)", GetLastError());
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	DWORD size = 0;
 	if(!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "HandleMutation (%x)", GetLastError());
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
 	
 	HANDLE hHeap = GetProcessHeap();
 	if(hHeap == NULL) {
-		LOG_F(ERROR, "HandleMutation (%x)", GetLastError());
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	BYTE* buf = (BYTE*)HeapAlloc(hHeap, 0, size * sizeof(BYTE));
 	
 	if(buf == NULL) {
-		LOG_F(ERROR, "HandleMutation (%x)", GetLastError());
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
 	
 	if(!ReadFile(hPipe, buf, size, &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "HandleMutation (%x)", GetLastError());
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
 
@@ -328,7 +326,7 @@ DWORD handleMutation(HANDLE hPipe) {
 	mutate(buf, size);
 	
 	if(!WriteFile(hPipe, buf, size, &dwBytesWritten, NULL)) {
-		LOG_F(ERROR, "HandleMutation (%x)", GetLastError());
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
 
@@ -337,14 +335,14 @@ DWORD handleMutation(HANDLE hPipe) {
 	HANDLE hFile = CreateFile(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
 	if(hFile == INVALID_HANDLE_VALUE) {
-		LOG_F(ERROR, "HandleMutation (%x)", GetLastError());
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	writeFKT(hFile, pathSize, filePath, position, size, buf);
 
 	if(!HeapFree(hHeap, NULL, buf)) {
-		LOG_F(ERROR, "HandleMutation (%x)", GetLastError());
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
 
@@ -357,7 +355,7 @@ DWORD getBytesFKT(HANDLE hFile, BYTE *buf, DWORD size) {
 	SetFilePointer(hFile, -(LONG)size, NULL, FILE_END);
 
 	if (!ReadFile(hFile, buf, size, &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "HandleReplay (%x)", GetLastError());
+		LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
 		exit(1);
 	}
 }
@@ -368,35 +366,35 @@ DWORD handleReplay(HANDLE hPipe) {
 
 	DWORD runId = 0;
 	if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "HandleReplay (%x)", GetLastError());
+		LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	DWORD mutateCount = 0;
 	
 	if(!ReadFile(hPipe, &mutateCount, sizeof(DWORD), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "HandleReplay (%x)", GetLastError());
+		LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	// TODO: validate size matches file size
 	DWORD size = 0;
 	if(!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "HandleReplay (%x)", GetLastError());
+		LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	HANDLE hHeap = GetProcessHeap();
 
 	if(hHeap == NULL) {
-		LOG_F(ERROR, "HandleReplay (%x)", GetLastError());
+		LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	BYTE* buf = (BYTE*)HeapAlloc(hHeap, 0, size * sizeof(BYTE));
 	
 	if(buf == NULL) {
-		LOG_F(ERROR, "HandleReplay (%x)", GetLastError());
+		LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
 		exit(1);
 	}
 
@@ -406,24 +404,24 @@ DWORD handleReplay(HANDLE hPipe) {
 	HANDLE hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 	
 	if(hFile == INVALID_HANDLE_VALUE) {
-		LOG_F(ERROR, "HandleReplay (%x)", GetLastError());
+		LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	getBytesFKT(hFile, buf, size);
 	
 	if(!WriteFile(hPipe, buf, size, &dwBytesWritten, NULL)) {
-		LOG_F(ERROR, "HandleReplay (%x)", GetLastError());
+		LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
 		exit(1);
 	}
 	
 	if(!CloseHandle(hFile)) {
-		LOG_F(ERROR, "HandleReplay (%x)", GetLastError());
+		LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	if(!HeapFree(hHeap, NULL, buf)) {
-		LOG_F(ERROR, "HandleReplay (%x)", GetLastError());
+		LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
 		exit(1);
 	}
 
@@ -436,7 +434,7 @@ DWORD serveRunInfo(HANDLE hPipe) {
 
 	DWORD runId = 0;
 	if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "HandleReplay (%x)", GetLastError());
+		LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
 		exit(1);
 	}
 
@@ -447,27 +445,27 @@ DWORD serveRunInfo(HANDLE hPipe) {
 	HANDLE hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 	
 	if(hFile == INVALID_HANDLE_VALUE) {
-		LOG_F(ERROR, "HandleReplay (%x)", GetLastError());
+		LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
 		exit(1);
 	}
 	
 	if(!ReadFile(hFile, commandLine, 8191 * sizeof(TCHAR), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "HandleReplay (%x)", GetLastError());
+		LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
 		exit(1);
 	}
 	
 	if(!CloseHandle(hFile)) {
-		LOG_F(ERROR, "HandleReplay (%x)", GetLastError());
+		LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	if(!WriteFile(hPipe, &dwBytesRead, sizeof(DWORD), &dwBytesWritten, NULL)) {
-		LOG_F(ERROR, "HandleReplay (%x)", GetLastError());
+		LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	if(!WriteFile(hPipe, commandLine, dwBytesRead, &dwBytesWritten, NULL)) {
-		LOG_F(ERROR, "HandleReplay (%x)", GetLastError());
+		LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
 		exit(1);
 	}
 
@@ -478,27 +476,27 @@ DWORD serveRunInfo(HANDLE hPipe) {
 	hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 
 	if(hFile == INVALID_HANDLE_VALUE) {
-		LOG_F(ERROR, "HandleReplay (%x)", GetLastError());
+		LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	if(!ReadFile(hFile, commandLine, 8191 * sizeof(TCHAR), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "HandleReplay (%x)", GetLastError());
+		LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	if(!CloseHandle(hFile)) {
-		LOG_F(ERROR, "HandleReplay (%x)", GetLastError());
+		LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	if(!WriteFile(hPipe, &dwBytesRead, sizeof(DWORD), &dwBytesWritten, NULL)) {
-		LOG_F(ERROR, "HandleReplay (%x)", GetLastError());
+		LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	if(!WriteFile(hPipe, commandLine, dwBytesRead, &dwBytesWritten, NULL)) {
-		LOG_F(ERROR, "HandleReplay (%x)", GetLastError());
+		LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
 		exit(1);
 	}
 
@@ -510,13 +508,13 @@ DWORD finalizeRun(HANDLE hPipe) {
 
 	DWORD runId = 0;
 	if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "FinalizeRun (%x)", GetLastError());
+		LOG_F(ERROR, "FinalizeRun (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	BOOL crash = false;
 	if(!ReadFile(hPipe, &crash, sizeof(BOOL), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "FinalizeRun (%x)", GetLastError());
+		LOG_F(ERROR, "FinalizeRun (0x%x)", GetLastError());
 		exit(1);
 	}
 	LOG_F(INFO, "Finalizing run %x", runId);
@@ -541,7 +539,7 @@ DWORD finalizeRun(HANDLE hPipe) {
 
 		wsprintf(targetFile, FUZZ_WORKING_FMT, runId);
 		if(!RemoveDirectory(targetFile)) {
-			LOG_F(ERROR, "FinalizeRun (%x)", GetLastError());
+			LOG_F(ERROR, "FinalizeRun (0x%x)", GetLastError());
 			exit(1);
 		}
 
@@ -554,303 +552,13 @@ DWORD finalizeRun(HANDLE hPipe) {
 	return 0;
 }
 
-DWORD traceInit(HANDLE hPipe) {
-	DWORD dwBytesRead = 0;
-	DWORD dwBytesWritten = 0;
-	
-	EnterCriticalSection(&critTrace);
-
-	DWORD runId = 0;
-	if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "TraceInit (%x)", GetLastError());
-		exit(1);
-	}
-
-	WCHAR targetFile[MAX_PATH + 1] = { 0 };
-	wsprintf(targetFile, FUZZ_WORKING_FMT_EXECUTION, runId);
-	HANDLE hTraceFile = CreateFile(targetFile, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, 0, NULL);
-
-	if(hTraceFile == INVALID_HANDLE_VALUE) {
-		LOG_F(ERROR, "TraceInit (%x)", GetLastError());
-		exit(1);
-	}
-
-	traceFileMap[runId] = hTraceFile;
-
-	ZeroMemory(targetFile, (MAX_PATH + 1) * sizeof(WCHAR));
-	wsprintf(targetFile, FUZZ_WORKING_FMT_MEM, runId);
-	DWORD size = (wcslen(targetFile) + 1) * sizeof(WCHAR);
-
-	if(!WriteFile(hPipe, &size, sizeof(DWORD), &dwBytesWritten, NULL)) {
-		LOG_F(ERROR, "TraceInit (%x)", GetLastError());
-		exit(1);
-	}
-
-	if(!WriteFile(hPipe, &targetFile, size, &dwBytesWritten, NULL)) {
-		LOG_F(ERROR, "TraceInit (%x)", GetLastError());
-		exit(1);
-	}
-
-	LeaveCriticalSection(&critTrace);
-	return 0;
-}
-
-DWORD traceInsns(HANDLE hPipe) {
-	DWORD dwBytesRead = 0;
-	DWORD dwBytesWritten = 0; 
-
-	DWORD runId = 0;
-	if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "TraceInsns (%x)", GetLastError());
-		exit(1);
-	}
-
-	while (1) {
-		UINT64 bbAddr = 0;
-		if(!ReadFile(hPipe, &bbAddr, sizeof(UINT64), &dwBytesRead, NULL)) {
-			LOG_F(ERROR, "TraceInsns (%x)", GetLastError());
-			exit(1);
-		}
-
-		DWORD traceSize = 0;
-		if(!ReadFile(hPipe, &traceSize, sizeof(DWORD), &dwBytesRead, NULL)) {
-			LOG_F(ERROR, "TraceInsns (%x)", GetLastError());
-			exit(1);
-		}
-
-		if (bbAddr == 0 && traceSize == 0) {
-			break;
-		}
-
-		HANDLE hHeap = GetProcessHeap();
-		BYTE *traceBuf = (BYTE *)HeapAlloc(hHeap, NULL, traceSize);
-
-		if(!ReadFile(hPipe, traceBuf, traceSize, &dwBytesRead, NULL)) {
-			LOG_F(ERROR, "TraceInsns (%x)", GetLastError());
-			exit(1);
-		}
-
-		// keep it synchronous 
-		BYTE nullByte = 0;
-		if(!WriteFile(hPipe, &nullByte, sizeof(BYTE), &dwBytesRead, NULL)) {
-			LOG_F(ERROR, "TraceInsns (%x)", GetLastError());
-			exit(1);
-		}
-
-		if (traceFileMap.find(runId) == traceFileMap.end()) {
-			LOG_F(ERROR, "No trace file found for runId %x (instruction)", runId);
-			exit(1);
-		}
-		else {
-			EnterCriticalSection(&critTrace);
-			HANDLE hTraceFile = traceFileMap[runId];
-			BYTE addrByte = 0x80;
-			if(!WriteFile(hTraceFile, &addrByte, sizeof(BYTE), &dwBytesWritten, NULL)) {
-				LOG_F(ERROR, "TraceInsns (%x)", GetLastError());
-				exit(1);
-			}
-
-			if(!WriteFile(hTraceFile, &bbAddr, sizeof(UINT64), &dwBytesWritten, NULL)) {
-				LOG_F(ERROR, "TraceInsns (%x)", GetLastError());
-				exit(1);
-			}
-			
-			if(!WriteFile(hTraceFile, traceBuf, traceSize, &dwBytesWritten, NULL)) {
-				LOG_F(ERROR, "TraceInsns (%x)", GetLastError());
-				exit(1);
-			}
-			LeaveCriticalSection(&critTrace);
-		}
-
-		/*printf("%x, %x, %x\t", runId, bbAddr, traceSize);
-		for (int i = 0; i < traceSize; i++) {
-			printf("%x ", traceBuf[i]);
-		}
-		printf("\n");*/
-		if(!HeapFree(hHeap, NULL, traceBuf)) {
-			LOG_F(ERROR, "TraceInsns (%x)", GetLastError());
-			exit(1);
-		}
-	}
-	
-	// TODO: close file on broken pipe?
-
-	return 0;
-}
-
-DWORD traceTaint(HANDLE hPipe) {
-	DWORD dwBytesRead = 0;
-	DWORD dwBytesWritten = 0;
-	
-	DWORD runId = 0;
-	if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "TraceTaint (%x)", GetLastError());
-		exit(1);
-	}
-
-	UINT64 taintAddr = 0;
-	if(!ReadFile(hPipe, &taintAddr, sizeof(UINT64), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "TraceTaint (%x)", GetLastError());
-		exit(1);
-	}
-
-	UINT64 taintSize = 0;
-	if(!ReadFile(hPipe, &taintSize, sizeof(UINT64), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "TraceTaint (%x)", GetLastError());
-		exit(1);
-	}
-
-	if (traceFileMap.find(runId) == traceFileMap.end()) {
-		LOG_F(ERROR, "No trace file found for runId %x (taint)", runId);
-		exit(1);
-	}
-	else {
-		EnterCriticalSection(&critTrace);
-		HANDLE hTraceFile = traceFileMap[runId];
-
-		BYTE taintByte = 0x81;
-		if(!WriteFile(hTraceFile, &taintByte, sizeof(BYTE), &dwBytesWritten, NULL)) {
-			LOG_F(ERROR, "TraceTaint (%x)", GetLastError());
-			exit(1);
-		}
-
-		if(!WriteFile(hTraceFile, &taintAddr, sizeof(UINT64), &dwBytesWritten, NULL)) {
-			LOG_F(ERROR, "TraceTaint (%x)", GetLastError());
-			exit(1);
-		}
-
-		if(!WriteFile(hTraceFile, &taintSize, sizeof(UINT64), &dwBytesWritten, NULL)) {
-			LOG_F(ERROR, "TraceTaint (%x)", GetLastError());
-			exit(1);
-		}
-
-		LeaveCriticalSection(&critTrace);
-	}
-
-	// keep it synchronous for now
-	BYTE nullByte = 0;
-	if(!WriteFile(hPipe, &nullByte, sizeof(BYTE), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "TraceTaint (%x)", GetLastError());
-		exit(1);
-	}
-
-	return 0;
-}
-
-DWORD traceCrash(HANDLE hPipe) {
-	DWORD dwBytesRead = 0;
-	DWORD dwBytesWritten = 0;
-
-	EnterCriticalSection(&critTrace);
-
-	DWORD runId = 0;
-	if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "TraceCrash (%x)", GetLastError());
-		exit(1);
-	}
-
-	UINT64 exceptionAddr = 0;
-	if(!ReadFile(hPipe, &exceptionAddr, sizeof(UINT64), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "TraceCrash (%x)", GetLastError());
-		exit(1);
-	}
-
-	DWORD exceptionCode = 0;
-	if(!ReadFile(hPipe, &exceptionCode, sizeof(DWORD), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "TraceCrash (%x)", GetLastError());
-		exit(1);
-	}
-
-	if (traceFileMap.find(runId) == traceFileMap.end()) {
-		LOG_F(ERROR, "Crash no trace file found for runId %x", runId);
-		exit(1);
-	}
-	else {
-		HANDLE hTraceFile = traceFileMap[runId];
-		if(!CloseHandle(hTraceFile)) {
-			LOG_F(ERROR, "TraceCrash (%x)", GetLastError());
-			exit(1);
-		}
-	}
-
-	WCHAR targetFile[MAX_PATH + 1] = { 0 };
-	wsprintf(targetFile, FUZZ_WORKING_FMT_CRASH, runId);
-	HANDLE hCrashFile = CreateFile(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
-	
-	if(!WriteFile(hCrashFile, &exceptionAddr, sizeof(UINT64), &dwBytesWritten, NULL)) {
-		LOG_F(ERROR, "TraceCrash (%x)", GetLastError());
-		exit(1);
-	}
-
-	if(!WriteFile(hCrashFile, &exceptionCode, sizeof(DWORD), &dwBytesWritten, NULL)) {
-		LOG_F(ERROR, "TraceCrash (%x)", GetLastError());
-		exit(1);
-	}
-
-	if(!CloseHandle(hCrashFile)) {
-		LOG_F(ERROR, "TraceCrash (%x)", GetLastError());
-		exit(1);
-	}
-
-	// keep it synchronous for now
-	BYTE nullByte = 0;
-	if(!WriteFile(hPipe, &nullByte, sizeof(BYTE), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "TraceCrash (%x)", GetLastError());
-		exit(1);
-	}
-
-	LeaveCriticalSection(&critTrace);
-	return 0;
-}
-
-// TODO: I think we can delete this
-DWORD handleLog(HANDLE hPipe) {
-	DWORD dwBytesRead = 0;
-	DWORD dwBytesWritten = 0;
-
-	DWORD size = 0;
-	if(!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "HandleLog (%x)", GetLastError());
-		exit(1);
-	}
-
-	HANDLE hHeap = GetProcessHeap();
-	if(hHeap == NULL) {
-		LOG_F(ERROR, "HandleLog (%x)", GetLastError());
-		exit(1);
-	}
-
-	BYTE* buf = (BYTE*)HeapAlloc(hHeap, 0, size * sizeof(BYTE));
-	if(buf == NULL) {
-		LOG_F(ERROR, "HandleLog (%x)", GetLastError());
-		exit(1);
-	}
-
-	if(!ReadFile(hPipe, buf, size, &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "HandleLog (%x)", GetLastError());
-		exit(1);
-	}
-
-	EnterCriticalSection(&critLog);
-	if(!WriteFile(hLog, buf, dwBytesRead, &dwBytesWritten, NULL)) {
-		LOG_F(ERROR, "HandleLog (%x)", GetLastError());
-		exit(1);
-	}
-	LeaveCriticalSection(&critLog);
-
-	return 0;
-}
-
-
 DWORD crashPath(HANDLE hPipe) {
 	DWORD dwBytesRead = 0;
 	DWORD dwBytesWritten = 0;
 	
-	EnterCriticalSection(&critTrace);
-
 	DWORD runId = 0;
 	if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "TraceInit (%x)", GetLastError());
+		LOG_F(ERROR, "crashPath (0x%x)", GetLastError());
 		exit(1);
 	}
 
@@ -859,11 +567,10 @@ DWORD crashPath(HANDLE hPipe) {
 	DWORD size = (wcslen(targetFile) + 1) * sizeof(WCHAR);
 
 	if(!WriteFile(hPipe, &targetFile, size, &dwBytesWritten, NULL)) {
-		LOG_F(ERROR, "TraceInit (%x)", GetLastError());
+		LOG_F(ERROR, "crashPath (0x%x)", GetLastError());
 		exit(1);
 	}
 
-	LeaveCriticalSection(&critTrace);
 	return 0;
 }
 
@@ -874,11 +581,7 @@ enum Event {
 	EVT_REPLAY,				// 2
 	EVT_RUN_INFO,			// 3
 	EVT_RUN_COMPLETE,		// 4
-	EVT_TRACE_INIT,			// 5
-	EVT_TRACE_INSNS,		// 6
-	EVT_TRACE_TAINT,		// 7
-	EVT_TRACE_CRASH_INFO,	// 8
-	EVT_CRASH_PATH,			// 9
+	EVT_CRASH_PATH,			// 5
 };
 
 DWORD WINAPI threadHandler(LPVOID lpvPipe) {
@@ -889,7 +592,7 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe) {
 
 	BYTE eventId = 255;
 	if(!ReadFile(hPipe, &eventId, sizeof(BYTE), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "ThreadHandler (%x)", GetLastError());
+		LOG_F(ERROR, "ThreadHandler (0x%x)", GetLastError());
 		exit(1);
 	}
 
@@ -909,39 +612,26 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe) {
 		case EVT_RUN_COMPLETE:
 			finalizeRun(hPipe);
 			break;
-		case EVT_TRACE_INIT:
-			traceInit(hPipe);
-			break;
-		case EVT_TRACE_INSNS:
-			traceInsns(hPipe);
-			break;
-		case EVT_TRACE_TAINT:
-			traceTaint(hPipe);
-			break;
-		case EVT_TRACE_CRASH_INFO:
-			traceCrash(hPipe);
-			break;
 		case EVT_CRASH_PATH:
 			crashPath(hPipe);
 			break;
 		default:
-			// TODO: log error
-			LOG_F(WARNING, "Unknown event id %x", eventId);
+			LOG_F(ERROR, "Unknown or invalid event id %x", eventId);
 			break;
 	}
 
 	if(!FlushFileBuffers(hPipe)) {
-		LOG_F(ERROR, "ThreadHandler (%x)", GetLastError());
+		LOG_F(ERROR, "ThreadHandler (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	if(!DisconnectNamedPipe(hPipe)) {
-		LOG_F(ERROR, "ThreadHandler (%x)", GetLastError());
+		LOG_F(ERROR, "ThreadHandler (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	if(!CloseHandle(hPipe)) {
-		LOG_F(ERROR, "ThreadHandler (%x)", GetLastError());
+		LOG_F(ERROR, "ThreadHandler (0x%x)", GetLastError());
 		exit(1);
 	}
 
@@ -960,7 +650,6 @@ int main(int mArgc, char **mArgv)
 
 
 	InitializeCriticalSection(&critId);
-	InitializeCriticalSection(&critTrace);
 	InitializeCriticalSection(&critLog);
 
 	while (1) {
@@ -997,7 +686,7 @@ int main(int mArgc, char **mArgv)
 
 			if (hThread == NULL)
 			{
-				LOG_F(ERROR, "CreateThread (%x)\n", GetLastError());
+				LOG_F(ERROR, "CreateThread (0x%x)\n", GetLastError());
 				return -1;
 			}
 			else {
@@ -1012,7 +701,6 @@ int main(int mArgc, char **mArgv)
 
 	// TODO: stop gracefully?
 	DeleteCriticalSection(&critId);
-	DeleteCriticalSection(&critTrace);
 	DeleteCriticalSection(&critLog);
     return 0;
 }
