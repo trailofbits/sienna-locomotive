@@ -1,1 +1,0 @@
-{"score": 0, "reason": "floating point exception", "exception": "EXCEPTION_INT_DIVIDE_BY_ZERO", "location": 140702424832094, "disassembly": "div r8", "tainted_regs": [], "tainted_addrs": []}

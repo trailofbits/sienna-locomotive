@@ -1,1 +1,0 @@
-{"score": 75, "reason": "branching tainted pc", "exception": "EXCEPTION_ACCESS_VIOLATION", "location": 140702424831451, "disassembly": "jmp rax", "tainted_regs": ["rax", "rip"], "tainted_addrs": [{"start": 676421630784, "size": 8}]}
