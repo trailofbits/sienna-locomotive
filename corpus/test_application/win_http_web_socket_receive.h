@@ -1,2 +1,2 @@
 
-int test_WinHttpWebSocketReceive();
+int test_WinHttpWebSocketReceive(bool fuzzing);

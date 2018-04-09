@@ -15,11 +15,6 @@
 #include <winsock2.h>
 #include <winhttp.h>
 
-void *mutatex;
-bool replay;
-bool mutate_count;
-UINT64 run_id;
-
 static droption_t<std::string> op_include
 (DROPTION_SCOPE_CLIENT, "i", "", "include",
  "Functions to be included in hooking.");
@@ -385,32 +380,6 @@ void wizard(client_id_t id, int argc, const char *argv[]) {
     if (!drmgr_init() || drreg_init(&ops) != DRREG_SUCCESS || !drwrap_init())
         DR_ASSERT(false);
 
-    replay = false;
-    mutate_count = 0;
-
-    UINT64 run_id = -1;
-    bool next = false;
-    for(int i = 0; i < argc; i++) {
-        if(next) {
-            run_id = _strtoui64(argv[i], (char **)NULL, 10);
-        }
-        
-        next = false;
-        
-        if(strcmp(argv[i], "-r") == 0) {
-            replay = true;
-            next = true;
-        }
-    }
-
-    if(run_id == (1<<64)-1) {
-        replay = false;
-    }
-    
-    dr_printf("replay: %d\n", replay);
-    dr_printf("run_id: %llu\n", run_id);
-
-    mutatex = dr_mutex_create();
     dr_register_exit_event(event_exit_trace);
 
     if (!drmgr_register_module_load_event(module_load_event) ||

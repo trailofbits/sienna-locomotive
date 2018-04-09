@@ -14,6 +14,7 @@
 #include "drreg.h"
 #include "drwrap.h"
 #include "dr_ir_instr.h"
+#include "droption.h"
 
 extern "C" {
 #include "utils.h"
@@ -821,6 +822,51 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
 static void
 dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t score, std::string disassembly) {
     std::string crash_json = dump_json(drcontext, score, reason, excpt, disassembly);
+
+    WCHAR targetFile[MAX_PATH + 1] = { 0 };
+    ZeroMemory(targetFile, sizeof(WCHAR) * (MAX_PATH + 1));
+    
+    if(replay) {
+        HANDLE h_pipe = CreateFile(
+            L"\\\\.\\pipe\\fuzz_server",
+            GENERIC_READ | GENERIC_WRITE,
+            0,
+            NULL,
+            OPEN_EXISTING,
+            0,
+            NULL);
+
+        if (h_pipe != INVALID_HANDLE_VALUE) {
+            DWORD read_mode = PIPE_READMODE_MESSAGE;
+            SetNamedPipeHandleState(
+                h_pipe,
+                &read_mode,
+                NULL,
+                NULL);
+
+            DWORD bytes_read = 0;
+            DWORD bytes_written = 0;
+
+            BYTE event_id = 5;
+
+            WriteFile(h_pipe, &event_id, sizeof(BYTE), &bytes_written, NULL);
+            TransactNamedPipe(h_pipe, &run_id, sizeof(DWORD), targetFile, MAX_PATH + 1, &bytes_read, NULL);
+            CloseHandle(h_pipe);
+
+            HANDLE hCrashFile = CreateFile(targetFile, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+            if (hCrashFile == INVALID_HANDLE_VALUE) {
+                dr_fprintf(STDERR, "Could not open crash file json (%x)", GetLastError());
+                exit(1);
+            }
+
+            DWORD bytesWritten;
+            if (!WriteFile(hCrashFile, crash_json.c_str(), crash_json.length(), &bytesWritten, NULL)) {
+                dr_fprintf(STDERR, "Could not write crash file json (%x)", GetLastError());
+                exit(1);
+            }
+        }
+    }
+        
     dr_printf("#### BEGIN CRASH DATA JSON\n");
     dr_printf("%s\n", crash_json.c_str());
     dr_printf("#### END CRASH DATA JSON\n");
@@ -1094,7 +1140,7 @@ wrap_post_ReadFile(void *wrapcxt, void *user_data) {
     if(replay) {
         dr_mutex_lock(mutatex);
         HANDLE h_pipe = CreateFile(
-            "\\\\.\\pipe\\fuzz_server",
+            L"\\\\.\\pipe\\fuzz_server",
             GENERIC_READ | GENERIC_WRITE,
             0,
             NULL,
@@ -1181,6 +1227,11 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     }
 }
 
+#define NO_REPLAY 0xFFFFFFF
+static droption_t<unsigned int> op_replay
+(DROPTION_SCOPE_CLIENT, "r", NO_REPLAY, "replay",
+ "The run id for a crash to replay.");
+
 void tracer(client_id_t id, int argc, const char *argv[]) {
     drreg_options_t ops = {sizeof(ops), 3, false};
     dr_set_client_name("DynamoRIO Sample Client 'instrace'",
@@ -1192,23 +1243,9 @@ void tracer(client_id_t id, int argc, const char *argv[]) {
     replay = false;
     mutate_count = 0;
 
-    UINT64 run_id = -1;
-    bool next = false;
-    for(int i = 0; i < argc; i++) {
-        if(next) {
-            run_id = _strtoui64(argv[i], (char **)NULL, 10);
-        }
-        
-        next = false;
-        
-        if(strcmp(argv[i], "-r") == 0) {
-            replay = true;
-            next = true;
-        }
-    }
-
-    if(run_id == (1<<64)-1) {
-        replay = false;
+    run_id = op_replay.get_value();
+    if(run_id != NO_REPLAY) {
+        replay = true;
     }
     
     dr_printf("replay: %d\n", replay);
@@ -1234,5 +1271,12 @@ void tracer(client_id_t id, int argc, const char *argv[]) {
 DR_EXPORT void
 dr_client_main(client_id_t id, int argc, const char *argv[])
 {
+    std::string parse_err;
+    int last_idx = 0;
+    if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
+        dr_fprintf(STDERR, "Usage error: %s", parse_err.c_str());
+        dr_abort();
+    }
+
     tracer(id, argc, argv);
 }

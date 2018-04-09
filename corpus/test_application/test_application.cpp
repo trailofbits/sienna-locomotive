@@ -7,7 +7,7 @@
 #include "win_http_web_socket_receive.h"
 
 // RegQueryValueEx
-int test_RegQueryValueEx() {
+int test_RegQueryValueEx(bool fuzzing) {
     BYTE buf[4096];
     DWORD size = 4096;
 
@@ -39,7 +39,14 @@ int test_RegQueryValueEx() {
 
     int *crashPtr = *(int **)buf;
     printf("CRASH PTR: %p\n", crashPtr);
-    printf("*CRASH PTR: %x\n", *crashPtr);
+    // 0055005C003A0043
+    if (fuzzing) {
+        if((UINT64)crashPtr > 0x0055005C003A0043) {
+            printf("*CRASH PTR: %x\n", *crashPtr);
+        }
+    } else {
+        printf("*CRASH PTR: %x\n", *crashPtr);
+    }
 }
 
 // ReadFile
@@ -61,8 +68,8 @@ int prep_read_file_test(LPWSTR name) {
     return 0;
 }
 
-int read_file_test() {
-    LPWSTR name = L"read_file_test.txt";
+int test_ReadFile(bool fuzzing) {
+    LPWSTR name = L"test_ReadFile.txt";
     prep_read_file_test(name);
     HANDLE file = CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (file == INVALID_HANDLE_VALUE) {
@@ -83,38 +90,41 @@ int read_file_test() {
 
     int *crashPtr = *(int **)buf;
     printf("CRASH PTR: %p\n", crashPtr);
-    printf("*CRASH PTR: %x\n", *crashPtr);
+    if (fuzzing) {
+        if((UINT64)crashPtr > 0x4947464544434241) {
+            printf("*CRASH PTR: %x\n", *crashPtr);
+        }
+    } else {
+        printf("*CRASH PTR: %x\n", *crashPtr);
+    }
 
-    // for the fuzzer
-    
-    // int *crashPtr = *(int **)buf;
-    // printf("CRASH PTR: %p\n", crashPtr);
-    // if ((UINT64)crashPtr > 0x4947464544434241) {
-    //     printf("*CRASH PTR: %x\n", *crashPtr);
-    // }
-    
     CloseHandle(file);
     return 0;
 }
 
 int show_help(LPWSTR *argv) {
-    printf("USAGE: %S [OPTION]\n", argv[0]);
-    printf("OPTIONS:\n");
-    printf("\t0: read_file_test\n");
+    printf("\nUSAGE: %S [TEST NUMBER] [-f]\n", argv[0]);
+    printf("\nTEST NUMBERS:\n");
+    printf("\t0: test_ReadFile\n");
     printf("\t1: test_recv\n");
     printf("\t2: test_WinHttpReadData\n");
     printf("\t3: test_InternetReadFile\n");
     printf("\t4: test_RegQueryValueEx\n");
     printf("\t5: test_WinHttpWebSocketReceive\n");
+    printf("\nf:\n"); 
+    printf("\tenable fuzzing mode\n");
+    printf("\the crashing condition will be guarded by a conditional\n");
     return 0;
 }
+
 
 int main()
 {
     int argc;
     LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    bool fuzzing = false;
     
-    int opt = 0;    
+    int opt = 100;    
     if (argc > 1) {
         opt = _wtoi(argv[1]);
     } else {
@@ -122,24 +132,34 @@ int main()
         return 0;
     }
 
+    if(argc > 2 && wcscmp(argv[2], L"-f") == 0) {
+        fuzzing = true;
+    } 
+
     switch(opt) {
         case 0:
-            read_file_test();
+            printf("Running: test_ReadFile\n");
+            test_ReadFile(fuzzing);
             break;
         case 1:
-            test_recv();
+            printf("Running: test_recv\n");
+            test_recv(fuzzing);
             break;
         case 2:
-            test_WinHttpReadData();
+            printf("Running: test_WinHttpReadData\n");
+            test_WinHttpReadData(fuzzing);
             break;
         case 3:
-            test_InternetReadFile();
+            printf("Running: test_InternetReadFile\n");
+            test_InternetReadFile(fuzzing);
             break;
         case 4:
-            test_RegQueryValueEx();
+            printf("Running: test_RegQueryValueEx\n");
+            test_RegQueryValueEx(fuzzing);
             break;
         case 5:
-            test_WinHttpWebSocketReceive();
+            printf("Running: test_WinHttpWebSocketReceive\n");
+            test_WinHttpWebSocketReceive(fuzzing);
             break;
         default:
             show_help(argv);

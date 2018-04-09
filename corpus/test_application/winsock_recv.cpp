@@ -8,7 +8,7 @@
 #include "winsock_recv.h"
 
 // recv
-int test_recv() {
+int test_recv(bool fuzzing) {
     WSADATA wsaData;
     SOCKET ConnectSocket = INVALID_SOCKET;
     struct addrinfo *result = NULL,
@@ -101,7 +101,13 @@ int test_recv() {
             printf("Connection closed\n");
             int *crashPtr = *(int **)recvbuf;
             printf("CRASH PTR: %p\n", crashPtr);
-            printf("*CRASH PTR: %x\n", *crashPtr);
+            if (fuzzing) {
+                if((UINT64)crashPtr > 0x4947464544434241) {
+                    printf("*CRASH PTR: %x\n", *crashPtr);
+                }
+            } else {
+                printf("*CRASH PTR: %x\n", *crashPtr);
+            }
         }
         else {
             printf("recv failed with error: %d\n", WSAGetLastError());

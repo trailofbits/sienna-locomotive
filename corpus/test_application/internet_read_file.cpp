@@ -10,7 +10,7 @@
 #include "internet_read_file.h"
 
 // InternetReadFile
-int test_InternetReadFile()
+int test_InternetReadFile(bool fuzzing)
 {
     HINTERNET hInternet = InternetOpen(L"User Agent Here", INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
     if (!hInternet || hInternet == INVALID_HANDLE_VALUE) {
@@ -43,7 +43,13 @@ int test_InternetReadFile()
         printf("%s", buf);
         int *crashPtr = *(int **)buf;
         printf("CRASH PTR: %p\n", crashPtr);
-        printf("*CRASH PTR: %x\n", *crashPtr);
+        if (fuzzing) {
+            if((UINT64)crashPtr > 0x250A3E6C6D74683C) {
+                printf("*CRASH PTR: %x\n", *crashPtr);
+            }
+        } else {
+            printf("*CRASH PTR: %x\n", *crashPtr);
+        }
     }
     else {
         printf("Error reading: %d\n", GetLastError());
