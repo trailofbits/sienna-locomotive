@@ -202,11 +202,10 @@ VOID strategyRandByte(BYTE *buf, DWORD size) {
 
 DWORD mutate(BYTE *buf, DWORD size) {
 	strategyRandByte(buf, size);
-
 	return 0;
 }
 
-DWORD writeFKT(HANDLE hFile, DWORD pathSize, TCHAR *filePath, DWORD64 position, DWORD size, BYTE* buf) {
+DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, TCHAR *filePath, DWORD64 position, DWORD size, BYTE* buf) {
 	DWORD dwBytesWritten = 0;
 
 	if (!WriteFile(hFile, "FKT\0", 4, &dwBytesWritten, NULL)) {
@@ -215,7 +214,6 @@ DWORD writeFKT(HANDLE hFile, DWORD pathSize, TCHAR *filePath, DWORD64 position, 
 	}
 
 	// only one type for right now, files
-	DWORD type = 1;
 	if (!WriteFile(hFile, &type, sizeof(DWORD), &dwBytesWritten, NULL)) {
 		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
@@ -260,6 +258,12 @@ DWORD handleMutation(HANDLE hPipe) {
 
 	DWORD runId = 0;
 	if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+		exit(1);
+	}
+
+	DWORD type = 0;
+	if(!ReadFile(hPipe, &type, sizeof(DWORD), &dwBytesRead, NULL)) {
 		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
@@ -339,7 +343,7 @@ DWORD handleMutation(HANDLE hPipe) {
 		exit(1);
 	}
 
-	writeFKT(hFile, pathSize, filePath, position, size, buf);
+	writeFKT(hFile, type, pathSize, filePath, position, size, buf);
 
 	if(!HeapFree(hHeap, NULL, buf)) {
 		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());

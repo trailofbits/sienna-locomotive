@@ -7,6 +7,7 @@
 #include "dr_api.h"
 #include "drmgr.h"
 #include "drwrap.h"
+#include "droption.h"
 
 #ifdef WINDOWS
 #define IF_WINDOWS_ELSE(x,y) x
@@ -31,6 +32,25 @@ static size_t max_ReadFile;
 static void *max_lock; /* sync writes to max_ReadFile */
 
 static BOOL mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size);
+
+
+static droption_t<std::string> op_include(
+    DROPTION_SCOPE_CLIENT, 
+    "i", 
+    "", 
+    "include",
+    "Functions to be included in hooking.");
+
+
+enum class Function {
+    ReadFile,
+    recv,
+    WinHttpReadData,
+    InternetReadFile,
+    WinHttpWebSocketReceive,
+    RegQueryValueEx,
+    ReadEventLog,
+};
 
 DWORD runId;
 BOOL crashed = false;
@@ -260,7 +280,7 @@ event_exit(void) {
 static DWORD mutateCount = 0;
 
 static BOOL 
-mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
+mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
     TCHAR filePath[MAX_PATH+1];
     TCHAR *new_buf = (TCHAR *)buf;
 
@@ -284,10 +304,12 @@ mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
     DWORD bytesWritten = 0;
     
     BYTE eventId = 1;
+    DWORD type = static_cast<DWORD>(function);
     
     // Send state information to the fuzz server
     WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL);
     WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL);
+    WriteFile(hPipe, &type, sizeof(DWORD), &bytesWritten, NULL);
     WriteFile(hPipe, &mutateCount, sizeof(DWORD), &bytesWritten, NULL);
     
     WriteFile(hPipe, &pathSize, sizeof(DWORD), &bytesWritten, NULL);
@@ -467,6 +489,7 @@ mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
 // }
 
 struct read_info {
+    Function function;
     HANDLE hFile;
     LPVOID lpBuffer;
     DWORD nNumberOfBytesToRead;
@@ -488,6 +511,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     DWORD64 position = positionHigh;
 
     *user_data = malloc(sizeof(read_info));
+    ((read_info *)*user_data)->function = Function::ReadFile;
     ((read_info *)*user_data)->hFile = hFile;
     ((read_info *)*user_data)->lpBuffer = lpBuffer;
     ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
@@ -505,6 +529,7 @@ wrap_post_ReadFile(void *wrapcxt, void *user_data) {
 
     read_info *info = ((read_info *)user_data);
 
+    Function function = info->function;
     HANDLE hFile = info->hFile;
     LPVOID lpBuffer = info->lpBuffer;
     DWORD nNumberOfBytesToRead = info->nNumberOfBytesToRead;
@@ -516,12 +541,9 @@ wrap_post_ReadFile(void *wrapcxt, void *user_data) {
         nNumberOfBytesToRead = *lpNumberOfBytesRead;
     }
     
-    if (!mutate(hFile, position, lpBuffer, nNumberOfBytesToRead)) {
+    if (!mutate(function, hFile, position, lpBuffer, nNumberOfBytesToRead)) {
         // TODO: fallback mutations?
-        //TCHAR *new_buf = (TCHAR *)lpBuffer;
-        //for(DWORD i = 0; i < nNumberOfBytesToRead; ++i) {
-        //    new_buf[i] = (TCHAR)'A';
-        //}
+        exit(1);
     }
 
     if (lpNumberOfBytesRead != NULL) {
@@ -563,6 +585,11 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     std::map<char *, PREPROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
+        std::string include = op_include.get_value();
+        if(include != "" && include.find(functionName) == std::string::npos) {
+            continue;
+        }
+
         void(__cdecl *hookFunctionPre)(void *, void **);
         hookFunctionPre = it->second;
         void(__cdecl *hookFunctionPost)(void *, void *);
@@ -592,9 +619,9 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
                        "https://github.com/trailofbits/sienna-locomotive/issues");
     dr_log(NULL, LOG_ALL, 1, "DR client 'SL Fuzzer' initializing\n");
     if (dr_is_notify_on()) {
-        #ifdef WINDOWS
+#ifdef WINDOWS
         dr_enable_console_printing();
-        #endif
+#endif
         dr_log(NULL, LOG_ALL, ERROR, "Client SL Fuzzer is running\n");
     }
 

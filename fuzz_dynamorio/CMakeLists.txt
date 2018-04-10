@@ -12,3 +12,4 @@ configure_DynamoRIO_client(fuzzer)
 
 use_DynamoRIO_extension(fuzzer drmgr)
 use_DynamoRIO_extension(fuzzer drwrap)
+use_DynamoRIO_extension(fuzzer droption)
