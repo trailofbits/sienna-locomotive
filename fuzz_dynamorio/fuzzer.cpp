@@ -1,6 +1,9 @@
 #include <map>
 
 #include <stdio.h>
+
+#include <winsock2.h>
+#include <winhttp.h>
 #include <Windows.h>
 #include <Winternl.h>
 
@@ -8,6 +11,7 @@
 #include "drmgr.h"
 #include "drwrap.h"
 #include "droption.h"
+
 
 #ifdef WINDOWS
 #define IF_WINDOWS_ELSE(x,y) x
@@ -22,11 +26,6 @@
 #endif
 
 #define NULL_TERMINATE(buf) buf[(sizeof(buf)/sizeof(buf[0])) - 1] = '\0'
-
-static bool onexception(void *drcontext, dr_exception_t *excpt);
-static void event_exit(void);
-static void wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data);
-static void wrap_post_ReadFile(void *wrapcxt, void *user_data);
 
 static size_t max_ReadFile;
 static void *max_lock; /* sync writes to max_ReadFile */
@@ -114,12 +113,14 @@ HANDLE getPipe() {
         DWORD err = GetLastError();
         if (err != ERROR_PIPE_BUSY) {
             dr_log(NULL, LOG_ALL, ERROR, "Could not open pipe (%x)", err);
-            return hPipe;
+            dr_fprintf(STDERR, "Could not open pipe (0x%x)\n", err);
+            dr_fprintf(STDERR, "Is the server running?\n");
+            dr_exit_process(1);
         }
 
         if (!WaitNamedPipe("\\\\.\\pipe\\fuzz_server", 5000)) {
             dr_log(NULL, LOG_ALL, ERROR, "Could not connect, timeout");
-            // TODO: fallback mutations?
+            dr_fprintf(STDERR, "Could not connect, timeout\n", err);
             dr_exit_process(1);
         }
     }
@@ -292,18 +293,22 @@ static BOOL
 mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
     TCHAR filePath[MAX_PATH+1];
     TCHAR *new_buf = (TCHAR *)buf;
+    DWORD pathSize = 0;
 
-    if (hFile == INVALID_HANDLE_VALUE) {
-        dr_log(NULL, LOG_ALL, ERROR, "The file we're trying to write to doesn't appear to be valid\n");
-        return false;
+    if(function == Function::ReadFile) {
+        if (hFile == INVALID_HANDLE_VALUE) {
+            dr_log(NULL, LOG_ALL, ERROR, "The file we're trying to read from doesn't appear to be valid\n");
+            return false;
+        }
+
+        pathSize = GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, 0);
+
+        if (pathSize > MAX_PATH || pathSize == 0) {
+            dr_log(NULL, LOG_ALL, ERROR, "Pathsize %d is out of bounds\n", pathSize);
+            return false;
+        }
     }
 
-    DWORD pathSize = GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, 0);
-
-    if (pathSize > MAX_PATH || pathSize == 0) {
-        dr_log(NULL, LOG_ALL, ERROR, "Pathsize %d is out of bounds\n", pathSize);
-        return false;
-    }
     
     filePath[pathSize] = 0;
     
@@ -337,95 +342,140 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
   return true;
 }
 
+struct read_info {
+    Function function;
+    HANDLE hFile;
+    LPVOID lpBuffer;
+    DWORD nNumberOfBytesToRead;
+    LPDWORD lpNumberOfBytesRead;
+    DWORD64 position;
+};
 
-// static void
-// wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
-//     dr_fprintf(STDERR, "<in wrap_pre_ReadEventLog>\n");
-//     HANDLE hEventLog = (HANDLE)drwrap_get_arg(wrapcxt, 0);
-//     DWORD  dwReadFlags = (DWORD)drwrap_get_arg(wrapcxt, 1);
-//     DWORD  dwRecordOffset = (DWORD)drwrap_get_arg(wrapcxt, 2);
-//     LPVOID lpBuffer = (LPVOID)drwrap_get_arg(wrapcxt, 3);
-//     DWORD  nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 4);
-//     DWORD  *pnBytesRead = (DWORD *)drwrap_get_arg(wrapcxt, 5);
-//     DWORD  *pnMinNumberOfBytesNeeded = (DWORD *)drwrap_get_arg(wrapcxt, 6);
+static void
+wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
+    dr_fprintf(STDERR, "<in wrap_pre_ReadEventLog>\n");
+    HANDLE hEventLog = (HANDLE)drwrap_get_arg(wrapcxt, 0);
+    DWORD  dwReadFlags = (DWORD)drwrap_get_arg(wrapcxt, 1);
+    DWORD  dwRecordOffset = (DWORD)drwrap_get_arg(wrapcxt, 2);
+    LPVOID lpBuffer = (LPVOID)drwrap_get_arg(wrapcxt, 3);
+    DWORD  nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 4);
+    DWORD  *pnBytesRead = (DWORD *)drwrap_get_arg(wrapcxt, 5);
+    DWORD  *pnMinNumberOfBytesNeeded = (DWORD *)drwrap_get_arg(wrapcxt, 6);
     
-//     *user_data = malloc(sizeof(read_info));
-//     ((read_info *)*user_data)->lpBuffer = lpBuffer;
-//     ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
-// }
+    *user_data = malloc(sizeof(read_info));
+    ((read_info *)*user_data)->function = Function::ReadEventLog;
+    ((read_info *)*user_data)->hFile = hEventLog;
+    ((read_info *)*user_data)->lpBuffer = lpBuffer;
+    ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
+    ((read_info *)*user_data)->lpNumberOfBytesRead = pnBytesRead;
+    ((read_info *)*user_data)->position = 0;
+}
 
 
-// static void
-// wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
-//     dr_fprintf(STDERR, "<in wrap_pre_RegQueryValueEx>\n");
-//     HKEY    hKey = (HKEY)drwrap_get_arg(wrapcxt, 0);
-//     LPCTSTR lpValueName = (LPCTSTR)drwrap_get_arg(wrapcxt, 1);
-//     LPDWORD lpReserved = (LPDWORD)drwrap_get_arg(wrapcxt, 2);
-//     LPDWORD lpType = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
-//     LPBYTE  lpData = (LPBYTE)drwrap_get_arg(wrapcxt, 4);
-//     LPDWORD lpcbData = (LPDWORD)drwrap_get_arg(wrapcxt, 5);
+static void
+wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
+    dr_fprintf(STDERR, "<in wrap_pre_RegQueryValueEx>\n");
+    HKEY    hKey = (HKEY)drwrap_get_arg(wrapcxt, 0);
+    LPCTSTR lpValueName = (LPCTSTR)drwrap_get_arg(wrapcxt, 1);
+    LPDWORD lpReserved = (LPDWORD)drwrap_get_arg(wrapcxt, 2);
+    LPDWORD lpType = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
+    LPBYTE  lpData = (LPBYTE)drwrap_get_arg(wrapcxt, 4);
+    LPDWORD lpcbData = (LPDWORD)drwrap_get_arg(wrapcxt, 5);
 
-//     if(lpData != NULL && lpcbData != NULL) {
-//         *user_data = malloc(sizeof(read_info));
-//         ((read_info *)*user_data)->lpBuffer = lpData;
-//         ((read_info *)*user_data)->nNumberOfBytesToRead = *lpcbData;
-//     } else {
-//         *user_data = NULL;
-//     }
-// }
+    if(lpData != NULL && lpcbData != NULL) {
+        *user_data = malloc(sizeof(read_info));
+        ((read_info *)*user_data)->function = Function::RegQueryValueEx;
+        ((read_info *)*user_data)->hFile = hKey;
+        ((read_info *)*user_data)->lpBuffer = lpData;
+        ((read_info *)*user_data)->nNumberOfBytesToRead = *lpcbData;
+        ((read_info *)*user_data)->lpNumberOfBytesRead = lpcbData;
+        ((read_info *)*user_data)->position = 0;
+    } else {
+        *user_data = NULL;
+    }
+}
 
-// static void
-// wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
-//     dr_fprintf(STDERR, "<in wrap_pre_WinHttpWebSocketReceive>\n");
-//     HINTERNET hRequest = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
-//     PVOID pvBuffer = drwrap_get_arg(wrapcxt, 1);
-//     DWORD dwBufferLength = (DWORD)drwrap_get_arg(wrapcxt, 2);
-//     PDWORD pdwBytesRead = (PDWORD)drwrap_get_arg(wrapcxt, 3);
-//     WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE)(int)drwrap_get_arg(wrapcxt, 3);
+static void
+wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
+    dr_fprintf(STDERR, "<in wrap_pre_WinHttpWebSocketReceive>\n");
+    HINTERNET hRequest = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
+    PVOID pvBuffer = drwrap_get_arg(wrapcxt, 1);
+    DWORD dwBufferLength = (DWORD)drwrap_get_arg(wrapcxt, 2);
+    PDWORD pdwBytesRead = (PDWORD)drwrap_get_arg(wrapcxt, 3);
+    WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE)(int)drwrap_get_arg(wrapcxt, 3);
     
-//     *user_data = malloc(sizeof(read_info));
-//     ((read_info *)*user_data)->lpBuffer = pvBuffer;
-//     ((read_info *)*user_data)->nNumberOfBytesToRead = dwBufferLength;
-// }
+    // TODO: put this in another file cause you can't import wininet and winhttp
+    // LONG positionHigh = 0;
+    // DWORD positionLow = InternetSetFilePointer(hRequest, 0, &positionHigh, FILE_CURRENT);
+    // DWORD64 position = positionHigh;
 
-// static void
-// wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
-//     dr_fprintf(STDERR, "<in wrap_pre_InternetReadFile>\n");
-//     HINTERNET hFile = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
-//     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
-//     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
-//     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
-    
-//     *user_data = malloc(sizeof(read_info));
-//     ((read_info *)*user_data)->lpBuffer = lpBuffer;
-//     ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
-// }
+    *user_data = malloc(sizeof(read_info));
+    ((read_info *)*user_data)->function = Function::WinHttpWebSocketReceive;
+    ((read_info *)*user_data)->hFile = hRequest;
+    ((read_info *)*user_data)->lpBuffer = pvBuffer;
+    ((read_info *)*user_data)->nNumberOfBytesToRead = dwBufferLength;
+    ((read_info *)*user_data)->lpNumberOfBytesRead = pdwBytesRead;
+    ((read_info *)*user_data)->position = 0;
+}
 
-// static void
-// wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
-//     dr_fprintf(STDERR, "<in wrap_pre_WinHttpReadData>\n");
-//     HINTERNET hRequest = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
-//     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
-//     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
-//     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
+static void
+wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
+    dr_fprintf(STDERR, "<in wrap_pre_InternetReadFile>\n");
+    HINTERNET hFile = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
+    LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
+    DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
+    LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
     
-//     *user_data = malloc(sizeof(read_info));
-//     ((read_info *)*user_data)->lpBuffer = lpBuffer;
-//     ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
-// }
+    // LONG positionHigh = 0;
+    // DWORD positionLow = InternetSetFilePointer(hFile, 0, &positionHigh, FILE_CURRENT);
+    // DWORD64 position = positionHigh;
 
-// static void
-// wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
-//     dr_fprintf(STDERR, "<in wrap_pre_recv>\n");
-//     SOCKET s = (SOCKET)drwrap_get_arg(wrapcxt, 0);
-//     char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
-//     int len = (int)drwrap_get_arg(wrapcxt, 2);
-//     int flags = (int)drwrap_get_arg(wrapcxt, 3);
+    *user_data = malloc(sizeof(read_info));
+    ((read_info *)*user_data)->function = Function::InternetReadFile;
+    ((read_info *)*user_data)->hFile = hFile;
+    ((read_info *)*user_data)->lpBuffer = lpBuffer;
+    ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
+    ((read_info *)*user_data)->lpNumberOfBytesRead = lpNumberOfBytesRead;
+    ((read_info *)*user_data)->position = 0;
+}
+
+static void
+wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
+    dr_fprintf(STDERR, "<in wrap_pre_WinHttpReadData>\n");
+    HINTERNET hRequest = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
+    LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
+    DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
+    LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
     
-//     *user_data = malloc(sizeof(read_info));
-//     ((read_info *)*user_data)->lpBuffer = buf;
-//     ((read_info *)*user_data)->nNumberOfBytesToRead = len;
-// }
+    // LONG positionHigh = 0;
+    // DWORD positionLow = InternetSetFilePointer(hRequest, 0, &positionHigh, FILE_CURRENT);
+    // DWORD64 position = positionHigh;
+
+    *user_data = malloc(sizeof(read_info));
+    ((read_info *)*user_data)->function = Function::WinHttpReadData;
+    ((read_info *)*user_data)->hFile = hRequest;
+    ((read_info *)*user_data)->lpBuffer = lpBuffer;
+    ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
+    ((read_info *)*user_data)->lpNumberOfBytesRead = lpNumberOfBytesRead;
+    ((read_info *)*user_data)->position = 0;
+}
+
+static void
+wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
+    dr_fprintf(STDERR, "<in wrap_pre_recv>\n");
+    SOCKET s = (SOCKET)drwrap_get_arg(wrapcxt, 0);
+    char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
+    int len = (int)drwrap_get_arg(wrapcxt, 2);
+    int flags = (int)drwrap_get_arg(wrapcxt, 3);
+    
+    *user_data = malloc(sizeof(read_info));
+    ((read_info *)*user_data)->function = Function::recv;
+    ((read_info *)*user_data)->hFile = NULL;
+    ((read_info *)*user_data)->lpBuffer = buf;
+    ((read_info *)*user_data)->nNumberOfBytesToRead = len;
+    ((read_info *)*user_data)->lpNumberOfBytesRead = NULL;
+    ((read_info *)*user_data)->position = 0;
+}
 
 // static void
 // wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
@@ -437,74 +487,6 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
 //         free(user_data);
 //     }
 // }
-
-// static void
-// wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
-//     dr_fprintf(STDERR, "<in wrap_pre_ReadFile>\n");
-//     HANDLE hFile = drwrap_get_arg(wrapcxt, 0);
-//     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
-//     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
-//     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
-    
-//     *user_data = malloc(sizeof(read_info));
-//     ((read_info *)*user_data)->lpBuffer = lpBuffer;
-//     ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
-// }
-
-// static void
-// wrap_post_ReadFile(void *wrapcxt, void *user_data) {
-//     LPVOID lpBuffer = ((read_info *)user_data)->lpBuffer;
-//     DWORD nNumberOfBytesToRead = ((read_info *)user_data)->nNumberOfBytesToRead;
-//     taint_mem((app_pc)lpBuffer, nNumberOfBytesToRead);
-
-//     free(user_data);
-
-//     if(replay) {
-//         dr_mutex_lock(mutatex);
-//         HANDLE h_pipe = CreateFile(
-//             L"\\\\.\\pipe\\fuzz_server",
-//             GENERIC_READ | GENERIC_WRITE,
-//             0,
-//             NULL,
-//             OPEN_EXISTING,
-//             0,
-//             NULL);
-
-//         if (h_pipe != INVALID_HANDLE_VALUE) {
-//             DWORD read_mode = PIPE_READMODE_MESSAGE;
-//             SetNamedPipeHandleState(
-//                 h_pipe,
-//                 &read_mode,
-//                 NULL,
-//                 NULL);
-
-//             DWORD bytes_read = 0;
-//             DWORD bytes_written = 0;
-
-//             BYTE event_id = 2;
-
-//             WriteFile(h_pipe, &event_id, sizeof(BYTE), &bytes_written, NULL);
-//             WriteFile(h_pipe, &run_id, sizeof(DWORD), &bytes_written, NULL);
-//             WriteFile(h_pipe, &mutate_count, sizeof(DWORD), &bytes_written, NULL);
-//             TransactNamedPipe(h_pipe, &nNumberOfBytesToRead, sizeof(DWORD), lpBuffer, nNumberOfBytesToRead, &bytes_read, NULL);
-//             mutate_count++;
-//             CloseHandle(h_pipe);
-//             dr_mutex_unlock(mutatex);
-//         }
-//     }
-
-//     BOOL ok = TRUE; 
-//     drwrap_set_retval(wrapcxt, &ok); // FIXME
-// }
-
-struct read_info {
-    Function function;
-    HANDLE hFile;
-    LPVOID lpBuffer;
-    DWORD nNumberOfBytesToRead;
-    LPDWORD lpNumberOfBytesRead;
-    DWORD64 position;
-};
 
 /* from wrap.cpp sample code. Runs before ReadFile is called. Records arguments to
    ReadFile and stores them in probably thread-unsafe variables above. */
@@ -531,7 +513,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
 /* Called after ReadFile returns. Calls `mutate` on the bytes that ReadFile
    wrote into the program's memory. */
 static void
-wrap_post_ReadFile(void *wrapcxt, void *user_data) {
+wrap_post_Generic(void *wrapcxt, void *user_data) {
     if(user_data == NULL) {
         return;
     }
@@ -558,11 +540,6 @@ wrap_post_ReadFile(void *wrapcxt, void *user_data) {
     if (lpNumberOfBytesRead != NULL) {
         *lpNumberOfBytesRead = nNumberOfBytesToRead;
     }
-    
-    drwrap_set_mcontext(wrapcxt); // is this necessary?
-
-    BOOL ok = TRUE; 
-    drwrap_set_retval(wrapcxt, &ok); // FIXME
 }
 
 static void
@@ -573,28 +550,29 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
 
     std::map<char *, PREPROTO> toHookPre;
     toHookPre["ReadFile"] = wrap_pre_ReadFile;
-    // toHookPre["InternetReadFile"] = wrap_pre_InternetReadFile;
-    // toHookPre["ReadEventLog"] = wrap_pre_ReadEventLog;
-    // toHookPre["RegQueryValueExW"] = wrap_pre_RegQueryValueEx;
-    // toHookPre["RegQueryValueExA"] = wrap_pre_RegQueryValueEx;
-    // toHookPre["WinHttpWebSocketReceive"] = wrap_pre_WinHttpWebSocketReceive;
-    // toHookPre["WinHttpReadData"] = wrap_pre_WinHttpReadData;
-    // toHookPre["recv"] = wrap_pre_recv;
+    toHookPre["InternetReadFile"] = wrap_pre_InternetReadFile;
+    toHookPre["ReadEventLog"] = wrap_pre_ReadEventLog;
+    toHookPre["RegQueryValueExW"] = wrap_pre_RegQueryValueEx;
+    toHookPre["RegQueryValueExA"] = wrap_pre_RegQueryValueEx;
+    toHookPre["WinHttpWebSocketReceive"] = wrap_pre_WinHttpWebSocketReceive;
+    toHookPre["WinHttpReadData"] = wrap_pre_WinHttpReadData;
+    toHookPre["recv"] = wrap_pre_recv;
     
     std::map<char *, POSTPROTO> toHookPost;
-    toHookPost["ReadFile"] = wrap_post_ReadFile;
-    // toHookPost["InternetReadFile"] = wrap_post_GenericTaint;
-    // toHookPost["ReadEventLog"] = wrap_post_GenericTaint;
-    // toHookPost["RegQueryValueExW"] = wrap_post_GenericTaint;
-    // toHookPost["RegQueryValueExA"] = wrap_post_GenericTaint;
-    // toHookPost["WinHttpWebSocketReceive"] = wrap_post_GenericTaint;
-    // toHookPost["WinHttpReadData"] = wrap_post_GenericTaint;
-    // toHookPost["recv"] = wrap_post_GenericTaint;
+    toHookPost["ReadFile"] = wrap_post_Generic;
+    toHookPost["InternetReadFile"] = wrap_post_Generic;
+    toHookPost["ReadEventLog"] = wrap_post_Generic;
+    toHookPost["RegQueryValueExW"] = wrap_post_Generic;
+    toHookPost["RegQueryValueExA"] = wrap_post_Generic;
+    toHookPost["WinHttpWebSocketReceive"] = wrap_post_Generic;
+    toHookPost["WinHttpReadData"] = wrap_post_Generic;
+    toHookPost["recv"] = wrap_post_Generic;
 
     std::map<char *, PREPROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
         std::string include = op_include.get_value();
+
         if(include != "" && include.find(functionName) == std::string::npos) {
             continue;
         }
@@ -626,6 +604,14 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
 DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
     dr_set_client_name("Sienna-Locomotive Fuzzer",
                        "https://github.com/trailofbits/sienna-locomotive/issues");
+
+    std::string parse_err;
+    int last_idx = 0;
+    if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
+        dr_fprintf(STDERR, "Usage error: %s", parse_err.c_str());
+        dr_abort();
+    }
+
     dr_log(NULL, LOG_ALL, 1, "DR client 'SL Fuzzer' initializing\n");
     if (dr_is_notify_on()) {
 #ifdef WINDOWS

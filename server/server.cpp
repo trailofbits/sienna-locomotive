@@ -194,6 +194,7 @@ VOID strategyRandByte(BYTE *buf, DWORD size) {
 	random <<= 15;
 	random |= rand();
 
+	LOG_F(INFO, "size (%d)", size);
 	DWORD pos = random % size;
 	BYTE mut = rand() % 256;
 
@@ -327,7 +328,8 @@ DWORD handleMutation(HANDLE hPipe) {
 		size = dwBytesRead;
 	}
 
-	mutate(buf, size);
+	if(size > 0)
+		mutate(buf, size);
 	
 	if(!WriteFile(hPipe, buf, size, &dwBytesWritten, NULL)) {
 		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
