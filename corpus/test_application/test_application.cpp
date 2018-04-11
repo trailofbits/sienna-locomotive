@@ -47,6 +47,8 @@ int test_RegQueryValueEx(bool fuzzing) {
     } else {
         printf("*CRASH PTR: %x\n", *crashPtr);
     }
+
+    return 0;
 }
 
 // ReadFile

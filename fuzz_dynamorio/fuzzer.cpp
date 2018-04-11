@@ -177,9 +177,18 @@ get_target_command_line() {
     char * mbsCommandLineContents;
 
     if (dr_safe_read(parameterBlock.CommandLine.Buffer, parameterBlock.CommandLine.Length, commandLineContents, &byte_counter)) {
-        size_t outSize = wcstombs(NULL, commandLineContents, parameterBlock.CommandLine.Length);
+        size_t outSize = 0;
+        if(wcstombs_s(&outSize, NULL, 0, commandLineContents, parameterBlock.CommandLine.Length)) {
+            dr_log(NULL, LOG_ALL, ERROR, "Could not get length of command line");
+            dr_exit_process(1);
+        }
+
         mbsCommandLineContents = (char *)dr_global_alloc(outSize);
-        byte_counter = wcstombs(mbsCommandLineContents, commandLineContents, outSize);
+        if(wcstombs_s(&byte_counter, mbsCommandLineContents, outSize, commandLineContents, parameterBlock.CommandLine.Length)) {
+            dr_log(NULL, LOG_ALL, ERROR, "Could not convert command line");
+            dr_exit_process(1);
+        }
+
         dr_global_free(commandLineContents, parameterBlock.CommandLine.Length);
     } else {
         dr_log(NULL, LOG_ALL, ERROR, "Could not read command line buffer");

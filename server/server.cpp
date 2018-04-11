@@ -362,6 +362,8 @@ DWORD getBytesFKT(HANDLE hFile, BYTE *buf, DWORD size) {
 		LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
 		exit(1);
 	}
+
+	return 0;
 }
 
 DWORD handleReplay(HANDLE hPipe) {
