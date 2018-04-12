@@ -53,15 +53,18 @@ def main():
     fuzzer_path = os.path.join(sienna_path, r'build\fuzz_dynamorio\Debug\fuzzer.dll')
     test_application_path = os.path.join(sienna_path, r'build\corpus\test_application\Debug\test_application.exe')
 
+    while True:
+        if test_number == 1:
+            socket_server_path = os.path.join(sienna_path, r'build\corpus\test_application\Debug\socket_server.exe')
+            sock_proc = subprocess.Popen(socket_server_path)
 
-    if test_number == 1:
-        socket_server_path = os.path.join(sienna_path, r'build\corpus\test_application\Debug\socket_server.exe')
-        sock_proc = subprocess.Popen(socket_server_path)
+        cmd = [drrun_path, '-c', fuzzer_path, '-i', functions[test_number], '--', test_application_path, str(test_number), '-f']
 
-    cmd = [drrun_path, '-c', fuzzer_path, '-i', functions[test_number], '--', test_application_path, str(test_number), '-f']
-
-    proc = subprocess.Popen(cmd)
-    proc.wait()
+        proc = subprocess.Popen(cmd, stderr=subprocess.PIPE)
+        _, err = proc.communicate()
+        if b'<crash found for run id ' in err:
+            print(err)
+            break
 
 if __name__ == '__main__':
     main()

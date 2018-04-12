@@ -69,7 +69,7 @@ int test_WinHttpReadData(bool fuzzing) {
                 ZeroMemory( pszOutBuffer, dwSize+1 );
                 printf("pszOutBuffer: %p\n", pszOutBuffer);
                 printf("dwSize: %x\n", dwSize);
-                if(!WinHttpReadData(hRequest, (LPVOID)pszOutBuffer, dwSize, &dwDownloaded)) {
+                if(!WinHttpReadData(hRequest, (LPVOID)pszOutBuffer, 8, &dwDownloaded)) {
                     printf( "Error %u in WinHttpReadData.\n", GetLastError( ) );
                 }
                 else {

@@ -137,6 +137,7 @@ HANDLE getPipe() {
 
 DWORD finalize(HANDLE hPipe, DWORD runId, BOOL crashed) {
     if (crashed) {
+        dr_fprintf(STDERR, "<crash found for run id %d>\n", runId);
         dr_log(NULL, LOG_ALL, ERROR, "Crash found for run id %d!", runId);
     }
 
@@ -271,6 +272,7 @@ onexception(void *drcontext, dr_exception_t *excpt) {
             break;
     }
 
+    dr_exit_process(1);
     return true;
 }
 
@@ -476,17 +478,6 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->lpNumberOfBytesRead = NULL;
     ((read_info *)*user_data)->position = 0;
 }
-
-// static void
-// wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
-//     dr_fprintf(STDERR, "<in wrap_post_GenericTaint>\n");
-//     if(user_data != NULL) {
-//         LPVOID lpBuffer = ((read_info *)user_data)->lpBuffer;
-//         DWORD nNumberOfBytesToRead = ((read_info *)user_data)->nNumberOfBytesToRead;
-//         taint_mem((app_pc)lpBuffer, nNumberOfBytesToRead);
-//         free(user_data);
-//     }
-// }
 
 /* from wrap.cpp sample code. Runs before ReadFile is called. Records arguments to
    ReadFile and stores them in probably thread-unsafe variables above. */
