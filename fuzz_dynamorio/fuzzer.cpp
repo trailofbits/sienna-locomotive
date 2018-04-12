@@ -587,12 +587,25 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
         }
 
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
+        const char *mod_name = dr_module_preferred_name(mod);
+        if(strcmp(functionName, "ReadFile") == 0) {
+            if(strcmp(mod_name, "KERNEL32.dll") != 0) {
+                continue;
+            }
+        }
+
+        if(strcmp(functionName, "RegQueryValueExA") == 0 || strcmp(functionName, "RegQueryValueExW") == 0) {
+            if(strcmp(mod_name, "ADVAPI32.dll") != 0) {
+                continue;
+            }
+        }
+
         if (towrap != NULL) {
             dr_flush_region(towrap, 0x1000);
             bool ok = drwrap_wrap(towrap, hookFunctionPre, hookFunctionPost);
             // bool ok = false;
             if (ok) {
-                dr_fprintf(STDERR, "<wrapped %s @ 0x%p\n", functionName, towrap);
+                dr_fprintf(STDERR, "<wrapped %s @ 0x%p in %s\n", functionName, towrap, mod_name);
             } else {
                 dr_fprintf(STDERR, "<FAILED to wrap %s @ 0x%p: already wrapped?\n", functionName, towrap);
             }
