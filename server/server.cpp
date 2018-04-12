@@ -77,7 +77,7 @@ DWORD findUnusedId() {
 	DWORD id = 0;
 	for (id = 0; id <= UINT64_MAX; id++) {
 		if (usedIds.find(id) == usedIds.end()) {
-			LOG_F(INFO, "Found run id %x", id);
+			LOG_F(INFO, "Found run id 0x%x", id);
 			break;
 		}
 	}
@@ -525,10 +525,10 @@ DWORD finalizeRun(HANDLE hPipe) {
 		LOG_F(ERROR, "FinalizeRun (0x%x)", GetLastError());
 		exit(1);
 	}
-	LOG_F(INFO, "Finalizing run %x", runId);
+	LOG_F(INFO, "Finalizing run 0x%x", runId);
 
 	if (!crash) {
-		LOG_F(INFO, "No crash removing run %x", runId);
+		LOG_F(INFO, "No crash removing run 0x%x", runId);
 		EnterCriticalSection(&critId);
 		WIN32_FIND_DATA findData;
 		WCHAR targetFile[MAX_PATH + 1] = { 0 };
@@ -554,7 +554,7 @@ DWORD finalizeRun(HANDLE hPipe) {
 		LeaveCriticalSection(&critId);
 	}
 	else {
-		LOG_F(INFO, "Crash found for run %x", runId);
+		LOG_F(INFO, "Crash found for run 0x%x", runId);
 	}
 
 	return 0;
@@ -624,7 +624,7 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe) {
 			crashPath(hPipe);
 			break;
 		default:
-			LOG_F(ERROR, "Unknown or invalid event id %x", eventId);
+			LOG_F(ERROR, "Unknown or invalid event id 0x%x", eventId);
 			break;
 	}
 
