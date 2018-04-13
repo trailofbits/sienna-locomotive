@@ -33,7 +33,7 @@ int test_InternetReadFile(bool fuzzing)
     char *buf = new char[bufSize];
     DWORD bytesRead = 0;
 
-    if (InternetReadFile(hWebpage, buf, bufSize-1, &bytesRead)) { 
+    if (InternetReadFile(hWebpage, buf, 8, &bytesRead)) { 
         if (bytesRead == 0) {
             printf("no bytes read");
             return 1;

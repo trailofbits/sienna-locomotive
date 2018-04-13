@@ -77,7 +77,7 @@ DWORD findUnusedId() {
 	DWORD id = 0;
 	for (id = 0; id <= UINT64_MAX; id++) {
 		if (usedIds.find(id) == usedIds.end()) {
-			LOG_F(INFO, "Found run id %x", id);
+			LOG_F(INFO, "Found run id 0x%x", id);
 			break;
 		}
 	}
@@ -194,6 +194,7 @@ VOID strategyRandByte(BYTE *buf, DWORD size) {
 	random <<= 15;
 	random |= rand();
 
+	LOG_F(INFO, "size (%d)", size);
 	DWORD pos = random % size;
 	BYTE mut = rand() % 256;
 
@@ -202,11 +203,10 @@ VOID strategyRandByte(BYTE *buf, DWORD size) {
 
 DWORD mutate(BYTE *buf, DWORD size) {
 	strategyRandByte(buf, size);
-
 	return 0;
 }
 
-DWORD writeFKT(HANDLE hFile, DWORD pathSize, TCHAR *filePath, DWORD64 position, DWORD size, BYTE* buf) {
+DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, TCHAR *filePath, DWORD64 position, DWORD size, BYTE* buf) {
 	DWORD dwBytesWritten = 0;
 
 	if (!WriteFile(hFile, "FKT\0", 4, &dwBytesWritten, NULL)) {
@@ -215,7 +215,6 @@ DWORD writeFKT(HANDLE hFile, DWORD pathSize, TCHAR *filePath, DWORD64 position, 
 	}
 
 	// only one type for right now, files
-	DWORD type = 1;
 	if (!WriteFile(hFile, &type, sizeof(DWORD), &dwBytesWritten, NULL)) {
 		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
@@ -260,6 +259,12 @@ DWORD handleMutation(HANDLE hPipe) {
 
 	DWORD runId = 0;
 	if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
+		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+		exit(1);
+	}
+
+	DWORD type = 0;
+	if(!ReadFile(hPipe, &type, sizeof(DWORD), &dwBytesRead, NULL)) {
 		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
@@ -323,7 +328,8 @@ DWORD handleMutation(HANDLE hPipe) {
 		size = dwBytesRead;
 	}
 
-	mutate(buf, size);
+	if(size > 0)
+		mutate(buf, size);
 	
 	if(!WriteFile(hPipe, buf, size, &dwBytesWritten, NULL)) {
 		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
@@ -339,7 +345,7 @@ DWORD handleMutation(HANDLE hPipe) {
 		exit(1);
 	}
 
-	writeFKT(hFile, pathSize, filePath, position, size, buf);
+	writeFKT(hFile, type, pathSize, filePath, position, size, buf);
 
 	if(!HeapFree(hHeap, NULL, buf)) {
 		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
@@ -358,6 +364,8 @@ DWORD getBytesFKT(HANDLE hFile, BYTE *buf, DWORD size) {
 		LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
 		exit(1);
 	}
+
+	return 0;
 }
 
 DWORD handleReplay(HANDLE hPipe) {
@@ -517,10 +525,10 @@ DWORD finalizeRun(HANDLE hPipe) {
 		LOG_F(ERROR, "FinalizeRun (0x%x)", GetLastError());
 		exit(1);
 	}
-	LOG_F(INFO, "Finalizing run %x", runId);
+	LOG_F(INFO, "Finalizing run 0x%x", runId);
 
 	if (!crash) {
-		LOG_F(INFO, "No crash removing run %x", runId);
+		LOG_F(INFO, "No crash removing run 0x%x", runId);
 		EnterCriticalSection(&critId);
 		WIN32_FIND_DATA findData;
 		WCHAR targetFile[MAX_PATH + 1] = { 0 };
@@ -546,7 +554,7 @@ DWORD finalizeRun(HANDLE hPipe) {
 		LeaveCriticalSection(&critId);
 	}
 	else {
-		LOG_F(INFO, "Crash found for run %x", runId);
+		LOG_F(INFO, "Crash found for run 0x%x", runId);
 	}
 
 	return 0;
@@ -616,7 +624,7 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe) {
 			crashPath(hPipe);
 			break;
 		default:
-			LOG_F(ERROR, "Unknown or invalid event id %x", eventId);
+			LOG_F(ERROR, "Unknown or invalid event id 0x%x", eventId);
 			break;
 	}
 

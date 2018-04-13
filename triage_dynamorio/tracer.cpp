@@ -876,7 +876,6 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
 
 static bool
 onexception(void *drcontext, dr_exception_t *excpt) {
-    DWORD num_written;
     DWORD exception_code = excpt->record->ExceptionCode;
 
     reg_id_t reg_pc = reg_to_full_width64(DR_REG_NULL);
