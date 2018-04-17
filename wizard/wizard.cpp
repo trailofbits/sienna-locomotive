@@ -15,9 +15,19 @@
 #include <winsock2.h>
 #include <winhttp.h>
 
-static droption_t<std::string> op_include
-(DROPTION_SCOPE_CLIENT, "i", "", "include",
- "Functions to be included in hooking.");
+static droption_t<std::string> op_include(
+    DROPTION_SCOPE_CLIENT, 
+    "i", 
+    "", 
+    "include",
+    "Functions to be included in hooking.");
+
+static droption_t<std::string> op_target(
+    DROPTION_SCOPE_CLIENT, 
+    "t", 
+    "", 
+    "target",
+    "Specific call to target.");
 
 static void
 event_thread_init(void *drcontext)
@@ -53,6 +63,8 @@ enum class Function {
     RegQueryValueEx,
     ReadEventLog,
 };
+
+std::map<Function, UINT64> call_counts;
 
 char *get_function_name(Function function) {
     switch(function) {
@@ -290,8 +302,29 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     }
 
     read_info *info = ((read_info *)user_data);
-    char *functionName = get_function_name(info->function);
-    dr_fprintf(STDERR, "hook: %s\n", functionName);
+    CHAR *functionName = get_function_name(info->function);
+    
+    BOOL targeted = true;
+    std::string target = op_target.get_value();
+    
+    dr_printf("target: %s\n", target.c_str());
+    dr_printf("function: %s\n", functionName);
+
+    if(target != "") {
+        targeted = false;
+        if(target.find(functionName) != std::string::npos) {
+            dr_printf("targeted: %s\n", functionName);
+            char *end;
+            UINT64 num = strtoull(target.c_str(), &end, 10);
+            if(call_counts[info->function] == num) {
+                targeted = true;
+            }
+        }
+    }
+    
+    call_counts[info->function]++;
+    dr_fprintf(STDERR, "id: %llu,%s\n", call_counts[info->function], functionName);
+    
     if(info->source != NULL) {
         dr_fprintf(STDERR, "source: %s\n", info->source);
         free(info->source);
@@ -304,9 +337,9 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     DWORD nNumberOfBytesToRead = info->nNumberOfBytesToRead;
     free(user_data);
 
-    hex_dump(lpBuffer, nNumberOfBytesToRead);
-    // BOOL ok = TRUE; 
-    // drwrap_set_retval(wrapcxt, &ok); // FIXME
+    if(targeted) {
+        hex_dump(lpBuffer, nNumberOfBytesToRead);
+    }
 }
 
 static void
@@ -344,6 +377,10 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
         std::string include = op_include.get_value();
+
+        // TODO: this is flawed
+        // 1. InternetReadFile contains ReadFile
+        // 2. RegQueryValueEx does not contain RegQueryValueExW
         if(include != "" && include.find(functionName) == std::string::npos) {
             continue;
         }
@@ -359,6 +396,18 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
 
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
         const char *mod_name = dr_module_preferred_name(mod);
+        if(strcmp(functionName, "ReadFile") == 0) {
+            if(strcmp(mod_name, "KERNELBASE.dll") != 0) {
+                continue;
+            }
+        }
+
+        if(strcmp(functionName, "RegQueryValueExA") == 0 || strcmp(functionName, "RegQueryValueExW") == 0) {
+            if(strcmp(mod_name, "KERNELBASE.dll") != 0) {
+                continue;
+            }
+        }
+
         if (towrap != NULL) {
             dr_flush_region(towrap, 0x1000);
             bool ok = drwrap_wrap(towrap, hookFunctionPre, hookFunctionPost);

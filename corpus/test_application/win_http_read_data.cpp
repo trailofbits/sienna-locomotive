@@ -93,6 +93,7 @@ int test_WinHttpReadData(bool fuzzing) {
                 // Free the memory allocated to the buffer.
                 delete [] pszOutBuffer;
             }
+            break;
         } while( dwSize > 0 );
     }
 

@@ -36,6 +36,46 @@ UINT64 run_id;
 std::set<reg_id_t> tainted_regs;
 std::set<app_pc> tainted_mems;
 
+static droption_t<std::string> op_target(
+    DROPTION_SCOPE_CLIENT, 
+    "t", 
+    "", 
+    "target",
+    "Specific call to target.");
+
+enum class Function {
+    ReadFile,
+    recv,
+    WinHttpReadData,
+    InternetReadFile,
+    WinHttpWebSocketReceive,
+    RegQueryValueEx,
+    ReadEventLog,
+};
+
+std::map<Function, UINT64> call_counts;
+
+char *get_function_name(Function function) {
+    switch(function) {
+        case Function::ReadFile:
+            return "ReadFile";
+        case Function::recv:
+            return "recv";
+        case Function::WinHttpReadData:
+            return "WinHttpReadData";
+        case Function::InternetReadFile:
+            return "InternetReadFile";
+        case Function::WinHttpWebSocketReceive:
+            return "WinHttpWebSocketReceive";
+        case Function::RegQueryValueEx:
+            return "RegQueryValueEx";
+        case Function::ReadEventLog:
+            return "ReadEventLog";
+    }
+
+    return "unknown";
+}
+
 static reg_id_t reg_to_full_width32(reg_id_t reg) {
     switch(reg){
         case DR_REG_AX:
@@ -1013,6 +1053,7 @@ onexception(void *drcontext, dr_exception_t *excpt) {
 struct read_info {
     LPVOID lpBuffer;
     DWORD nNumberOfBytesToRead;
+    Function function;
 };
 
 static void
@@ -1029,8 +1070,8 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
     *user_data = malloc(sizeof(read_info));
     ((read_info *)*user_data)->lpBuffer = lpBuffer;
     ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
+    ((read_info *)*user_data)->function = Function::ReadEventLog;
 }
-
 
 static void
 wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
@@ -1046,6 +1087,7 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
         *user_data = malloc(sizeof(read_info));
         ((read_info *)*user_data)->lpBuffer = lpData;
         ((read_info *)*user_data)->nNumberOfBytesToRead = *lpcbData;
+        ((read_info *)*user_data)->function = Function::RegQueryValueEx;
     } else {
         *user_data = NULL;
     }
@@ -1063,6 +1105,7 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
     *user_data = malloc(sizeof(read_info));
     ((read_info *)*user_data)->lpBuffer = pvBuffer;
     ((read_info *)*user_data)->nNumberOfBytesToRead = dwBufferLength;
+    ((read_info *)*user_data)->function = Function::WinHttpWebSocketReceive;
 }
 
 static void
@@ -1076,6 +1119,7 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
     *user_data = malloc(sizeof(read_info));
     ((read_info *)*user_data)->lpBuffer = lpBuffer;
     ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
+    ((read_info *)*user_data)->function = Function::InternetReadFile;
 }
 
 static void
@@ -1089,6 +1133,7 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
     *user_data = malloc(sizeof(read_info));
     ((read_info *)*user_data)->lpBuffer = lpBuffer;
     ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
+    ((read_info *)*user_data)->function = Function::WinHttpReadData;
 }
 
 static void
@@ -1102,17 +1147,7 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
     *user_data = malloc(sizeof(read_info));
     ((read_info *)*user_data)->lpBuffer = buf;
     ((read_info *)*user_data)->nNumberOfBytesToRead = len;
-}
-
-static void
-wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
-    dr_fprintf(STDERR, "<in wrap_post_GenericTaint>\n");
-    if(user_data != NULL) {
-        LPVOID lpBuffer = ((read_info *)user_data)->lpBuffer;
-        DWORD nNumberOfBytesToRead = ((read_info *)user_data)->nNumberOfBytesToRead;
-        taint_mem((app_pc)lpBuffer, nNumberOfBytesToRead);
-        free(user_data);
-    }
+    ((read_info *)*user_data)->function = Function::recv;
 }
 
 static void
@@ -1126,17 +1161,43 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     *user_data = malloc(sizeof(read_info));
     ((read_info *)*user_data)->lpBuffer = lpBuffer;
     ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
+    ((read_info *)*user_data)->function = Function::ReadFile;
 }
 
 static void
-wrap_post_ReadFile(void *wrapcxt, void *user_data) {
+wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
+    dr_fprintf(STDERR, "<in wrap_post_GenericTaint>\n");
+    if(user_data == NULL) {
+        return;
+    }
+
     LPVOID lpBuffer = ((read_info *)user_data)->lpBuffer;
     DWORD nNumberOfBytesToRead = ((read_info *)user_data)->nNumberOfBytesToRead;
-    taint_mem((app_pc)lpBuffer, nNumberOfBytesToRead);
-
+    Function function = ((read_info *)user_data)->function;
     free(user_data);
 
-    if(replay) {
+    BOOL targeted = true;
+    std::string target = op_target.get_value();
+    CHAR *functionName = get_function_name(function);
+
+    if(target != "") {
+        targeted = false;
+        if(target.find(functionName) != std::string::npos) {
+            char *end;
+            UINT64 num = strtoull(target.c_str(), &end, 10);
+            if(call_counts[function] == num) {
+                targeted = true;
+            }
+        }
+    }
+
+    call_counts[function]++;
+
+    if(targeted) {
+        taint_mem((app_pc)lpBuffer, nNumberOfBytesToRead);
+    }
+    
+    if(replay && targeted) {
         dr_mutex_lock(mutatex);
         HANDLE h_pipe = CreateFile(
             L"\\\\.\\pipe\\fuzz_server",
@@ -1169,10 +1230,50 @@ wrap_post_ReadFile(void *wrapcxt, void *user_data) {
             dr_mutex_unlock(mutatex);
         }
     }
-
-    BOOL ok = TRUE; 
-    drwrap_set_retval(wrapcxt, &ok); // FIXME
 }
+
+// static void
+// wrap_post_ReadFile(void *wrapcxt, void *user_data) {
+//     LPVOID lpBuffer = ((read_info *)user_data)->lpBuffer;
+//     DWORD nNumberOfBytesToRead = ((read_info *)user_data)->nNumberOfBytesToRead;
+//     taint_mem((app_pc)lpBuffer, nNumberOfBytesToRead);
+
+//     free(user_data);
+
+//     if(replay) {
+//         dr_mutex_lock(mutatex);
+//         HANDLE h_pipe = CreateFile(
+//             L"\\\\.\\pipe\\fuzz_server",
+//             GENERIC_READ | GENERIC_WRITE,
+//             0,
+//             NULL,
+//             OPEN_EXISTING,
+//             0,
+//             NULL);
+
+//         if (h_pipe != INVALID_HANDLE_VALUE) {
+//             DWORD read_mode = PIPE_READMODE_MESSAGE;
+//             SetNamedPipeHandleState(
+//                 h_pipe,
+//                 &read_mode,
+//                 NULL,
+//                 NULL);
+
+//             DWORD bytes_read = 0;
+//             DWORD bytes_written = 0;
+
+//             BYTE event_id = 2;
+
+//             WriteFile(h_pipe, &event_id, sizeof(BYTE), &bytes_written, NULL);
+//             WriteFile(h_pipe, &run_id, sizeof(DWORD), &bytes_written, NULL);
+//             WriteFile(h_pipe, &mutate_count, sizeof(DWORD), &bytes_written, NULL);
+//             TransactNamedPipe(h_pipe, &nNumberOfBytesToRead, sizeof(DWORD), lpBuffer, nNumberOfBytesToRead, &bytes_read, NULL);
+//             mutate_count++;
+//             CloseHandle(h_pipe);
+//             dr_mutex_unlock(mutatex);
+//         }
+//     }
+// }
 
 static void
 module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
@@ -1191,7 +1292,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPre["ReadFile"] = wrap_pre_ReadFile;
     
     std::map<char *, POSTPROTO> toHookPost;
-    toHookPost["ReadFile"] = wrap_post_ReadFile;
+    toHookPost["ReadFile"] = wrap_post_GenericTaint;
     toHookPost["InternetReadFile"] = wrap_post_GenericTaint;
     toHookPost["ReadEventLog"] = wrap_post_GenericTaint;
     toHookPost["RegQueryValueExW"] = wrap_post_GenericTaint;
@@ -1213,6 +1314,19 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
         }
 
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
+        const char *mod_name = dr_module_preferred_name(mod);
+        if(strcmp(functionName, "ReadFile") == 0) {
+            if(strcmp(mod_name, "KERNELBASE.dll") != 0) {
+                continue;
+            }
+        }
+
+        if(strcmp(functionName, "RegQueryValueExA") == 0 || strcmp(functionName, "RegQueryValueExW") == 0) {
+            if(strcmp(mod_name, "KERNELBASE.dll") != 0) {
+                continue;
+            }
+        }
+
         if (towrap != NULL) {
             dr_flush_region(towrap, 0x1000);
             bool ok = drwrap_wrap(towrap, hookFunctionPre, hookFunctionPost);
