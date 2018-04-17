@@ -58,19 +58,19 @@ std::map<Function, UINT64> call_counts;
 char *get_function_name(Function function) {
     switch(function) {
         case Function::ReadFile:
-            return "ReadFile";
+            return ",ReadFile";
         case Function::recv:
-            return "recv";
+            return ",recv";
         case Function::WinHttpReadData:
-            return "WinHttpReadData";
+            return ",WinHttpReadData";
         case Function::InternetReadFile:
-            return "InternetReadFile";
+            return ",InternetReadFile";
         case Function::WinHttpWebSocketReceive:
-            return "WinHttpWebSocketReceive";
+            return ",WinHttpWebSocketReceive";
         case Function::RegQueryValueEx:
-            return "RegQueryValueEx";
+            return ",RegQueryValueEx";
         case Function::ReadEventLog:
-            return "ReadEventLog";
+            return ",ReadEventLog";
     }
 
     return "unknown";
@@ -1196,7 +1196,7 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
     if(targeted) {
         taint_mem((app_pc)lpBuffer, nNumberOfBytesToRead);
     }
-    
+
     if(replay && targeted) {
         dr_mutex_lock(mutatex);
         HANDLE h_pipe = CreateFile(
@@ -1231,49 +1231,6 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
         }
     }
 }
-
-// static void
-// wrap_post_ReadFile(void *wrapcxt, void *user_data) {
-//     LPVOID lpBuffer = ((read_info *)user_data)->lpBuffer;
-//     DWORD nNumberOfBytesToRead = ((read_info *)user_data)->nNumberOfBytesToRead;
-//     taint_mem((app_pc)lpBuffer, nNumberOfBytesToRead);
-
-//     free(user_data);
-
-//     if(replay) {
-//         dr_mutex_lock(mutatex);
-//         HANDLE h_pipe = CreateFile(
-//             L"\\\\.\\pipe\\fuzz_server",
-//             GENERIC_READ | GENERIC_WRITE,
-//             0,
-//             NULL,
-//             OPEN_EXISTING,
-//             0,
-//             NULL);
-
-//         if (h_pipe != INVALID_HANDLE_VALUE) {
-//             DWORD read_mode = PIPE_READMODE_MESSAGE;
-//             SetNamedPipeHandleState(
-//                 h_pipe,
-//                 &read_mode,
-//                 NULL,
-//                 NULL);
-
-//             DWORD bytes_read = 0;
-//             DWORD bytes_written = 0;
-
-//             BYTE event_id = 2;
-
-//             WriteFile(h_pipe, &event_id, sizeof(BYTE), &bytes_written, NULL);
-//             WriteFile(h_pipe, &run_id, sizeof(DWORD), &bytes_written, NULL);
-//             WriteFile(h_pipe, &mutate_count, sizeof(DWORD), &bytes_written, NULL);
-//             TransactNamedPipe(h_pipe, &nNumberOfBytesToRead, sizeof(DWORD), lpBuffer, nNumberOfBytesToRead, &bytes_read, NULL);
-//             mutate_count++;
-//             CloseHandle(h_pipe);
-//             dr_mutex_unlock(mutatex);
-//         }
-//     }
-// }
 
 static void
 module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {

@@ -66,19 +66,19 @@ std::map<Function, UINT64> call_counts;
 char *get_function_name(Function function) {
     switch(function) {
         case Function::ReadFile:
-            return "ReadFile";
+            return ",ReadFile";
         case Function::recv:
-            return "recv";
+            return ",recv";
         case Function::WinHttpReadData:
-            return "WinHttpReadData";
+            return ",WinHttpReadData";
         case Function::InternetReadFile:
-            return "InternetReadFile";
+            return ",InternetReadFile";
         case Function::WinHttpWebSocketReceive:
-            return "WinHttpWebSocketReceive";
+            return ",WinHttpWebSocketReceive";
         case Function::RegQueryValueEx:
-            return "RegQueryValueEx";
+            return ",RegQueryValueEx";
         case Function::ReadEventLog:
-            return "ReadEventLog";
+            return ",ReadEventLog";
     }
 
     return "unknown";

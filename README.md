@@ -32,6 +32,11 @@ C:\path\to\DynamoRIO\bin64\drrun.exe -c build\fuzz_dynamorio\Debug\fuzzer.dll --
 
 # triage crash
 C:\path\to\DynamoRIO\bin64\drrun.exe -c sienna-locomotive\build\triage_dynamorio\Debug\tracer.dll -r [RUN_ID] -- build\corpus\test_application\Debug\test_application.exe 0 -f
+
+# targeting 
+C:\path\to\DynamoRIO\bin64\drrun.exe -c build\fuzz_dynamorio\Debug\fuzzer.dll -t 0,ReadFile -- build\corpus\test_application\Debug\test_application.exe 0 -f
+
+C:\path\to\DynamoRIO\bin64\drrun.exe -c build\triage_dynamorio\Debug\tracer.dll -r [RUN_ID] -t 0,ReadFile -- build\corpus\test_application\Debug\test_application.exe 0 -f
 ```
 
 ## File Formats
