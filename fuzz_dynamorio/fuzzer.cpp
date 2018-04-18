@@ -40,6 +40,13 @@ static droption_t<std::string> op_include(
     "include",
     "Functions to be included in hooking.");
 
+static droption_t<std::string> op_target(
+    DROPTION_SCOPE_CLIENT, 
+    "t", 
+    "", 
+    "target",
+    "Specific call to target.");
+
 
 enum class Function {
     ReadFile,
@@ -53,6 +60,29 @@ enum class Function {
 
 DWORD runId;
 BOOL crashed = false;
+
+std::map<Function, UINT64> call_counts;
+
+char *get_function_name(Function function) {
+    switch(function) {
+        case Function::ReadFile:
+            return ",ReadFile";
+        case Function::recv:
+            return ",recv";
+        case Function::WinHttpReadData:
+            return ",WinHttpReadData";
+        case Function::InternetReadFile:
+            return ",InternetReadFile";
+        case Function::WinHttpWebSocketReceive:
+            return ",WinHttpWebSocketReceive";
+        case Function::RegQueryValueEx:
+            return ",RegQueryValueEx";
+        case Function::ReadEventLog:
+            return ",ReadEventLog";
+    }
+
+    return "unknown";
+}
 
 //TODO: Fix logging 
 DWORD getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs) {
@@ -519,17 +549,32 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     DWORD64 position = info->position;
     free(user_data);
 
+    BOOL targeted = true;
+    std::string target = op_target.get_value();
+    CHAR *functionName = get_function_name(function);
+
+    if(target != "") {
+        targeted = false;
+        if(target.find(functionName) != std::string::npos) {
+            char *end;
+            UINT64 num = strtoull(target.c_str(), &end, 10);
+            if(call_counts[function] == num) {
+                targeted = true;
+            }
+        }
+    }
+
+    call_counts[function]++;
+
     if (lpNumberOfBytesRead) {
         nNumberOfBytesToRead = *lpNumberOfBytesRead;
     }
     
-    if (!mutate(function, hFile, position, lpBuffer, nNumberOfBytesToRead)) {
-        // TODO: fallback mutations?
-        exit(1);
-    }
-
-    if (lpNumberOfBytesRead != NULL) {
-        *lpNumberOfBytesRead = nNumberOfBytesToRead;
+    if(targeted) {
+        if (!mutate(function, hFile, position, lpBuffer, nNumberOfBytesToRead)) {
+            // TODO: fallback mutations?
+            exit(1);
+        }
     }
 }
 
@@ -580,13 +625,13 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
         const char *mod_name = dr_module_preferred_name(mod);
         if(strcmp(functionName, "ReadFile") == 0) {
-            if(strcmp(mod_name, "KERNEL32.dll") != 0) {
+            if(strcmp(mod_name, "KERNELBASE.dll") != 0) {
                 continue;
             }
         }
 
         if(strcmp(functionName, "RegQueryValueExA") == 0 || strcmp(functionName, "RegQueryValueExW") == 0) {
-            if(strcmp(mod_name, "ADVAPI32.dll") != 0) {
+            if(strcmp(mod_name, "KERNELBASE.dll") != 0) {
                 continue;
             }
         }
