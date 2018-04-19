@@ -1,3 +1,4 @@
+*.pyc
 fuzzkit/.vs/*
 fuzzkit/x64/*/
 fuzzkit/fuzzkit/x64/*/
@@ -14,3 +15,9 @@ corpus/win_asm/*.obj
 fuzzkit/fuzz_dynamorio/build
 fuzzkit/fuzz_dynamorio/dynamorio
 fuzzkit/fuzz_dynamorio/.vs
+fuzz_dynamorio/build
+fuzz_dynamorio/dynamorio
+fuzz_dynamorio/.vs
+fuzz_dynamorio/config.ini
+server/.vs
+server/x64
