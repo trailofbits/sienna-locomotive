@@ -6,27 +6,30 @@ import os
 import concurrent.futures
 import traceback
 import subprocess
-from fuzzer_config import config
 
-def start_server():
-    print("Couldn't connect to the fuzz server. Attempting to start it now...")
-    pid = subprocess.Popen([config['server_path']], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).pid
-    print("Server running in process {}".format(pid))
+def run_dr(_config):
+    program_arr = [_config['drrun_path'], '-c', _config['client_path']] + _config['client_args'] + ['--', _config['target_application']] + _config['target_args']
+    return subprocess.call(program_arr)
 
-def run_dr():
-    return subprocess.call([config['drrun_path'], '-c', config['client_path'], '--', config['target_application']] + config['target_args'])
+def main():
+    from fuzzer_config import config
 
-if not os.path.isfile("\\\\.\\pipe\\fuzz_server"):
-    start_server()
+    # Start the server if it's not already running
+    if not os.path.isfile("\\\\.\\pipe\\fuzz_server"):
+        pid = subprocess.Popen([config['server_path']], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).pid
+        print("Server running in process {}".format(pid))
 
-# We can use a with statement to ensure threads are cleaned up promptly
-with concurrent.futures.ThreadPoolExecutor(max_workers=config['simultaneous']) as executor:
-    futures = [executor.submit(run_dr) for i in range(config['runs'])]
-    for future in concurrent.futures.as_completed(futures, timeout=None):
-        try:
-            return_code = future.result()
-        except Exception as e:
-            print('fuzzing run generated an exception: %s' % (e))
-            traceback.print_exc()
-        else:
-            print('fuzzing run returned %s' % (return_code))
+    # Spawn a thread that will run DynamoRIO and wait for the output
+    with concurrent.futures.ThreadPoolExecutor(max_workers=config['simultaneous']) as executor:
+        futures = [executor.submit(run_dr, config) for i in range(config['runs'])]
+        for future in concurrent.futures.as_completed(futures, timeout=None):
+            try:
+                return_code = future.result()
+            except Exception as e:
+                print('fuzzing run generated an exception: %s' % (e))
+                traceback.print_exc()
+            else:
+                print('fuzzing run returned %s' % (return_code))
+
+if __name__ == '__main__':
+    main()

@@ -12,7 +12,7 @@ import configparser
 # Create a default config file if one doesn't exist
 if not os.path.exists('config.ini'):
 	default_config = configparser.ConfigParser()
-	default_config['DEFAULT'] = {'drrun_path': 'dynamorio\\bin64\\drrun.exe', 'client_path': 'build\\x64-Debug\\fuzzer.dll', 'server_path': 'build\\x64-Debug\\server.exe', \
+	default_config['DEFAULT'] = {'drrun_path': 'dynamorio\\bin64\\drrun.exe', 'client_path': 'build\\x64-Debug\\fuzzer.dll', 'client_args': '', 'server_path': 'build\\x64-Debug\\server.exe', \
 								 'target_application': 'notepad.exe', 'target_args':'', 'runs': 1, 'simultaneous': 1}
 	with open('config.ini', 'w') as configfile:
 		default_config.write(configfile)
@@ -41,9 +41,9 @@ for opt in int_options:
 	config[opt] = int(config[opt])
 
 # Convert comma-separated arguments into lists
-list_options = ['target_args']
+list_options = ['client_args', 'target_args']
 for opt in list_options:
-	config[opt] = config[opt].split(',')
+	config[opt] = [] if (len(config[opt]) == 0) else config[opt].split(',')
 
 # Replace any values in the config dict with the optional value from the argument.
 # Note that if you set a default value for an arg, this will overwrite its value in the config
