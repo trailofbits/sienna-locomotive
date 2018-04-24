@@ -3,7 +3,7 @@ Handles argument and config file parsing for the fuzzer
 
 1: Check if the config file exists. If not, create it with sensible defaults
 2: If the config file exists, read in the contents
-3: If the user has provided any arguments that overwrite the values in the config file, use those instead 
+3: If the user has provided any arguments that overwrite the values in the config file, use those instead
 """
 import os
 import argparse
@@ -12,7 +12,7 @@ import configparser
 # Create a default config file if one doesn't exist
 if not os.path.exists('config.ini'):
 	default_config = configparser.ConfigParser()
-	default_config['DEFAULT'] = {'drrun_path': 'dynamorio\\bin64\\drrun.exe', 'client_path': 'build\\x64-Debug\\fuzzer.dll', \
+	default_config['DEFAULT'] = {'drrun_path': 'dynamorio\\bin64\\drrun.exe', 'client_path': 'build\\x64-Debug\\fuzzer.dll', 'server_path': 'build\\x64-Debug\\server.exe', \
 								 'target_application': 'notepad.exe', 'target_args':'', 'runs': 1, 'simultaneous': 1}
 	with open('config.ini', 'w') as configfile:
 		default_config.write(configfile)
@@ -27,6 +27,7 @@ parser.add_argument('-p', '--profile', action='store', dest='profile', default='
 parser.add_argument('-r', '--runs', action='store', dest='runs', type=int, help="Number of times to run the target application")
 parser.add_argument('-s', '--simultaneous', action='store', dest='simultaneous', type=int, help="Number of simultaneous instances of the target application that can run")
 parser.add_argument('-t', '--target', action='store', dest='target_application', type=str, help="Path to the target application")
+parser.add_argument('-a', '--arguments', action='store', dest='target_args', nargs='+', type=str, help="Arguments for the target application (supports multiple)")
 args = parser.parse_args()
 
 # Read the ConfigParser object into a standard dict
