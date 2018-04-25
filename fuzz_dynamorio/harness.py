@@ -24,16 +24,17 @@ def main():
         wizard_output = completed_process.stderr.decode('utf-8')
         wizard_findings = set()
         for line in str.splitlines(wizard_output):
-            if 'wrapped' in line and '@' in line:
-                func_name = line.split('wrapped ')[1].split(' @ ')[0]
+            if '<id:' in line:
+                func_name = line.replace(">","").split(',')[-1]
                 wizard_findings.add(func_name)
+        wizard_findings = list(wizard_findings)
         print(wizard_output)
         print("Functions found:")
         for i, func_name in enumerate(wizard_findings):
             print("{})".format(i), func_name)
-        index = input("Choose a function to fuzz> ")
-
-    # exit()
+        index = int(input("Choose a function to fuzz> "))
+        config['client_args'].append('-t')
+        config['client_args'].append(wizard_findings[index])
 
     # Start the server if it's not already running
     if not os.path.isfile("\\\\.\\pipe\\fuzz_server"):

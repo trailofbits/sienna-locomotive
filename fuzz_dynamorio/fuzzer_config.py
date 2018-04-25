@@ -8,9 +8,12 @@ Handles argument and config file parsing for the fuzzer
 import os
 import argparse
 import configparser
+from functools import reduce
+
+config_path = reduce(os.path.join, [os.getenv('APPDATA'), 'Trail of Bits', 'fuzzkit', 'config.ini'])
 
 # Create a default config file if one doesn't exist
-if not os.path.exists('config.ini'):
+if not os.path.exists(config_path):
 	default_config = configparser.ConfigParser()
 	default_config['DEFAULT'] = {'drrun_path': 'dynamorio\\bin64\\drrun.exe', \
 								'client_path': 'build\\fuzz_dynamorio\\Debug\\fuzzer.dll', \
@@ -21,12 +24,12 @@ if not os.path.exists('config.ini'):
 								'target_args':'', \
 								'runs': 1, \
 								'simultaneous': 1}
-	with open('config.ini', 'w') as configfile:
+	with open(config_path, 'w') as configfile:
 		default_config.write(configfile)
 
 # Read the config file
 _config = configparser.ConfigParser()
-_config.read('config.ini')
+_config.read(config_path)
 
 # Set up argument parser
 parser = argparse.ArgumentParser(description='Run the DynamoRIO fuzzing harness. You can pass arguments to the command line to override the defaults in config.ini')
@@ -35,7 +38,7 @@ parser.add_argument('-p', '--profile', action='store', dest='profile', default='
 parser.add_argument('-r', '--runs', action='store', dest='runs', type=int, help="Number of times to run the target application")
 parser.add_argument('-s', '--simultaneous', action='store', dest='simultaneous', type=int, help="Number of simultaneous instances of the target application that can run")
 parser.add_argument('-t', '--target', action='store', dest='target_application', type=str, help="Path to the target application")
-parser.add_argument('-a', '--arguments', action='store', dest='target_args', nargs='+', type=str, help="Arguments for the target application (supports multiple)")
+parser.add_argument('-a', '--arguments', action='store', dest='target_args', nargs=argparse.REMAINDER, type=str, help="Arguments for the target application (supports multiple, must come last)")
 args = parser.parse_args()
 
 # Read the ConfigParser object into a standard dict
