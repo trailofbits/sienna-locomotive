@@ -1,5 +1,4 @@
-cmake_minimum_required(VERSION 3.9)
-
+cmake_minimum_required(VERSION 3.10)
 add_subdirectory(fuzz_dynamorio)
 add_subdirectory(server)
 add_subdirectory(triage_dynamorio)
