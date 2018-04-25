@@ -12,12 +12,9 @@ corpus/win_asm/bak_crashes.asm
 corpus/win_asm/*.exe
 corpus/win_asm/*.lnk
 corpus/win_asm/*.obj
-fuzzkit/fuzz_dynamorio/build
-fuzzkit/fuzz_dynamorio/dynamorio
-fuzzkit/fuzz_dynamorio/.vs
-fuzz_dynamorio/build
-fuzz_dynamorio/dynamorio
 fuzz_dynamorio/.vs
 fuzz_dynamorio/config.ini
 server/.vs
 server/x64
+dynamorio/
+config.ini

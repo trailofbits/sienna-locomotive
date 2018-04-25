@@ -7,12 +7,33 @@ import concurrent.futures
 import traceback
 import subprocess
 
-def run_dr(_config):
+def run_dr(_config, save_stdout=False, save_stderr=False):
     program_arr = [_config['drrun_path'], '-c', _config['client_path']] + _config['client_args'] + ['--', _config['target_application']] + _config['target_args']
-    return subprocess.call(program_arr)
+    completed_process = subprocess.run(program_arr, stdout=(subprocess.PIPE if save_stdout else None), stderr=(subprocess.PIPE if save_stderr else None))
+    return completed_process
 
 def main():
     from fuzzer_config import config
+
+    if config['wizard']:
+        completed_process = run_dr({'drrun_path': config['drrun_path'], \
+                                    'client_path': config['wizard_path'], \
+                                    'client_args': [], \
+                                    'target_application': config['target_application'], \
+                                    'target_args': config['target_args']}, save_stdout=False, save_stderr=True)
+        wizard_output = completed_process.stderr.decode('utf-8')
+        wizard_findings = set()
+        for line in str.splitlines(wizard_output):
+            if 'wrapped' in line and '@' in line:
+                func_name = line.split('wrapped ')[1].split(' @ ')[0]
+                wizard_findings.add(func_name)
+        print(wizard_output)
+        print("Functions found:")
+        for i, func_name in enumerate(wizard_findings):
+            print("{})".format(i), func_name)
+        index = input("Choose a function to fuzz> ")
+
+    # exit()
 
     # Start the server if it's not already running
     if not os.path.isfile("\\\\.\\pipe\\fuzz_server"):
@@ -24,12 +45,12 @@ def main():
         futures = [executor.submit(run_dr, config) for i in range(config['runs'])]
         for future in concurrent.futures.as_completed(futures, timeout=None):
             try:
-                return_code = future.result()
+                proc = future.result()
             except Exception as e:
                 print('fuzzing run generated an exception: %s' % (e))
                 traceback.print_exc()
             else:
-                print('fuzzing run returned %s' % (return_code))
+                print('fuzzing run returned %s' % (proc.returncode))
 
 if __name__ == '__main__':
     main()

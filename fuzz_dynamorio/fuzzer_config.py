@@ -12,8 +12,15 @@ import configparser
 # Create a default config file if one doesn't exist
 if not os.path.exists('config.ini'):
 	default_config = configparser.ConfigParser()
-	default_config['DEFAULT'] = {'drrun_path': 'dynamorio\\bin64\\drrun.exe', 'client_path': 'build\\x64-Debug\\fuzzer.dll', 'client_args': '', 'server_path': 'build\\x64-Debug\\server.exe', \
-								 'target_application': 'notepad.exe', 'target_args':'', 'runs': 1, 'simultaneous': 1}
+	default_config['DEFAULT'] = {'drrun_path': 'dynamorio\\bin64\\drrun.exe', \
+								'client_path': 'build\\fuzz_dynamorio\\Debug\\fuzzer.dll', \
+								'client_args': '', \
+								'server_path': 'build\\server\\Debug\\server.exe', \
+								'wizard_path': 'build\\wizard\\Debug\\wizard.dll', \
+								'target_application': 'notepad.exe', \
+								'target_args':'', \
+								'runs': 1, \
+								'simultaneous': 1}
 	with open('config.ini', 'w') as configfile:
 		default_config.write(configfile)
 
@@ -23,6 +30,7 @@ _config.read('config.ini')
 
 # Set up argument parser
 parser = argparse.ArgumentParser(description='Run the DynamoRIO fuzzing harness. You can pass arguments to the command line to override the defaults in config.ini')
+parser.add_argument('-w', '--wizard', action='store_true', dest='wizard', default=False, help="Run the wizard before fuzzing to select a function to fuzz") # TODO : default to true before release
 parser.add_argument('-p', '--profile', action='store', dest='profile', default='DEFAULT', type=str, help="Pull configuration from a specific section in config.ini. Defaults to DEFAULT")
 parser.add_argument('-r', '--runs', action='store', dest='runs', type=int, help="Number of times to run the target application")
 parser.add_argument('-s', '--simultaneous', action='store', dest='simultaneous', type=int, help="Number of simultaneous instances of the target application that can run")
