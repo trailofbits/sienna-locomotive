@@ -17,4 +17,5 @@ fuzz_dynamorio/config.ini
 server/.vs
 server/x64
 dynamorio/
+build/
 config.ini
