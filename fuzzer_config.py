@@ -16,6 +16,7 @@ config_path = reduce(os.path.join, [os.getenv('APPDATA'), 'Trail of Bits', 'fuzz
 if not os.path.exists(config_path):
 	default_config = configparser.ConfigParser()
 	default_config['DEFAULT'] = {'drrun_path': 'dynamorio\\bin64\\drrun.exe', \
+								'drrun_args': '', \
 								'client_path': 'build\\fuzz_dynamorio\\Debug\\fuzzer.dll', \
 								'client_args': '', \
 								'server_path': 'build\\server\\Debug\\server.exe', \
@@ -34,10 +35,12 @@ _config.read(config_path)
 # Set up argument parser
 parser = argparse.ArgumentParser(description='Run the DynamoRIO fuzzing harness. You can pass arguments to the command line to override the defaults in config.ini')
 parser.add_argument('-w', '--wizard', action='store_true', dest='wizard', default=False, help="Run the wizard before fuzzing to select a function to fuzz") # TODO : default to true before release
+parser.add_argument('-v', '--verbose', action='store_true', dest='verbose', default=False, help="Tell drrun to run in verbose mode")
+parser.add_argument('-n', '--nopersist', action='store_true', dest='nopersist', default=False, help="Tell drrun not to use persistent code caches (slower)")
 parser.add_argument('-p', '--profile', action='store', dest='profile', default='DEFAULT', type=str, help="Pull configuration from a specific section in config.ini. Defaults to DEFAULT")
 parser.add_argument('-r', '--runs', action='store', dest='runs', type=int, help="Number of times to run the target application")
 parser.add_argument('-s', '--simultaneous', action='store', dest='simultaneous', type=int, help="Number of simultaneous instances of the target application that can run")
-parser.add_argument('-t', '--target', action='store', dest='target_application', type=str, help="Path to the target application")
+parser.add_argument('-t', '--target', action='store', dest='target_application', type=str, help="Path to the target application. Note: Ignores arguments in the config file")
 parser.add_argument('-a', '--arguments', action='store', dest='target_args', nargs=argparse.REMAINDER, type=str, help="Arguments for the target application (supports multiple, must come last)")
 args = parser.parse_args()
 
@@ -52,9 +55,18 @@ for opt in int_options:
 	config[opt] = int(config[opt])
 
 # Convert comma-separated arguments into lists
-list_options = ['client_args', 'target_args']
+list_options = ['drrun_args', 'client_args', 'target_args']
 for opt in list_options:
 	config[opt] = [] if (len(config[opt]) == 0) else config[opt].split(',')
+
+if args.target_application is not None and len(config['target_args']) > 0:
+	config['target_args'] =  []
+
+if args.verbose:
+	config['drrun_args'].append('-verbose')
+
+if not args.nopersist:
+	config['drrun_args'].append('-persist')
 
 # Replace any values in the config dict with the optional value from the argument.
 # Note that if you set a default value for an arg, this will overwrite its value in the config

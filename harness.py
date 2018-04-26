@@ -8,7 +8,7 @@ import traceback
 import subprocess
 
 def run_dr(_config, save_stdout=False, save_stderr=False):
-    program_arr = [_config['drrun_path'], '-c', _config['client_path']] + _config['client_args'] + ['--', _config['target_application']] + _config['target_args']
+    program_arr = [_config['drrun_path']] + _config['drrun_args'] + ['-c', _config['client_path']] + _config['client_args'] + ['--', _config['target_application']] + _config['target_args']
     completed_process = subprocess.run(program_arr, stdout=(subprocess.PIPE if save_stdout else None), stderr=(subprocess.PIPE if save_stderr else None))
     return completed_process
 
@@ -17,6 +17,7 @@ def main():
 
     if config['wizard']:
         completed_process = run_dr({'drrun_path': config['drrun_path'], \
+                                    'drrun_args': config['drrun_args'], \
                                     'client_path': config['wizard_path'], \
                                     'client_args': [], \
                                     'target_application': config['target_application'], \
