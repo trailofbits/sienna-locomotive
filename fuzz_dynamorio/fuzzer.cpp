@@ -34,16 +34,16 @@ static BOOL mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size);
 
 
 static droption_t<std::string> op_include(
-    DROPTION_SCOPE_CLIENT, 
-    "i", 
-    "", 
+    DROPTION_SCOPE_CLIENT,
+    "i",
+    "",
     "include",
     "Functions to be included in hooking.");
 
 static droption_t<std::string> op_target(
-    DROPTION_SCOPE_CLIENT, 
-    "t", 
-    "", 
+    DROPTION_SCOPE_CLIENT,
+    "t",
+    "",
     "target",
     "Specific call to target.");
 
@@ -84,7 +84,7 @@ char *get_function_name(Function function) {
     return "unknown";
 }
 
-//TODO: Fix logging 
+//TODO: Fix logging
 DWORD getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs) {
     dr_log(NULL, LOG_ALL, ERROR, "Requesting run id");
     DWORD bytesRead = 0;
@@ -192,7 +192,7 @@ DWORD finalize(HANDLE hPipe, DWORD runId, BOOL crashed) {
     return 0;
 }
 
-static LPTSTR 
+static LPTSTR
 get_target_command_line() {
     // see: https://github.com/DynamoRIO/dynamorio/issues/2662
     // alternatively: https://wj32.org/wp/2009/01/24/howto-get-the-command-line-of-processes/
@@ -321,7 +321,7 @@ event_exit(void) {
 /* Hands bytes off to the mutation server, gets mutated bytes, and writes them into memory. */
 static DWORD mutateCount = 0;
 
-static BOOL 
+static BOOL
 mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
     TCHAR filePath[MAX_PATH+1];
     TCHAR *new_buf = (TCHAR *)buf;
@@ -341,34 +341,34 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
         }
     }
 
-    
+
     filePath[pathSize] = 0;
-    
+
     HANDLE hPipe = getPipe();
-    
+
     DWORD bytesRead = 0;
     DWORD bytesWritten = 0;
-    
+
     BYTE eventId = 1;
     DWORD type = static_cast<DWORD>(function);
-    
+
     // Send state information to the fuzz server
     WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL);
     WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL);
     WriteFile(hPipe, &type, sizeof(DWORD), &bytesWritten, NULL);
     WriteFile(hPipe, &mutateCount, sizeof(DWORD), &bytesWritten, NULL);
-    
+
     WriteFile(hPipe, &pathSize, sizeof(DWORD), &bytesWritten, NULL);
     WriteFile(hPipe, &filePath, pathSize * sizeof(TCHAR), &bytesWritten, NULL);
-    
+
     WriteFile(hPipe, &position, sizeof(DWORD64), &bytesWritten, NULL);
     WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL);
-      
+
     // Send current contents of buf to the server, overwrite them with its reply
     TransactNamedPipe(hPipe, buf, size, buf, size, &bytesRead, NULL);
-    
+
     CloseHandle(hPipe);
-    
+
     mutateCount++;
 
   return true;
@@ -393,7 +393,7 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
     DWORD  nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 4);
     DWORD  *pnBytesRead = (DWORD *)drwrap_get_arg(wrapcxt, 5);
     DWORD  *pnMinNumberOfBytesNeeded = (DWORD *)drwrap_get_arg(wrapcxt, 6);
-    
+
     *user_data = malloc(sizeof(read_info));
     ((read_info *)*user_data)->function = Function::ReadEventLog;
     ((read_info *)*user_data)->hFile = hEventLog;
@@ -435,7 +435,7 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
     DWORD dwBufferLength = (DWORD)drwrap_get_arg(wrapcxt, 2);
     PDWORD pdwBytesRead = (PDWORD)drwrap_get_arg(wrapcxt, 3);
     WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE)(int)drwrap_get_arg(wrapcxt, 3);
-    
+
     // TODO: put this in another file cause you can't import wininet and winhttp
     // LONG positionHigh = 0;
     // DWORD positionLow = InternetSetFilePointer(hRequest, 0, &positionHigh, FILE_CURRENT);
@@ -457,7 +457,7 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
-    
+
     // LONG positionHigh = 0;
     // DWORD positionLow = InternetSetFilePointer(hFile, 0, &positionHigh, FILE_CURRENT);
     // DWORD64 position = positionHigh;
@@ -478,7 +478,7 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
-    
+
     // LONG positionHigh = 0;
     // DWORD positionLow = InternetSetFilePointer(hRequest, 0, &positionHigh, FILE_CURRENT);
     // DWORD64 position = positionHigh;
@@ -499,7 +499,7 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
     char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
     int len = (int)drwrap_get_arg(wrapcxt, 2);
     int flags = (int)drwrap_get_arg(wrapcxt, 3);
-    
+
     *user_data = malloc(sizeof(read_info));
     ((read_info *)*user_data)->function = Function::recv;
     ((read_info *)*user_data)->hFile = NULL;
@@ -569,7 +569,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     if (lpNumberOfBytesRead) {
         nNumberOfBytesToRead = *lpNumberOfBytesRead;
     }
-    
+
     if(targeted) {
         if (!mutate(function, hFile, position, lpBuffer, nNumberOfBytesToRead)) {
             // TODO: fallback mutations?
@@ -593,7 +593,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPre["WinHttpWebSocketReceive"] = wrap_pre_WinHttpWebSocketReceive;
     toHookPre["WinHttpReadData"] = wrap_pre_WinHttpReadData;
     toHookPre["recv"] = wrap_pre_recv;
-    
+
     std::map<char *, POSTPROTO> toHookPost;
     toHookPost["ReadFile"] = wrap_post_Generic;
     toHookPost["InternetReadFile"] = wrap_post_Generic;
@@ -673,11 +673,12 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
 
     HANDLE hPipe = getPipe();
     runId = getRunID(hPipe, dr_get_application_name(), get_target_command_line());
+    dr_fprintf(STDERR, "Beginning fuzzing run %d\n", runId);
     CloseHandle(hPipe);
 
     drmgr_init();
     drwrap_init();
-    
+
     max_ReadFile = 0;
 
     drmgr_register_exception_event(onexception);

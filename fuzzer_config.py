@@ -10,6 +10,9 @@ import argparse
 import configparser
 from functools import reduce
 
+def get_path_to_run_file(run_id, filename):
+	return reduce(os.path.join, [os.getenv('APPDATA'), 'Trail of Bits', 'fuzzkit', 'working', str(run_id), filename])
+
 config_path = reduce(os.path.join, [os.getenv('APPDATA'), 'Trail of Bits', 'fuzzkit', 'config.ini'])
 
 # Create a default config file if one doesn't exist
@@ -21,6 +24,7 @@ if not os.path.exists(config_path):
 								'client_args': '', \
 								'server_path': 'build\\server\\Debug\\server.exe', \
 								'wizard_path': 'build\\wizard\\Debug\\wizard.dll', \
+								'triage_path': 'build\\triage_dynamorio\\Debug\\tracer.dll', \
 								'target_application': 'notepad.exe', \
 								'target_args':'', \
 								'runs': 1, \

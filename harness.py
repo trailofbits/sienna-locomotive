@@ -13,7 +13,7 @@ def run_dr(_config, save_stdout=False, save_stderr=False):
     return completed_process
 
 def main():
-    from fuzzer_config import config
+    from fuzzer_config import config, get_path_to_run_file
 
     if config['wizard']:
         completed_process = run_dr({'drrun_path': config['drrun_path'], \
@@ -44,7 +44,7 @@ def main():
 
     # Spawn a thread that will run DynamoRIO and wait for the output
     with concurrent.futures.ThreadPoolExecutor(max_workers=config['simultaneous']) as executor:
-        futures = [executor.submit(run_dr, config) for i in range(config['runs'])]
+        futures = [executor.submit(run_dr, config, False, True) for i in range(config['runs'])]
         for future in concurrent.futures.as_completed(futures, timeout=None):
             try:
                 proc = future.result()
@@ -52,7 +52,26 @@ def main():
                 print('fuzzing run generated an exception: %s' % (e))
                 traceback.print_exc()
             else:
-                print('fuzzing run returned %s' % (proc.returncode))
+                run_id = 'ERR'
+                for line in str.splitlines(proc.stderr.decode('utf-8')):
+                    if 'Beginning fuzzing run' in line:
+                        run_id = int(line.replace('Beginning fuzzing run ', '').strip())
+                with open(get_path_to_run_file(run_id, 'fuzz.stdout'), 'wb') as stdoutfile:
+                    if proc.stdout is not None: # TODO: figure out why proc.stdout is always empty
+                        stdoutfile.write(proc.stdout)
+                with open(get_path_to_run_file(run_id, 'fuzz.stderr'), 'wb') as stderrfile:
+                    stderrfile.write(proc.stderr)
+
+                if proc.returncode != 0:
+                    print('Fuzzing run %s returned %s' % (run_id, proc.returncode))
+                    print("Starting Triage")
+                    completed_process = run_dr({'drrun_path': config['drrun_path'], \
+                                                'drrun_args': config['drrun_args'], \
+                                                'client_path': config['triage_path'], \
+                                                'client_args': ['-r', str(run_id)], \
+                                                'target_application': config['target_application'], \
+                                                'target_args': config['target_args']}, save_stdout=False, save_stderr=False)
+                    print("Triage returned %s" % completed_process.returncode)
 
 if __name__ == '__main__':
     main()
