@@ -600,7 +600,7 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe) {
 
 	BYTE eventId = 255;
 	if(!ReadFile(hPipe, &eventId, sizeof(BYTE), &dwBytesRead, NULL)) {
-		if (GetLastError() != 0x6D){
+		if (GetLastError() != ERROR_BROKEN_PIPE){
 			LOG_F(ERROR, "ThreadHandler (0x%x)", GetLastError());
 			exit(1);
 		}
