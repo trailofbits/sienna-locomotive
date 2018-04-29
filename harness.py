@@ -26,7 +26,7 @@ def main():
         wizard_findings = set()
         for line in str.splitlines(wizard_output):
             if '<id:' in line:
-                func_name = line.replace(">","").split(',')[-1]
+                func_name = line.split('<id: ')[0].split(',')[0] + ',' + line.replace(">","").split(',')[-1]
                 wizard_findings.add(func_name)
         wizard_findings = list(wizard_findings)
         print(wizard_output)
