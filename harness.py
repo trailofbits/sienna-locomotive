@@ -67,12 +67,16 @@ def main():
 
                 # Write stdout and stderr to files
                 # https://stackoverflow.com/questions/47038990/python-subprocess-cannot-capture-output-of-windows-program
-                if proc.stdout is not None: # TODO: figure out why proc.stdout is always empty
-                    with open(get_path_to_run_file(run_id, 'fuzz.stdout'), 'wb') as stdoutfile:
-                                stdoutfile.write(proc.stdout)
-                if proc.stderr is not None:
-                    with open(get_path_to_run_file(run_id, 'fuzz.stderr'), 'wb') as stderrfile:
-                        stderrfile.write(proc.stderr)
+                try:
+                    if proc.stdout is not None: # TODO: figure out why proc.stdout is always empty
+                        with open(get_path_to_run_file(run_id, 'fuzz.stdout'), 'wb') as stdoutfile:
+                                    stdoutfile.write(proc.stdout)
+                    if proc.stderr is not None:
+                        with open(get_path_to_run_file(run_id, 'fuzz.stderr'), 'wb') as stderrfile:
+                            stderrfile.write(proc.stderr)
+                except FileNotFoundError:
+                    if config['verbose']:
+                        print("Run %s did not produce a crash" % run_id)
 
                 # Start triage if the fuzzing harness exited with an error code
                 if proc.returncode != 0:
@@ -98,19 +102,26 @@ def main():
                 run_id = future.run_id
 
                 # Write stdout and stderr to files
-                if proc.stdout is not None:
-                    with open(get_path_to_run_file(run_id, 'triage.stdout'), 'wb') as stdoutfile:
-                        stdoutfile.write(proc.stdout)
-                if proc.stderr is not None:
-                    with open(get_path_to_run_file(run_id, 'triage.stderr'), 'wb') as stderrfile:
-                        stderrfile.write(proc.stderr)
+                try:
+                    if proc.stdout is not None:
+                        with open(get_path_to_run_file(run_id, 'triage.stdout'), 'wb') as stdoutfile:
+                            stdoutfile.write(proc.stdout)
+                    if proc.stderr is not None:
+                        with open(get_path_to_run_file(run_id, 'triage.stderr'), 'wb') as stderrfile:
+                            stderrfile.write(proc.stderr)
+                except FileNotFoundError:
+                    print("Couldn't find an output directory for run %s" % run_id)
 
                 # Parse triage results and print them
-                with open(get_path_to_run_file(run_id, 'crash.json'), 'r') as crash_json:
-                    results = json.loads(crash_json.read())
-                    results['run_id'] = run_id
-                    print("Triage ({score}): {reason} in run {run_id} caused {exception}".format(**results))
-                    print("\t0x{location:02x}: {instruction}".format(**results))
+                try:
+                    with open(get_path_to_run_file(run_id, 'crash.json'), 'r') as crash_json:
+                        results = json.loads(crash_json.read())
+                        results['run_id'] = run_id
+                        print("Triage ({score}): {reason} in run {run_id} caused {exception}".format(**results))
+                        print("\t0x{location:02x}: {instruction}".format(**results))
+                except FileNotFoundError:
+                    print("Triage run %s returned %s (no crash file found)" % (run_id, proc.returncode))
+
 
 if __name__ == '__main__':
     main()
