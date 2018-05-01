@@ -322,8 +322,8 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
         }
     }
     
-    call_counts[info->function]++;
     dr_fprintf(STDERR, "<id: %llu%s>\n", call_counts[info->function], functionName);
+    call_counts[info->function]++;
 
     if(info->source != NULL) {
         dr_fprintf(STDERR, "source: %s\n", info->source);
