@@ -197,18 +197,6 @@ VOID strategyAAAA(BYTE *buf, DWORD size) {
 	}
 }
 
-VOID strategyRandByte(BYTE *buf, DWORD size) {
-	std::random_device rd;
-	srand(rd());
-	DWORD random = getRand();
-
-	LOG_F(INFO, "size (%d)", size);
-	DWORD pos = random % size;
-	BYTE mut = rand() % 256;
-
-	buf[pos] = mut;
-}
-
 VOID strategyFlipBit(BYTE *buf, DWORD size) {
 	std::random_device rd;
 	srand(rd());
@@ -252,7 +240,7 @@ VOID strategyRandNBytes(BYTE *buf, DWORD size) {
 	DWORD max = 0;
 	while(max < 1) {
 		// size -> 1, 2, 4, 8
-		rand_size = 2 ** (getRand() % 4);
+		rand_size = pow(2, getRand() % 4);
 		max = (size + 1) - rand_size;
 	}
 
@@ -265,6 +253,64 @@ VOID strategyRandNBytes(BYTE *buf, DWORD size) {
 	for(DWORD i=0; i<rand_size; i++) {
 		BYTE mut = rand() % 256;
 		buf[pos + i] = mut;
+	}
+}
+
+#define VALUES1 -128, -1, 0, 1, 16, 32, 64, 127, 128, 255
+#define VALUES2 -32768, -129, 256, 512, 1000, 1024, 4096, 32767, 65535
+#define VALUES4 -2147483648, -100663046, -32769, 32768, 65536, 100663045, 2147483647, 4294967295
+#define VALUES8  -9151314442816848000, -2147483649, 2147483648, 4294967296, 432345564227567365, 18446744073709551615
+
+VOID strategyKnownValues(BYTE *buf, DWORD size) {
+	UINT8 values1[] = { VALUES1 };
+	UINT16 values2[] = { VALUES1, VALUES2 };
+	UINT32 values4[] = { VALUES1, VALUES2, VALUES4 };
+	UINT64 values8[] = { VALUES1, VALUES2, VALUES4, VALUES8 };
+
+	std::random_device rd;
+	srand(rd());
+
+	DWORD rand_size = 0;
+	DWORD max = 0;
+	while(max < 1) {
+		// size -> 1, 2, 4, 8
+		rand_size = pow(2, getRand() % 4);
+		max = (size + 1) - rand_size;
+	}
+
+	// pos -> zero to ((size + 1) - rand_size)
+	// e.g. buf size is 16, rand_size is 8
+	// max will be from 0 to 9 guaranteeing a 
+	// pos that will fit into the buffer
+	DWORD pos = getRand() % max;
+	BOOL endian = rand() % 2;
+
+	DWORD selection = 0;
+	switch(rand_size) {
+		case 1:
+			selection = getRand() % (sizeof(values1) / sizeof(values1[0]));
+			// nibble endianness, because sim cards
+			values1[selection] = endian ? values1[selection] >> 4 | values1[selection] << 4 : values1[selection];
+			*(UINT8 *)(buf+pos) = values1[selection];
+			break;
+		case 2:
+			selection = getRand() % (sizeof(values2) / sizeof(values2[0]));
+			values2[selection] = endian ? _byteswap_ushort(values2[selection]) : values2[selection];
+			*(UINT16 *)(buf+pos) = values2[selection];
+			break;
+		case 4:
+			selection = getRand() % (sizeof(values4) / sizeof(values4[0]));
+			values4[selection] = endian ? _byteswap_ulong(values4[selection]) : values4[selection];
+			*(UINT32 *)(buf+pos) = values4[selection];
+			break;
+		case 8:
+			selection = getRand() % (sizeof(values8) / sizeof(values8[0]));
+			values8[selection] = endian ? _byteswap_uint64(values8[selection]) : values8[selection];
+			*(UINT64 *)(buf+pos) = values8[selection];
+			break;
+		default:
+			strategyAAAA(buf, size);
+			break;
 	}
 }
 
@@ -286,15 +332,15 @@ DWORD mutate(BYTE *buf, DWORD size) {
 		case 2:
 			strategyRepeatBytes(buf, size);
 			break;
+		case 3:
+			strategyKnownValues(buf, size);
+			break;
 		default: 
 			strategyAAAA(buf, size);
 			break;
 	}
 
-	// rand 2, 4, 8
-
 	// SIZES 1, 2, 4, 8
-		// change SIZE to interesting value
 		// add / sub from SIZE
 		// flip endian of SIZE
 	
