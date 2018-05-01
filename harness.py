@@ -44,8 +44,9 @@ def main():
 
     # Spawn a thread that will run DynamoRIO and wait for the output
     with concurrent.futures.ThreadPoolExecutor(max_workers=config['simultaneous']) as executor:
-        futures = [executor.submit(run_dr, config, False, True) for i in range(config['runs'])]
-        for future in concurrent.futures.as_completed(futures, timeout=None):
+        fuzz_futures = [executor.submit(run_dr, config, False, True) for i in range(config['runs'])]
+        triage_futures = []
+        for future in concurrent.futures.as_completed(fuzz_futures, timeout=None):
             try:
                 proc = future.result()
             except Exception as e:
@@ -56,22 +57,42 @@ def main():
                 for line in str.splitlines(proc.stderr.decode('utf-8')):
                     if 'Beginning fuzzing run' in line:
                         run_id = int(line.replace('Beginning fuzzing run ', '').strip())
-                with open(get_path_to_run_file(run_id, 'fuzz.stdout'), 'wb') as stdoutfile:
-                    if proc.stdout is not None: # TODO: figure out why proc.stdout is always empty
-                        stdoutfile.write(proc.stdout)
-                with open(get_path_to_run_file(run_id, 'fuzz.stderr'), 'wb') as stderrfile:
-                    stderrfile.write(proc.stderr)
+
+                if proc.stdout is not None: # TODO: figure out why proc.stdout is always empty
+                    with open(get_path_to_run_file(run_id, 'fuzz.stdout'), 'wb') as stdoutfile:
+                                stdoutfile.write(proc.stdout)
+                if proc.stderr is not None:
+                    with open(get_path_to_run_file(run_id, 'fuzz.stderr'), 'wb') as stderrfile:
+                        stderrfile.write(proc.stderr)
 
                 if proc.returncode != 0:
                     print('Fuzzing run %s returned %s' % (run_id, proc.returncode))
-                    print("Starting Triage")
-                    completed_process = run_dr({'drrun_path': config['drrun_path'], \
-                                                'drrun_args': config['drrun_args'], \
-                                                'client_path': config['triage_path'], \
-                                                'client_args': ['-r', str(run_id)], \
-                                                'target_application': config['target_application'], \
-                                                'target_args': config['target_args']}, save_stdout=False, save_stderr=False)
-                    print("Triage returned %s" % completed_process.returncode)
+                    triage_config = {'drrun_path': config['drrun_path'], \
+                                    'drrun_args': config['drrun_args'], \
+                                    'client_path': config['triage_path'], \
+                                    'client_args': ['-r', str(run_id)], \
+                                    'target_application': config['target_application'], \
+                                    'target_args': config['target_args']}
+                    triage_future = executor.submit(run_dr, triage_config, True, True)
+                    setattr(triage_future, "run_id", run_id)
+                    triage_futures.append(triage_future)
+
+        for future in concurrent.futures.as_completed(triage_futures, timeout=None):
+            try:
+                proc = future.result()
+            except Exception as e:
+                print('Triage run generated an exception: %s' % (e))
+                traceback.print_exc()
+            else:
+                run_id = future.run_id
+                if proc.stdout is not None:
+                    with open(get_path_to_run_file(run_id, 'triage.stdout'), 'wb') as stdoutfile:
+                        stdoutfile.write(proc.stdout)
+                if proc.stderr is not None:
+                    with open(get_path_to_run_file(run_id, 'triage.stderr'), 'wb') as stderrfile:
+                        stderrfile.write(proc.stderr)
+
+                print("Triage run %s returned %s" % (run_id, proc.returncode))
 
 if __name__ == '__main__':
     main()
