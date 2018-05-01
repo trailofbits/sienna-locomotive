@@ -383,6 +383,9 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
     we also need to find out about stdcall arguments size 
     for the functions we're hooking (so it can clean up)
 
+    for things with file pointers, those need to be updated
+    to the correct position
+
     on the server we need some mapping like below for the
     read / recevied bytes
 
@@ -400,7 +403,8 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
     mapRunIdCommandLine[runId] = strCommandLine;
 
     // set the bytes in mutate
-
+*/
+/*
 static BOOL
 check_cache() {
     std::string target = op_target.get_value();
