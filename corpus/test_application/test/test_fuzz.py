@@ -60,8 +60,11 @@ def main():
 
         cmd = [drrun_path, '-c', fuzzer_path, '-i', functions[test_number], '--', test_application_path, str(test_number), '-f']
 
-        proc = subprocess.Popen(cmd, stderr=subprocess.PIPE)
-        _, err = proc.communicate()
+        proc = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        out, err = proc.communicate()
+        print('out', out)
+        print('err', err)
+        print('========')
         if b'<crash found for run id ' in err:
             print(err)
             break
