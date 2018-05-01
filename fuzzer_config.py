@@ -25,7 +25,7 @@ if not os.path.exists(config_path):
 								'server_path': 'build\\server\\Debug\\server.exe', \
 								'wizard_path': 'build\\wizard\\Debug\\wizard.dll', \
 								'triage_path': 'build\\triage_dynamorio\\Debug\\tracer.dll', \
-								'target_application': 'notepad.exe', \
+								'target_application_path': 'build\\corpus\\test_application\\Debug\\test_application.exe', \
 								'target_args':'', \
 								'runs': 1, \
 								'simultaneous': 1}
@@ -44,7 +44,7 @@ parser.add_argument('-n', '--nopersist', action='store_true', dest='nopersist', 
 parser.add_argument('-p', '--profile', action='store', dest='profile', default='DEFAULT', type=str, help="Pull configuration from a specific section in config.ini. Defaults to DEFAULT")
 parser.add_argument('-r', '--runs', action='store', dest='runs', type=int, help="Number of times to run the target application")
 parser.add_argument('-s', '--simultaneous', action='store', dest='simultaneous', type=int, help="Number of simultaneous instances of the target application that can run")
-parser.add_argument('-t', '--target', action='store', dest='target_application', type=str, help="Path to the target application. Note: Ignores arguments in the config file")
+parser.add_argument('-t', '--target', action='store', dest='target_application_path', type=str, help="Path to the target application. Note: Ignores arguments in the config file")
 parser.add_argument('-a', '--arguments', action='store', dest='target_args', nargs=argparse.REMAINDER, type=str, help="Arguments for the target application (supports multiple, must come last)")
 args = parser.parse_args()
 
@@ -63,7 +63,7 @@ list_options = ['drrun_args', 'client_args', 'target_args']
 for opt in list_options:
 	config[opt] = [] if (len(config[opt]) == 0) else config[opt].split(',')
 
-if args.target_application is not None and len(config['target_args']) > 0:
+if args.target_application_path is not None and len(config['target_args']) > 0:
 	config['target_args'] =  []
 
 if args.verbose:
@@ -79,3 +79,8 @@ if not args.nopersist:
 for arg in vars(args):
 	if getattr(args, arg) is not None:
 		config[arg] = getattr(args, arg)
+
+for key in config:
+	if 'path' in key:
+		if not os.path.exists(config[key]):
+			print("WARNING: {key} = {dest}, which does not exist.".format(key=key, dest=config[key]))
