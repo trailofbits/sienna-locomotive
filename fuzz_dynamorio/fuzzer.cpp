@@ -374,6 +374,76 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
   return true;
 }
 
+/*
+    drwrap_skip_call does not invoke the post function
+    
+    that means we need to cache the return value
+    and properly set all the other variables in the call
+    
+    we also need to find out about stdcall arguments size 
+    for the functions we're hooking (so it can clean up)
+
+    on the server we need some mapping like below for the
+    read / recevied bytes
+
+    run_id ->
+        command_line
+    command_line ->
+        function ->
+            bytes
+
+    std::map<DWORD, std::wstring> mapRunIdCommandLine;
+    std::map<std::wstring, std::map<std::wstring, BYTE *>> mapCommandLineFunctionBytes;
+
+    // set the cache in get run id
+    std::wstring strCommandLine(commandLine);
+    mapRunIdCommandLine[runId] = strCommandLine;
+
+    // set the bytes in mutate
+
+static BOOL
+check_cache() {
+    std::string target = op_target.get_value();
+    if(target == "") {
+        return false;
+    }
+
+    BOOL cached = false;
+    HANDLE h_pipe = CreateFile(
+        L"\\\\.\\pipe\\fuzz_server",
+        GENERIC_READ | GENERIC_WRITE,
+        0,
+        NULL,
+        OPEN_EXISTING,
+        0,
+        NULL);
+
+    if (h_pipe != INVALID_HANDLE_VALUE) {
+        DWORD read_mode = PIPE_READMODE_MESSAGE;
+        SetNamedPipeHandleState(
+            h_pipe,
+            &read_mode,
+            NULL,
+            NULL);
+
+        DWORD bytes_read = 0;
+        DWORD bytes_written = 0;
+
+        BYTE event_id = //TODO;
+        BOOL cached = false;
+
+        WriteFile(h_pipe, &event_id, sizeof(BYTE), &bytes_written, NULL);
+        WriteFile(h_pipe, &run_id, sizeof(DWORD), &bytes_written, NULL);
+        WriteFile(h_pipe, target.c_str(), target.length(), , &bytes_written, NULL);
+        ReadFile(h_pipe, &cached, sizeof(BOOL), &bytes_read, NULL);
+
+        CloseHandle(h_pipe);
+    }
+
+    return cached;
+}
+//*/
+
 struct read_info {
     Function function;
     HANDLE hFile;

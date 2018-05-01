@@ -2,12 +2,14 @@
 #define NOMINMAX
 #include <Windows.h>
 #include <set>
+#include <map>
 #include <unordered_map>
 
 #define LOGURU_IMPLEMENTATION 1
 #include "loguru.hpp"
 
 #define BUFSIZE 100000
+
 #include <ShlObj.h>
 #include <PathCch.h>
 #pragma comment(lib, "Pathcch.lib")
@@ -181,6 +183,14 @@ DWORD generateRunId(HANDLE hPipe) {
 	return 0;
 }
 
+DWORD getRand() {
+	DWORD random = rand();
+	random <<= 15;
+	random |= rand();
+
+	return random;
+}
+
 VOID strategyAAAA(BYTE *buf, DWORD size) {
 	for (DWORD i = 0; i < size; i++) {
 		buf[i] = 'A';
@@ -190,9 +200,7 @@ VOID strategyAAAA(BYTE *buf, DWORD size) {
 VOID strategyRandByte(BYTE *buf, DWORD size) {
 	std::random_device rd;
 	srand(rd());
-	DWORD random = rand();
-	random <<= 15;
-	random |= rand();
+	DWORD random = getRand();
 
 	LOG_F(INFO, "size (%d)", size);
 	DWORD pos = random % size;
@@ -201,8 +209,101 @@ VOID strategyRandByte(BYTE *buf, DWORD size) {
 	buf[pos] = mut;
 }
 
+VOID strategyFlipBit(BYTE *buf, DWORD size) {
+	std::random_device rd;
+	srand(rd());
+
+	DWORD pos = getRand() % size;
+	BYTE byte = buf[pos];
+
+	BYTE mask = 1 << rand() % 8;
+	buf[pos] = byte ^ mask;
+}
+
+VOID strategyRepeatBytes(BYTE *buf, DWORD size) {
+	std::random_device rd;
+	srand(rd());
+
+	// pos -> zero to second to last byte
+	DWORD pos = getRand() % (size - 1);
+
+	// repeat_length -> 1 to (remaining_size - 1)
+	DWORD size_m2 = size - 2;
+	DWORD repeat_length = getRand() % (size_m2 - pos);
+	repeat_length++;
+
+	// set start and end
+	DWORD curr_pos = pos + repeat_length;
+	DWORD end = getRand() % (size - curr_pos);
+	end += curr_pos + 1;
+
+	while(curr_pos < end) {
+		buf[curr_pos] = buf[pos];
+		curr_pos++;
+		pos++;
+	}
+}
+
+VOID strategyRandNBytes(BYTE *buf, DWORD size) {
+	std::random_device rd;
+	srand(rd());
+
+	DWORD rand_size = 0;
+	DWORD max = 0;
+	while(max < 1) {
+		// size -> 1, 2, 4, 8
+		rand_size = 2 ** (getRand() % 4);
+		max = (size + 1) - rand_size;
+	}
+
+	// pos -> zero to ((size + 1) - rand_size)
+	// e.g. buf size is 16, rand_size is 8
+	// max will be from 0 to 9 guanteeing a 
+	// pos that will fit into the buffer
+	DWORD pos = getRand() % max;
+	
+	for(DWORD i=0; i<rand_size; i++) {
+		BYTE mut = rand() % 256;
+		buf[pos + i] = mut;
+	}
+}
+
 DWORD mutate(BYTE *buf, DWORD size) {
-	strategyRandByte(buf, size);
+	// afl for inspiration
+
+	if(size == 0) {
+		return 0;
+	}
+	
+	DWORD choice = getRand() % 3;
+	switch(choice) {
+		case 0:
+			strategyFlipBit(buf, size);
+			break;
+		case 1:
+			strategyRandNBytes(buf, size);
+			break;
+		case 2:
+			strategyRepeatBytes(buf, size);
+			break;
+		default: 
+			strategyAAAA(buf, size);
+			break;
+	}
+
+	// rand 2, 4, 8
+
+	// SIZES 1, 2, 4, 8
+		// change SIZE to interesting value
+		// add / sub from SIZE
+		// flip endian of SIZE
+	
+	// delete bytes
+	// insert bytes
+	// rotate bytes
+
+	// move bytes
+	
 	return 0;
 }
 
