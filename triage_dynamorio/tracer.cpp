@@ -43,6 +43,13 @@ static droption_t<std::string> op_target(
     "target",
     "Specific call to target.");
 
+static droption_t<unsigned int> op_no_taint(
+    DROPTION_SCOPE_CLIENT, 
+    "nt", 
+    0, 
+    "no-taint",
+    "Do not do instruction level instrumentation.");
+
 enum class Function {
     ReadFile,
     recv,
@@ -58,19 +65,19 @@ std::map<Function, UINT64> call_counts;
 char *get_function_name(Function function) {
     switch(function) {
         case Function::ReadFile:
-            return ",ReadFile";
+            return "ReadFile";
         case Function::recv:
-            return ",recv";
+            return "recv";
         case Function::WinHttpReadData:
-            return ",WinHttpReadData";
+            return "WinHttpReadData";
         case Function::InternetReadFile:
-            return ",InternetReadFile";
+            return "InternetReadFile";
         case Function::WinHttpWebSocketReceive:
-            return ",WinHttpWebSocketReceive";
+            return "WinHttpWebSocketReceive";
         case Function::RegQueryValueEx:
-            return ",RegQueryValueEx";
+            return "RegQueryValueEx";
         case Function::ReadEventLog:
-            return ",ReadEventLog";
+            return "ReadEventLog";
     }
 
     return "unknown";
@@ -624,9 +631,14 @@ event_thread_exit(void *drcontext)
 static void
 event_exit_trace(void)
 {
+    if(!op_no_taint.get_value()) {
+        if(!drmgr_unregister_bb_insertion_event(event_app_instruction)) {
+            DR_ASSERT(false);
+        }
+    }
+
     if (!drmgr_unregister_thread_init_event(event_thread_init) ||
         !drmgr_unregister_thread_exit_event(event_thread_exit) ||
-        !drmgr_unregister_bb_insertion_event(event_app_instruction) ||
         drreg_exit() != DRREG_SUCCESS)
     {
         DR_ASSERT(false);
@@ -1176,19 +1188,14 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
     Function function = ((read_info *)user_data)->function;
     free(user_data);
 
-    BOOL targeted = true;
+    
+    BOOL targeted = false;
     std::string target = op_target.get_value();
-    CHAR *functionName = get_function_name(function);
-
-    if(target != "") {
-        targeted = false;
-        if(target.find(functionName) != std::string::npos) {
-            char *end;
-            UINT64 num = strtoull(target.c_str(), &end, 10);
-            if(call_counts[function] == num) {
-                targeted = true;
-            }
-        }
+    
+    char *end;
+    UINT64 num = strtoull(target.c_str(), &end, 10);
+    if(call_counts[function] == num) {
+        targeted = true;
     }
 
     call_counts[function]++;
@@ -1261,6 +1268,13 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     std::map<char *, PREPROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
+        
+        std::string target = op_target.get_value();
+        std::string strFunctionName(functionName);
+        if(target != "" && target.find("," + strFunctionName) == std::string::npos) {
+            continue;
+        }
+
         void(__cdecl *hookFunctionPre)(void *, void **);
         hookFunctionPre = it->second;
         void(__cdecl *hookFunctionPost)(void *, void *);
@@ -1324,12 +1338,19 @@ void tracer(client_id_t id, int argc, const char *argv[]) {
     mutatex = dr_mutex_create();
     dr_register_exit_event(event_exit_trace);
 
+    if(!op_no_taint.get_value()) {
+        if(!drmgr_register_bb_instrumentation_event(
+                                                NULL,
+                                                 event_app_instruction,
+                                                 NULL)) 
+        {
+            DR_ASSERT(false);
+        }
+    }
+
     if (!drmgr_register_module_load_event(module_load_event) ||
         !drmgr_register_thread_init_event(event_thread_init) ||
         !drmgr_register_thread_exit_event(event_thread_exit) ||
-        !drmgr_register_bb_instrumentation_event(NULL,
-                                                 event_app_instruction,
-                                                 NULL) ||
         !drmgr_register_exception_event(onexception)) 
     {
         DR_ASSERT(false);
@@ -1345,6 +1366,12 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
     int last_idx = 0;
     if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
         dr_fprintf(STDERR, "Usage error: %s", parse_err.c_str());
+        dr_abort();
+    }
+
+    std::string target = op_target.get_value();
+    if(target == "") {
+        dr_fprintf(STDERR, "ERROR: arg -t (target) required");
         dr_abort();
     }
 
