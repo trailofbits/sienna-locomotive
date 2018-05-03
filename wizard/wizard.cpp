@@ -91,7 +91,7 @@ struct read_info {
     LPVOID lpBuffer;
     DWORD nNumberOfBytesToRead;
     Function function;
-    char *source;
+    TCHAR *source;
     DWORD position;
 };
 

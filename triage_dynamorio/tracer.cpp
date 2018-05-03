@@ -43,6 +43,20 @@ static droption_t<std::string> op_target(
     "target",
     "Specific call to target.");
 
+static droption_t<std::string> op_include(
+    DROPTION_SCOPE_CLIENT, 
+    "i", 
+    "", 
+    "include",
+    "Functions to be included in hooking.");
+
+static droption_t<unsigned int> op_no_taint(
+    DROPTION_SCOPE_CLIENT, 
+    "nt", 
+    0, 
+    "no-taint",
+    "Do not do instruction level instrumentation.");
+
 enum class Function {
     ReadFile,
     recv,
@@ -234,6 +248,7 @@ taint_mem(app_pc addr, uint size) {
     for(uint i=0; i<size; i++) {
         tainted_mems.insert(addr+i);
     }
+    dr_fprintf(STDERR, "tainted_mems size: %d\n", tainted_mems.size());
 }
 
 static bool
@@ -624,6 +639,12 @@ event_thread_exit(void *drcontext)
 static void
 event_exit_trace(void)
 {
+    if(!op_no_taint.get_value()) {
+        if(!drmgr_unregister_bb_insertion_event(event_app_instruction)) {
+            DR_ASSERT(false);
+        }
+    }
+
     if (!drmgr_unregister_thread_init_event(event_thread_init) ||
         !drmgr_unregister_thread_exit_event(event_thread_exit) ||
         !drmgr_unregister_bb_insertion_event(event_app_instruction) ||
@@ -1261,6 +1282,12 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     std::map<char *, PREPROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
+        std::string include = op_include.get_value();
+
+        if(include != "" && include.find(functionName) == std::string::npos) {
+            continue;
+        }
+
         void(__cdecl *hookFunctionPre)(void *, void **);
         hookFunctionPre = it->second;
         void(__cdecl *hookFunctionPost)(void *, void *);
@@ -1324,12 +1351,19 @@ void tracer(client_id_t id, int argc, const char *argv[]) {
     mutatex = dr_mutex_create();
     dr_register_exit_event(event_exit_trace);
 
+    if(!op_no_taint.get_value()) {
+        if(!drmgr_register_bb_instrumentation_event(
+                                                NULL,
+                                                 event_app_instruction,
+                                                 NULL)) 
+        {
+            DR_ASSERT(false);
+        }
+    }
+
     if (!drmgr_register_module_load_event(module_load_event) ||
         !drmgr_register_thread_init_event(event_thread_init) ||
         !drmgr_register_thread_exit_event(event_thread_exit) ||
-        !drmgr_register_bb_instrumentation_event(NULL,
-                                                 event_app_instruction,
-                                                 NULL) ||
         !drmgr_register_exception_event(onexception)) 
     {
         DR_ASSERT(false);

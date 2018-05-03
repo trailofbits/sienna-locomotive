@@ -128,7 +128,7 @@ HANDLE getPipe() {
     HANDLE hPipe;
     while (1) {
         hPipe = CreateFile(
-            "\\\\.\\pipe\\fuzz_server",
+            L"\\\\.\\pipe\\fuzz_server",
             GENERIC_READ | GENERIC_WRITE,
             0,
             NULL,
@@ -148,7 +148,7 @@ HANDLE getPipe() {
             dr_exit_process(1);
         }
 
-        if (!WaitNamedPipe("\\\\.\\pipe\\fuzz_server", 5000)) {
+        if (!WaitNamedPipe(L"\\\\.\\pipe\\fuzz_server", 5000)) {
             dr_log(NULL, LOG_ALL, ERROR, "Could not connect, timeout");
             dr_fprintf(STDERR, "Could not connect, timeout\n", err);
             dr_exit_process(1);
@@ -208,26 +208,12 @@ get_target_command_line() {
     WCHAR * commandLineContents = (WCHAR *)dr_global_alloc(parameterBlock.CommandLine.Length);
     char * mbsCommandLineContents;
 
-    if (dr_safe_read(parameterBlock.CommandLine.Buffer, parameterBlock.CommandLine.Length, commandLineContents, &byte_counter)) {
-        size_t outSize = 0;
-        if(wcstombs_s(&outSize, NULL, 0, commandLineContents, parameterBlock.CommandLine.Length)) {
-            dr_log(NULL, LOG_ALL, ERROR, "Could not get length of command line");
-            dr_exit_process(1);
-        }
-
-        mbsCommandLineContents = (char *)dr_global_alloc(outSize);
-        if(wcstombs_s(&byte_counter, mbsCommandLineContents, outSize, commandLineContents, parameterBlock.CommandLine.Length)) {
-            dr_log(NULL, LOG_ALL, ERROR, "Could not convert command line");
-            dr_exit_process(1);
-        }
-
-        dr_global_free(commandLineContents, parameterBlock.CommandLine.Length);
-    } else {
+    if (!dr_safe_read(parameterBlock.CommandLine.Buffer, parameterBlock.CommandLine.Length, commandLineContents, &byte_counter)) {
         dr_log(NULL, LOG_ALL, ERROR, "Could not read command line buffer");
         dr_exit_process(1);
     }
 
-  return mbsCommandLineContents;
+  return commandLineContents;
 }
 
 static bool
@@ -239,64 +225,64 @@ onexception(void *drcontext, dr_exception_t *excpt) {
 
     switch (exceptionCode){
         case EXCEPTION_ACCESS_VIOLATION:
-            dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_ACCESS_VIOLATION");
+            dr_fprintf(STDERR, "EXCEPTION_ACCESS_VIOLATION\n");
             break;
         case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
-            dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_ARRAY_BOUNDS_EXCEEDED");
+            dr_fprintf(STDERR, "EXCEPTION_ARRAY_BOUNDS_EXCEEDED\n");
             break;
         case EXCEPTION_BREAKPOINT:
-            dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_BREAKPOINT");
+            dr_fprintf(STDERR, "EXCEPTION_BREAKPOINT\n");
             break;
         case EXCEPTION_DATATYPE_MISALIGNMENT:
-            dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_DATATYPE_MISALIGNMENT");
+            dr_fprintf(STDERR, "EXCEPTION_DATATYPE_MISALIGNMENT\n");
             break;
         case EXCEPTION_FLT_DENORMAL_OPERAND:
-            dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_FLT_DENORMAL_OPERAND");
+            dr_fprintf(STDERR, "EXCEPTION_FLT_DENORMAL_OPERAND\n");
             break;
         case EXCEPTION_FLT_DIVIDE_BY_ZERO:
-            dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_FLT_DIVIDE_BY_ZERO");
+            dr_fprintf(STDERR, "EXCEPTION_FLT_DIVIDE_BY_ZERO\n");
             break;
         case EXCEPTION_FLT_INEXACT_RESULT:
-            dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_FLT_INEXACT_RESULT");
+            dr_fprintf(STDERR, "EXCEPTION_FLT_INEXACT_RESULT\n");
             break;
         case EXCEPTION_FLT_INVALID_OPERATION:
-            dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_FLT_INVALID_OPERATION");
+            dr_fprintf(STDERR, "EXCEPTION_FLT_INVALID_OPERATION\n");
             break;
         case EXCEPTION_FLT_OVERFLOW:
-            dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_FLT_OVERFLOW");
+            dr_fprintf(STDERR, "EXCEPTION_FLT_OVERFLOW\n");
             break;
         case EXCEPTION_FLT_STACK_CHECK:
-            dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_FLT_STACK_CHECK");
+            dr_fprintf(STDERR, "EXCEPTION_FLT_STACK_CHECK\n");
             break;
         case EXCEPTION_FLT_UNDERFLOW:
-            dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_FLT_UNDERFLOW");
+            dr_fprintf(STDERR, "EXCEPTION_FLT_UNDERFLOW\n");
             break;
         case EXCEPTION_ILLEGAL_INSTRUCTION:
-            dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_ILLEGAL_INSTRUCTION");
+            dr_fprintf(STDERR, "EXCEPTION_ILLEGAL_INSTRUCTION\n");
             break;
         case EXCEPTION_IN_PAGE_ERROR:
-            dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_IN_PAGE_ERROR");
+            dr_fprintf(STDERR, "EXCEPTION_IN_PAGE_ERROR\n");
             break;
         case EXCEPTION_INT_DIVIDE_BY_ZERO:
-            dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_INT_DIVIDE_BY_ZERO");
+            dr_fprintf(STDERR, "EXCEPTION_INT_DIVIDE_BY_ZERO\n");
             break;
         case EXCEPTION_INT_OVERFLOW:
-            dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_INT_OVERFLOW");
+            dr_fprintf(STDERR, "EXCEPTION_INT_OVERFLOW\n");
             break;
         case EXCEPTION_INVALID_DISPOSITION:
-            dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_INVALID_DISPOSITION");
+            dr_fprintf(STDERR, "EXCEPTION_INVALID_DISPOSITION\n");
             break;
         case EXCEPTION_NONCONTINUABLE_EXCEPTION:
-            dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_NONCONTINUABLE_EXCEPTION");
+            dr_fprintf(STDERR, "EXCEPTION_NONCONTINUABLE_EXCEPTION\n");
             break;
         case EXCEPTION_PRIV_INSTRUCTION:
-            dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_PRIV_INSTRUCTION");
+            dr_fprintf(STDERR, "EXCEPTION_PRIV_INSTRUCTION\n");
             break;
         case EXCEPTION_SINGLE_STEP:
-            dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_SINGLE_STEP");
+            dr_fprintf(STDERR, "EXCEPTION_SINGLE_STEP\n");
             break;
         case EXCEPTION_STACK_OVERFLOW:
-            dr_log(NULL, LOG_ALL, ERROR, "EXCEPTION_STACK_OVERFLOW");
+            dr_fprintf(STDERR, "EXCEPTION_STACK_OVERFLOW\n");
             break;
         default:
             break;
@@ -339,6 +325,8 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
             dr_log(NULL, LOG_ALL, ERROR, "Pathsize %d is out of bounds\n", pathSize);
             return false;
         }
+
+        dr_fprintf(STDERR, "FILE PATH: %s\n", filePath);
     }
 
     
@@ -385,6 +373,8 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
 
     for things with file pointers, those need to be updated
     to the correct position
+
+    make getlasterror work as expected
 
     on the server we need some mapping like below for the
     read / recevied bytes
@@ -457,6 +447,20 @@ struct read_info {
     DWORD64 position;
 };
 
+
+/*
+    BOOL ReadEventLog(
+      _In_  HANDLE hEventLog,
+      _In_  DWORD  dwReadFlags,
+      _In_  DWORD  dwRecordOffset,
+      _Out_ LPVOID lpBuffer,
+      _In_  DWORD  nNumberOfBytesToRead,
+      _Out_ DWORD  *pnBytesRead,
+      _Out_ DWORD  *pnMinNumberOfBytesNeeded
+    );
+
+    Return: If the function succeeds, the return value is nonzero.
+*/
 static void
 wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
     dr_fprintf(STDERR, "<in wrap_pre_ReadEventLog>\n");
@@ -478,6 +482,18 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
 }
 
 
+/*
+    LONG WINAPI RegQueryValueEx(
+      _In_        HKEY    hKey,
+      _In_opt_    LPCTSTR lpValueName,
+      _Reserved_  LPDWORD lpReserved,
+      _Out_opt_   LPDWORD lpType,
+      _Out_opt_   LPBYTE  lpData,
+      _Inout_opt_ LPDWORD lpcbData
+    );
+
+    Return: If the function succeeds, the return value is ERROR_SUCCESS.
+*/
 static void
 wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
     dr_fprintf(STDERR, "<in wrap_pre_RegQueryValueEx>\n");
@@ -501,6 +517,18 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
     }
 }
 
+
+/*
+    DWORD WINAPI WinHttpWebSocketReceive(
+      _In_  HINTERNET                      hWebSocket,
+      _Out_ PVOID                          pvBuffer,
+      _In_  DWORD                          dwBufferLength,
+      _Out_ DWORD                          *pdwBytesRead,
+      _Out_ WINHTTP_WEB_SOCKET_BUFFER_TYPE *peBufferType
+    );
+
+    Return: NO_ERROR on success. Otherwise an error code.
+*/
 static void
 wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
     dr_fprintf(STDERR, "<in wrap_pre_WinHttpWebSocketReceive>\n");
@@ -524,6 +552,16 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->position = 0;
 }
 
+/*
+    BOOL InternetReadFile(
+      _In_  HINTERNET hFile,
+      _Out_ LPVOID    lpBuffer,
+      _In_  DWORD     dwNumberOfBytesToRead,
+      _Out_ LPDWORD   lpdwNumberOfBytesRead
+    );
+
+    Return: Returns TRUE if successful
+*/
 static void
 wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
     dr_fprintf(STDERR, "<in wrap_pre_InternetReadFile>\n");
@@ -545,6 +583,16 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->position = 0;
 }
 
+/*
+    BOOL WINAPI WinHttpReadData(
+      _In_  HINTERNET hRequest,
+      _Out_ LPVOID    lpBuffer,
+      _In_  DWORD     dwNumberOfBytesToRead,
+      _Out_ LPDWORD   lpdwNumberOfBytesRead
+    );
+
+    Return: Returns TRUE if successful
+*/
 static void
 wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
     dr_fprintf(STDERR, "<in wrap_pre_WinHttpReadData>\n");
@@ -566,6 +614,17 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->position = 0;
 }
 
+
+/*
+    int recv(
+      _In_  SOCKET s,
+      _Out_ char   *buf,
+      _In_  int    len,
+      _In_  int    flags
+    );
+
+    Return: recv returns the number of bytes received
+*/
 static void
 wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
     dr_fprintf(STDERR, "<in wrap_pre_recv>\n");
@@ -583,8 +642,17 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->position = 0;
 }
 
-/* from wrap.cpp sample code. Runs before ReadFile is called. Records arguments to
-   ReadFile and stores them in probably thread-unsafe variables above. */
+/* 
+    BOOL WINAPI ReadFile(
+      _In_        HANDLE       hFile,
+      _Out_       LPVOID       lpBuffer,
+      _In_        DWORD        nNumberOfBytesToRead,
+      _Out_opt_   LPDWORD      lpNumberOfBytesRead,
+      _Inout_opt_ LPOVERLAPPED lpOverlapped
+    );
+
+    Return: If the function succeeds, the return value is nonzero (TRUE).
+*/
 static void
 wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     HANDLE hFile = drwrap_get_arg(wrapcxt, 0);
@@ -746,7 +814,11 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
     //TODO: support multiple passes over one binary without re-running drrun
 
     HANDLE hPipe = getPipe();
-    runId = getRunID(hPipe, dr_get_application_name(), get_target_command_line());
+    const char* mbsAppName = dr_get_application_name();
+    TCHAR wcsAppName[MAX_PATH];
+    mbstowcs(wcsAppName, mbsAppName, MAX_PATH);
+
+    runId = getRunID(hPipe, wcsAppName, get_target_command_line());
     CloseHandle(hPipe);
 
     drmgr_init();

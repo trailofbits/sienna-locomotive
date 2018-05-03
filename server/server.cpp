@@ -607,6 +607,7 @@ DWORD handleMutation(HANDLE hPipe) {
 	}
 
 	filePath[pathSize] = 0;
+	LOG_F(INFO, "file path: %s\n", filePath);
 
 	DWORD64 position = 0;
 	if (!ReadFile(hPipe, &position, sizeof(DWORD64), &dwBytesRead, NULL)) {
@@ -691,6 +692,8 @@ DWORD handleReplay(HANDLE hPipe) {
 		LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
 		exit(1);
 	}
+
+	LOG_F(INFO, "Replaying for run id %d", runId);
 
 	DWORD mutateCount = 0;
 	
