@@ -381,7 +381,14 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
         // TODO: this is flawed
         // 1. InternetReadFile contains ReadFile
         // 2. RegQueryValueEx does not contain RegQueryValueExW
-        if(include != "" && include.find(functionName) == std::string::npos) {
+        std::string target = op_target.get_value();
+        std::string strFunctionName(functionName);
+        if(target != "" && target.find("," + strFunctionName) == std::string::npos) {
+            continue;
+        }
+
+        bool contains = include.find(functionName) == 0 || include.find("," + strFunctionName) != std::string::npos;
+        if(include != "" && !contains) {
             continue;
         }
 

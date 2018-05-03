@@ -32,14 +32,6 @@ static void *max_lock; /* sync writes to max_ReadFile */
 
 static BOOL mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size);
 
-
-static droption_t<std::string> op_include(
-    DROPTION_SCOPE_CLIENT, 
-    "i", 
-    "", 
-    "include",
-    "Functions to be included in hooking.");
-
 static droption_t<std::string> op_target(
     DROPTION_SCOPE_CLIENT, 
     "t", 
@@ -66,19 +58,19 @@ std::map<Function, UINT64> call_counts;
 char *get_function_name(Function function) {
     switch(function) {
         case Function::ReadFile:
-            return ",ReadFile";
+            return "ReadFile";
         case Function::recv:
-            return ",recv";
+            return "recv";
         case Function::WinHttpReadData:
-            return ",WinHttpReadData";
+            return "WinHttpReadData";
         case Function::InternetReadFile:
-            return ",InternetReadFile";
+            return "InternetReadFile";
         case Function::WinHttpWebSocketReceive:
-            return ",WinHttpWebSocketReceive";
+            return "WinHttpWebSocketReceive";
         case Function::RegQueryValueEx:
-            return ",RegQueryValueEx";
+            return "RegQueryValueEx";
         case Function::ReadEventLog:
-            return ",ReadEventLog";
+            return "ReadEventLog";
     }
 
     return "unknown";
@@ -691,19 +683,12 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     DWORD64 position = info->position;
     free(user_data);
 
-    BOOL targeted = true;
+    BOOL targeted = false;
     std::string target = op_target.get_value();
-    CHAR *functionName = get_function_name(function);
-
-    if(target != "") {
-        targeted = false;
-        if(target.find(functionName) != std::string::npos) {
-            char *end;
-            UINT64 num = strtoull(target.c_str(), &end, 10);
-            if(call_counts[function] == num) {
-                targeted = true;
-            }
-        }
+    char *end;
+    UINT64 num = strtoull(target.c_str(), &end, 10);
+    if(call_counts[function] == num) {
+        targeted = true;
     }
 
     call_counts[function]++;
@@ -749,9 +734,10 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     std::map<char *, PREPROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
-        std::string include = op_include.get_value();
-
-        if(include != "" && include.find(functionName) == std::string::npos) {
+        
+        std::string target = op_target.get_value();
+        std::string strFunctionName(functionName);
+        if(target != "" && target.find("," + strFunctionName) == std::string::npos) {
             continue;
         }
 
@@ -800,6 +786,12 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
     int last_idx = 0;
     if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
         dr_fprintf(STDERR, "Usage error: %s", parse_err.c_str());
+        dr_abort();
+    }
+
+    std::string target = op_target.get_value();
+    if(target == "") {
+        dr_fprintf(STDERR, "ERROR: arg -t (target) required");
         dr_abort();
     }
 
