@@ -215,15 +215,15 @@ is_tainted(void *drcontext, opnd_t opnd)
             reg_id_t reg_disp = opnd_get_disp(opnd);
             reg_id_t reg_indx = opnd_get_index(opnd);
 
-            if(reg_base != NULL && tainted_regs.find(reg_base) != tainted_regs.end()) {
+            if(reg_base != NULL && tainted_regs.find(reg_to_full_width64(reg_base)) != tainted_regs.end()) {
                 return true;
             }
 
-            if(reg_disp != NULL && tainted_regs.find(reg_disp) != tainted_regs.end()) {
+            if(reg_disp != NULL && tainted_regs.find(reg_to_full_width64(reg_disp)) != tainted_regs.end()) {
                 return true;
             }
             
-            if (reg_indx != NULL && tainted_regs.find(reg_indx) != tainted_regs.end()) {
+            if (reg_indx != NULL && tainted_regs.find(reg_to_full_width64(reg_indx)) != tainted_regs.end()) {
                 return true;
             }
         }
@@ -340,8 +340,8 @@ handle_xor(void *drcontext, instr_t *instr) {
         opnd_t opnd_1 = instr_get_src(instr, 1);
 
         if(opnd_is_reg(opnd_0) && opnd_is_reg(opnd_1)) {
-            reg_id_t reg_0 = opnd_get_reg(opnd_0);
-            reg_id_t reg_1 = opnd_get_reg(opnd_1);
+            reg_id_t reg_0 = reg_to_full_width64(opnd_get_reg(opnd_0));
+            reg_id_t reg_1 = reg_to_full_width64(opnd_get_reg(opnd_1));
 
             if(reg_0 == reg_1) {
                 size_t n = tainted_regs.erase(reg_0);
@@ -420,8 +420,8 @@ handle_xchg(void *drcontext, instr_t *instr) {
         opnd_t opnd_1 = instr_get_src(instr, 1);
 
         if(opnd_is_reg(opnd_0) && opnd_is_reg(opnd_1)) {
-            reg_id_t reg_0 = opnd_get_reg(opnd_0);
-            reg_id_t reg_1 = opnd_get_reg(opnd_1);
+            reg_id_t reg_0 = reg_to_full_width64(opnd_get_reg(opnd_0));
+            reg_id_t reg_1 = reg_to_full_width64(opnd_get_reg(opnd_1));
 
 
             bool reg_0_tainted = tainted_regs.find(reg_0) != tainted_regs.end();
@@ -490,7 +490,7 @@ handle_branches(void *drcontext, instr_t *instr) {
             opnd_t opnd = instr_get_src(instr, i);
 
             if(opnd_is_reg(opnd)) {
-                reg_id_t reg = opnd_get_reg(opnd);
+                reg_id_t reg = reg_to_full_width64(opnd_get_reg(opnd));
                 if(reg != reg_stack && tainted_regs.find(reg) != tainted_regs.end()) {
                     // taint pc
                     tainted_regs.insert(reg_pc);
@@ -556,6 +556,10 @@ handle_specific(void *drcontext, instr_t *instr) {
 static void
 propagate_taint(app_pc pc) 
 {
+    if(tainted_mems.size() == 0 && tainted_regs.size() == 0) {
+        return;
+    }
+    
     void *drcontext = dr_get_current_drcontext();
     instr_t instr;
     instr_init(drcontext, &instr);
@@ -568,6 +572,7 @@ propagate_taint(app_pc pc)
     // }
 
     if(handle_specific(drcontext, &instr)) {
+        instr_free(drcontext, &instr);
         return;
     }
 
@@ -595,6 +600,8 @@ propagate_taint(app_pc pc)
     if(tainted | untainted) {
         int opcode = instr_get_opcode(&instr);
     }
+
+    instr_free(drcontext, &instr);
 }
 
 static dr_emit_flags_t
@@ -952,6 +959,8 @@ onexception(void *drcontext, dr_exception_t *excpt) {
     }
 
     instr_t instr;
+    // TODO: this isn't instr_freed because of all the early returns
+    // it shouldn't hurt though
     instr_init(drcontext, &instr);
     decode(drcontext, exception_address, &instr);
     char buf[100];
@@ -1303,9 +1312,9 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
             bool ok = drwrap_wrap(towrap, hookFunctionPre, hookFunctionPost);
             // bool ok = false;
             if (ok) {
-                dr_fprintf(STDERR, "<wrapped %s @ 0x%p\n", functionName, towrap);
+                dr_fprintf(STDERR, "<wrapped %s @ 0x%p>\n", functionName, towrap);
             } else {
-                dr_fprintf(STDERR, "<FAILED to wrap %s @ 0x%p: already wrapped?\n", functionName, towrap);
+                dr_fprintf(STDERR, "<FAILED to wrap %s @ 0x%p: already wrapped?>\n", functionName, towrap);
             }
         }
     }
@@ -1318,8 +1327,8 @@ static droption_t<unsigned int> op_replay
 
 void tracer(client_id_t id, int argc, const char *argv[]) {
     drreg_options_t ops = {sizeof(ops), 3, false};
-    dr_set_client_name("DynamoRIO Sample Client 'instrace'",
-                       "http://dynamorio.org/issues");
+    dr_set_client_name("Tracer",
+                       "https://github.com/trailofbits/sienna-locomotive");
 
     if (!drmgr_init() || drreg_init(&ops) != DRREG_SUCCESS || !drwrap_init())
         DR_ASSERT(false);
