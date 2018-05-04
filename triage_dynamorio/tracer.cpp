@@ -959,6 +959,8 @@ onexception(void *drcontext, dr_exception_t *excpt) {
     }
 
     instr_t instr;
+    // TODO: this isn't instr_freed because of all the early returns
+    // it shouldn't hurt though
     instr_init(drcontext, &instr);
     decode(drcontext, exception_address, &instr);
     char buf[100];
@@ -1325,8 +1327,8 @@ static droption_t<unsigned int> op_replay
 
 void tracer(client_id_t id, int argc, const char *argv[]) {
     drreg_options_t ops = {sizeof(ops), 3, false};
-    dr_set_client_name("DynamoRIO Sample Client 'instrace'",
-                       "http://dynamorio.org/issues");
+    dr_set_client_name("Tracer",
+                       "https://github.com/trailofbits/sienna-locomotive");
 
     if (!drmgr_init() || drreg_init(&ops) != DRREG_SUCCESS || !drwrap_init())
         DR_ASSERT(false);
