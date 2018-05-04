@@ -215,15 +215,15 @@ is_tainted(void *drcontext, opnd_t opnd)
             reg_id_t reg_disp = opnd_get_disp(opnd);
             reg_id_t reg_indx = opnd_get_index(opnd);
 
-            if(reg_base != NULL && tainted_regs.find(reg_base) != tainted_regs.end()) {
+            if(reg_base != NULL && tainted_regs.find(reg_to_full_width64(reg_base)) != tainted_regs.end()) {
                 return true;
             }
 
-            if(reg_disp != NULL && tainted_regs.find(reg_disp) != tainted_regs.end()) {
+            if(reg_disp != NULL && tainted_regs.find(reg_to_full_width64(reg_disp)) != tainted_regs.end()) {
                 return true;
             }
             
-            if (reg_indx != NULL && tainted_regs.find(reg_indx) != tainted_regs.end()) {
+            if (reg_indx != NULL && tainted_regs.find(reg_to_full_width64(reg_indx)) != tainted_regs.end()) {
                 return true;
             }
         }
@@ -340,8 +340,8 @@ handle_xor(void *drcontext, instr_t *instr) {
         opnd_t opnd_1 = instr_get_src(instr, 1);
 
         if(opnd_is_reg(opnd_0) && opnd_is_reg(opnd_1)) {
-            reg_id_t reg_0 = opnd_get_reg(opnd_0);
-            reg_id_t reg_1 = opnd_get_reg(opnd_1);
+            reg_id_t reg_0 = reg_to_full_width64(opnd_get_reg(opnd_0));
+            reg_id_t reg_1 = reg_to_full_width64(opnd_get_reg(opnd_1));
 
             if(reg_0 == reg_1) {
                 size_t n = tainted_regs.erase(reg_0);
@@ -420,8 +420,8 @@ handle_xchg(void *drcontext, instr_t *instr) {
         opnd_t opnd_1 = instr_get_src(instr, 1);
 
         if(opnd_is_reg(opnd_0) && opnd_is_reg(opnd_1)) {
-            reg_id_t reg_0 = opnd_get_reg(opnd_0);
-            reg_id_t reg_1 = opnd_get_reg(opnd_1);
+            reg_id_t reg_0 = reg_to_full_width64(opnd_get_reg(opnd_0));
+            reg_id_t reg_1 = reg_to_full_width64(opnd_get_reg(opnd_1));
 
 
             bool reg_0_tainted = tainted_regs.find(reg_0) != tainted_regs.end();
@@ -490,7 +490,7 @@ handle_branches(void *drcontext, instr_t *instr) {
             opnd_t opnd = instr_get_src(instr, i);
 
             if(opnd_is_reg(opnd)) {
-                reg_id_t reg = opnd_get_reg(opnd);
+                reg_id_t reg = reg_to_full_width64(opnd_get_reg(opnd));
                 if(reg != reg_stack && tainted_regs.find(reg) != tainted_regs.end()) {
                     // taint pc
                     tainted_regs.insert(reg_pc);
