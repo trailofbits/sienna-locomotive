@@ -556,6 +556,10 @@ handle_specific(void *drcontext, instr_t *instr) {
 static void
 propagate_taint(app_pc pc) 
 {
+    if(tainted_mems.size() == 0 && tainted_regs.size() == 0) {
+        return;
+    }
+    
     void *drcontext = dr_get_current_drcontext();
     instr_t instr;
     instr_init(drcontext, &instr);
@@ -568,6 +572,7 @@ propagate_taint(app_pc pc)
     // }
 
     if(handle_specific(drcontext, &instr)) {
+        instr_free(drcontext, &instr);
         return;
     }
 
@@ -595,6 +600,8 @@ propagate_taint(app_pc pc)
     if(tainted | untainted) {
         int opcode = instr_get_opcode(&instr);
     }
+
+    instr_free(drcontext, &instr);
 }
 
 static dr_emit_flags_t
@@ -1303,9 +1310,9 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
             bool ok = drwrap_wrap(towrap, hookFunctionPre, hookFunctionPost);
             // bool ok = false;
             if (ok) {
-                dr_fprintf(STDERR, "<wrapped %s @ 0x%p\n", functionName, towrap);
+                dr_fprintf(STDERR, "<wrapped %s @ 0x%p>\n", functionName, towrap);
             } else {
-                dr_fprintf(STDERR, "<FAILED to wrap %s @ 0x%p: already wrapped?\n", functionName, towrap);
+                dr_fprintf(STDERR, "<FAILED to wrap %s @ 0x%p: already wrapped?>\n", functionName, towrap);
             }
         }
     }
