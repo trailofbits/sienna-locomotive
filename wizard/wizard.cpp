@@ -62,6 +62,7 @@ enum class Function {
     WinHttpWebSocketReceive,
     RegQueryValueEx,
     ReadEventLog,
+    fread,
 };
 
 std::map<Function, UINT64> call_counts;
@@ -82,6 +83,8 @@ char *get_function_name(Function function) {
             return ",RegQueryValueEx";
         case Function::ReadEventLog:
             return ",ReadEventLog";
+        case Function::fread:
+            return ",fread";
     }
 
     return "unknown";
@@ -249,50 +252,69 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->position = SetFilePointer(hFile, 0, NULL, FILE_CURRENT);
 }
 
+static void
+wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
+    dr_fprintf(STDERR, "<in wrap_pre_fread>\n");
+    void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
+    size_t size = (size_t)drwrap_get_arg(wrapcxt, 1);
+    size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
+
+    *user_data = malloc(sizeof(read_info));
+    ((read_info *)*user_data)->lpBuffer = buffer;
+    ((read_info *)*user_data)->nNumberOfBytesToRead = size * count;
+    ((read_info *)*user_data)->function = Function::fread;
+    ((read_info *)*user_data)->source = NULL;
+    ((read_info *)*user_data)->position = NULL;
+}
+
 static void 
 hex_dump(LPVOID lpBuffer, DWORD nNumberOfBytesToRead) {
     DWORD size = nNumberOfBytesToRead > 256 ? 256 : nNumberOfBytesToRead;
+    file_t dumpFile = dr_open_file("C:\\Users\\dgoddard\\out.txt", DR_FILE_WRITE_APPEND);
+
+    DWORD bytesWritten;
     for(DWORD i = 0; i < size; i++) {
         BYTE ch = ((BYTE *)lpBuffer)[i];
 
         if(i % 16 == 0) {
             if(i != 0) {
-                dr_fprintf(STDERR, "|");
+                dr_fprintf(dumpFile, "|");
                 for(DWORD j = i - 16; j < i; j++) {
                     BYTE pch = ((BYTE *)lpBuffer)[j];
                     if(pch > 0x1f && pch < 0x7f) {
-                        dr_fprintf(STDERR, "%c", pch);
+                        dr_fprintf(dumpFile, "%c", pch);
                     } else {
-                        dr_fprintf(STDERR, ".");
+                        dr_fprintf(dumpFile, ".");
                     }
                 }
-                dr_fprintf(STDERR, "\n");
+                dr_fprintf(dumpFile, "\n");
             }
-            dr_fprintf(STDERR, "%4d | ", i);
+            dr_fprintf(dumpFile, "%4d | ", i);
 
         }
-        dr_fprintf(STDERR, "%02X ", ch);
+        dr_fprintf(dumpFile, "%02X ", ch);
     }
 
     DWORD i = size;
     while(i % 16 != 0) {
-        dr_fprintf(STDERR, "   ");
+        dr_fprintf(dumpFile, "   ");
         i++;
     }
 
     if(i != 0) {
-        dr_fprintf(STDERR, "|");
+        dr_fprintf(dumpFile, "|");
         for(DWORD j = i - 16; j < i && j < size; j++) {
             BYTE pch = ((BYTE *)lpBuffer)[j];
             if(pch > 0x1f && pch < 0x7f) {
-                dr_fprintf(STDERR, "%c", pch);
+                dr_fprintf(dumpFile, "%c", pch);
             } else {
-                dr_fprintf(STDERR, ".");
+                dr_fprintf(dumpFile, ".");
             }
         }
-        dr_fprintf(STDERR, "\n");
+        dr_fprintf(dumpFile, "\n");
     }
-    dr_fprintf(STDERR, "\n");
+    dr_fprintf(dumpFile, "\n");
+    dr_close_file(dumpFile);
 }
 
 static void
@@ -301,6 +323,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
         return;
     }
 
+    file_t dumpFile = dr_open_file("C:\\Users\\dgoddard\\out.txt", DR_FILE_WRITE_APPEND);
     read_info *info = ((read_info *)user_data);
     CHAR *functionName = get_function_name(info->function);
     
@@ -322,7 +345,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
         }
     }
     
-    dr_fprintf(STDERR, "<id: %llu%s>\n", call_counts[info->function], functionName);
+    dr_fprintf(dumpFile, "<id: %llu%s>\n", call_counts[info->function], functionName);
     call_counts[info->function]++;
 
     if(info->source != NULL) {
@@ -336,6 +359,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     LPVOID lpBuffer = info->lpBuffer;
     DWORD nNumberOfBytesToRead = info->nNumberOfBytesToRead;
     free(user_data);
+    dr_close_file(dumpFile);
 
     if(targeted) {
         hex_dump(lpBuffer, nNumberOfBytesToRead);
@@ -362,6 +386,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPre["WinHttpReadData"] = wrap_pre_WinHttpReadData;
     toHookPre["recv"] = wrap_pre_recv;
     toHookPre["ReadFile"] = wrap_pre_ReadFile;
+    toHookPre["fread"] = wrap_pre_fread;
     
     std::map<char *, POSTPROTO> toHookPost;
     toHookPost["ReadFile"] = wrap_post_Generic;
@@ -372,23 +397,23 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPost["WinHttpWebSocketReceive"] = wrap_post_Generic;
     toHookPost["WinHttpReadData"] = wrap_post_Generic;
     toHookPost["recv"] = wrap_post_Generic;
+    toHookPost["fread"] = wrap_post_Generic;
 
     std::map<char *, PREPROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
         std::string include = op_include.get_value();
 
-        // TODO: this is flawed
-        // 1. InternetReadFile contains ReadFile
-        // 2. RegQueryValueEx does not contain RegQueryValueExW
         std::string target = op_target.get_value();
         std::string strFunctionName(functionName);
         if(target != "" && target.find("," + strFunctionName) == std::string::npos) {
+            dr_fprintf(STDERR, "<skipp cauase target>\n");
             continue;
         }
 
         bool contains = include.find(functionName) == 0 || include.find("," + strFunctionName) != std::string::npos;
         if(include != "" && !contains) {
+            dr_fprintf(STDERR, "<skipp cauase include>\n");
             continue;
         }
 
