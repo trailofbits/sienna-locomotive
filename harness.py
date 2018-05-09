@@ -27,12 +27,12 @@ def main():
                                     'target_application_path': config['target_application_path'], \
                                     'target_args': config['target_args']}, save_stdout=False, save_stderr=True, verbose=config['verbose'])
         wizard_output = completed_process.stderr.decode('utf-8')
-        wizard_findings = set()
+        wizard_findings = []
         for line in str.splitlines(wizard_output):
             if '<id:' in line:
-                func_name = line.split('<id: ')[0].split(',')[0] + ',' + line.replace(">","").split(',')[-1]
-                wizard_findings.add(func_name)
-        wizard_findings = list(wizard_findings)
+                func_name = line.strip('<id: >').split(',')[0] + ',' + line.strip('<id: >').split(',')[-1]
+                if func_name not in wizard_findings:
+                    wizard_findings.append(func_name)
         print(wizard_output)
         print("Functions found:")
         for i, func_name in enumerate(wizard_findings):
@@ -84,7 +84,7 @@ def main():
                     triage_config = {'drrun_path': config['drrun_path'], \
                                     'drrun_args': config['drrun_args'], \
                                     'client_path': config['triage_path'], \
-                                    'client_args': ['-r', str(run_id)], \
+                                    'client_args': ['-r', str(run_id), '-t', wizard_findings[index]], \
                                     'target_application_path': config['target_application_path'], \
                                     'target_args': config['target_args']}
                     triage_future = executor.submit(run_dr, triage_config, True, True, verbose=config['verbose'])
