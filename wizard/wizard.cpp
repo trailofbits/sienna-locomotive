@@ -270,7 +270,6 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
 static void 
 hex_dump(LPVOID lpBuffer, DWORD nNumberOfBytesToRead) {
     DWORD size = nNumberOfBytesToRead > 256 ? 256 : nNumberOfBytesToRead;
-    file_t dumpFile = dr_open_file("C:\\Users\\dgoddard\\out.txt", DR_FILE_WRITE_APPEND);
 
     DWORD bytesWritten;
     for(DWORD i = 0; i < size; i++) {
@@ -278,43 +277,42 @@ hex_dump(LPVOID lpBuffer, DWORD nNumberOfBytesToRead) {
 
         if(i % 16 == 0) {
             if(i != 0) {
-                dr_fprintf(dumpFile, "|");
+                dr_fprintf(STDERR, "|");
                 for(DWORD j = i - 16; j < i; j++) {
                     BYTE pch = ((BYTE *)lpBuffer)[j];
                     if(pch > 0x1f && pch < 0x7f) {
-                        dr_fprintf(dumpFile, "%c", pch);
+                        dr_fprintf(STDERR, "%c", pch);
                     } else {
-                        dr_fprintf(dumpFile, ".");
+                        dr_fprintf(STDERR, ".");
                     }
                 }
-                dr_fprintf(dumpFile, "\n");
+                dr_fprintf(STDERR, "\n");
             }
-            dr_fprintf(dumpFile, "%4d | ", i);
+            dr_fprintf(STDERR, "%4d | ", i);
 
         }
-        dr_fprintf(dumpFile, "%02X ", ch);
+        dr_fprintf(STDERR, "%02X ", ch);
     }
 
     DWORD i = size;
     while(i % 16 != 0) {
-        dr_fprintf(dumpFile, "   ");
+        dr_fprintf(STDERR, "   ");
         i++;
     }
 
     if(i != 0) {
-        dr_fprintf(dumpFile, "|");
+        dr_fprintf(STDERR, "|");
         for(DWORD j = i - 16; j < i && j < size; j++) {
             BYTE pch = ((BYTE *)lpBuffer)[j];
             if(pch > 0x1f && pch < 0x7f) {
-                dr_fprintf(dumpFile, "%c", pch);
+                dr_fprintf(STDERR, "%c", pch);
             } else {
-                dr_fprintf(dumpFile, ".");
+                dr_fprintf(STDERR, ".");
             }
         }
-        dr_fprintf(dumpFile, "\n");
+        dr_fprintf(STDERR, "\n");
     }
-    dr_fprintf(dumpFile, "\n");
-    dr_close_file(dumpFile);
+    dr_fprintf(STDERR, "\n");
 }
 
 static void
@@ -323,7 +321,6 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
         return;
     }
 
-    file_t dumpFile = dr_open_file("C:\\Users\\dgoddard\\out.txt", DR_FILE_WRITE_APPEND);
     read_info *info = ((read_info *)user_data);
     CHAR *functionName = get_function_name(info->function);
     
@@ -345,7 +342,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
         }
     }
     
-    dr_fprintf(dumpFile, "<id: %llu%s>\n", call_counts[info->function], functionName);
+    dr_fprintf(STDERR, "<id: %llu%s>\n", call_counts[info->function], functionName);
     call_counts[info->function]++;
 
     if(info->source != NULL) {
@@ -359,7 +356,6 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     LPVOID lpBuffer = info->lpBuffer;
     DWORD nNumberOfBytesToRead = info->nNumberOfBytesToRead;
     free(user_data);
-    dr_close_file(dumpFile);
 
     if(targeted) {
         hex_dump(lpBuffer, nNumberOfBytesToRead);
