@@ -386,7 +386,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPre["WinHttpReadData"] = wrap_pre_WinHttpReadData;
     toHookPre["recv"] = wrap_pre_recv;
     toHookPre["ReadFile"] = wrap_pre_ReadFile;
-    toHookPre["fread"] = wrap_pre_fread;
+    toHookPre["fread_s"] = wrap_pre_fread;
     
     std::map<char *, POSTPROTO> toHookPost;
     toHookPost["ReadFile"] = wrap_post_Generic;
@@ -397,7 +397,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPost["WinHttpWebSocketReceive"] = wrap_post_Generic;
     toHookPost["WinHttpReadData"] = wrap_post_Generic;
     toHookPost["recv"] = wrap_post_Generic;
-    toHookPost["fread"] = wrap_post_Generic;
+    toHookPost["fread_s"] = wrap_post_Generic;
 
     std::map<char *, PREPROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
@@ -476,7 +476,6 @@ void wizard(client_id_t id, int argc, const char *argv[]) {
 DR_EXPORT void
 dr_client_main(client_id_t id, int argc, const char *argv[])
 {
-
     std::string parse_err;
     int last_idx = 0;
     if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
