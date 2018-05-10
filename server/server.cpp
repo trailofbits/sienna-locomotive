@@ -64,7 +64,7 @@ DWORD findUnusedId() {
 	std::set<UINT64> usedIds;
 
 	EnterCriticalSection(&critId);
-	
+
 	hFind = FindFirstFile(FUZZ_WORKING_STAR, &findData);
 	if (hFind != INVALID_HANDLE_VALUE) {
 		do {
@@ -117,7 +117,7 @@ DWORD generateRunId(HANDLE hPipe) {
 		LOG_F(ERROR, "Invalid size for command name");
 		return 1;
 	}
-	
+
 	if(!ReadFile(hPipe, commandLine, size, &dwBytesRead, NULL)) {
 		LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
 		exit(1);
@@ -141,7 +141,7 @@ DWORD generateRunId(HANDLE hPipe) {
 		LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
 		exit(1);
 	}
-	
+
 	ZeroMemory(commandLine, 8192 * sizeof(TCHAR));
 
 	// get program arguments
@@ -155,7 +155,7 @@ DWORD generateRunId(HANDLE hPipe) {
 		LOG_F(ERROR, "Invalid size for command name");
 		return 1;
 	}
-	
+
 	if(!ReadFile(hPipe, commandLine, size, &dwBytesRead, NULL)) {
 		LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
 		exit(1);
@@ -164,7 +164,7 @@ DWORD generateRunId(HANDLE hPipe) {
 	ZeroMemory(targetFile, (MAX_PATH + 1)*sizeof(WCHAR));
 	wsprintf(targetFile, FUZZ_WORKING_FMT_ARGS, runId);
 	hFile = CreateFile(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
-	
+
 	if(hFile == INVALID_HANDLE_VALUE) {
 		LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
 		exit(1);
@@ -620,7 +620,7 @@ DWORD handleMutation(HANDLE hPipe) {
 		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
-	
+
 	HANDLE hHeap = GetProcessHeap();
 	if(hHeap == NULL) {
 		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
@@ -628,12 +628,12 @@ DWORD handleMutation(HANDLE hPipe) {
 	}
 
 	BYTE* buf = (BYTE*)HeapAlloc(hHeap, 0, size * sizeof(BYTE));
-	
+
 	if(buf == NULL) {
 		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
 	}
-	
+
 	if(!ReadFile(hPipe, buf, size, &dwBytesRead, NULL)) {
 		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
@@ -645,7 +645,7 @@ DWORD handleMutation(HANDLE hPipe) {
 
 	if(size > 0)
 		mutate(buf, size);
-	
+
 	if(!WriteFile(hPipe, buf, size, &dwBytesWritten, NULL)) {
 		LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
 		exit(1);
@@ -696,7 +696,7 @@ DWORD handleReplay(HANDLE hPipe) {
 	LOG_F(INFO, "Replaying for run id %d", runId);
 
 	DWORD mutateCount = 0;
-	
+
 	if(!ReadFile(hPipe, &mutateCount, sizeof(DWORD), &dwBytesRead, NULL)) {
 		LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
 		exit(1);
@@ -717,7 +717,7 @@ DWORD handleReplay(HANDLE hPipe) {
 	}
 
 	BYTE* buf = (BYTE*)HeapAlloc(hHeap, 0, size * sizeof(BYTE));
-	
+
 	if(buf == NULL) {
 		LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
 		exit(1);
@@ -727,19 +727,19 @@ DWORD handleReplay(HANDLE hPipe) {
 	wsprintf(targetFile, FUZZ_WORKING_FMT_FKT, runId, mutateCount);
 	// TODO: validate file exists
 	HANDLE hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
-	
+
 	if(hFile == INVALID_HANDLE_VALUE) {
 		LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
 		exit(1);
 	}
 
 	getBytesFKT(hFile, buf, size);
-	
+
 	if(!WriteFile(hPipe, buf, size, &dwBytesWritten, NULL)) {
 		LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
 		exit(1);
 	}
-	
+
 	if(!CloseHandle(hFile)) {
 		LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
 		exit(1);
@@ -768,17 +768,17 @@ DWORD serveRunInfo(HANDLE hPipe) {
 
 	wsprintf(targetFile, FUZZ_WORKING_FMT_PROGRAM, runId);
 	HANDLE hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
-	
+
 	if(hFile == INVALID_HANDLE_VALUE) {
 		LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
 		exit(1);
 	}
-	
+
 	if(!ReadFile(hFile, commandLine, 8191 * sizeof(TCHAR), &dwBytesRead, NULL)) {
 		LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
 		exit(1);
 	}
-	
+
 	if(!CloseHandle(hFile)) {
 		LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
 		exit(1);
@@ -797,7 +797,7 @@ DWORD serveRunInfo(HANDLE hPipe) {
 	ZeroMemory(commandLine, 8192 * sizeof(TCHAR));
 	ZeroMemory(targetFile, (MAX_PATH + 1) * sizeof(WCHAR));
 	wsprintf(targetFile, FUZZ_WORKING_FMT_ARGS, runId);
-	
+
 	hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 
 	if(hFile == INVALID_HANDLE_VALUE) {
@@ -880,7 +880,7 @@ DWORD finalizeRun(HANDLE hPipe) {
 DWORD crashPath(HANDLE hPipe) {
 	DWORD dwBytesRead = 0;
 	DWORD dwBytesWritten = 0;
-	
+
 	DWORD runId = 0;
 	if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
 		LOG_F(ERROR, "crashPath (0x%x)", GetLastError());
@@ -917,8 +917,15 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe) {
 
 	BYTE eventId = 255;
 	if(!ReadFile(hPipe, &eventId, sizeof(BYTE), &dwBytesRead, NULL)) {
-		LOG_F(ERROR, "ThreadHandler (0x%x)", GetLastError());
-		exit(1);
+		if (GetLastError() != ERROR_BROKEN_PIPE){
+			LOG_F(ERROR, "ThreadHandler (0x%x)", GetLastError());
+			exit(1);
+		}
+		else{
+			 // Pipe was broken when we tried to read it. Happens when the python client
+			 // checks if it exists.
+			return 0;
+		}
 	}
 
 	switch (eventId) {
@@ -982,12 +989,12 @@ void lockProcess() {
 int main(int mArgc, char **mArgv)
 {
 	initDirs();
-	
+
 	loguru::init(mArgc, mArgv);
 	CHAR logLocalPathA[MAX_PATH];
 	wcstombs(logLocalPathA, FUZZ_LOG, MAX_PATH);
 	loguru::add_file(logLocalPathA, loguru::Append, loguru::Verbosity_MAX);
-	
+
 	LOG_F(INFO, "Server started!");
 
 	lockProcess();
@@ -1049,4 +1056,3 @@ int main(int mArgc, char **mArgv)
 	DeleteCriticalSection(&critLog);
     return 0;
 }
-
