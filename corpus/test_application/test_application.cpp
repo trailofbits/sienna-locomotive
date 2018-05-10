@@ -104,6 +104,33 @@ int test_ReadFile(bool fuzzing) {
     return 0;
 }
 
+int test_fread(bool fuzzing) {
+    LPWSTR name = L"test_ReadFile.txt";
+    prep_read_file_test(name);
+    
+    BYTE buf[0x1000] = {0};
+    FILE *stream;
+    if(fopen_s(&stream, "test_ReadFile.txt", "r+t") == 0) {  
+        fread(buf, sizeof(BYTE), 8, stream);  
+        fclose( stream );  
+
+        buf[8] = 0;
+        printf("BUF: %s\n", buf);
+
+        int *crashPtr = *(int **)buf;
+        printf("CRASH PTR: %p\n", crashPtr);
+        if (fuzzing) {
+            if((UINT64)crashPtr > 0x4947464544434241) {
+                printf("*CRASH PTR: %x\n", *crashPtr);
+            }
+        } else {
+            printf("*CRASH PTR: %x\n", *crashPtr);
+        }
+    }  
+
+    return 0;
+}
+
 int show_help(LPWSTR *argv) {
     printf("\nUSAGE: %S [TEST NUMBER] [-f]\n", argv[0]);
     printf("\nTEST NUMBERS:\n");
@@ -113,6 +140,7 @@ int show_help(LPWSTR *argv) {
     printf("\t3: test_InternetReadFile\n");
     printf("\t4: test_RegQueryValueEx\n");
     printf("\t5: test_WinHttpWebSocketReceive\n");
+    printf("\t6: test_fread\n");
     printf("\nf:\n"); 
     printf("\tenable fuzzing mode\n");
     printf("\the crashing condition will be guarded by a conditional\n");
@@ -162,6 +190,10 @@ int main()
         case 5:
             printf("Running: test_WinHttpWebSocketReceive\n");
             test_WinHttpWebSocketReceive(fuzzing);
+            break;
+        case 6:
+            printf("Running: test_fread\n");
+            test_fread(fuzzing);
             break;
         default:
             show_help(argv);

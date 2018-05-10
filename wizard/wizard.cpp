@@ -62,6 +62,7 @@ enum class Function {
     WinHttpWebSocketReceive,
     RegQueryValueEx,
     ReadEventLog,
+    fread,
 };
 
 std::map<Function, UINT64> call_counts;
@@ -82,6 +83,8 @@ char *get_function_name(Function function) {
             return ",RegQueryValueEx";
         case Function::ReadEventLog:
             return ",ReadEventLog";
+        case Function::fread:
+            return ",fread";
     }
 
     return "unknown";
@@ -249,9 +252,26 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->position = SetFilePointer(hFile, 0, NULL, FILE_CURRENT);
 }
 
+static void
+wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
+    dr_fprintf(STDERR, "<in wrap_pre_fread>\n");
+    void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
+    size_t size = (size_t)drwrap_get_arg(wrapcxt, 1);
+    size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
+
+    *user_data = malloc(sizeof(read_info));
+    ((read_info *)*user_data)->lpBuffer = buffer;
+    ((read_info *)*user_data)->nNumberOfBytesToRead = size * count;
+    ((read_info *)*user_data)->function = Function::fread;
+    ((read_info *)*user_data)->source = NULL;
+    ((read_info *)*user_data)->position = NULL;
+}
+
 static void 
 hex_dump(LPVOID lpBuffer, DWORD nNumberOfBytesToRead) {
     DWORD size = nNumberOfBytesToRead > 256 ? 256 : nNumberOfBytesToRead;
+
+    DWORD bytesWritten;
     for(DWORD i = 0; i < size; i++) {
         BYTE ch = ((BYTE *)lpBuffer)[i];
 
@@ -362,6 +382,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPre["WinHttpReadData"] = wrap_pre_WinHttpReadData;
     toHookPre["recv"] = wrap_pre_recv;
     toHookPre["ReadFile"] = wrap_pre_ReadFile;
+    toHookPre["fread_s"] = wrap_pre_fread;
     
     std::map<char *, POSTPROTO> toHookPost;
     toHookPost["ReadFile"] = wrap_post_Generic;
@@ -372,23 +393,23 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPost["WinHttpWebSocketReceive"] = wrap_post_Generic;
     toHookPost["WinHttpReadData"] = wrap_post_Generic;
     toHookPost["recv"] = wrap_post_Generic;
+    toHookPost["fread_s"] = wrap_post_Generic;
 
     std::map<char *, PREPROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
         std::string include = op_include.get_value();
 
-        // TODO: this is flawed
-        // 1. InternetReadFile contains ReadFile
-        // 2. RegQueryValueEx does not contain RegQueryValueExW
         std::string target = op_target.get_value();
         std::string strFunctionName(functionName);
         if(target != "" && target.find("," + strFunctionName) == std::string::npos) {
+            dr_fprintf(STDERR, "<skipp cauase target>\n");
             continue;
         }
 
         bool contains = include.find(functionName) == 0 || include.find("," + strFunctionName) != std::string::npos;
         if(include != "" && !contains) {
+            dr_fprintf(STDERR, "<skipp cauase include>\n");
             continue;
         }
 
@@ -451,7 +472,6 @@ void wizard(client_id_t id, int argc, const char *argv[]) {
 DR_EXPORT void
 dr_client_main(client_id_t id, int argc, const char *argv[])
 {
-
     std::string parse_err;
     int last_idx = 0;
     if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {

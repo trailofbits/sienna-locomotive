@@ -36,6 +36,12 @@ UINT64 run_id;
 std::set<reg_id_t> tainted_regs;
 std::set<app_pc> tainted_mems;
 
+#define LAST_COUNT 5
+int last_call_idx = 0;
+int last_insn_idx = 0;
+app_pc last_calls[LAST_COUNT] = { 0 };
+app_pc last_insns[LAST_COUNT] = { 0 };
+
 static droption_t<std::string> op_target(
     DROPTION_SCOPE_CLIENT, 
     "t", 
@@ -556,6 +562,10 @@ handle_specific(void *drcontext, instr_t *instr) {
 static void
 propagate_taint(app_pc pc) 
 {
+    last_insns[last_insn_idx] = pc;
+    last_insn_idx++;
+    last_insn_idx %= LAST_COUNT;
+
     if(tainted_mems.size() == 0 && tainted_regs.size() == 0) {
         return;
     }
@@ -564,6 +574,19 @@ propagate_taint(app_pc pc)
     instr_t instr;
     instr_init(drcontext, &instr);
     decode(drcontext, pc, &instr);
+
+    if(instr_is_call(&instr)) {
+        opnd_t target = instr_get_target(&instr);
+        if(opnd_is_memory_reference(target)) {
+            dr_mcontext_t mc = {sizeof(mc),DR_MC_ALL};
+            dr_get_mcontext(drcontext, &mc);
+            app_pc addr = opnd_compute_address(target, &mc);
+
+            last_calls[last_call_idx] = addr;
+            last_call_idx++;
+            last_call_idx %= LAST_COUNT;
+        }
+    }
 
     // if(tainted_mems.size() > 0) {
     //     char buf[100];
@@ -828,6 +851,7 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
         writer.EndObject();
     }
 
+
     bool tainted = tainted_regs.find(DR_REG_NULL) != tainted_regs.end();
     writer.StartObject();
     writer.Key("reg");
@@ -838,6 +862,26 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
     writer.Bool(tainted);
     writer.EndObject();
 
+    writer.EndArray();
+
+    writer.Key("last_calls");
+    writer.StartArray();
+    // so we can go backward and not end up negative
+    for(int i = 0; i < LAST_COUNT; i++) {
+        int idx = last_call_idx + i;
+        idx %= LAST_COUNT;
+        writer.Uint64((uint64)last_calls[idx]);
+    }
+    writer.EndArray();
+
+    writer.Key("last_insns");
+    writer.StartArray();
+    // so we can go backward and not end up negative
+    for(int i = 0; i < LAST_COUNT; i++) {
+        int idx = last_insn_idx + i;
+        idx %= LAST_COUNT;
+        writer.Uint64((uint64)last_insns[idx]);
+    }
     writer.EndArray();
 
     writer.Key("tainted_addrs");

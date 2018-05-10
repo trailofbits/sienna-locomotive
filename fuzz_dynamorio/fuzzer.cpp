@@ -48,6 +48,7 @@ enum class Function {
     WinHttpWebSocketReceive,
     RegQueryValueEx,
     ReadEventLog,
+    fread,
 };
 
 DWORD runId;
@@ -71,6 +72,8 @@ char *get_function_name(Function function) {
             return "RegQueryValueEx";
         case Function::ReadEventLog:
             return "ReadEventLog";
+        case Function::fread:
+            return "fread";
     }
 
     return "unknown";
@@ -647,6 +650,7 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
 */
 static void
 wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
+    dr_fprintf(STDERR, "<in wrap_pre_ReadFile>\n");
     HANDLE hFile = drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -665,8 +669,22 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->position = (position << 32) | positionLow;
 }
 
-/* Called after ReadFile returns. Calls `mutate` on the bytes that ReadFile
-   wrote into the program's memory. */
+static void
+wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
+    dr_fprintf(STDERR, "<in wrap_pre_fread>\n");
+    void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
+    size_t size = (size_t)drwrap_get_arg(wrapcxt, 1);
+    size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
+
+    *user_data = malloc(sizeof(read_info));
+    ((read_info *)*user_data)->function = Function::fread;
+    ((read_info *)*user_data)->hFile = NULL;
+    ((read_info *)*user_data)->lpBuffer = buffer;
+    ((read_info *)*user_data)->nNumberOfBytesToRead = size * count;
+    ((read_info *)*user_data)->lpNumberOfBytesRead = NULL;
+    ((read_info *)*user_data)->position = NULL;
+}
+
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data) {
     if(user_data == NULL) {
@@ -720,7 +738,8 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPre["WinHttpWebSocketReceive"] = wrap_pre_WinHttpWebSocketReceive;
     toHookPre["WinHttpReadData"] = wrap_pre_WinHttpReadData;
     toHookPre["recv"] = wrap_pre_recv;
-
+    toHookPre["fread"] = wrap_pre_fread;
+    
     std::map<char *, POSTPROTO> toHookPost;
     toHookPost["ReadFile"] = wrap_post_Generic;
     toHookPost["InternetReadFile"] = wrap_post_Generic;
@@ -730,6 +749,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPost["WinHttpWebSocketReceive"] = wrap_post_Generic;
     toHookPost["WinHttpReadData"] = wrap_post_Generic;
     toHookPost["recv"] = wrap_post_Generic;
+    toHookPost["fread"] = wrap_post_Generic;
 
     std::map<char *, PREPROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
@@ -776,6 +796,14 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
         }
     }
 }
+
+/*
+    instrument_bb
+
+    is first instr
+    get module names == target
+    insert clean call 
+*/
 
 /* Runs after process initialization. Initializes DynamoRIO and registers module load callback*/
 DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
