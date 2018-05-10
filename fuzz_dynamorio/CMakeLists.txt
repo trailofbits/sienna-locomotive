@@ -7,6 +7,7 @@ if (NOT DynamoRIO_FOUND)
 endif(NOT DynamoRIO_FOUND)
 
 add_library(fuzzer SHARED fuzzer.cpp)
+target_compile_definitions(fuzzer PRIVATE -DUNICODE)
 
 configure_DynamoRIO_client(fuzzer)
 

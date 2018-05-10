@@ -91,7 +91,7 @@ struct read_info {
     LPVOID lpBuffer;
     DWORD nNumberOfBytesToRead;
     Function function;
-    char *source;
+    TCHAR *source;
     DWORD position;
 };
 
@@ -322,8 +322,8 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
         }
     }
     
+    dr_fprintf(STDERR, "<id: %llu%s>\n", call_counts[info->function], functionName);
     call_counts[info->function]++;
-    dr_fprintf(STDERR, "<id: %llu,%s>\n", call_counts[info->function], functionName);
 
     if(info->source != NULL) {
         dr_fprintf(STDERR, "source: %s\n", info->source);
@@ -381,7 +381,14 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
         // TODO: this is flawed
         // 1. InternetReadFile contains ReadFile
         // 2. RegQueryValueEx does not contain RegQueryValueExW
-        if(include != "" && include.find(functionName) == std::string::npos) {
+        std::string target = op_target.get_value();
+        std::string strFunctionName(functionName);
+        if(target != "" && target.find("," + strFunctionName) == std::string::npos) {
+            continue;
+        }
+
+        bool contains = include.find(functionName) == 0 || include.find("," + strFunctionName) != std::string::npos;
+        if(include != "" && !contains) {
             continue;
         }
 
