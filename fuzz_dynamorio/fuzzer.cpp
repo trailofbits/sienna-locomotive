@@ -841,6 +841,8 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
     runId = getRunID(hPipe, wcsAppName, get_target_command_line());
     CloseHandle(hPipe);
 
+    dr_fprintf(STDERR, "Beginning fuzzing run %d\n", runId);
+
     drmgr_init();
     drwrap_init();
 
