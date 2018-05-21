@@ -42,6 +42,9 @@ int last_insn_idx = 0;
 app_pc last_calls[LAST_COUNT] = { 0 };
 app_pc last_insns[LAST_COUNT] = { 0 };
 
+app_pc module_start = 0;
+app_pc module_end = 0;
+
 /* Required, which specific call to target */
 static droption_t<std::string> op_target(
     DROPTION_SCOPE_CLIENT, 
@@ -556,9 +559,11 @@ handle_specific(void *drcontext, instr_t *instr) {
 static void
 propagate_taint(app_pc pc) 
 {
-    last_insns[last_insn_idx] = pc;
-    last_insn_idx++;
-    last_insn_idx %= LAST_COUNT;
+    if(pc > module_start && pc < module_end) {
+        last_insns[last_insn_idx] = pc;
+        last_insn_idx++;
+        last_insn_idx %= LAST_COUNT;
+    }
 
     if(tainted_mems.size() == 0 && tainted_regs.size() == 0) {
         return;
@@ -576,9 +581,11 @@ propagate_taint(app_pc pc)
             dr_get_mcontext(drcontext, &mc);
             app_pc addr = opnd_compute_address(target, &mc);
 
-            last_calls[last_call_idx] = addr;
-            last_call_idx++;
-            last_call_idx %= LAST_COUNT;
+            if(pc > module_start && pc < module_end) {
+                last_calls[last_call_idx] = addr;
+                last_call_idx++;
+                last_call_idx %= LAST_COUNT;
+            }
         }
     }
 
@@ -1317,6 +1324,13 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPost["WinHttpReadData"] = wrap_post_GenericTaint;
     toHookPost["recv"] = wrap_post_GenericTaint;
 
+    const char *mod_name = dr_module_preferred_name(mod);
+    /* assume our target executable is an exe */
+    if(strstr(mod_name, ".exe") != NULL) {
+        module_start = mod->start;
+        module_end = module_start + mod->module_internal_size;
+    }
+
     // when a module is loaded, iterate its functions looking for matches in toHookPre
     std::map<char *, PREPROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
@@ -1341,7 +1355,6 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
 
         // find target function in module
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
-        const char *mod_name = dr_module_preferred_name(mod);
 
         // special cases
         // ReadFile and RegQueryValueEx* are in multiple DLLs
