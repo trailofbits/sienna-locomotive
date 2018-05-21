@@ -8,6 +8,8 @@ import traceback
 import subprocess
 import json
 
+server_proc = None
+
 def run_dr(_config, save_stdout=False, save_stderr=False, verbose=False):
     program_arr = [_config['drrun_path']] + _config['drrun_args'] + ['-c', _config['client_path']] + _config['client_args'] + ['--', _config['target_application_path']] + _config['target_args']
     if verbose:
@@ -20,11 +22,11 @@ def main():
 
     # Run the wizard to select a target function
     if config['wizard']:
-        completed_process = run_dr({'drrun_path': config['drrun_path'], \
-                                    'drrun_args': config['drrun_args'], \
-                                    'client_path': config['wizard_path'], \
-                                    'client_args': [], \
-                                    'target_application_path': config['target_application_path'], \
+        completed_process = run_dr({'drrun_path': config['drrun_path'],
+                                    'drrun_args': config['drrun_args'],
+                                    'client_path': config['wizard_path'],
+                                    'client_args': [],
+                                    'target_application_path': config['target_application_path'],
                                     'target_args': config['target_args']}, save_stdout=False, save_stderr=True, verbose=config['verbose'])
         wizard_output = completed_process.stderr.decode('utf-8')
         wizard_findings = []
@@ -43,8 +45,9 @@ def main():
 
     # Start the server if it's not already running
     if not os.path.isfile("\\\\.\\pipe\\fuzz_server"):
-        pid = subprocess.Popen([config['server_path']], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).pid
-        print("Server running in process {}".format(pid))
+        global server_proc
+        server_proc = subprocess.Popen([config['server_path']], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print("Server running in process {}".format(server_proc.pid))
 
     added = 0
     # Spawn a thread that will run DynamoRIO and wait for the output
@@ -53,7 +56,7 @@ def main():
         count = min(config['runs'], config['simultaneous']*4)
         added += count
         next_fuzz_futures = [executor.submit(run_dr, config, False, True, config['verbose']) for i in range(count)]
-
+        stop = False
         while len(next_fuzz_futures) > 0:
             triage_futures = []
             fuzz_futures = next_fuzz_futures
@@ -89,17 +92,22 @@ def main():
                     # Start triage if the fuzzing harness exited with an error code
                     if proc.returncode != 0:
                         print('Fuzzing run %s returned %s' % (run_id, proc.returncode))
-                        triage_config = {'drrun_path': config['drrun_path'], \
-                                        'drrun_args': config['drrun_args'], \
-                                        'client_path': config['triage_path'], \
-                                        'client_args': ['-r', str(run_id), '-t', wizard_findings[index]], \
-                                        'target_application_path': config['target_application_path'], \
+                        triage_config = {'drrun_path': config['drrun_path'],
+                                        'drrun_args': config['drrun_args'],
+                                        'client_path': config['triage_path'],
+                                        'client_args': ['-r', str(run_id)],
+                                        'target_application_path': config['target_application_path'],
                                         'target_args': config['target_args']}
+                        
+                        if config['wizard']:
+                            triage_config['client_args'] += ['-t', wizard_findings[index]]
+
                         triage_future = executor.submit(run_dr, triage_config, True, True, verbose=config['verbose'])
                         setattr(triage_future, "run_id", run_id) # Bind run id to the future so it's easier to find next time
                         triage_futures.append(triage_future)
+                        stop = True
 
-                    if added < config['runs']:
+                    if added < config['runs'] or config['continuous'] and not stop:
                         next_fuzz_futures.append(executor.submit(run_dr, config, False, True, config['verbose']))
                         added += 1
 
@@ -136,4 +144,11 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        if server_proc != None:
+            print('Killing server...')
+            server_proc.kill()
+        raise 
+

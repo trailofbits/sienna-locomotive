@@ -18,16 +18,16 @@ config_path = reduce(os.path.join, [os.getenv('APPDATA'), 'Trail of Bits', 'fuzz
 # Create a default config file if one doesn't exist
 if not os.path.exists(config_path):
 	default_config = configparser.ConfigParser()
-	default_config['DEFAULT'] = {'drrun_path': 'dynamorio\\bin64\\drrun.exe', \
-								'drrun_args': '', \
-								'client_path': 'build\\fuzz_dynamorio\\Debug\\fuzzer.dll', \
-								'client_args': '', \
-								'server_path': 'build\\server\\Debug\\server.exe', \
-								'wizard_path': 'build\\wizard\\Debug\\wizard.dll', \
-								'triage_path': 'build\\triage_dynamorio\\Debug\\tracer.dll', \
-								'target_application_path': 'build\\corpus\\test_application\\Debug\\test_application.exe', \
-								'target_args':'', \
-								'runs': 1, \
+	default_config['DEFAULT'] = {'drrun_path': 'dynamorio\\bin64\\drrun.exe', 
+								'drrun_args': '', 
+								'client_path': 'build\\fuzz_dynamorio\\Debug\\fuzzer.dll', 
+								'client_args': '', 
+								'server_path': 'build\\server\\Debug\\server.exe', 
+								'wizard_path': 'build\\wizard\\Debug\\wizard.dll', 
+								'triage_path': 'build\\triage_dynamorio\\Debug\\tracer.dll', 
+								'target_application_path': 'build\\corpus\\test_application\\Debug\\test_application.exe', 
+								'target_args':'', 
+								'runs': 1, 
 								'simultaneous': 1}
 	with open(config_path, 'w') as configfile:
 		default_config.write(configfile)
@@ -42,6 +42,7 @@ parser.add_argument('-w', '--wizard', action='store_true', dest='wizard', defaul
 parser.add_argument('-v', '--verbose', action='store_true', dest='verbose', default=False, help="Tell drrun to run in verbose mode")
 parser.add_argument('-n', '--nopersist', action='store_true', dest='nopersist', default=False, help="Tell drrun not to use persistent code caches (slower)")
 parser.add_argument('-p', '--profile', action='store', dest='profile', default='DEFAULT', type=str, help="Pull configuration from a specific section in config.ini. Defaults to DEFAULT")
+parser.add_argument('-c', '--continuous', action='store_true', dest='continuous', default=False, help="Run continuously")
 parser.add_argument('-r', '--runs', action='store', dest='runs', type=int, help="Number of times to run the target application")
 parser.add_argument('-s', '--simultaneous', action='store', dest='simultaneous', type=int, help="Number of simultaneous instances of the target application that can run")
 parser.add_argument('-t', '--target', action='store', dest='target_application_path', type=str, help="Path to the target application. Note: Ignores arguments in the config file")
