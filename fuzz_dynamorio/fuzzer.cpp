@@ -757,7 +757,11 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
         
         std::string target = op_target.get_value();
         std::string strFunctionName(functionName);
-        if(target != "" && target.find("," + strFunctionName) == std::string::npos) {
+        if(strFunctionName == "RegQueryValueExW" || strFunctionName == "RegQueryValueExA") {
+            if(target.find(",RegQueryValueEx") == std::string::npos) {
+                continue;
+            }
+        } else if(target != "" && target.find("," + strFunctionName) == std::string::npos) {
             continue;
         }
 
