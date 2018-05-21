@@ -673,12 +673,25 @@ DWORD handleMutation(HANDLE hPipe) {
 DWORD getBytesFKT(HANDLE hFile, BYTE *buf, DWORD size) {
     DWORD dwBytesRead = 0;
 
+    DWORD buf_size = 0;
+    SetFilePointer(hFile, 0x14, NULL, FILE_BEGIN);
+    if (!ReadFile(hFile, &buf_size, 4, &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    if(buf_size < size) {
+        size = buf_size;
+    }
+
     SetFilePointer(hFile, -(LONG)size, NULL, FILE_END);
 
     if (!ReadFile(hFile, buf, size, &dwBytesRead, NULL)) {
         LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
         exit(1);
     }
+
+    LOG_F(INFO, "Read in %02x %02x %02x %02x %02x %02x %02x %02x\n", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
 
     return 0;
 }
@@ -702,7 +715,6 @@ DWORD handleReplay(HANDLE hPipe) {
         exit(1);
     }
 
-    // TODO: validate size matches file size
     DWORD size = 0;
     if(!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());

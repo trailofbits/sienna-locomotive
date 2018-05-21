@@ -1246,7 +1246,6 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
     Function function = ((read_info *)user_data)->function;
     free(user_data);
 
-    
     BOOL targeted = false;
     std::string target = op_target.get_value();
     
@@ -1339,7 +1338,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
         // if our toHookPre function matches -t target
         std::string target = op_target.get_value();
         std::string strFunctionName(functionName);
-        
+
         if(strFunctionName == "RegQueryValueExW" || strFunctionName == "RegQueryValueExA") {
             if(target.find(",RegQueryValueEx") == std::string::npos) {
                 continue;
