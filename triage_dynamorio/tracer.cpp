@@ -42,6 +42,7 @@ int last_insn_idx = 0;
 app_pc last_calls[LAST_COUNT] = { 0 };
 app_pc last_insns[LAST_COUNT] = { 0 };
 
+/* Required, which specific call to target */
 static droption_t<std::string> op_target(
     DROPTION_SCOPE_CLIENT, 
     "t", 
@@ -49,12 +50,22 @@ static droption_t<std::string> op_target(
     "target",
     "Specific call to target.");
 
+/* Mostly used to debug if taint tracking is too slow */
 static droption_t<unsigned int> op_no_taint(
     DROPTION_SCOPE_CLIENT, 
     "nt", 
     0, 
     "no-taint",
     "Do not do instruction level instrumentation.");
+
+/* Used when replaying a run from the server */
+#define NO_REPLAY 0xFFFFFFF
+static droption_t<unsigned int> op_replay(
+    DROPTION_SCOPE_CLIENT, 
+    "r", 
+    NO_REPLAY, 
+    "replay",
+    "The run id for a crash to replay.");
 
 enum class Function {
     ReadFile,
@@ -68,27 +79,7 @@ enum class Function {
 
 std::map<Function, UINT64> call_counts;
 
-char *get_function_name(Function function) {
-    switch(function) {
-        case Function::ReadFile:
-            return "ReadFile";
-        case Function::recv:
-            return "recv";
-        case Function::WinHttpReadData:
-            return "WinHttpReadData";
-        case Function::InternetReadFile:
-            return "InternetReadFile";
-        case Function::WinHttpWebSocketReceive:
-            return "WinHttpWebSocketReceive";
-        case Function::RegQueryValueEx:
-            return "RegQueryValueEx";
-        case Function::ReadEventLog:
-            return "ReadEventLog";
-    }
-
-    return "unknown";
-}
-
+/* Currently unused as this runs on 64 bit applications */
 static reg_id_t reg_to_full_width32(reg_id_t reg) {
     switch(reg){
         case DR_REG_AX:
@@ -120,6 +111,7 @@ static reg_id_t reg_to_full_width32(reg_id_t reg) {
     }
 }
 
+/* Converts a register to full width for taint tracking */
 static reg_id_t reg_to_full_width64(reg_id_t reg) {
     switch(reg){
         case DR_REG_EAX:
@@ -191,14 +183,14 @@ static reg_id_t reg_to_full_width64(reg_id_t reg) {
     }
 }
 
+/* Check whether and operand is tainted */
 static bool
 is_tainted(void *drcontext, opnd_t opnd) 
 {
     if(opnd_is_reg(opnd)) {
+        /* Check if a register is in tainted_regs */
         reg_id_t reg = opnd_get_reg(opnd);
         reg = reg_to_full_width64(reg);
-
-        // dr_get_thread_id
 
         if(tainted_regs.find(reg) != tainted_regs.end()) {
             return true;
@@ -208,6 +200,7 @@ is_tainted(void *drcontext, opnd_t opnd)
         dr_get_mcontext(drcontext, &mc);
         app_pc addr = opnd_compute_address(opnd, &mc);
 
+        /* Check if a memory region overlaps a tainted address */
         opnd_size_t dr_size = opnd_get_size(opnd);
         uint size = opnd_size_in_bytes(dr_size);
         for(uint i=0; i<size; i++) {
@@ -216,6 +209,7 @@ is_tainted(void *drcontext, opnd_t opnd)
             }
         }
 
+        /* Check if a register used in calculating an address is tainted */
         if(opnd_is_base_disp(opnd)) {
             reg_id_t reg_base = opnd_get_base(opnd);
             reg_id_t reg_disp = opnd_get_disp(opnd);
@@ -251,11 +245,6 @@ taint_mem(app_pc addr, uint size) {
 
 static bool
 untaint_mem(app_pc addr, uint size) {
-    /* TODO: 
-        this seems to be off by 1 on (goes into a tainted buffer):
-        rep movs %ds:(%rsi)[1byte] %rsi %rdi %rcx -> %es:(%rdi)[1byte] %rsi %rdi %rcx
-        see WinHttpReadData test
-    */
     bool untainted = false;
     for(uint i=0; i<size; i++) {
         size_t n = tainted_mems.erase(addr+i);
@@ -336,6 +325,7 @@ untaint(void *drcontext, opnd_t opnd)
 }
 
 
+/* Handle special case of xor regA, regA */
 static bool
 handle_xor(void *drcontext, instr_t *instr) {
     bool result = false;
@@ -363,6 +353,7 @@ handle_xor(void *drcontext, instr_t *instr) {
     return result;
 }
 
+/* Handle push and pop by not tainting RSP (included in operands) */
 static void
 handle_push_pop(void *drcontext, instr_t *instr) {
     int src_count = instr_num_srcs(instr);
@@ -408,14 +399,14 @@ handle_push_pop(void *drcontext, instr_t *instr) {
         untainted |= untaint(drcontext, opnd);
     }
 
-    // 
-    if(tainted | untainted) {
-        int opcode = instr_get_opcode(instr);
+    // if(tainted | untainted) {
+    //     int opcode = instr_get_opcode(instr);
         // char buf[100];
         // instr_disassemble_to_buffer(drcontext, instr, buf, 100);
-    }
+    // }
 }
 
+/* Xchg of a tainted reg and non tainted reg should swap taint */
 static bool
 handle_xchg(void *drcontext, instr_t *instr) {
     bool result = false;
@@ -448,6 +439,7 @@ handle_xchg(void *drcontext, instr_t *instr) {
     return result;
 }
 
+/* Special cases for tainting / untainting PC */
 static bool
 handle_branches(void *drcontext, instr_t *instr) {
 
@@ -471,7 +463,7 @@ handle_branches(void *drcontext, instr_t *instr) {
     // call
     if(is_call) {
         if(pc_tainted) {
-            // taint mem at rsp
+            // make saved return address tainted
             for(int i=0; i<dst_count; i++) {
                 opnd_t opnd = instr_get_dst(instr, i);
                 if(opnd_is_memory_reference(opnd)) {
@@ -505,6 +497,7 @@ handle_branches(void *drcontext, instr_t *instr) {
         }
     }
 
+    /* TODO: check that this taints PC if the tainted address is saved (by the if(is_call)) and restored */
     // ret
     if(is_ret) {
         bool tainted = false;
@@ -559,6 +552,7 @@ handle_specific(void *drcontext, instr_t *instr) {
 
 }
 
+/* */
 static void
 propagate_taint(app_pc pc) 
 {
@@ -594,11 +588,13 @@ propagate_taint(app_pc pc)
     //     dr_printf("%s\n", buf);
     // }
 
+    /* Handle specific instructions */
     if(handle_specific(drcontext, &instr)) {
         instr_free(drcontext, &instr);
         return;
     }
 
+    /* Check if sources are tainted */
     int src_count = instr_num_srcs(&instr);
     bool tainted = false;
 
@@ -607,22 +603,23 @@ propagate_taint(app_pc pc)
         tainted |= is_tainted(drcontext, opnd);
     }
 
+    /* If tainted sources, taint destinations */
     int dst_count = instr_num_dsts(&instr);
-
     for(int i=0; i<dst_count && tainted; i++) {
         opnd_t opnd = instr_get_dst(&instr, i);
         taint(drcontext, opnd);
     }
 
+    /* If not tainted sources, untaint destinations*/
     bool untainted = false;
     for(int i=0; i<dst_count && !tainted; i++) {
         opnd_t opnd = instr_get_dst(&instr, i);
         untainted |= untaint(drcontext, opnd);
     }
 
-    if(tainted | untainted) {
-        int opcode = instr_get_opcode(&instr);
-    }
+    // if(tainted | untainted) {
+    //     int opcode = instr_get_opcode(&instr);
+    // }
 
     instr_free(drcontext, &instr);
 }
@@ -640,6 +637,7 @@ event_app_instruction(
     if (!instr_is_app(instr))
         return DR_EMIT_DEFAULT;
 
+    /* Clean call propagate taint on each instruction*/
     dr_insert_clean_call(drcontext, bb, instr, propagate_taint, false, 1, 
                 OPND_CREATE_INTPTR(instr_get_app_pc(instr)));
 
@@ -677,6 +675,7 @@ event_exit_trace(void)
     drmgr_exit();
 }
 
+/* Debug functionality */
 static void
 dump_regs(void *drcontext, app_pc exception_address) {
     reg_id_t regs[16] = { 
@@ -792,6 +791,7 @@ exception_to_string(DWORD exception_code) {
     return exception_str;
 }
 
+/* Get crash info as JSON */
 std::string
 dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *excpt, std::string disassembly) {
     DWORD exception_code = excpt->record->ExceptionCode;
@@ -866,7 +866,6 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
 
     writer.Key("last_calls");
     writer.StartArray();
-    // so we can go backward and not end up negative
     for(int i = 0; i < LAST_COUNT; i++) {
         int idx = last_call_idx + i;
         idx %= LAST_COUNT;
@@ -876,7 +875,6 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
 
     writer.Key("last_insns");
     writer.StartArray();
-    // so we can go backward and not end up negative
     for(int i = 0; i < LAST_COUNT; i++) {
         int idx = last_insn_idx + i;
         idx %= LAST_COUNT;
@@ -1298,6 +1296,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
 #define PREPROTO void(__cdecl *)(void *, void **)
 #define POSTPROTO void(__cdecl *)(void *, void *)
 
+    // set up pre and post hooks for each target function
     std::map<char *, PREPROTO> toHookPre;
     toHookPre["ReadEventLog"] = wrap_pre_ReadEventLog;
     toHookPre["RegQueryValueExW"] = wrap_pre_RegQueryValueEx;
@@ -1318,10 +1317,12 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPost["WinHttpReadData"] = wrap_post_GenericTaint;
     toHookPost["recv"] = wrap_post_GenericTaint;
 
+    // when a module is loaded, iterate its functions looking for matches in toHookPre
     std::map<char *, PREPROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
         
+        // if our toHookPre function matches -t target
         std::string target = op_target.get_value();
         std::string strFunctionName(functionName);
         if(target != "" && target.find("," + strFunctionName) == std::string::npos) {
@@ -1333,12 +1334,19 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
         void(__cdecl *hookFunctionPost)(void *, void *);
         hookFunctionPost = NULL;
 
+        // if we have a post hook function, use it
         if(toHookPost.find(functionName) != toHookPost.end()) {
             hookFunctionPost = toHookPost[functionName];
         }
 
+        // find target function in module
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
         const char *mod_name = dr_module_preferred_name(mod);
+
+        // special cases
+        // ReadFile and RegQueryValueEx* are in multiple DLLs
+        // only use the ones in KERNELBASE.dll
+
         if(strcmp(functionName, "ReadFile") == 0) {
             if(strcmp(mod_name, "KERNELBASE.dll") != 0) {
                 continue;
@@ -1351,6 +1359,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
             }
         }
 
+        // if the function was found, wrap it
         if (towrap != NULL) {
             dr_flush_region(towrap, 0x1000);
             bool ok = drwrap_wrap(towrap, hookFunctionPre, hookFunctionPost);
@@ -1364,11 +1373,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     }
 }
 
-#define NO_REPLAY 0xFFFFFFF
-static droption_t<unsigned int> op_replay
-(DROPTION_SCOPE_CLIENT, "r", NO_REPLAY, "replay",
- "The run id for a crash to replay.");
-
+// register callbacks
 void tracer(client_id_t id, int argc, const char *argv[]) {
     drreg_options_t ops = {sizeof(ops), 3, false};
     dr_set_client_name("Tracer",
@@ -1391,11 +1396,12 @@ void tracer(client_id_t id, int argc, const char *argv[]) {
     mutatex = dr_mutex_create();
     dr_register_exit_event(event_exit_trace);
 
+    // trace without taint tracking
     if(!op_no_taint.get_value()) {
         if(!drmgr_register_bb_instrumentation_event(
                                                 NULL,
-                                                 event_app_instruction,
-                                                 NULL)) 
+                                                event_app_instruction,
+                                                NULL)) 
         {
             DR_ASSERT(false);
         }
@@ -1415,6 +1421,7 @@ void tracer(client_id_t id, int argc, const char *argv[]) {
 DR_EXPORT void
 dr_client_main(client_id_t id, int argc, const char *argv[])
 {
+    // parse client options
     std::string parse_err;
     int last_idx = 0;
     if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
@@ -1422,6 +1429,7 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_abort();
     }
 
+    // target is mandatory
     std::string target = op_target.get_value();
     if(target == "") {
         dr_fprintf(STDERR, "ERROR: arg -t (target) required");
