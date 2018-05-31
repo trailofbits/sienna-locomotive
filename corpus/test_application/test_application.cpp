@@ -104,6 +104,44 @@ int test_ReadFile(bool fuzzing) {
     return 0;
 }
 
+int test_ReadFile_inf_loop(bool fuzzing) {
+    LPWSTR name = L"test_ReadFile.txt";
+    prep_read_file_test(name);
+    HANDLE file = CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (file == INVALID_HANDLE_VALUE) {
+        printf("ERROR: CreateFile (%x)\n", GetLastError());
+        return 1;
+    }
+
+    BYTE buf[0x1000];
+    DWORD bytes_to_read = 8;
+    DWORD bytes_read;
+    while(1) {
+        SetFilePointer(file, 0, NULL, FILE_BEGIN);
+
+        if (!ReadFile(file, buf, bytes_to_read, &bytes_read, NULL) || bytes_read != bytes_to_read) {
+            printf("ERROR: ReadFile (ms_buf) (%x)\n", GetLastError());
+            return 1;
+        }
+
+        buf[8] = 0;
+        printf("BUF: %s\n", buf);
+
+        int *crashPtr = *(int **)buf;
+        printf("CRASH PTR: %p\n", crashPtr);
+        if (fuzzing) {
+            if((UINT64)crashPtr > 0x4947464544434241) {
+                printf("*CRASH PTR: %x\n", *crashPtr);
+            }
+        } else {
+            printf("*CRASH PTR: %x\n", *crashPtr);
+        }
+    }
+
+    CloseHandle(file);
+    return 0;
+}
+
 int test_fread(bool fuzzing) {
     LPWSTR name = L"test_ReadFile.txt";
     prep_read_file_test(name);
@@ -194,6 +232,10 @@ int main()
         case 6:
             printf("Running: test_fread\n");
             test_fread(fuzzing);
+            break;
+        case 7:
+            printf("Running: test_ReadFile_inf_loop\n");
+            test_ReadFile_inf_loop(fuzzing);
             break;
         default:
             show_help(argv);
