@@ -6,6 +6,16 @@ The primary goal is ease of use. That won't stop us from trying to make it faste
 
 ### Building 
 
+#### Dependencies
+
+* CMake
+* Visual Studio 2017
+* DynamoRIO (save the path where you installed it)
+
+#### Build Commands
+
+From the root of the Sienna Locomotive repository:
+
 ```
 mkdir build
 cd build
