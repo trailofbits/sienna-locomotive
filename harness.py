@@ -10,12 +10,17 @@ import json
 
 server_proc = None
 
+
 def run_dr(_config, save_stdout=False, save_stderr=False, verbose=False):
-    program_arr = [_config['drrun_path']] + _config['drrun_args'] + ['-c', _config['client_path']] + _config['client_args'] + ['--', _config['target_application_path']] + _config['target_args']
+    program_arr = [_config['drrun_path']] + _config['drrun_args'] + ['-c', _config['client_path']] + \
+        _config['client_args'] + ['--', _config['target_application_path']] + _config['target_args']
     if verbose:
         print("Executing drrun: %s" % ' '.join(program_arr))
-    completed_process = subprocess.run(program_arr, stdout=(subprocess.PIPE if save_stdout else None), stderr=(subprocess.PIPE if save_stderr else None))
+    completed_process = subprocess.run(program_arr,
+                                       stdout=(subprocess.PIPE if save_stdout else None),
+                                       stderr=(subprocess.PIPE if save_stderr else None))
     return completed_process
+
 
 def main():
     from fuzzer_config import config, get_path_to_run_file
@@ -27,7 +32,10 @@ def main():
                                     'client_path': config['wizard_path'],
                                     'client_args': [],
                                     'target_application_path': config['target_application_path'],
-                                    'target_args': config['target_args']}, save_stdout=False, save_stderr=True, verbose=config['verbose'])
+                                    'target_args': config['target_args']},
+                                   save_stdout=False,
+                                   save_stderr=True,
+                                   verbose=config['verbose'])
         wizard_output = completed_process.stderr.decode('utf-8')
         wizard_findings = []
         for line in str.splitlines(wizard_output):
@@ -46,8 +54,8 @@ def main():
     # Start the server if it's not already running
     if not os.path.isfile("\\\\.\\pipe\\fuzz_server"):
         global server_proc
-        server_proc = subprocess.Popen([config['server_path']], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        print("Server running in process {}".format(server_proc.pid))
+        server_proc = subprocess.Popen(["powershell", "start", "powershell", "{-NoExit", "-Command",
+                                        "\"{}\"}}".format(config['server_path'])])
 
     added = 0
     # Spawn a thread that will run DynamoRIO and wait for the output
@@ -79,7 +87,7 @@ def main():
                     # Write stdout and stderr to files
                     # https://stackoverflow.com/questions/47038990/python-subprocess-cannot-capture-output-of-windows-program
                     try:
-                        if proc.stdout is not None: # TODO: figure out why proc.stdout is always empty
+                        if proc.stdout is not None:  # TODO: figure out why proc.stdout is always empty
                             with open(get_path_to_run_file(run_id, 'fuzz.stdout'), 'wb') as stdoutfile:
                                         stdoutfile.write(proc.stdout)
                         if proc.stderr is not None:
@@ -93,17 +101,17 @@ def main():
                     if proc.returncode != 0:
                         print('Fuzzing run %s returned %s' % (run_id, proc.returncode))
                         triage_config = {'drrun_path': config['drrun_path'],
-                                        'drrun_args': config['drrun_args'],
-                                        'client_path': config['triage_path'],
-                                        'client_args': ['-r', str(run_id)],
-                                        'target_application_path': config['target_application_path'],
-                                        'target_args': config['target_args']}
-                        
+                                         'drrun_args': config['drrun_args'],
+                                         'client_path': config['triage_path'],
+                                         'client_args': ['-r', str(run_id)],
+                                         'target_application_path': config['target_application_path'],
+                                         'target_args': config['target_args']}
+
                         if config['wizard']:
                             triage_config['client_args'] += ['-t', wizard_findings[index]]
 
                         triage_future = executor.submit(run_dr, triage_config, True, True, verbose=config['verbose'])
-                        setattr(triage_future, "run_id", run_id) # Bind run id to the future so it's easier to find next time
+                        setattr(triage_future, "run_id", run_id)  # Bind run id to the future so it's easier to find
                         triage_futures.append(triage_future)
                         stop = True
 
@@ -147,8 +155,5 @@ if __name__ == '__main__':
     try:
         main()
     except KeyboardInterrupt:
-        if server_proc != None:
-            print('Killing server...')
-            server_proc.kill()
-        raise 
-
+        print('Cleaning Up...')  # TODO cleanup?
+        raise

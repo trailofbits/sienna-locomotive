@@ -10,27 +10,34 @@ import argparse
 import configparser
 from functools import reduce
 
+
 def get_path_to_run_file(run_id, filename):
-	return reduce(os.path.join, [os.getenv('APPDATA'), 'Trail of Bits', 'fuzzkit', 'working', str(run_id), filename])
+    return reduce(os.path.join, [os.getenv('APPDATA'), 'Trail of Bits', 'fuzzkit', 'working', str(run_id), filename])
+
+
+sl2_dir = reduce(os.path.join, [os.getenv('APPDATA'), 'Trail of Bits', 'fuzzkit'])
+if not os.path.isdir(sl2_dir):
+    os.makedirs(os.path.join(sl2_dir, 'working'))
+    os.mkdir(os.path.join(sl2_dir, 'log'))
 
 config_path = reduce(os.path.join, [os.getenv('APPDATA'), 'Trail of Bits', 'fuzzkit', 'config.ini'])
 
 # Create a default config file if one doesn't exist
 if not os.path.exists(config_path):
-	default_config = configparser.ConfigParser()
-	default_config['DEFAULT'] = {'drrun_path': 'dynamorio\\bin64\\drrun.exe', 
-								'drrun_args': '', 
-								'client_path': 'build\\fuzz_dynamorio\\Debug\\fuzzer.dll', 
-								'client_args': '', 
-								'server_path': 'build\\server\\Debug\\server.exe', 
-								'wizard_path': 'build\\wizard\\Debug\\wizard.dll', 
-								'triage_path': 'build\\triage_dynamorio\\Debug\\tracer.dll', 
-								'target_application_path': 'build\\corpus\\test_application\\Debug\\test_application.exe', 
-								'target_args':'', 
-								'runs': 1, 
-								'simultaneous': 1}
-	with open(config_path, 'w') as configfile:
-		default_config.write(configfile)
+    default_config = configparser.ConfigParser()
+    default_config['DEFAULT'] = {'drrun_path': 'dynamorio\\bin64\\drrun.exe',
+                                 'drrun_args': '',
+                                 'client_path': 'build\\fuzz_dynamorio\\Debug\\fuzzer.dll',
+                                 'client_args': '',
+                                 'server_path': 'build\\server\\Debug\\server.exe',
+                                 'wizard_path': 'build\\wizard\\Debug\\wizard.dll',
+                                 'triage_path': 'build\\triage_dynamorio\\Debug\\tracer.dll',
+                                 'target_application_path': 'build\\corpus\\test_application\\Debug\\test_application.exe',
+                                 'target_args': '',
+                                 'runs': 1,
+                                 'simultaneous': 1}
+    with open(config_path, 'w') as configfile:
+        default_config.write(configfile)
 
 # Read the config file
 _config = configparser.ConfigParser()
@@ -50,38 +57,38 @@ parser.add_argument('-a', '--arguments', action='store', dest='target_args', nar
 args = parser.parse_args()
 
 # Read the ConfigParser object into a standard dict
-config = {} # This is what gets exported
+config = {}  # This is what gets exported
 for key in _config[args.profile]:
-	config[key] = _config[args.profile].get(key)
+    config[key] = _config[args.profile].get(key)
 
 # Convert numeric arguments into ints. Need to update this list manually if adding anything.
 int_options = ['runs', 'simultaneous']
 for opt in int_options:
-	config[opt] = int(config[opt])
+    config[opt] = int(config[opt])
 
 # Convert comma-separated arguments into lists
 list_options = ['drrun_args', 'client_args', 'target_args']
 for opt in list_options:
-	config[opt] = [] if (len(config[opt]) == 0) else config[opt].split(',')
+    config[opt] = [] if (len(config[opt]) == 0) else config[opt].split(',')
 
 if args.target_application_path is not None and len(config['target_args']) > 0:
-	config['target_args'] =  []
+    config['target_args'] = []
 
 if args.verbose:
-	config['drrun_args'].append('-verbose')
+    config['drrun_args'].append('-verbose')
 
 if not args.nopersist:
-	config['drrun_args'].append('-persist')
+    config['drrun_args'].append('-persist')
 
 # Replace any values in the config dict with the optional value from the argument.
 # Note that if you set a default value for an arg, this will overwrite its value in the config
 # file even if the argument is not explicitly set by the user, so make sure you use keys that aren't
 # in the config file for any arguments that have default values.
 for arg in vars(args):
-	if getattr(args, arg) is not None:
-		config[arg] = getattr(args, arg)
+    if getattr(args, arg) is not None:
+        config[arg] = getattr(args, arg)
 
 for key in config:
-	if 'path' in key:
-		if not os.path.exists(config[key]):
-			print("WARNING: {key} = {dest}, which does not exist.".format(key=key, dest=config[key]))
+    if 'path' in key:
+        if not os.path.exists(config[key]):
+            print("WARNING: {key} = {dest}, which does not exist.".format(key=key, dest=config[key]))
