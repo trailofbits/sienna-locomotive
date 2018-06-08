@@ -11,16 +11,12 @@ import configparser
 from functools import reduce
 
 
-def get_path_to_run_file(run_id, filename):
-    return reduce(os.path.join, [os.getenv('APPDATA'), 'Trail of Bits', 'fuzzkit', 'working', str(run_id), filename])
-
-
 sl2_dir = reduce(os.path.join, [os.getenv('APPDATA'), 'Trail of Bits', 'fuzzkit'])
 if not os.path.isdir(sl2_dir):
     os.makedirs(os.path.join(sl2_dir, 'working'))
     os.mkdir(os.path.join(sl2_dir, 'log'))
 
-config_path = reduce(os.path.join, [os.getenv('APPDATA'), 'Trail of Bits', 'fuzzkit', 'config.ini'])
+config_path = os.path.join(sl2_dir, 'config.ini')
 
 # Create a default config file if one doesn't exist
 if not os.path.exists(config_path):
@@ -45,11 +41,14 @@ _config.read(config_path)
 
 # Set up argument parser
 parser = argparse.ArgumentParser(description='Run the DynamoRIO fuzzing harness. You can pass arguments to the command line to override the defaults in config.ini')
-parser.add_argument('-w', '--wizard', action='store_true', dest='wizard', default=False, help="Run the wizard before fuzzing to select a function to fuzz") # TODO : default to true before release
+parser.add_argument('-w', '--wizard', action='store_true', dest='wizard', default=False, help="Run the wizard before fuzzing to select a function to fuzz")  # TODO : default to true before release
 parser.add_argument('-v', '--verbose', action='store_true', dest='verbose', default=False, help="Tell drrun to run in verbose mode")
 parser.add_argument('-n', '--nopersist', action='store_true', dest='nopersist', default=False, help="Tell drrun not to use persistent code caches (slower)")
 parser.add_argument('-p', '--profile', action='store', dest='profile', default='DEFAULT', type=str, help="Pull configuration from a specific section in config.ini. Defaults to DEFAULT")
-parser.add_argument('-c', '--continuous', action='store_true', dest='continuous', default=False, help="Run continuously")
+parser.add_argument('-c', '--continuous', action='store_true', dest='continuous', default=False, help="Continuously fuzz the target application")
+parser.add_argument('-x', '--exit', action='store_true', dest='exit_early', default=False, help="Exit the application once it finds and triages a single crash")
+parser.add_argument('-f', '--fuzztimeout', action='store', dest='fuzz_timeout', type=int, help="Timeout (seconds) after which fuzzing runs should be killed. Defaults to infinite")
+parser.add_argument('-i', '--triagetimeout', action='store', dest='triage_timeout', type=int, help="Timeout (seconds) after which triage runs should be killed. Defaults to infinite")
 parser.add_argument('-r', '--runs', action='store', dest='runs', type=int, help="Number of times to run the target application")
 parser.add_argument('-s', '--simultaneous', action='store', dest='simultaneous', type=int, help="Number of simultaneous instances of the target application that can run")
 parser.add_argument('-t', '--target', action='store', dest='target_application_path', type=str, help="Path to the target application. Note: Ignores arguments in the config file")
@@ -92,3 +91,7 @@ for key in config:
     if 'path' in key:
         if not os.path.exists(config[key]):
             print("WARNING: {key} = {dest}, which does not exist.".format(key=key, dest=config[key]))
+
+if __name__ == '__main__':
+    from pprint import pprint
+    pprint(config)
