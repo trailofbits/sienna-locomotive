@@ -16,29 +16,29 @@
 #include <winhttp.h>
 
 static droption_t<std::string> op_include(
-    DROPTION_SCOPE_CLIENT, 
-    "i", 
-    "", 
+    DROPTION_SCOPE_CLIENT,
+    "i",
+    "",
     "include",
     "Functions to be included in hooking.");
 
 static droption_t<std::string> op_target(
-    DROPTION_SCOPE_CLIENT, 
-    "t", 
-    "", 
+    DROPTION_SCOPE_CLIENT,
+    "t",
+    "",
     "target",
     "Specific call to target.");
 
 static void
 event_thread_init(void *drcontext)
 {
-    
+
 }
 
 static void
 event_thread_exit(void *drcontext)
 {
-    
+
 }
 
 static void
@@ -111,7 +111,7 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
     DWORD  nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 4);
     DWORD  *pnBytesRead = (DWORD *)drwrap_get_arg(wrapcxt, 5);
     DWORD  *pnMinNumberOfBytesNeeded = (DWORD *)drwrap_get_arg(wrapcxt, 6);
-    
+
     *user_data = malloc(sizeof(read_info));
     ((read_info *)*user_data)->lpBuffer = lpBuffer;
     ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
@@ -153,7 +153,7 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
     DWORD dwBufferLength = (DWORD)drwrap_get_arg(wrapcxt, 2);
     PDWORD pdwBytesRead = (PDWORD)drwrap_get_arg(wrapcxt, 3);
     WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE)(int)drwrap_get_arg(wrapcxt, 3);
-    
+
     // get url
     // InternetQueryOption
 
@@ -172,7 +172,7 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
-    
+
     // get url
     // InternetQueryOption
 
@@ -191,7 +191,7 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
-    
+
     // get url
     // InternetQueryOption
 
@@ -210,7 +210,7 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
     char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
     int len = (int)drwrap_get_arg(wrapcxt, 2);
     int flags = (int)drwrap_get_arg(wrapcxt, 3);
-    
+
     // get ip address
     // getpeername
 
@@ -267,7 +267,7 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->position = NULL;
 }
 
-static void 
+static void
 hex_dump(LPVOID lpBuffer, DWORD nNumberOfBytesToRead) {
     DWORD size = nNumberOfBytesToRead > 256 ? 256 : nNumberOfBytesToRead;
 
@@ -323,10 +323,10 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
 
     read_info *info = ((read_info *)user_data);
     CHAR *functionName = get_function_name(info->function);
-    
+
     BOOL targeted = true;
     std::string target = op_target.get_value();
-    
+
     dr_printf("target: %s\n", target.c_str());
     dr_printf("function: %s\n", functionName);
 
@@ -341,7 +341,8 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
             }
         }
     }
-    
+
+    dr_fprintf(STDERR, "--------\n");
     dr_fprintf(STDERR, "<id: %llu%s>\n", call_counts[info->function], functionName);
     call_counts[info->function]++;
 
@@ -359,6 +360,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
 
     if(targeted) {
         hex_dump(lpBuffer, nNumberOfBytesToRead);
+        dr_fprintf(STDERR, "--------\n");
     }
 }
 
@@ -383,7 +385,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPre["recv"] = wrap_pre_recv;
     toHookPre["ReadFile"] = wrap_pre_ReadFile;
     toHookPre["fread_s"] = wrap_pre_fread;
-    
+
     std::map<char *, POSTPROTO> toHookPost;
     toHookPost["ReadFile"] = wrap_post_Generic;
     toHookPost["InternetReadFile"] = wrap_post_Generic;
@@ -469,7 +471,7 @@ void wizard(client_id_t id, int argc, const char *argv[]) {
         DR_ASSERT(false);
     }
 
-    dr_log(NULL, LOG_ALL, 1, "Client 'instrace' initializing\n");
+    dr_log(NULL, LOG_ALL, 1, "Client 'Wizard' initializing\n");
 }
 
 DR_EXPORT void

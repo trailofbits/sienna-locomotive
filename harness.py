@@ -4,7 +4,7 @@ Fuzzing harness for DynamoRIO client. Imports fuzzer_config.py for argument and 
 
 import os
 import concurrent.futures
-import traceback
+import re
 import subprocess
 import json
 import threading
@@ -62,23 +62,40 @@ def wizard_run(_config):
                                 'client_args': [],
                                 'target_application_path': _config['target_application_path'],
                                 'target_args': _config['target_args']},
-                               save_stdout=False,
+                               save_stdout=True,
                                save_stderr=True,
                                verbose=_config['verbose'])
     wizard_output = completed_process.stderr.decode('utf-8')
     wizard_findings = []
-    for line in str.splitlines(wizard_output):
-        if '<id:' in line:
-            func_name = line.strip('<id: >').split(',')[0] + ',' + line.strip('<id: >').split(',')[-1]
-            if func_name not in wizard_findings:
-                wizard_findings.append(func_name)
-    print(wizard_output)
+    sections = re.split(r"--------\n", wizard_output)
+    for line in str.splitlines(sections[0]):
+        if '<wrapped ' in line:
+            re.search(r"<wrapped (?P<func_name>\S+) @ (?P<address>\S+) in (?P<module>\S+)", line).groupdict()  # TODO use
+    for section in sections[1:]:
+        results = {'index': -123, 'func_name': 'PARSE ERROR', 'hexdump_lines': []}
+        for line in section.splitlines():
+            if '<id:' in line:
+                results.update(re.search(r"<id: (?P<index>\d+),(?P<func_name>\S+)>", line).groupdict())
+            elif 'source:' in line:
+                results.update(re.search(r"source: (?P<source>\S+)", line).groupdict())
+            elif 'range:' in line:
+                results.update(re.search(r"range: (?P<start>\S+),(?P<end>\S+)", line).groupdict())
+            else:
+                if len(line.strip()) > 0:
+                    results['hexdump_lines'].append(line.strip())
+        if not any((lambda l, r: l['index'] == r['index'] and l['func_name'] == r['func_name'])(results, finding) for finding in wizard_findings):
+            if 'ERROR' not in results['func_name']:
+                wizard_findings.append(results)
     print("Functions found:")
-    for i, func_name in enumerate(wizard_findings):
-        print("{})".format(i), func_name)
+    for i, finding in enumerate(wizard_findings):
+        if 'source' in finding:
+            print("{}) {func_name} from {source}:{start}-{end}".format(i, **finding))
+        else:
+            print("{}) {func_name}".format(i, **finding))
+        print("   ", '\n   '.join(line for line in finding['hexdump_lines'][:5]))
     index = int(input("Choose a function to fuzz> "))
     _config['client_args'].append('-t')
-    _config['client_args'].append(wizard_findings[index])
+    _config['client_args'].append("{},{}".format(wizard_findings[index]['index'], wizard_findings[index]['func_name']))
     return _config
 
 
@@ -86,12 +103,13 @@ def fuzzer_run(_config):
     """ Runs the fuzzer """
     completed_process = run_dr(_config, True, True, _config['verbose'], _config.get('fuzz_timeout', None))
 
-    # Parse run ID from stderr)
     run_id = 'ERR'
     for line in str.splitlines(completed_process.stderr.decode('utf-8')):
         if 'Beginning fuzzing run' in line:
             run_id = int(line.replace('Beginning fuzzing run ', '').strip())
-        # TODO validate the run ID
+    if run_id == 'ERR':
+        print("Error: No run ID could be parsed from the server output")
+        return False, -1
 
     # Start triage if the fuzzing harness exited with an error code
     if completed_process.returncode != 0:
