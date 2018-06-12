@@ -77,7 +77,7 @@ def wizard_run(_config):
             if '<id:' in line:
                 results.update(re.search(r"<id: (?P<index>\d+),(?P<func_name>\S+)>", line).groupdict())
             elif 'source:' in line:
-                results.update(re.search(r"source: (?P<source>\S+)", line).groupdict())
+                results.update(re.search(r"source: (?P<source>[\S ]+)", line).groupdict())
             elif 'range:' in line:
                 results.update(re.search(r"range: (?P<start>\S+),(?P<end>\S+)", line).groupdict())
             else:
@@ -92,7 +92,9 @@ def wizard_run(_config):
             print("{}) {func_name} from {source}:{start}-{end}".format(i, **finding))
         else:
             print("{}) {func_name}".format(i, **finding))
-        print("   ", '\n   '.join(line for line in finding['hexdump_lines'][:5]))
+        print("   ", '\n   '.join(line for line in finding['hexdump_lines'][:4]))
+        if len(finding['hexdump_lines']) > 4:
+            print("   ...")
     index = int(input("Choose a function to fuzz> "))
     _config['client_args'].append('-t')
     _config['client_args'].append("{},{}".format(wizard_findings[index]['index'], wizard_findings[index]['func_name']))

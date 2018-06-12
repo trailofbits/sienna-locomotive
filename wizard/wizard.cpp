@@ -246,8 +246,8 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->source = NULL;
     ((read_info *)*user_data)->position = NULL;
 
-    TCHAR *filePath = (TCHAR *)malloc(sizeof(TCHAR) * (MAX_PATH+1));
-    DWORD pathSize = GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, 0);
+    LPWSTR filePath = (LPWSTR)malloc(sizeof(WCHAR) * (MAX_PATH+1));
+    DWORD pathSize = GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, FILE_NAME_NORMALIZED);
     ((read_info *)*user_data)->source = filePath;
     ((read_info *)*user_data)->position = SetFilePointer(hFile, 0, NULL, FILE_CURRENT);
 }
@@ -347,7 +347,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     call_counts[info->function]++;
 
     if(info->source != NULL) {
-        dr_fprintf(STDERR, "source: %s\n", info->source);
+        dr_fprintf(STDERR, "source: \"%S\"\n", info->source);
         free(info->source);
         DWORD end = info->position + info->nNumberOfBytesToRead;
         dr_fprintf(STDERR, "range: 0x%x,0x%x\n", info->position, end);
