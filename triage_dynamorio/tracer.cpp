@@ -47,26 +47,26 @@ app_pc module_end = 0;
 
 /* Required, which specific call to target */
 static droption_t<std::string> op_target(
-    DROPTION_SCOPE_CLIENT, 
-    "t", 
-    "", 
+    DROPTION_SCOPE_CLIENT,
+    "t",
+    "",
     "target",
     "Specific call to target.");
 
 /* Mostly used to debug if taint tracking is too slow */
 static droption_t<unsigned int> op_no_taint(
-    DROPTION_SCOPE_CLIENT, 
-    "nt", 
-    0, 
+    DROPTION_SCOPE_CLIENT,
+    "nt",
+    0,
     "no-taint",
     "Do not do instruction level instrumentation.");
 
 /* Used when replaying a run from the server */
 #define NO_REPLAY 0xFFFFFFF
 static droption_t<unsigned int> op_replay(
-    DROPTION_SCOPE_CLIENT, 
-    "r", 
-    NO_REPLAY, 
+    DROPTION_SCOPE_CLIENT,
+    "r",
+    NO_REPLAY,
     "replay",
     "The run id for a crash to replay.");
 
@@ -78,6 +78,7 @@ enum class Function {
     WinHttpWebSocketReceive,
     RegQueryValueEx,
     ReadEventLog,
+    fread,
 };
 
 std::map<Function, UINT64> call_counts;
@@ -188,7 +189,7 @@ static reg_id_t reg_to_full_width64(reg_id_t reg) {
 
 /* Check whether and operand is tainted */
 static bool
-is_tainted(void *drcontext, opnd_t opnd) 
+is_tainted(void *drcontext, opnd_t opnd)
 {
     if(opnd_is_reg(opnd)) {
         /* Check if a register is in tainted_regs */
@@ -225,12 +226,12 @@ is_tainted(void *drcontext, opnd_t opnd)
             if(reg_disp != NULL && tainted_regs.find(reg_to_full_width64(reg_disp)) != tainted_regs.end()) {
                 return true;
             }
-            
+
             if (reg_indx != NULL && tainted_regs.find(reg_to_full_width64(reg_indx)) != tainted_regs.end()) {
                 return true;
             }
         }
-    } 
+    }
     // else if(opnd_is_pc(opnd)) {
     //     opnd_get_pc(opnd);
     // } else if(opnd_is_abs_addr(opnd)) {
@@ -261,14 +262,14 @@ untaint_mem(app_pc addr, uint size) {
 }
 
 static void
-taint(void *drcontext, opnd_t opnd) 
+taint(void *drcontext, opnd_t opnd)
 {
     if(opnd_is_reg(opnd)) {
         reg_id_t reg = opnd_get_reg(opnd);
         reg = reg_to_full_width64(reg);
 
         tainted_regs.insert(reg);
-        
+
         // char buf[100];
         // opnd_disassemble_to_buffer(drcontext, opnd, buf, 100);
     } else if(opnd_is_memory_reference(opnd)) {
@@ -282,18 +283,18 @@ taint(void *drcontext, opnd_t opnd)
         uint size = opnd_size_in_bytes(dr_size);
         // loop insert
         taint_mem(addr, size);
-    } 
+    }
     // else if(opnd_is_pc(opnd)) {
     //     opnd_get_pc(opnd);
     // } else if(opnd_is_abs_addr(opnd)) {
     //     opnd_get_addr(opnd);
     // }
-    
+
     return;
 }
 
 static bool
-untaint(void *drcontext, opnd_t opnd) 
+untaint(void *drcontext, opnd_t opnd)
 {
     bool untainted = false;
     if(opnd_is_reg(opnd)) {
@@ -317,13 +318,13 @@ untaint(void *drcontext, opnd_t opnd)
         uint size = opnd_size_in_bytes(dr_size);
         // loop insert
         untainted = untaint_mem(addr, size);
-    } 
+    }
     // else if(opnd_is_pc(opnd)) {
     //     opnd_get_pc(opnd);
     // } else if(opnd_is_abs_addr(opnd)) {
     //     opnd_get_addr(opnd);
     // }
-    
+
     return untainted;
 }
 
@@ -557,7 +558,7 @@ handle_specific(void *drcontext, instr_t *instr) {
 
 /* */
 static void
-propagate_taint(app_pc pc) 
+propagate_taint(app_pc pc)
 {
     if(pc > module_start && pc < module_end) {
         last_insns[last_insn_idx] = pc;
@@ -568,7 +569,7 @@ propagate_taint(app_pc pc)
     if(tainted_mems.size() == 0 && tainted_regs.size() == 0) {
         return;
     }
-    
+
     void *drcontext = dr_get_current_drcontext();
     instr_t instr;
     instr_init(drcontext, &instr);
@@ -633,19 +634,19 @@ propagate_taint(app_pc pc)
 
 static dr_emit_flags_t
 event_app_instruction(
-    void *drcontext, 
-    void *tag, 
+    void *drcontext,
+    void *tag,
     instrlist_t *bb,
-    instr_t *instr, 
+    instr_t *instr,
     bool for_trace,
-    bool translating, 
+    bool translating,
     void *user_data)
 {
     if (!instr_is_app(instr))
         return DR_EMIT_DEFAULT;
 
     /* Clean call propagate taint on each instruction*/
-    dr_insert_clean_call(drcontext, bb, instr, propagate_taint, false, 1, 
+    dr_insert_clean_call(drcontext, bb, instr, propagate_taint, false, 1,
                 OPND_CREATE_INTPTR(instr_get_app_pc(instr)));
 
     return DR_EMIT_DEFAULT;
@@ -654,13 +655,13 @@ event_app_instruction(
 static void
 event_thread_init(void *drcontext)
 {
-    
+
 }
 
 static void
 event_thread_exit(void *drcontext)
 {
-    
+
 }
 
 static void
@@ -685,23 +686,23 @@ event_exit_trace(void)
 /* Debug functionality */
 static void
 dump_regs(void *drcontext, app_pc exception_address) {
-    reg_id_t regs[16] = { 
-        DR_REG_RAX, 
-        DR_REG_RBX, 
-        DR_REG_RCX, 
-        DR_REG_RDX, 
-        DR_REG_RSP, 
-        DR_REG_RBP, 
-        DR_REG_RSI, 
-        DR_REG_RDI, 
-        DR_REG_R8, 
-        DR_REG_R9, 
-        DR_REG_R10, 
-        DR_REG_R11, 
-        DR_REG_R12, 
-        DR_REG_R13, 
-        DR_REG_R14, 
-        DR_REG_R15, 
+    reg_id_t regs[16] = {
+        DR_REG_RAX,
+        DR_REG_RBX,
+        DR_REG_RCX,
+        DR_REG_RDX,
+        DR_REG_RSP,
+        DR_REG_RBP,
+        DR_REG_RSI,
+        DR_REG_RDI,
+        DR_REG_R8,
+        DR_REG_R9,
+        DR_REG_R10,
+        DR_REG_R11,
+        DR_REG_R12,
+        DR_REG_R13,
+        DR_REG_R14,
+        DR_REG_R15,
     };
 
     std::set<reg_id_t>::iterator reg_it;
@@ -826,23 +827,23 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
 
     writer.Key("tainted_regs");
     writer.StartArray();
-    reg_id_t regs[16] = { 
-        DR_REG_RAX, 
-        DR_REG_RBX, 
-        DR_REG_RCX, 
-        DR_REG_RDX, 
-        DR_REG_RSP, 
-        DR_REG_RBP, 
-        DR_REG_RSI, 
-        DR_REG_RDI, 
-        DR_REG_R8, 
-        DR_REG_R9, 
-        DR_REG_R10, 
-        DR_REG_R11, 
-        DR_REG_R12, 
-        DR_REG_R13, 
-        DR_REG_R14, 
-        DR_REG_R15, 
+    reg_id_t regs[16] = {
+        DR_REG_RAX,
+        DR_REG_RBX,
+        DR_REG_RCX,
+        DR_REG_RDX,
+        DR_REG_RSP,
+        DR_REG_RBP,
+        DR_REG_RSI,
+        DR_REG_RDI,
+        DR_REG_R8,
+        DR_REG_R9,
+        DR_REG_R10,
+        DR_REG_R11,
+        DR_REG_R12,
+        DR_REG_R13,
+        DR_REG_R14,
+        DR_REG_R15,
     };
 
     for(int i=0; i<16; i++) {
@@ -933,7 +934,7 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
 
     WCHAR targetFile[MAX_PATH + 1] = { 0 };
     ZeroMemory(targetFile, sizeof(WCHAR) * (MAX_PATH + 1));
-    
+
     if(replay) {
         HANDLE h_pipe = CreateFile(
             L"\\\\.\\pipe\\fuzz_server",
@@ -974,7 +975,7 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
             }
         }
     }
-        
+
     dr_printf("#### BEGIN CRASH DATA JSON\n");
     dr_printf("%s\n", crash_json.c_str());
     dr_printf("#### END CRASH DATA JSON\n");
@@ -1014,9 +1015,9 @@ onexception(void *drcontext, dr_exception_t *excpt) {
     decode(drcontext, exception_address, &instr);
     char buf[100];
     instr_disassemble_to_buffer(drcontext, &instr, buf, 100);
-    
+
     disassembly = buf;
-    
+
     // check exception code
     if (exception_code == EXCEPTION_ILLEGAL_INSTRUCTION) {
         if(pc_tainted) {
@@ -1060,7 +1061,7 @@ onexception(void *drcontext, dr_exception_t *excpt) {
         dump_crash(drcontext, excpt, reason, score, disassembly);
     }
 
-    // check ret 
+    // check ret
     if (is_ret) {
         if (pc_tainted || stack_tainted) {
             score = 100;
@@ -1136,7 +1137,7 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
     DWORD  nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 4);
     DWORD  *pnBytesRead = (DWORD *)drwrap_get_arg(wrapcxt, 5);
     DWORD  *pnMinNumberOfBytesNeeded = (DWORD *)drwrap_get_arg(wrapcxt, 6);
-    
+
     *user_data = malloc(sizeof(read_info));
     ((read_info *)*user_data)->lpBuffer = lpBuffer;
     ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
@@ -1171,7 +1172,7 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
     DWORD dwBufferLength = (DWORD)drwrap_get_arg(wrapcxt, 2);
     PDWORD pdwBytesRead = (PDWORD)drwrap_get_arg(wrapcxt, 3);
     WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE)(int)drwrap_get_arg(wrapcxt, 3);
-    
+
     *user_data = malloc(sizeof(read_info));
     ((read_info *)*user_data)->lpBuffer = pvBuffer;
     ((read_info *)*user_data)->nNumberOfBytesToRead = dwBufferLength;
@@ -1185,7 +1186,7 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
-    
+
     *user_data = malloc(sizeof(read_info));
     ((read_info *)*user_data)->lpBuffer = lpBuffer;
     ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
@@ -1199,7 +1200,7 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
-    
+
     *user_data = malloc(sizeof(read_info));
     ((read_info *)*user_data)->lpBuffer = lpBuffer;
     ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
@@ -1213,7 +1214,7 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
     char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
     int len = (int)drwrap_get_arg(wrapcxt, 2);
     int flags = (int)drwrap_get_arg(wrapcxt, 3);
-    
+
     *user_data = malloc(sizeof(read_info));
     ((read_info *)*user_data)->lpBuffer = buf;
     ((read_info *)*user_data)->nNumberOfBytesToRead = len;
@@ -1227,11 +1228,24 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
-    
+
     *user_data = malloc(sizeof(read_info));
     ((read_info *)*user_data)->lpBuffer = lpBuffer;
     ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
     ((read_info *)*user_data)->function = Function::ReadFile;
+}
+
+static void
+wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
+    dr_fprintf(STDERR, "<in wrap_pre_fread>\n");
+    void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
+    size_t size = (size_t)drwrap_get_arg(wrapcxt, 1);
+    size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
+
+    *user_data = malloc(sizeof(read_info));
+    ((read_info *)*user_data)->function = Function::fread;
+    ((read_info *)*user_data)->lpBuffer = buffer;
+    ((read_info *)*user_data)->nNumberOfBytesToRead = size * count;
 }
 
 static void
@@ -1248,7 +1262,7 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
 
     BOOL targeted = false;
     std::string target = op_target.get_value();
-    
+
     char *end;
     UINT64 num = strtoull(target.c_str(), &end, 10);
     if(call_counts[function] == num) {
@@ -1312,8 +1326,10 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPre["WinHttpReadData"] = wrap_pre_WinHttpReadData;
     toHookPre["recv"] = wrap_pre_recv;
     toHookPre["ReadFile"] = wrap_pre_ReadFile;
-    
+    toHookPre["fread"] = wrap_pre_fread;
+
     std::map<char *, POSTPROTO> toHookPost;
+    toHookPost["fread"] = wrap_post_GenericTaint;
     toHookPost["ReadFile"] = wrap_post_GenericTaint;
     toHookPost["InternetReadFile"] = wrap_post_GenericTaint;
     toHookPost["ReadEventLog"] = wrap_post_GenericTaint;
@@ -1334,7 +1350,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     std::map<char *, PREPROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
-        
+
         // if our toHookPre function matches -t target
         std::string target = op_target.get_value();
         std::string strFunctionName(functionName);
@@ -1406,7 +1422,7 @@ void tracer(client_id_t id, int argc, const char *argv[]) {
     if(run_id != NO_REPLAY) {
         replay = true;
     }
-    
+
     dr_printf("replay: %d\n", replay);
     dr_printf("run_id: %llu\n", run_id);
 
@@ -1418,7 +1434,7 @@ void tracer(client_id_t id, int argc, const char *argv[]) {
         if(!drmgr_register_bb_instrumentation_event(
                                                 NULL,
                                                 event_app_instruction,
-                                                NULL)) 
+                                                NULL))
         {
             DR_ASSERT(false);
         }
@@ -1427,7 +1443,7 @@ void tracer(client_id_t id, int argc, const char *argv[]) {
     if (!drmgr_register_module_load_event(module_load_event) ||
         !drmgr_register_thread_init_event(event_thread_init) ||
         !drmgr_register_thread_exit_event(event_thread_exit) ||
-        !drmgr_register_exception_event(onexception)) 
+        !drmgr_register_exception_event(onexception))
     {
         DR_ASSERT(false);
     }

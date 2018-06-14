@@ -7,6 +7,7 @@ import concurrent.futures
 import re
 import subprocess
 import json
+import traceback
 import threading
 from functools import reduce
 
@@ -104,9 +105,9 @@ def wizard_run(_config):
 def fuzzer_run(_config):
     """ Runs the fuzzer """
     completed_process = run_dr(_config, True, True, _config['verbose'], _config.get('fuzz_timeout', None))
-
     run_id = 'ERR'
-    for line in str.splitlines(completed_process.stderr.decode('utf-8')):
+    proc_stderr = completed_process.stderr.decode('utf-8')
+    for line in str.splitlines(proc_stderr):
         if 'Beginning fuzzing run' in line:
             run_id = int(line.replace('Beginning fuzzing run ', '').strip())
     if run_id == 'ERR':
@@ -114,7 +115,7 @@ def fuzzer_run(_config):
         return False, -1
 
     # Start triage if the fuzzing harness exited with an error code
-    if completed_process.returncode != 0:
+    if 'EXCEPTION_' in proc_stderr:
         print('Fuzzing run %s returned %s' % (run_id, completed_process.returncode))
         # Write stdout and stderr to files
         # TODO figure out why proc.stdout is always empty
@@ -123,7 +124,7 @@ def fuzzer_run(_config):
     elif _config['verbose']:
         print("Run %d did not find a crash" % run_id)
 
-    return (completed_process.returncode != 0), run_id
+    return ('EXCEPTION_' in proc_stderr), run_id
 
 
 def triage_run(_config, run_id):

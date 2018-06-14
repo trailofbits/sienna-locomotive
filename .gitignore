@@ -19,3 +19,4 @@ server/x64
 dynamorio/
 build/
 config.ini
+.DS_Store
