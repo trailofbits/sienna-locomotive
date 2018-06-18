@@ -59,6 +59,9 @@ def run_dr(_config, save_stdout=False, save_stderr=False, verbose=False, timeout
         if verbose:
             print("Killing parent process: %s" % popen_obj.pid)
         popen_obj.kill()
+        stdout, stderr = popen_obj.communicate(timeout=1)  # Try to grab the existing console output
+        popen_obj.stdout = stdout
+        popen_obj.stderr = stderr
         return popen_obj
 
 
@@ -177,16 +180,19 @@ def triage_run(_config, run_id):
 
 def fuzz_and_triage(_config):
     global can_fuzz
-    while can_fuzz:
-        crashed, run_id = fuzzer_run(_config)
-        if crashed:
-            triage_run(_config, run_id)
+    try:
+        while can_fuzz:
+            crashed, run_id = fuzzer_run(_config)
+            if crashed:
+                triage_run(_config, run_id)
 
-            if _config['exit_early']:
-                can_fuzz = False
+                if _config['exit_early']:
+                    can_fuzz = False
 
-        if not _config['continuous']:
-            return
+            if not _config['continuous']:
+                return
+    except Exception:
+        traceback.print_exc()
 
 
 def main():
