@@ -9,6 +9,8 @@ import subprocess
 import json
 import traceback
 import threading
+import time
+import signal
 from functools import reduce
 
 print_lock = threading.Lock()
@@ -30,16 +32,34 @@ def configure_future_attributes(future, callback, **kwargs):
 
 def run_dr(_config, save_stdout=False, save_stderr=False, verbose=False, timeout=None):
     """ Runs dynamorio with the given config. Clobbers console output if save_stderr/stdout are true """
-    program_arr = [_config['drrun_path']] + _config['drrun_args'] + ['-c', _config['client_path']] + \
+    program_arr = [_config['drrun_path'], '-pidfile', 'pidfile'] + _config['drrun_args'] + ['-c', _config['client_path']] + \
         _config['client_args'] + ['--', _config['target_application_path']] + _config['target_args']
     if verbose:
         with print_lock:
             print("Executing drrun: %s" % ' '.join(program_arr))
-    completed_process = subprocess.run(program_arr,
-                                       stdout=(subprocess.PIPE if save_stdout else None),
-                                       stderr=(subprocess.PIPE if save_stderr else None),
-                                       timeout=timeout)
-    return completed_process
+
+    started = time.time()
+    popen_obj = subprocess.Popen(program_arr, stdout=(subprocess.PIPE if save_stdout else None), stderr=(subprocess.PIPE if save_stderr else None))
+
+    try:
+        stdout, stderr = popen_obj.communicate(timeout=timeout)
+        if verbose:
+            print("Process completed after %s seconds" % (time.time() - started))
+        popen_obj.stdout = stdout
+        popen_obj.stderr = stderr
+        return popen_obj
+    except subprocess.TimeoutExpired:
+        if verbose:
+            print("Process Timed Out after %s seconds" % (time.time() - started))
+        with open('pidfile', 'r') as pidfile:
+            pid = pidfile.read().strip()
+            if verbose:
+                print("Killing child process:", pid)
+            os.kill(int(pid), signal.SIGTERM)
+        if verbose:
+            print("Killing parent process: %s" % popen_obj.pid)
+        popen_obj.kill()
+        return popen_obj
 
 
 def write_output_files(proc, run_id, stage_name):
@@ -104,7 +124,7 @@ def wizard_run(_config):
 
 def fuzzer_run(_config):
     """ Runs the fuzzer """
-    completed_process = run_dr(_config, True, True, _config['verbose'], _config.get('fuzz_timeout', None))
+    completed_process = run_dr(_config, True, True, verbose=_config['verbose'], timeout=_config.get('fuzz_timeout', None))
     run_id = 'ERR'
     proc_stderr = completed_process.stderr.decode('utf-8')
     for line in str.splitlines(proc_stderr):

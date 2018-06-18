@@ -201,7 +201,6 @@ get_target_command_line() {
     }
 
     WCHAR * commandLineContents = (WCHAR *)dr_global_alloc(parameterBlock.CommandLine.Length);
-    char * mbsCommandLineContents;
 
     if (!dr_safe_read(parameterBlock.CommandLine.Buffer, parameterBlock.CommandLine.Length, commandLineContents, &byte_counter)) {
         dr_log(NULL, LOG_ALL, ERROR, "Could not read command line buffer");
@@ -359,11 +358,11 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
 
 /*
     drwrap_skip_call does not invoke the post function
-    
+
     that means we need to cache the return value
     and properly set all the other variables in the call
-    
-    we also need to find out about stdcall arguments size 
+
+    we also need to find out about stdcall arguments size
     for the functions we're hooking (so it can clean up)
 
     for things with file pointers, those need to be updated
@@ -637,7 +636,7 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->position = 0;
 }
 
-/* 
+/*
     BOOL WINAPI ReadFile(
       _In_        HANDLE       hFile,
       _Out_       LPVOID       lpBuffer,
@@ -739,7 +738,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPre["WinHttpReadData"] = wrap_pre_WinHttpReadData;
     toHookPre["recv"] = wrap_pre_recv;
     toHookPre["fread"] = wrap_pre_fread;
-    
+
     std::map<char *, POSTPROTO> toHookPost;
     toHookPost["ReadFile"] = wrap_post_Generic;
     toHookPost["InternetReadFile"] = wrap_post_Generic;
@@ -754,7 +753,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     std::map<char *, PREPROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
-        
+
         std::string target = op_target.get_value();
         std::string strFunctionName(functionName);
         if(strFunctionName == "RegQueryValueExW" || strFunctionName == "RegQueryValueExA") {
@@ -806,7 +805,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
 
     is first instr
     get module names == target
-    insert clean call 
+    insert clean call
 */
 
 /* Runs after process initialization. Initializes DynamoRIO and registers module load callback*/
@@ -830,7 +829,7 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
     dr_log(NULL, LOG_ALL, 1, "DR client 'SL Fuzzer' initializing\n");
     if (dr_is_notify_on()) {
 #ifdef WINDOWS
-        dr_enable_console_printing();
+        dr_enable_console_printing();  // TODO - necessary?
 #endif
         dr_log(NULL, LOG_ALL, ERROR, "Client SL Fuzzer is running\n");
     }
@@ -846,7 +845,6 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
     CloseHandle(hPipe);
 
     dr_fprintf(STDERR, "Beginning fuzzing run %d\n", runId);
-
     drmgr_init();
     drwrap_init();
 

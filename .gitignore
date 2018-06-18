@@ -20,3 +20,4 @@ dynamorio/
 build/
 config.ini
 .DS_Store
+pidfile
