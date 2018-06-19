@@ -11,6 +11,7 @@ import traceback
 import threading
 import time
 import signal
+import struct
 from functools import reduce
 
 print_lock = threading.Lock()
@@ -47,6 +48,7 @@ def run_dr(_config, save_stdout=False, save_stderr=False, verbose=False, timeout
             print("Process completed after %s seconds" % (time.time() - started))
         popen_obj.stdout = stdout
         popen_obj.stderr = stderr
+        popen_obj.timed_out = False
         return popen_obj
     except subprocess.TimeoutExpired:
         if verbose:
@@ -56,12 +58,10 @@ def run_dr(_config, save_stdout=False, save_stderr=False, verbose=False, timeout
             if verbose:
                 print("Killing child process:", pid)
             os.kill(int(pid), signal.SIGTERM)
-        if verbose:
-            print("Killing parent process: %s" % popen_obj.pid)
-        popen_obj.kill()
-        stdout, stderr = popen_obj.communicate(timeout=1)  # Try to grab the existing console output
+        stdout, stderr = popen_obj.communicate(timeout=5)  # Try to grab the existing console output
         popen_obj.stdout = stdout
         popen_obj.stderr = stderr
+        popen_obj.timed_out = True
         return popen_obj
 
 
@@ -76,6 +76,16 @@ def write_output_files(proc, run_id, stage_name):
                 stderrfile.write(proc.stderr)
     except FileNotFoundError:
         print("Couldn't find an output directory for run %s" % run_id)
+
+
+def finalize(run_id, crashed):
+    f = open("\\\\.\\pipe\\fuzz_server", 'w+b', buffering=0)
+    f.write(struct.pack('B', 0x4))
+    f.seek(0)
+    f.write(struct.pack('I', run_id))
+    f.seek(0)
+    f.write(struct.pack('?', 1 if crashed else 0))
+    f.close()
 
 
 def wizard_run(_config):
@@ -146,6 +156,11 @@ def fuzzer_run(_config):
         write_output_files(completed_process, run_id, 'fuzz')
     elif _config['verbose']:
         print("Run %d did not find a crash" % run_id)
+    if completed_process.timed_out:
+        if 'EXCEPTION_' in proc_stderr:
+            finalize(run_id, True)
+        else:
+            finalize(run_id, False)
 
     return ('EXCEPTION_' in proc_stderr), run_id
 
