@@ -58,9 +58,15 @@ def run_dr(_config, save_stdout=False, save_stderr=False, verbose=False, timeout
             if verbose:
                 print("Killing child process:", pid)
             os.kill(int(pid), signal.SIGTERM)
-        stdout, stderr = popen_obj.communicate(timeout=5)  # Try to grab the existing console output
-        popen_obj.stdout = stdout
-        popen_obj.stderr = stderr
+        try:
+            stdout, stderr = popen_obj.communicate(timeout=5)  # Try to grab the existing console output
+            popen_obj.stdout = stdout
+            popen_obj.stderr = stderr
+        except subprocess.TimeoutExpired:
+            if verbose:
+                print("Caused the target application to hang")
+            popen_obj.stdout = "ERROR".encode('utf-8')
+            popen_obj.stderr = "EXCEPTION_SL2_TIMEOUT".encode('utf-8')
         popen_obj.timed_out = True
         return popen_obj
 
