@@ -18,56 +18,75 @@ print_lock = threading.Lock()
 can_fuzz = True
 
 
+def print_l(*args):
+    """ Thread safe print """
+    with print_lock:
+        print(*args)
+
+
 def get_path_to_run_file(run_id, filename):
     """ Helper function for easily getting the full path to a file in the current run's directory """
     return reduce(os.path.join, [os.getenv('APPDATA'), 'Trail of Bits', 'fuzzkit', 'working', str(run_id), filename])
 
 
-def configure_future_attributes(future, callback, **kwargs):
-    """ Adds a completion callback and any custom attributes to a future """
-    for key, item in kwargs.iteritems():
-        setattr(future, key, item)
-    future.add_done_callback(callback)
-    return future
-
-
 def run_dr(_config, save_stdout=False, save_stderr=False, verbose=False, timeout=None):
     """ Runs dynamorio with the given config. Clobbers console output if save_stderr/stdout are true """
-    program_arr = [_config['drrun_path'], '-pidfile', 'pidfile'] + _config['drrun_args'] + ['-c', _config['client_path']] + \
-        _config['client_args'] + ['--', _config['target_application_path']] + _config['target_args']
+    program_arr = [_config['drrun_path'], '-pidfile', 'pidfile'] + _config['drrun_args'] + \
+        ['-c', _config['client_path']] + _config['client_args'] + \
+        ['--', _config['target_application_path']] + _config['target_args']
+
     if verbose:
-        with print_lock:
-            print("Executing drrun: %s" % ' '.join(program_arr))
+        print_l("Executing drrun: %s" % ' '.join(program_arr))
 
+    # Run client on target application
     started = time.time()
-    popen_obj = subprocess.Popen(program_arr, stdout=(subprocess.PIPE if save_stdout else None), stderr=(subprocess.PIPE if save_stderr else None))
+    popen_obj = subprocess.Popen(program_arr,
+                                 stdout=(subprocess.PIPE if save_stdout else None),
+                                 stderr=(subprocess.PIPE if save_stderr else None))
 
+    # Try to get the output from the process, time out if necessary
     try:
         stdout, stderr = popen_obj.communicate(timeout=timeout)
+
         if verbose:
-            print("Process completed after %s seconds" % (time.time() - started))
+            print_l("Process completed after %s seconds" % (time.time() - started))
+
+        # Overwrite fields on the object we return to make stdout/stderr the right type
         popen_obj.stdout = stdout
         popen_obj.stderr = stderr
         popen_obj.timed_out = False
+
         return popen_obj
+
+    # Handle cases where the program didn't exit in time
     except subprocess.TimeoutExpired:
         if verbose:
-            print("Process Timed Out after %s seconds" % (time.time() - started))
+            print_l("Process Timed Out after %s seconds" % (time.time() - started))
+
+        # Parse PID of target application and kill it, which causes drrun to exit
         with open('pidfile', 'r') as pidfile:
             pid = pidfile.read().strip()
             if verbose:
-                print("Killing child process:", pid)
+                print_l("Killing child process:", pid)
             os.kill(int(pid), signal.SIGTERM)
+
+        # Try to get the output again
         try:
             stdout, stderr = popen_obj.communicate(timeout=5)  # Try to grab the existing console output
             popen_obj.stdout = stdout
             popen_obj.stderr = stderr
+
+        # If the timeout fires again, we probably caused the target program to hang
         except subprocess.TimeoutExpired:
             if verbose:
-                print("Caused the target application to hang")
+                print_l("Caused the target application to hang")
+
+            # Fix types again (expects bytes)
             popen_obj.stdout = "ERROR".encode('utf-8')
             popen_obj.stderr = "EXCEPTION_SL2_TIMEOUT".encode('utf-8')
+
         popen_obj.timed_out = True
+
         return popen_obj
 
 
@@ -81,16 +100,18 @@ def write_output_files(proc, run_id, stage_name):
             with open(get_path_to_run_file(run_id, '{}.stderr'.format(stage_name)), 'wb') as stderrfile:
                 stderrfile.write(proc.stderr)
     except FileNotFoundError:
-        print("Couldn't find an output directory for run %s" % run_id)
+        print_l("Couldn't find an output directory for run %s" % run_id)
 
 
 def finalize(run_id, crashed):
+    """ Manually closes out a fuzzing run. Only necessary if we killed the target binary before DynamoRIO could
+    close out the run """
     f = open("\\\\.\\pipe\\fuzz_server", 'w+b', buffering=0)
-    f.write(struct.pack('B', 0x4))
+    f.write(struct.pack('B', 0x4))  # Write the event ID (4)
     f.seek(0)
-    f.write(struct.pack('I', run_id))
+    f.write(struct.pack('I', run_id))  # Write the run ID
     f.seek(0)
-    f.write(struct.pack('?', 1 if crashed else 0))
+    f.write(struct.pack('?', 1 if crashed else 0))  # Write a bool indicating a crash
     f.close()
 
 
@@ -108,10 +129,15 @@ def wizard_run(_config):
     wizard_output = completed_process.stderr.decode('utf-8')
     wizard_findings = []
     sections = re.split(r"--------\n", wizard_output)
+
+    # Enumerate wrapped functions -- TODO use
     for line in str.splitlines(sections[0]):
         if '<wrapped ' in line:
-            re.search(r"<wrapped (?P<func_name>\S+) @ (?P<address>\S+) in (?P<module>\S+)", line).groupdict()  # TODO use
+            re.search(r"<wrapped (?P<func_name>\S+) @ (?P<address>\S+) in (?P<module>\S+)", line).groupdict()
+
+    # Get function names, ID's, and contents, if applicable
     for section in sections[1:]:
+        # Create result dict from parsing applicable lines
         results = {'index': -123, 'func_name': 'PARSE ERROR', 'hexdump_lines': []}
         for line in section.splitlines():
             if '<id:' in line:
@@ -123,52 +149,65 @@ def wizard_run(_config):
             else:
                 if len(line.strip()) > 0:
                     results['hexdump_lines'].append(line.strip())
-        if not any((lambda l, r: l['index'] == r['index'] and l['func_name'] == r['func_name'])(results, finding) for finding in wizard_findings):
+
+        # Add function to wizard findings if it's not already there
+        if not any((lambda l, r: l['index'] == r['index'] and l['func_name'] == r['func_name'])(results, finding)
+                   for finding in wizard_findings):
             if 'ERROR' not in results['func_name']:
                 wizard_findings.append(results)
-    print("Functions found:")
+
+    # Print findings
+    print_l("Functions found:")
     for i, finding in enumerate(wizard_findings):
         if 'source' in finding:
-            print("{}) {func_name} from {source}:{start}-{end}".format(i, **finding))
+            print_l("{}) {func_name} from {source}:{start}-{end}".format(i, **finding))
         else:
-            print("{}) {func_name}".format(i, **finding))
-        print("   ", '\n   '.join(line for line in finding['hexdump_lines'][:4]))
+            print_l("{}) {func_name}".format(i, **finding))
+        print_l("   ", '\n   '.join(line for line in finding['hexdump_lines'][:4]))
         if len(finding['hexdump_lines']) > 4:
-            print("   ...")
+            print_l("   ...")
+
+    # Let the user select a finding, add it to the config
     index = int(input("Choose a function to fuzz> "))
     _config['client_args'].append('-t')
     _config['client_args'].append("{},{}".format(wizard_findings[index]['index'], wizard_findings[index]['func_name']))
+
     return _config
 
 
 def fuzzer_run(_config):
     """ Runs the fuzzer """
-    completed_process = run_dr(_config, True, True, verbose=_config['verbose'], timeout=_config.get('fuzz_timeout', None))
+    completed_process = run_dr(_config, True, True,
+                               verbose=_config['verbose'], timeout=_config.get('fuzz_timeout', None))
+
+    # Parse run ID from fuzzer output
     run_id = 'ERR'
     proc_stderr = completed_process.stderr.decode('utf-8')
     for line in str.splitlines(proc_stderr):
         if 'Beginning fuzzing run' in line:
             run_id = int(line.replace('Beginning fuzzing run ', '').strip())
     if run_id == 'ERR':
-        print("Error: No run ID could be parsed from the server output")
+        print_l("Error: No run ID could be parsed from the server output")
         return False, -1
 
-    # Start triage if the fuzzing harness exited with an error code
-    if 'EXCEPTION_' in proc_stderr:
-        print('Fuzzing run %s returned %s' % (run_id, completed_process.returncode))
+    # Identify whether the fuzzing run resulted in a crash
+    crashed = 'EXCEPTION_' in proc_stderr
+    if crashed:
+        print_l('Fuzzing run %s returned %s' % (run_id, completed_process.returncode))
         # Write stdout and stderr to files
-        # TODO figure out why proc.stdout is always empty
-        # https://stackoverflow.com/questions/47038990/python-subprocess-cannot-capture-output-of-windows-program
+        # TODO fix issue #40
         write_output_files(completed_process, run_id, 'fuzz')
     elif _config['verbose']:
-        print("Run %d did not find a crash" % run_id)
+        print_l("Run %d did not find a crash" % run_id)
+
+    # Handle orphaned pipes after a timeout
     if completed_process.timed_out:
-        if 'EXCEPTION_' in proc_stderr:
+        if crashed:
             finalize(run_id, True)
         else:
             finalize(run_id, False)
 
-    return ('EXCEPTION_' in proc_stderr), run_id
+    return crashed, run_id
 
 
 def triage_run(_config, run_id):
@@ -192,15 +231,16 @@ def triage_run(_config, run_id):
         with open(get_path_to_run_file(run_id, 'crash.json'), 'r') as crash_json:
             results = json.loads(crash_json.read())
             results['run_id'] = run_id
-            with print_lock:
-                print("Triage ({score}): {reason} in run {run_id} caused {exception}".format(**results))
-                print("\t0x{location:02x}: {instruction}".format(**results))
+            print_l("Triage ({score}): {reason} in run {run_id} caused {exception}".format(**results))
+            print_l("\t0x{location:02x}: {instruction}".format(**results))
     except FileNotFoundError:
-        print("Triage run %s returned %s (no crash file found)" % (run_id, completed_process.returncode))
+        print_l("Triage run %s returned %s (no crash file found)" % (run_id, completed_process.returncode))
 
 
 def fuzz_and_triage(_config):
+    """ Runs the fuzzer (in a loop if continuous is true), then runs the triage tool if a crash is found """
     global can_fuzz
+    # TODO: Move try/except so we can start new runs after an exception
     try:
         while can_fuzz:
             crashed, run_id = fuzzer_run(_config)
@@ -208,10 +248,11 @@ def fuzz_and_triage(_config):
                 triage_run(_config, run_id)
 
                 if _config['exit_early']:
-                    can_fuzz = False
+                    can_fuzz = False  # Prevent other threads from starting new fuzzing runs
 
             if not _config['continuous']:
                 return
+
     except Exception:
         traceback.print_exc()
 
@@ -230,7 +271,12 @@ def main():
 
     # Spawn a thread that will run DynamoRIO and wait for the output
     with concurrent.futures.ThreadPoolExecutor(max_workers=config['simultaneous']) as executor:
-        fuzz_futures = [executor.submit(fuzz_and_triage, config) for _ in range(config['runs'])]  # TODO - more reasonable number
+        # If we're in continuous mode, spawn as many futures as we can run simultaneously.
+        # Otherwise, spawn as many as we want to run in total
+        fuzz_futures = [executor.submit(fuzz_and_triage, config)
+                        for _ in range(config['runs'] if not config['continuous'] else config['simultaneous'])]
+
+        # Wait for exit
         concurrent.futures.wait(fuzz_futures)
 
 
@@ -238,6 +284,6 @@ if __name__ == '__main__':
     try:
         main()
     except KeyboardInterrupt:
-        print("Waiting for worker threads to exit...")
+        print_l("Waiting for worker threads to exit...")
         can_fuzz = False
         raise
