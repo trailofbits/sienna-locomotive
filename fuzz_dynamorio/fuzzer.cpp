@@ -32,6 +32,7 @@ static void *max_lock; /* sync writes to max_ReadFile */
 
 static BOOL mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size);
 
+// structure for getting command line client options in dynamorio
 static droption_t<std::string> op_target(
     DROPTION_SCOPE_CLIENT,
     "t",
@@ -40,6 +41,7 @@ static droption_t<std::string> op_target(
     "Specific call to target.");
 
 
+// All the functions we support
 enum class Function {
     ReadFile,
     recv,
@@ -56,6 +58,7 @@ BOOL crashed = false;
 
 std::map<Function, UINT64> call_counts;
 
+/* Translates function names into strings */
 char *get_function_name(Function function) {
     switch(function) {
         case Function::ReadFile:
@@ -80,6 +83,7 @@ char *get_function_name(Function function) {
 }
 
 //TODO: Fix logging
+/* Tries to get a new Run ID from the fuzz server */
 DWORD getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs) {
     dr_log(NULL, LOG_ALL, ERROR, "Requesting run id");
     DWORD bytesRead = 0;
@@ -119,6 +123,7 @@ DWORD getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs) {
     return runId;
 }
 
+/* Get a handle to the pipe that lets us talk to the server */
 HANDLE getPipe() {
     HANDLE hPipe;
     while (1) {
@@ -135,6 +140,7 @@ HANDLE getPipe() {
             break;
         }
 
+        // This is basically just a check that the server is running
         DWORD err = GetLastError();
         if (err != ERROR_PIPE_BUSY) {
             dr_log(NULL, LOG_ALL, ERROR, "Could not open pipe (%x)", err);
@@ -160,6 +166,7 @@ HANDLE getPipe() {
     return hPipe;
 }
 
+/* Close out the fuzzing run with the server */
 DWORD finalize(HANDLE hPipe, DWORD runId, BOOL crashed) {
     if (crashed) {
         dr_fprintf(STDERR, "<crash found for run id %d>\n", runId);
@@ -169,16 +176,17 @@ DWORD finalize(HANDLE hPipe, DWORD runId, BOOL crashed) {
     DWORD bytesWritten;
     BYTE eventId = 4;
 
+    // write the event ID (4 for finalize)
     if (!WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL)) {
         dr_log(NULL, LOG_ALL, ERROR, "Error finalizing (%x)", GetLastError());
         dr_exit_process(1);
     }
-
+    // Write the run ID
     if (!WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL)) {
         dr_log(NULL, LOG_ALL, ERROR, "Error finalizing (%x)", GetLastError());
         dr_exit_process(1);
     }
-
+     // write whether the run found a crash
     if (!WriteFile(hPipe, &crashed, sizeof(BOOL), &bytesWritten, NULL)) {
         dr_log(NULL, LOG_ALL, ERROR, "Error finalizing (%x)", GetLastError());
         dr_exit_process(1);
@@ -187,6 +195,7 @@ DWORD finalize(HANDLE hPipe, DWORD runId, BOOL crashed) {
     return 0;
 }
 
+/* Read the PEB of the target application and get the full command line */
 static LPTSTR
 get_target_command_line() {
     // see: https://github.com/DynamoRIO/dynamorio/issues/2662
@@ -195,14 +204,16 @@ get_target_command_line() {
     _RTL_USER_PROCESS_PARAMETERS parameterBlock;
     size_t byte_counter;
 
+    // Read process parameter block from PEB
     if (!dr_safe_read(clientPEB->ProcessParameters, sizeof(_RTL_USER_PROCESS_PARAMETERS), &parameterBlock, &byte_counter)) {
         dr_log(NULL, LOG_ALL, ERROR, "Could not read process parameter block");
         dr_exit_process(1);
     }
 
+    // Allocate space for the command line
     WCHAR * commandLineContents = (WCHAR *)dr_global_alloc(parameterBlock.CommandLine.Length);
-    char * mbsCommandLineContents;
 
+    // Read the command line from the parameter block
     if (!dr_safe_read(parameterBlock.CommandLine.Buffer, parameterBlock.CommandLine.Length, commandLineContents, &byte_counter)) {
         dr_log(NULL, LOG_ALL, ERROR, "Could not read command line buffer");
         dr_exit_process(1);
@@ -211,6 +222,7 @@ get_target_command_line() {
   return commandLineContents;
 }
 
+/* Maps exception code to an exit status. Print it out, then exit. */
 static bool
 onexception(void *drcontext, dr_exception_t *excpt) {
     dr_log(NULL, LOG_ALL, ERROR, "Exception occurred!\n");
@@ -287,13 +299,14 @@ onexception(void *drcontext, dr_exception_t *excpt) {
     return true;
 }
 
-/* from wrap.cpp sample code */
+/* Runs after the target application has exited */
 static void
 event_exit(void) {
     HANDLE hPipe = getPipe();
-    finalize(hPipe, runId, crashed);
-    CloseHandle(hPipe);
+    finalize(hPipe, runId, crashed); // Delete the fuzzing run if we didn't find a crash
+    CloseHandle(hPipe); // Close out connection to server
 
+    // Clean up DynamoRIO
     dr_log(NULL, LOG_ALL, ERROR, "Dynamorio Exiting\n");
     drwrap_exit();
     drmgr_exit();
@@ -301,13 +314,13 @@ event_exit(void) {
 
 /* Hands bytes off to the mutation server, gets mutated bytes, and writes them into memory. */
 static DWORD mutateCount = 0;
-
 static BOOL
 mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
     TCHAR filePath[MAX_PATH+1];
     TCHAR *new_buf = (TCHAR *)buf;
     DWORD pathSize = 0;
 
+    // Check that ReadFile calls are to something actually valid
     if(function == Function::ReadFile) {
         if (hFile == INVALID_HANDLE_VALUE) {
             dr_log(NULL, LOG_ALL, ERROR, "The file we're trying to read from doesn't appear to be valid\n");
@@ -325,6 +338,7 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
     }
 
 
+    // initialize output variables
     filePath[pathSize] = 0;
 
     HANDLE hPipe = getPipe();
@@ -359,11 +373,11 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
 
 /*
     drwrap_skip_call does not invoke the post function
-    
+
     that means we need to cache the return value
     and properly set all the other variables in the call
-    
-    we also need to find out about stdcall arguments size 
+
+    we also need to find out about stdcall arguments size
     for the functions we're hooking (so it can clean up)
 
     for things with file pointers, those need to be updated
@@ -433,6 +447,7 @@ check_cache() {
 }
 //*/
 
+// Metadata object for a target function call
 struct read_info {
     Function function;
     HANDLE hFile;
@@ -442,6 +457,10 @@ struct read_info {
     DWORD64 position;
 };
 
+/*
+  The next several functions are wrappers that DynamoRIO calls before each of the targeted functions runs. Each of them
+  records metadata about the target function call for use later.
+*/
 
 /*
     BOOL ReadEventLog(
@@ -637,7 +656,7 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->position = 0;
 }
 
-/* 
+/*
     BOOL WINAPI ReadFile(
       _In_        HANDLE       hFile,
       _Out_       LPVOID       lpBuffer,
@@ -669,6 +688,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->position = (position << 32) | positionLow;
 }
 
+// TODO fill out this function prototype
 static void
 wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     dr_fprintf(STDERR, "<in wrap_pre_fread>\n");
@@ -685,6 +705,7 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->position = NULL;
 }
 
+/* Mutates whatever data the hooked function wrote */
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data) {
     if(user_data == NULL) {
@@ -693,6 +714,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
 
     read_info *info = ((read_info *)user_data);
 
+    // Record the metadata about this function call
     Function function = info->function;
     HANDLE hFile = info->hFile;
     LPVOID lpBuffer = info->lpBuffer;
@@ -701,6 +723,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     DWORD64 position = info->position;
     free(user_data);
 
+    // Double check that this is the specific function call we're supposed to be targeting
     BOOL targeted = false;
     std::string target = op_target.get_value();
     char *end;
@@ -708,13 +731,13 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     if(call_counts[function] == num) {
         targeted = true;
     }
-
-    call_counts[function]++;
+    call_counts[function]++; // increment the call counter
 
     if (lpNumberOfBytesRead) {
         nNumberOfBytesToRead = *lpNumberOfBytesRead;
     }
 
+    // Talk to the server and mutate the bytes
     if(targeted) {
         if (!mutate(function, hFile, position, lpBuffer, nNumberOfBytesToRead)) {
             // TODO: fallback mutations?
@@ -723,12 +746,15 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     }
 }
 
+/* Runs when a new module (typically an exe or dll) is loaded. Tells DynamoRIO to hook all the interesting functions
+    in that module. */
 static void
 module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     // void(__cdecl *)(void *, OUT void **)
 #define PREPROTO void(__cdecl *)(void *, void **)
 #define POSTPROTO void(__cdecl *)(void *, void *)
 
+    // Build list of pre-function hooks
     std::map<char *, PREPROTO> toHookPre;
     toHookPre["ReadFile"] = wrap_pre_ReadFile;
     toHookPre["InternetReadFile"] = wrap_pre_InternetReadFile;
@@ -739,7 +765,8 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPre["WinHttpReadData"] = wrap_pre_WinHttpReadData;
     toHookPre["recv"] = wrap_pre_recv;
     toHookPre["fread"] = wrap_pre_fread;
-    
+
+    // Build list of post-function hooks
     std::map<char *, POSTPROTO> toHookPost;
     toHookPost["ReadFile"] = wrap_post_Generic;
     toHookPost["InternetReadFile"] = wrap_post_Generic;
@@ -751,10 +778,12 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPost["recv"] = wrap_post_Generic;
     toHookPost["fread"] = wrap_post_Generic;
 
+    // Iterate over list of hooks and register them with DynamoRIO
     std::map<char *, PREPROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
-        
+
+        // Look for function matching the target specified on the command line
         std::string target = op_target.get_value();
         std::string strFunctionName(functionName);
         if(strFunctionName == "RegQueryValueExW" || strFunctionName == "RegQueryValueExA") {
@@ -774,6 +803,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
             hookFunctionPost = toHookPost[functionName];
         }
 
+        // Skip ReadFile calls from the kernel (TODO - investigate fuzzgoat results)
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
         const char *mod_name = dr_module_preferred_name(mod);
         if(strcmp(functionName, "ReadFile") == 0) {
@@ -782,12 +812,14 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
             }
         }
 
+        // Skip registry queries in the kernel
         if(strcmp(functionName, "RegQueryValueExA") == 0 || strcmp(functionName, "RegQueryValueExW") == 0) {
             if(strcmp(mod_name, "KERNELBASE.dll") != 0) {
                 continue;
             }
         }
 
+        // If everything looks good and we've made it this far, wrap the function
         if (towrap != NULL) {
             dr_flush_region(towrap, 0x1000);
             bool ok = drwrap_wrap(towrap, hookFunctionPre, hookFunctionPost);
@@ -806,14 +838,15 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
 
     is first instr
     get module names == target
-    insert clean call 
+    insert clean call
 */
 
-/* Runs after process initialization. Initializes DynamoRIO and registers module load callback*/
+/* Runs after process initialization. Initializes DynamoRIO */
 DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
     dr_set_client_name("Sienna-Locomotive Fuzzer",
                        "https://github.com/trailofbits/sienna-locomotive/issues");
 
+    // Parse command line options
     std::string parse_err;
     int last_idx = 0;
     if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
@@ -827,26 +860,29 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
         dr_abort();
     }
 
+    // Set up console printing
     dr_log(NULL, LOG_ALL, 1, "DR client 'SL Fuzzer' initializing\n");
     if (dr_is_notify_on()) {
 #ifdef WINDOWS
-        dr_enable_console_printing();
+        dr_enable_console_printing();  // TODO - necessary?
 #endif
         dr_log(NULL, LOG_ALL, ERROR, "Client SL Fuzzer is running\n");
     }
 
     //TODO: support multiple passes over one binary without re-running drrun
 
+    // Get application name
     HANDLE hPipe = getPipe();
     const char* mbsAppName = dr_get_application_name();
     TCHAR wcsAppName[MAX_PATH];
     mbstowcs(wcsAppName, mbsAppName, MAX_PATH);
 
+    // Send application name and invokation to fuzz server, get back the run ID
     runId = getRunID(hPipe, wcsAppName, get_target_command_line());
     CloseHandle(hPipe);
 
+    // Initialize DynamoRIO and register callbacks
     dr_fprintf(STDERR, "Beginning fuzzing run %d\n", runId);
-
     drmgr_init();
     drwrap_init();
 
