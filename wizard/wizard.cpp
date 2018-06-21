@@ -15,6 +15,7 @@
 #include <winsock2.h>
 #include <winhttp.h>
 
+// Use for parsing command line options
 static droption_t<std::string> op_include(
     DROPTION_SCOPE_CLIENT,
     "i",
@@ -29,6 +30,7 @@ static droption_t<std::string> op_target(
     "target",
     "Specific call to target.");
 
+/* Run whenever a thread inits/exits */
 static void
 event_thread_init(void *drcontext)
 {
@@ -41,6 +43,7 @@ event_thread_exit(void *drcontext)
 
 }
 
+/* Clean up after the target binary exits */
 static void
 event_exit_trace(void)
 {
@@ -54,6 +57,7 @@ event_exit_trace(void)
     drmgr_exit();
 }
 
+// All the functions we can hook
 enum class Function {
     ReadFile,
     recv,
@@ -67,6 +71,7 @@ enum class Function {
 
 std::map<Function, UINT64> call_counts;
 
+// Maps functions to strings
 char *get_function_name(Function function) {
     switch(function) {
         case Function::ReadFile:
@@ -90,6 +95,7 @@ char *get_function_name(Function function) {
     return "unknown";
 }
 
+// function metadata structure
 struct read_info {
     LPVOID lpBuffer;
     DWORD nNumberOfBytesToRead;
@@ -97,6 +103,10 @@ struct read_info {
     TCHAR *source;
     DWORD position;
 };
+
+/*
+Below we have a number of functions that instrument metadata retreival for the individual functions we can hook.
+*/
 
 // TODO: hook functions that open the handles for these
 //       so we can track the names of the resources geing read
@@ -267,6 +277,7 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->position = NULL;
 }
 
+/* helper function for dumping memory contents to stderr */
 static void
 hex_dump(LPVOID lpBuffer, DWORD nNumberOfBytesToRead) {
     DWORD size = nNumberOfBytesToRead > 256 ? 256 : nNumberOfBytesToRead;
@@ -315,6 +326,7 @@ hex_dump(LPVOID lpBuffer, DWORD nNumberOfBytesToRead) {
     dr_fprintf(STDERR, "\n");
 }
 
+/* prints information about the function call to stderr so the harness can ingest it */
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data) {
     if(user_data == NULL) {
@@ -364,6 +376,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     }
 }
 
+/* Runs every time we load a new module. Wraps functions we can target. See fuzzer.cpp for a more-detailed version */
 static void
 module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
 #define PREPROTO void(__cdecl *)(void *, void **)
@@ -454,6 +467,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     }
 }
 
+/* registers event callbacks and initializes DynamoRIO */
 void wizard(client_id_t id, int argc, const char *argv[]) {
     drreg_options_t ops = {sizeof(ops), 3, false};
     dr_set_client_name("Wizard",
@@ -474,6 +488,7 @@ void wizard(client_id_t id, int argc, const char *argv[]) {
     dr_log(NULL, LOG_ALL, 1, "Client 'Wizard' initializing\n");
 }
 
+/* Parses options and calls wizard helper */
 DR_EXPORT void
 dr_client_main(client_id_t id, int argc, const char *argv[])
 {
