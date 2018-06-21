@@ -29,7 +29,7 @@ if not os.path.exists(config_path):
                                  'wizard_path': 'build\\wizard\\Debug\\wizard.dll',
                                  'triage_path': 'build\\triage_dynamorio\\Debug\\tracer.dll',
                                  'target_application_path': 'build\\corpus\\test_application\\Debug\\test_application.exe',
-                                 'target_args': '',
+                                 'target_args': '0 -f',
                                  'runs': 1,
                                  'simultaneous': 1}
     with open(config_path, 'w') as configfile:
