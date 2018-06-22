@@ -32,6 +32,7 @@ WCHAR FUZZ_WORKING_FMT_CRASH[MAX_PATH] = L"";
 WCHAR FUZZ_WORKING_FMT_JSON[MAX_PATH] = L"";
 WCHAR FUZZ_LOG[MAX_PATH] = L"";
 
+// Initialize global variables containing relevant file/folder paths
 VOID initDirs() {
     PWSTR roamingPath;
     SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roamingPath);
@@ -58,6 +59,7 @@ VOID initDirs() {
     CoTaskMemFree(roamingPath);
 }
 
+/* Checks the working directory and finds a new unique run ID for the current fuzzing run */
 DWORD findUnusedId() {
     HANDLE hFind;
     WIN32_FIND_DATA findData;
@@ -96,6 +98,9 @@ DWORD findUnusedId() {
     return id;
 }
 
+/* Calls findUnusedId to get a new run ID, writes relevant run metadata files into the corresponding run metadata dir
+    This, like many things in the server, is pretty overzealous about exiting after any errors, often without an
+    explanation of what happened. TODO - fix this */
 DWORD generateRunId(HANDLE hPipe) {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
@@ -182,6 +187,10 @@ DWORD generateRunId(HANDLE hPipe) {
 
     return 0;
 }
+
+/*
+  Mutation strategies. The server selects one each time the fuzzing harness requests mutated bytes
+*/
 
 DWORD getRand() {
     DWORD random = rand();
@@ -299,10 +308,10 @@ VOID strategyRandValues(BYTE *buf, DWORD size) {
 
     // pos -> zero to ((size + 1) - rand_size)
     // e.g. buf size is 16, rand_size is 8
-    // max will be from 0 to 9 guanteeing a 
+    // max will be from 0 to 9 guanteeing a
     // pos that will fit into the buffer
     DWORD pos = getRand() % max;
-    
+
     for(DWORD i=0; i<rand_size; i++) {
         BYTE mut = rand() % 256;
         buf[pos + i] = mut;
@@ -334,7 +343,7 @@ VOID strategyKnownValues(BYTE *buf, DWORD size) {
 
     // pos -> zero to ((size + 1) - rand_size)
     // e.g. buf size is 16, rand_size is 8
-    // max will be from 0 to 9 guaranteeing a 
+    // max will be from 0 to 9 guaranteeing a
     // pos that will fit into the buffer
     DWORD pos = getRand() % max;
     BOOL endian = rand() % 2;
@@ -387,7 +396,7 @@ VOID strategyAddSubKnownValues(BYTE *buf, DWORD size) {
 
     // pos -> zero to ((size + 1) - rand_size)
     // e.g. buf size is 16, rand_size is 8
-    // max will be from 0 to 9 guaranteeing a 
+    // max will be from 0 to 9 guaranteeing a
     // pos that will fit into the buffer
     DWORD pos = getRand() % max;
     BOOL endian = rand() % 2;
@@ -396,7 +405,7 @@ VOID strategyAddSubKnownValues(BYTE *buf, DWORD size) {
     if(rand() % 2) {
         sub = -1;
     }
-    
+
     DWORD selection = 0;
     switch(rand_size) {
         case 1:
@@ -440,7 +449,7 @@ VOID strategyEndianSwap(BYTE *buf, DWORD size) {
 
     // pos -> zero to ((size + 1) - rand_size)
     // e.g. buf size is 16, rand_size is 8
-    // max will be from 0 to 9 guaranteeing a 
+    // max will be from 0 to 9 guaranteeing a
     // pos that will fit into the buffer
     DWORD pos = getRand() % max;
 
@@ -464,7 +473,7 @@ VOID strategyEndianSwap(BYTE *buf, DWORD size) {
     }
 }
 
-
+/* Selects a mutations strategy at random */
 DWORD mutate(BYTE *buf, DWORD size) {
     // afl for inspiration
     if(size == 0) {
@@ -473,7 +482,7 @@ DWORD mutate(BYTE *buf, DWORD size) {
 
     std::random_device rd;
     srand(rd());
-    
+
     DWORD choice = getRand() % 8;
     switch(choice) {
         case 0:
@@ -508,7 +517,7 @@ DWORD mutate(BYTE *buf, DWORD size) {
             LOG_F(INFO, "strategyRepeatBytesBackward");
             strategyRepeatBytesBackward(buf, size);
             break;
-        default: 
+        default:
             strategyAAAA(buf, size);
             break;
     }
@@ -516,10 +525,11 @@ DWORD mutate(BYTE *buf, DWORD size) {
     // insert bytes
         // move bytes
         // add random bytes to space
-    
+
     return 0;
 }
 
+/* Writes the fkt file in the event we found a crash. Stores information about the mutation that caused it */
 DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, TCHAR *filePath, DWORD64 position, DWORD size, BYTE* buf) {
     DWORD dwBytesWritten = 0;
 
@@ -567,6 +577,7 @@ DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, TCHAR *filePath, DWORD6
     return 0;
 }
 
+/* handles mutation requests over the named pipe from the fuzzing harness */
 DWORD handleMutation(HANDLE hPipe) {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
@@ -670,6 +681,7 @@ DWORD handleMutation(HANDLE hPipe) {
     return 0;
 }
 
+/* Gets the mutated bytes stored in the FKT file for mutation replay */
 DWORD getBytesFKT(HANDLE hFile, BYTE *buf, DWORD size) {
     DWORD dwBytesRead = 0;
 
@@ -696,6 +708,7 @@ DWORD getBytesFKT(HANDLE hFile, BYTE *buf, DWORD size) {
     return 0;
 }
 
+/* Handles requests over the named pipe from the triage client for replays of mutated bytes */
 DWORD handleReplay(HANDLE hPipe) {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
@@ -765,6 +778,7 @@ DWORD handleReplay(HANDLE hPipe) {
     return 0;
 }
 
+/* Dump information about a given run into the named pipe */
 DWORD serveRunInfo(HANDLE hPipe) {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
@@ -840,6 +854,7 @@ DWORD serveRunInfo(HANDLE hPipe) {
     return 0;
 }
 
+/* Deletes the run files to free up a Run ID if the last run didn't find a crash */
 DWORD finalizeRun(HANDLE hPipe) {
     DWORD dwBytesRead = 0;
 
@@ -889,6 +904,7 @@ DWORD finalizeRun(HANDLE hPipe) {
     return 0;
 }
 
+/* Return the location of the crash.json file for a given run ID */
 DWORD crashPath(HANDLE hPipe) {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
@@ -921,6 +937,7 @@ enum Event {
     EVT_CRASH_PATH,         // 5
 };
 
+/* Handles incoming connections from clients */
 DWORD WINAPI threadHandler(LPVOID lpvPipe) {
     HANDLE hPipe = (HANDLE)lpvPipe;
 
@@ -940,6 +957,7 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe) {
         }
     }
 
+    // Dispatch individual requests based on which event the client requested
     switch (eventId) {
         case EVT_RUN_ID:
             generateRunId(hPipe);
@@ -984,6 +1002,7 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe) {
 
 HANDLE hProcessMutex = INVALID_HANDLE_VALUE;
 
+/* concurrency protection */
 void lockProcess() {
     hProcessMutex = CreateMutex(NULL, FALSE, L"fuzz_server_mutex");
     if(!hProcessMutex || hProcessMutex == INVALID_HANDLE_VALUE) {
@@ -998,6 +1017,7 @@ void lockProcess() {
     }
 }
 
+// Init dirs and create a new thread to handle input from the named pipe
 int main(int mArgc, char **mArgv)
 {
     initDirs();

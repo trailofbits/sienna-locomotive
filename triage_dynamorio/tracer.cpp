@@ -240,6 +240,7 @@ is_tainted(void *drcontext, opnd_t opnd)
     return false;
 }
 
+/* Mark a memory address as tainted */
 static void
 taint_mem(app_pc addr, uint size) {
     for(uint i=0; i<size; i++) {
@@ -247,6 +248,7 @@ taint_mem(app_pc addr, uint size) {
     }
 }
 
+/* Unmark a memory address as tainted */
 static bool
 untaint_mem(app_pc addr, uint size) {
     bool untainted = false;
@@ -261,6 +263,7 @@ untaint_mem(app_pc addr, uint size) {
     return untainted;
 }
 
+/* Mark an operand as tainted. Could be a register or memory reference. */
 static void
 taint(void *drcontext, opnd_t opnd)
 {
@@ -293,6 +296,7 @@ taint(void *drcontext, opnd_t opnd)
     return;
 }
 
+/* Untaint an operand */
 static bool
 untaint(void *drcontext, opnd_t opnd)
 {
@@ -329,7 +333,7 @@ untaint(void *drcontext, opnd_t opnd)
 }
 
 
-/* Handle special case of xor regA, regA */
+/* Handle special case of xor regA, regA - untaint the destination since it's inevitably 0 */
 static bool
 handle_xor(void *drcontext, instr_t *instr) {
     bool result = false;
@@ -525,6 +529,8 @@ handle_branches(void *drcontext, instr_t *instr) {
     return true;
 }
 
+/* Dispatch to instruction-specific taint handling for things that don't fit the general
+    model of tainted operand -> tainted result */
 static bool
 handle_specific(void *drcontext, instr_t *instr) {
     int opcode = instr_get_opcode(instr);
@@ -556,10 +562,12 @@ handle_specific(void *drcontext, instr_t *instr) {
 
 }
 
-/* */
+/* Called on each instruction. Spreads taint from sources to destinations,
+    wipes tainted destinations with untainted sources. */
 static void
 propagate_taint(app_pc pc)
 {
+    // Store instruction trace
     if(pc > module_start && pc < module_end) {
         last_insns[last_insn_idx] = pc;
         last_insn_idx++;
@@ -575,6 +583,7 @@ propagate_taint(app_pc pc)
     instr_init(drcontext, &instr);
     decode(drcontext, pc, &instr);
 
+    // Save the count of times we've called this function (if it's a call)
     if(instr_is_call(&instr)) {
         opnd_t target = instr_get_target(&instr);
         if(opnd_is_memory_reference(target)) {
@@ -632,6 +641,8 @@ propagate_taint(app_pc pc)
     instr_free(drcontext, &instr);
 }
 
+/* Called upon basic block insertion with each individual instruction as an argument.
+    Inserts a clean call to propagate_taint before every instruction */
 static dr_emit_flags_t
 event_app_instruction(
     void *drcontext,
@@ -645,7 +656,8 @@ event_app_instruction(
     if (!instr_is_app(instr))
         return DR_EMIT_DEFAULT;
 
-    /* Clean call propagate taint on each instruction*/
+    /* Clean call propagate taint on each instruction. Should be side-effect free
+        http://dynamorio.org/docs/dr__ir__utils_8h.html#ae7b7bd1e750b8a24ebf401fb6a6d6d5e */
     dr_insert_clean_call(drcontext, bb, instr, propagate_taint, false, 1,
                 OPND_CREATE_INTPTR(instr_get_app_pc(instr)));
 
@@ -664,6 +676,7 @@ event_thread_exit(void *drcontext)
 
 }
 
+/* Clean up registered callbacks before exiting */
 static void
 event_exit_trace(void)
 {
@@ -683,7 +696,7 @@ event_exit_trace(void)
     drmgr_exit();
 }
 
-/* Debug functionality */
+/* Debug functionality. If you need to use it, add the relevant print statements */
 static void
 dump_regs(void *drcontext, app_pc exception_address) {
     reg_id_t regs[16] = {
@@ -799,7 +812,7 @@ exception_to_string(DWORD exception_code) {
     return exception_str;
 }
 
-/* Get crash info as JSON */
+/* Get crash info as JSON for dumping to stderr */
 std::string
 dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *excpt, std::string disassembly) {
     DWORD exception_code = excpt->record->ExceptionCode;
@@ -928,6 +941,7 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
     return s.GetString();
 }
 
+/* Get Run ID and dump crash info into JSON file in the run folder. */
 static void
 dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t score, std::string disassembly) {
     std::string crash_json = dump_json(drcontext, score, reason, excpt, disassembly);
@@ -983,6 +997,7 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
     dr_exit_process(1);
 }
 
+/* Scoring function. Checks exception code, then checks taint state in order to calculate the severity score */
 static bool
 onexception(void *drcontext, dr_exception_t *excpt) {
     DWORD exception_code = excpt->record->ExceptionCode;
@@ -992,11 +1007,14 @@ onexception(void *drcontext, dr_exception_t *excpt) {
     bool pc_tainted = tainted_regs.find(reg_pc) != tainted_regs.end();
     bool stack_tainted = tainted_regs.find(reg_stack) != tainted_regs.end();
 
+    // catch-all result
     app_pc exception_address = (app_pc)(excpt->record->ExceptionAddress);
     std::string reason = "unknown";
     uint8_t score = 50;
     std::string disassembly = "";
 
+    // TODO - remove use of IsBadReadPtr
+    // https://msdn.microsoft.com/en-us/library/windows/desktop/aa366713(v=vs.85).aspx
     if(IsBadReadPtr(exception_address, 1)) {
         if(pc_tainted) {
             reason = "oob execution tainted pc";
@@ -1018,7 +1036,7 @@ onexception(void *drcontext, dr_exception_t *excpt) {
 
     disassembly = buf;
 
-    // check exception code
+    // check exception code - illegal instructions are bad
     if (exception_code == EXCEPTION_ILLEGAL_INSTRUCTION) {
         if(pc_tainted) {
             reason = "illegal instruction tainted pc";
@@ -1030,12 +1048,15 @@ onexception(void *drcontext, dr_exception_t *excpt) {
         dump_crash(drcontext, excpt, reason, score, disassembly);
     }
 
+    // Divide by zero is probably not bad
     if (exception_code == EXCEPTION_INT_DIVIDE_BY_ZERO) {
         reason = "floating point exception";
         score = 0;
         dump_crash(drcontext, excpt, reason, score, disassembly);
     }
 
+    // Breakpoints - could indicate we're executing non-instructions?
+    // TODO figure out if 25 points makes sense
     if (exception_code == EXCEPTION_BREAKPOINT) {
         reason = "breakpoint";
         score = 25;
@@ -1094,7 +1115,11 @@ onexception(void *drcontext, dr_exception_t *excpt) {
         tainted_dst |= is_tainted(drcontext, opnd);
     }
 
+    // Check if the crash resulted from an invalid memory write
+    // usually EXCEPTION_ACCESS_VIOLATION
     if(mem_write) {
+      // If what we're writing or where we're writing it to are potentially attacker controlled, that's worse than if
+      // it's just a normal invalid write
         if(tainted_src || tainted_dst) {
             reason = "tainted write";
             score = 75;
@@ -1105,7 +1130,9 @@ onexception(void *drcontext, dr_exception_t *excpt) {
         dump_crash(drcontext, excpt, reason, score, disassembly);
     }
 
+    // ditto, but for invalid reads
     if(mem_read) {
+        // TODO - do we need to think about tainted destination addresses?
         if(tainted_src) {
             reason = "tainted read";
             score = 75;
@@ -1126,6 +1153,12 @@ struct read_info {
     DWORD nNumberOfBytesToRead;
     Function function;
 };
+
+/*
+*
+  Large block of pre-function callbacks that collect metadata about the target call
+*
+*/
 
 static void
 wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
@@ -1248,6 +1281,7 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->nNumberOfBytesToRead = size * count;
 }
 
+/* Called after each targeted function to replay mutation and mark bytes as tainted */
 static void
 wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
     dr_fprintf(STDERR, "<in wrap_post_GenericTaint>\n");
@@ -1255,11 +1289,13 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
         return;
     }
 
+    // Grab stored metadata
     LPVOID lpBuffer = ((read_info *)user_data)->lpBuffer;
     DWORD nNumberOfBytesToRead = ((read_info *)user_data)->nNumberOfBytesToRead;
     Function function = ((read_info *)user_data)->function;
     free(user_data);
 
+    // Identify whether this is the function we want to target
     BOOL targeted = false;
     std::string target = op_target.get_value();
 
@@ -1271,12 +1307,15 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
 
     call_counts[function]++;
 
+    // Mark the targeted memory as tainted
     if(targeted) {
         taint_mem((app_pc)lpBuffer, nNumberOfBytesToRead);
     }
 
+    // Talk to the server, get the stored mutation from the fuzzing run, and write it into memory.
     if(replay && targeted) {
         dr_mutex_lock(mutatex);
+        // Open handle to server
         HANDLE h_pipe = CreateFile(
             L"\\\\.\\pipe\\fuzz_server",
             GENERIC_READ | GENERIC_WRITE,
@@ -1299,9 +1338,11 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
 
             BYTE event_id = 2;
 
+            // Send the run ID and request the mutation
             WriteFile(h_pipe, &event_id, sizeof(BYTE), &bytes_written, NULL);
             WriteFile(h_pipe, &run_id, sizeof(DWORD), &bytes_written, NULL);
             WriteFile(h_pipe, &mutate_count, sizeof(DWORD), &bytes_written, NULL);
+            // Overwrite bytes with old mutation
             TransactNamedPipe(h_pipe, &nNumberOfBytesToRead, sizeof(DWORD), lpBuffer, nNumberOfBytesToRead, &bytes_read, NULL);
             mutate_count++;
             CloseHandle(h_pipe);
@@ -1310,6 +1351,7 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
     }
 }
 
+/* Register function pre/post callbacks in each module */
 static void
 module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     // void(__cdecl *)(void *, OUT void **)
@@ -1429,8 +1471,9 @@ void tracer(client_id_t id, int argc, const char *argv[]) {
     mutatex = dr_mutex_create();
     dr_register_exit_event(event_exit_trace);
 
-    // trace without taint tracking
+    // If taint tracing is enabled, register the propagate_taint callback
     if(!op_no_taint.get_value()) {
+        // http://dynamorio.org/docs/group__drmgr.html#ga83a5fc96944e10bd7356e0c492c93966
         if(!drmgr_register_bb_instrumentation_event(
                                                 NULL,
                                                 event_app_instruction,
