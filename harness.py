@@ -12,7 +12,8 @@ import threading
 import time
 import signal
 import struct
-from functools import reduce
+
+import fuzzer_config
 
 print_lock = threading.Lock()
 can_fuzz = True
@@ -26,7 +27,7 @@ def print_l(*args):
 
 def get_path_to_run_file(run_id, filename):
     """ Helper function for easily getting the full path to a file in the current run's directory """
-    return reduce(os.path.join, [os.getenv('APPDATA'), 'Trail of Bits', 'fuzzkit', 'working', str(run_id), filename])
+    return os.path.join(fuzzer_config.sl2_dir, str(run_id), filename)
 
 
 def run_dr(_config, save_stdout=False, save_stderr=False, verbose=False, timeout=None):
@@ -258,7 +259,7 @@ def fuzz_and_triage(_config):
 
 
 def main():
-    from fuzzer_config import config
+    config = fuzzer_config.config
 
     # Start the server if it's not already running
     if not os.path.isfile("\\\\.\\pipe\\fuzz_server"):
