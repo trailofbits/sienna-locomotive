@@ -17,7 +17,8 @@
 #include "droption.h"
 
 extern "C" {
-#include "utils.h"
+    #include "utils.h"
+    #include "common/uuid.h"
 }
 
 #include <fstream>
@@ -28,11 +29,12 @@ using json = nlohmann::json;
 #include <Windows.h>
 #include <winsock2.h>
 #include <winhttp.h>
+#include <Rpc.h>
 
 void *mutatex;
 bool replay;
 bool mutate_count;
-UINT64 run_id;
+UUID run_id;
 
 std::set<reg_id_t> tainted_regs;
 std::set<app_pc> tainted_mems;
@@ -77,11 +79,10 @@ static droption_t<unsigned int> op_no_taint(
     "Do not do instruction level instrumentation.");
 
 /* Used when replaying a run from the server */
-#define NO_REPLAY 0xFFFFFFF
-static droption_t<unsigned int> op_replay(
+static droption_t<std::string> op_replay(
     DROPTION_SCOPE_CLIENT,
     "r",
-    NO_REPLAY,
+    "",
     "replay",
     "The run id for a crash to replay.");
 
@@ -971,7 +972,7 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
             BYTE event_id = 5;
 
             WriteFile(h_pipe, &event_id, sizeof(BYTE), &bytes_written, NULL);
-            TransactNamedPipe(h_pipe, &run_id, sizeof(DWORD), targetFile, MAX_PATH + 1, &bytes_read, NULL);
+            TransactNamedPipe(h_pipe, &run_id, sizeof(UUID), targetFile, MAX_PATH + 1, &bytes_read, NULL);
             CloseHandle(h_pipe);
 
             HANDLE hCrashFile = CreateFile(targetFile, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -1337,7 +1338,7 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
 
             // Send the run ID and request the mutation
             WriteFile(h_pipe, &event_id, sizeof(BYTE), &bytes_written, NULL);
-            WriteFile(h_pipe, &run_id, sizeof(DWORD), &bytes_written, NULL);
+            WriteFile(h_pipe, &run_id, sizeof(UUID), &bytes_written, NULL);
             WriteFile(h_pipe, &mutate_count, sizeof(DWORD), &bytes_written, NULL);
             // Overwrite bytes with old mutation
             TransactNamedPipe(h_pipe, &nNumberOfBytesToRead, sizeof(DWORD), lpBuffer, nNumberOfBytesToRead, &bytes_read, NULL);
@@ -1462,13 +1463,13 @@ void tracer(client_id_t id, int argc, const char *argv[]) {
     replay = false;
     mutate_count = 0;
 
-    run_id = op_replay.get_value();
-    if(run_id != NO_REPLAY) {
+    std::string run_id_s = op_replay.get_value();
+
+    if(run_id_s.length() > 0) {
         replay = true;
     }
 
-    dr_printf("replay: %d\n", replay);
-    dr_printf("run_id: %llu\n", run_id);
+    sl2_wstring_to_uuid(run_id_s.c_str(), &run_id);
 
     mutatex = dr_mutex_create();
     dr_register_exit_event(event_exit_trace);
