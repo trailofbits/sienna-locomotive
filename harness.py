@@ -29,7 +29,7 @@ def print_l(*args):
 
 def get_path_to_run_file(run_id, filename):
     """ Helper function for easily getting the full path to a file in the current run's directory """
-    return os.path.join(fuzzer_config.sl2_dir, str(run_id), filename)
+    return os.path.join(fuzzer_config.sl2_dir, 'working', str(run_id), filename)
 
 
 def run_dr(_config, save_stdout=False, save_stderr=False, verbose=False, timeout=None):
