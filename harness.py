@@ -12,8 +12,10 @@ import threading
 import time
 import signal
 import struct
+import json
 
 import fuzzer_config
+from state import get_target_dir
 
 print_lock = threading.Lock()
 can_fuzz = True
@@ -116,6 +118,28 @@ def finalize(run_id, crashed):
     f.close()
 
 
+def select_wizard_findings(wizard_findings, target_file):
+    """ Print and select findings, then write to disk """
+    print_l("Functions found:")
+    for i, finding in enumerate(wizard_findings):
+        if 'source' in finding:
+            print_l("{}) {func_name} from {source}:{start}-{end}".format(i, **finding))
+        else:
+            print_l("{}) {func_name}".format(i, **finding))
+        print_l("   ", '\n   '.join(line for line in finding['hexdump_lines'][:4]))
+        if len(finding['hexdump_lines']) > 4:
+            print_l("   ...")
+
+    # Let the user select a finding, add it to the config
+    index = int(input("Choose a function to fuzz> "))
+    wizard_findings[index]['selected'] = True
+
+    with open(target_file, 'w') as json_file:
+        json.dump(wizard_findings, json_file)
+
+    return wizard_findings
+
+
 def wizard_run(_config):
     """ Runs the wizard and lets the user select a target function """
     completed_process = run_dr({'drrun_path': _config['drrun_path'],
@@ -139,7 +163,7 @@ def wizard_run(_config):
     # Get function names, ID's, and contents, if applicable
     for section in sections[1:]:
         # Create result dict from parsing applicable lines
-        results = {'index': -123, 'func_name': 'PARSE ERROR', 'hexdump_lines': []}
+        results = {'index': -123, 'func_name': 'PARSE ERROR', 'hexdump_lines': [], 'selected': False}
         for line in section.splitlines():
             if '<id:' in line:
                 results.update(re.search(r"<id: (?P<index>\d+),(?P<func_name>\S+)>", line).groupdict())
@@ -157,23 +181,7 @@ def wizard_run(_config):
             if 'ERROR' not in results['func_name']:
                 wizard_findings.append(results)
 
-    # Print findings
-    print_l("Functions found:")
-    for i, finding in enumerate(wizard_findings):
-        if 'source' in finding:
-            print_l("{}) {func_name} from {source}:{start}-{end}".format(i, **finding))
-        else:
-            print_l("{}) {func_name}".format(i, **finding))
-        print_l("   ", '\n   '.join(line for line in finding['hexdump_lines'][:4]))
-        if len(finding['hexdump_lines']) > 4:
-            print_l("   ...")
-
-    # Let the user select a finding, add it to the config
-    index = int(input("Choose a function to fuzz> "))
-    _config['client_args'].append('-t')
-    _config['client_args'].append("{},{}".format(wizard_findings[index]['index'], wizard_findings[index]['func_name']))
-
-    return _config
+    return wizard_findings
 
 
 def fuzzer_run(_config):
@@ -266,9 +274,18 @@ def main():
         subprocess.Popen(["powershell", "start", "powershell",
                           "{-NoExit", "-Command", "\"{}\"}}".format(config['server_path'])])
 
-    # Run the wizard to select a target function
-    if config['wizard']:
-        config = wizard_run(config)
+    # Run the wizard to select a target function if we don't have one saved
+    target_file = os.path.join(get_target_dir(config), 'targets.json')
+    findings = []
+    if config['wizard'] or not os.path.exists(target_file):
+        findings = select_wizard_findings(wizard_run(config), target_file)
+    else:
+        with open(target_file, 'r') as json_file:
+            findings = json.load(json_file)
+    for finding in findings:
+        if finding['selected']:
+            config['client_args'].append('-t')
+            config['client_args'].append("{},{}".format(finding['index'], finding['func_name']))
 
     # Spawn a thread that will run DynamoRIO and wait for the output
     with concurrent.futures.ThreadPoolExecutor(max_workers=config['simultaneous']) as executor:
