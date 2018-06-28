@@ -13,10 +13,7 @@
 #include <Dbghelp.h>
 #include <Windows.h>
 #include <winsock2.h>
-// #include <winhttp.h>
-#include <Wininet.h>
-#pragma comment(lib, "Wininet.lib")
-
+#include <winhttp.h>
 
 // Use for parsing command line options
 static droption_t<std::string> op_include(
@@ -165,7 +162,7 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
     PVOID pvBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD dwBufferLength = (DWORD)drwrap_get_arg(wrapcxt, 2);
     PDWORD pdwBytesRead = (PDWORD)drwrap_get_arg(wrapcxt, 3);
-    // WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE)(int)drwrap_get_arg(wrapcxt, 3);
+    WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE)(int)drwrap_get_arg(wrapcxt, 3);
 
     // get url
     // InternetQueryOption
@@ -188,15 +185,12 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
 
     // get url
     // InternetQueryOption
-    DWORD limit = MAX_PATH;
-    LPWSTR filePath = (LPWSTR)malloc(sizeof(WCHAR) * (MAX_PATH+1));
-    BOOL worked = InternetQueryOption(hFile, INTERNET_OPTION_URL, filePath, &limit);
 
     *user_data = malloc(sizeof(read_info));
     ((read_info *)*user_data)->lpBuffer = lpBuffer;
     ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
     ((read_info *)*user_data)->function = Function::InternetReadFile;
-    ((read_info *)*user_data)->source = NULL; //filePath;
+    ((read_info *)*user_data)->source = NULL;
     ((read_info *)*user_data)->position = NULL;
 }
 
