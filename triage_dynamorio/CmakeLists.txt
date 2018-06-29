@@ -7,8 +7,6 @@ endif(NOT DynamoRIO_FOUND)
 add_library(tracer SHARED tracer.cpp utils.c)
 target_compile_definitions(tracer PRIVATE -DUNICODE)
 
-include_directories(../include)
-
 target_link_libraries(tracer Dbghelp)
 
 configure_DynamoRIO_client(tracer)
