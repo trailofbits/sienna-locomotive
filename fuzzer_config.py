@@ -8,13 +8,13 @@ Handles argument and config file parsing for the fuzzer
 import os
 import argparse
 import configparser
-from functools import reduce
 
 
-sl2_dir = reduce(os.path.join, [os.getenv('APPDATA'), 'Trail of Bits', 'fuzzkit'])
+sl2_dir = os.path.join(os.getenv('APPDATA'), 'Trail of Bits', 'fuzzkit')
 if not os.path.isdir(sl2_dir):
     os.makedirs(os.path.join(sl2_dir, 'working'))
     os.mkdir(os.path.join(sl2_dir, 'log'))
+    os.mkdir(os.path.join(sl2_dir, 'targets'))
 
 config_path = os.path.join(sl2_dir, 'config.ini')
 
@@ -41,7 +41,7 @@ _config.read(config_path)
 
 # Set up argument parser
 parser = argparse.ArgumentParser(description='Run the DynamoRIO fuzzing harness. You can pass arguments to the command line to override the defaults in config.ini')
-parser.add_argument('-w', '--wizard', action='store_true', dest='wizard', default=False, help="Run the wizard before fuzzing to select a function to fuzz")  # TODO : default to true before release
+parser.add_argument('-w', '--wizard', action='store_true', dest='wizard', default=False, help="Run the wizard before fuzzing to select a function to fuzz. Ignores saved target selection.")
 parser.add_argument('-v', '--verbose', action='store_true', dest='verbose', default=False, help="Tell drrun to run in verbose mode")
 parser.add_argument('-n', '--nopersist', action='store_true', dest='nopersist', default=False, help="Tell drrun not to use persistent code caches (slower)")
 parser.add_argument('-p', '--profile', action='store', dest='profile', default='DEFAULT', type=str, help="Pull configuration from a specific section in config.ini. Defaults to DEFAULT")

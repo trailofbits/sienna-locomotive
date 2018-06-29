@@ -12,6 +12,10 @@
 #include "drwrap.h"
 #include "droption.h"
 
+#include <fstream>
+#include <json.hpp>
+using json = nlohmann::json;
+
 
 #ifdef WINDOWS
 #define IF_WINDOWS_ELSE(x,y) x
@@ -37,9 +41,22 @@ static droption_t<std::string> op_target(
     DROPTION_SCOPE_CLIENT,
     "t",
     "",
-    "target",
-    "Specific call to target.");
+    "targetfile",
+    "JSON file in which to look for targets");
 
+struct targetFunction {
+  bool selected;
+  UINT64 index;
+  std::string functionName;
+};
+
+void from_json(const json& j, targetFunction& t) {
+    t.selected = j.at("selected").get<bool>();
+    t.index = j.at("index").get<int>();
+    t.functionName = j.at("func_name").get<std::string>();
+}
+
+json parsedJson;
 
 // All the functions we support
 enum class Function {
@@ -725,11 +742,11 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
 
     // Double check that this is the specific function call we're supposed to be targeting
     BOOL targeted = false;
-    std::string target = op_target.get_value();
-    char *end;
-    UINT64 num = strtoull(target.c_str(), &end, 10);
-    if(call_counts[function] == num) {
+    std::string strFunctionName(get_function_name(function));
+    for (targetFunction t: parsedJson){
+      if (t.selected and t.functionName == strFunctionName and call_counts[function] == t.index){
         targeted = true;
+      }
     }
     call_counts[function]++; // increment the call counter
 
@@ -782,17 +799,23 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     std::map<char *, PREPROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
+        bool hook = false;
 
         // Look for function matching the target specified on the command line
-        std::string target = op_target.get_value();
         std::string strFunctionName(functionName);
-        if(strFunctionName == "RegQueryValueExW" || strFunctionName == "RegQueryValueExA") {
-            if(target.find(",RegQueryValueEx") == std::string::npos) {
-                continue;
+        for (targetFunction t: parsedJson){
+          if (t.selected and t.functionName == strFunctionName){
+            hook = true;
+          }
+          else if(t.selected and (strFunctionName == "RegQueryValueExW" or strFunctionName == "RegQueryValueExA")) {
+            if(t.functionName != "RegQueryValueEx") {
+              hook = false;
             }
-        } else if(target != "" && target.find("," + strFunctionName) == std::string::npos) {
-            continue;
+          }
         }
+
+        if (!hook)
+          continue;
 
         void(__cdecl *hookFunctionPre)(void *, void **);
         hookFunctionPre = it->second;
@@ -803,17 +826,17 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
             hookFunctionPost = toHookPost[functionName];
         }
 
-        // Skip ReadFile calls from the kernel (TODO - investigate fuzzgoat results)
+        // Only hook ReadFile calls from the kernel (TODO - investigate fuzzgoat results)
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
         const char *mod_name = dr_module_preferred_name(mod);
-        if(strcmp(functionName, "ReadFile") == 0) {
+        if(strFunctionName == "ReadFile") {
             if(strcmp(mod_name, "KERNELBASE.dll") != 0) {
                 continue;
             }
         }
 
-        // Skip registry queries in the kernel
-        if(strcmp(functionName, "RegQueryValueExA") == 0 || strcmp(functionName, "RegQueryValueExW") == 0) {
+        // Only hook registry queries in the kernel
+        if(strFunctionName == "RegQueryValueExA" or strFunctionName == "RegQueryValueExW") {
             if(strcmp(mod_name, "KERNELBASE.dll") != 0) {
                 continue;
             }
@@ -856,9 +879,14 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
 
     std::string target = op_target.get_value();
     if(target == "") {
-        dr_fprintf(STDERR, "ERROR: arg -t (target) required");
+        dr_fprintf(STDERR, "ERROR: arg -t (target file) required");
         dr_abort();
     }
+
+    std::ifstream jsonStream(target); // TODO ifstream can sometimes cause performance issues
+    jsonStream >> parsedJson;
+    if (!parsedJson.is_array())
+      dr_fprintf(STDERR, "Document root is not an array\n");
 
     // Set up console printing
     dr_log(NULL, LOG_ALL, 1, "DR client 'SL Fuzzer' initializing\n");

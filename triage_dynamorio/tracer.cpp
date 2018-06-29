@@ -20,8 +20,9 @@ extern "C" {
 #include "utils.h"
 }
 
-#include "rapidjson/prettywriter.h"
-#include "rapidjson/stringbuffer.h"
+#include <fstream>
+#include <json.hpp>
+using json = nlohmann::json;
 
 #include <Dbghelp.h>
 #include <Windows.h>
@@ -53,6 +54,20 @@ static droption_t<std::string> op_target(
     "target",
     "Specific call to target.");
 
+struct targetFunction {
+  bool selected;
+  UINT64 index;
+  std::string functionName;
+};
+
+void from_json(const json& j, targetFunction& t) {
+    t.selected = j.at("selected").get<bool>();
+    t.index = j.at("index").get<int>();
+    t.functionName = j.at("func_name").get<std::string>();
+}
+
+json parsedJson;
+
 /* Mostly used to debug if taint tracking is too slow */
 static droption_t<unsigned int> op_no_taint(
     DROPTION_SCOPE_CLIENT,
@@ -82,6 +97,30 @@ enum class Function {
 };
 
 std::map<Function, UINT64> call_counts;
+
+/* Translates function names into strings */
+char *get_function_name(Function function) {
+    switch(function) {
+        case Function::ReadFile:
+            return "ReadFile";
+        case Function::recv:
+            return "recv";
+        case Function::WinHttpReadData:
+            return "WinHttpReadData";
+        case Function::InternetReadFile:
+            return "InternetReadFile";
+        case Function::WinHttpWebSocketReceive:
+            return "WinHttpWebSocketReceive";
+        case Function::RegQueryValueEx:
+            return "RegQueryValueEx";
+        case Function::ReadEventLog:
+            return "ReadEventLog";
+        case Function::fread:
+            return "fread";
+    }
+
+    return "unknown";
+}
 
 /* Currently unused as this runs on 64 bit applications */
 static reg_id_t reg_to_full_width32(reg_id_t reg) {
@@ -818,28 +857,15 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
     DWORD exception_code = excpt->record->ExceptionCode;
     app_pc exception_address = (app_pc)excpt->record->ExceptionAddress;
 
-    rapidjson::StringBuffer s;
-    rapidjson::Writer<rapidjson::StringBuffer> writer(s);
+    json j;
 
-    writer.StartObject();
+    j["score"] = score;
+    j["reason"] = reason;
+    j["exception"] = exception_to_string(exception_code);
+    j["location"] = (uint64) exception_address;
+    j["instruction"] = disassembly;
 
-    writer.Key("score");
-    writer.Uint(score);
-
-    writer.Key("reason");
-    writer.String(reason.c_str());
-
-    writer.Key("exception");
-    writer.String(exception_to_string(exception_code).c_str());
-
-    writer.Key("location");
-    writer.Uint64((uint64)exception_address);
-
-    writer.Key("instruction");
-    writer.String(disassembly.c_str());
-
-    writer.Key("tainted_regs");
-    writer.StartArray();
+    j["regs"] = json::array();
     reg_id_t regs[16] = {
         DR_REG_RAX,
         DR_REG_RBX,
@@ -861,50 +887,33 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
 
     for(int i=0; i<16; i++) {
         bool tainted = tainted_regs.find(regs[i]) != tainted_regs.end();
-
-        writer.StartObject();
-        writer.Key("reg");
-        writer.String(get_register_name(regs[i]));
-        writer.Key("value");
-        writer.Uint64(reg_get_value(regs[i], excpt->mcontext));
-        writer.Key("tainted");
-        writer.Bool(tainted);
-        writer.EndObject();
+        json reg = {{"reg", get_register_name(regs[i])},
+                    {"value", reg_get_value(regs[i], excpt->mcontext)},
+                    {"tainted", tainted}};
+        j["regs"].push_back(reg);
     }
 
-
     bool tainted = tainted_regs.find(DR_REG_NULL) != tainted_regs.end();
-    writer.StartObject();
-    writer.Key("reg");
-    writer.String("rip");
-    writer.Key("value");
-    writer.Uint64((uint64)exception_address);
-    writer.Key("tainted");
-    writer.Bool(tainted);
-    writer.EndObject();
+    json rip = {{"reg", "rip"},
+                {"value", (uint64) exception_address},
+                {"tainted", tainted}};
+    j["regs"].push_back(rip);
 
-    writer.EndArray();
-
-    writer.Key("last_calls");
-    writer.StartArray();
+    j["last_calls"] = json::array();
     for(int i = 0; i < LAST_COUNT; i++) {
         int idx = last_call_idx + i;
         idx %= LAST_COUNT;
-        writer.Uint64((uint64)last_calls[idx]);
+        j["last_calls"].push_back((uint64)last_calls[idx]);
     }
-    writer.EndArray();
 
-    writer.Key("last_insns");
-    writer.StartArray();
+    j["last_insns"] = json::array();
     for(int i = 0; i < LAST_COUNT; i++) {
         int idx = last_insn_idx + i;
         idx %= LAST_COUNT;
-        writer.Uint64((uint64)last_insns[idx]);
+        j["last_insns"].push_back((uint64)last_insns[idx]);
     }
-    writer.EndArray();
 
-    writer.Key("tainted_addrs");
-    writer.StartArray();
+    j["tainted_addrs"] = json::array();
     if (tainted_mems.size() > 0) {
         std::set<app_pc>::iterator mit = tainted_mems.begin();
         UINT64 start = (UINT64)*mit;
@@ -914,12 +923,8 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
         for (; mit != tainted_mems.end(); mit++) {
             UINT64 curr = (UINT64)*mit;
             if (curr > (start + size)) {
-                writer.StartObject();
-                writer.Key("start");
-                writer.Uint64(start);
-                writer.Key("size");
-                writer.Uint64(size);
-                writer.EndObject();
+              json addr = {{"start", start}, {"size", size}};
+              j["tainted_addrs"].push_back(addr);
 
                 start = curr;
                 size = 0;
@@ -927,18 +932,11 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
             size++;
         }
 
-        writer.StartObject();
-        writer.Key("start");
-        writer.Uint64(start);
-        writer.Key("size");
-        writer.Uint64(size);
-        writer.EndObject();
+        json addr = {{"start", start}, {"size", size}};
+        j["tainted_addrs"].push_back(addr);
     }
-    writer.EndArray();
 
-    writer.EndObject();
-
-    return s.GetString();
+    return j.dump();
 }
 
 /* Get Run ID and dump crash info into JSON file in the run folder. */
@@ -1297,12 +1295,11 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
 
     // Identify whether this is the function we want to target
     BOOL targeted = false;
-    std::string target = op_target.get_value();
-
-    char *end;
-    UINT64 num = strtoull(target.c_str(), &end, 10);
-    if(call_counts[function] == num) {
+    std::string strFunctionName(get_function_name(function));
+    for (targetFunction t: parsedJson){
+      if (t.selected and t.functionName == strFunctionName and call_counts[function] == t.index){
         targeted = true;
+      }
     }
 
     call_counts[function]++;
@@ -1392,18 +1389,23 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     std::map<char *, PREPROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
+        bool hook = false;
 
-        // if our toHookPre function matches -t target
-        std::string target = op_target.get_value();
+        // Look for function matching the target specified on the command line
         std::string strFunctionName(functionName);
-
-        if(strFunctionName == "RegQueryValueExW" || strFunctionName == "RegQueryValueExA") {
-            if(target.find(",RegQueryValueEx") == std::string::npos) {
-                continue;
+        for (targetFunction t: parsedJson){
+          if (t.selected and t.functionName == strFunctionName){
+            hook = true;
+          }
+          else if(t.selected and (strFunctionName == "RegQueryValueExW" or strFunctionName == "RegQueryValueExA")) {
+            if(t.functionName != "RegQueryValueEx") {
+              hook = false;
             }
-        } else if(target != "" && target.find("," + strFunctionName) == std::string::npos) {
-            continue;
+          }
         }
+
+        if (!hook)
+          continue;
 
         void(__cdecl *hookFunctionPre)(void *, void **);
         hookFunctionPre = it->second;
@@ -1511,6 +1513,11 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_fprintf(STDERR, "ERROR: arg -t (target) required");
         dr_abort();
     }
+
+    std::ifstream jsonStream(target); // TODO ifstream can sometimes cause performance issues
+    jsonStream >> parsedJson;
+    if (!parsedJson.is_array())
+      dr_fprintf(STDERR, "Document root is not an array\n");
 
     tracer(id, argc, argv);
 }
