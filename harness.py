@@ -193,6 +193,7 @@ def wizard_run(_config):
 
         results['index'] = int(results['index'])
 
+    return wizard_findings
 
 def fuzzer_run(_config):
     """ Runs the fuzzer """
