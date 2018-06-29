@@ -118,7 +118,7 @@ def finalize(run_id, crashed):
     f.close()
 
 
-def select_wizard_findings(wizard_findings, target_file):
+def select_and_dump_wizard_findings(wizard_findings, target_file):
     """ Print and select findings, then write to disk """
     print_l("Functions found:")
     for i, finding in enumerate(wizard_findings):
@@ -180,6 +180,8 @@ def wizard_run(_config):
                    for finding in wizard_findings):
             if 'ERROR' not in results['func_name']:
                 wizard_findings.append(results)
+
+        results['index'] = int(results['index'])
 
     return wizard_findings
 
@@ -276,16 +278,11 @@ def main():
 
     # Run the wizard to select a target function if we don't have one saved
     target_file = os.path.join(get_target_dir(config), 'targets.json')
-    findings = []
     if config['wizard'] or not os.path.exists(target_file):
-        findings = select_wizard_findings(wizard_run(config), target_file)
-    else:
-        with open(target_file, 'r') as json_file:
-            findings = json.load(json_file)
-    for finding in findings:
-        if finding['selected']:
-            config['client_args'].append('-t')
-            config['client_args'].append("{},{}".format(finding['index'], finding['func_name']))
+        select_and_dump_wizard_findings(wizard_run(config), target_file)
+
+    config['client_args'].append('-t')
+    config['client_args'].append(target_file)
 
     # Spawn a thread that will run DynamoRIO and wait for the output
     with concurrent.futures.ThreadPoolExecutor(max_workers=config['simultaneous']) as executor:

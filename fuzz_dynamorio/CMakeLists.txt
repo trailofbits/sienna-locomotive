@@ -6,6 +6,7 @@ if (NOT DynamoRIO_FOUND)
   message(FATAL_ERROR "DynamoRIO package required to build")
 endif(NOT DynamoRIO_FOUND)
 
+include_directories(../include)
 add_library(fuzzer SHARED fuzzer.cpp)
 target_compile_definitions(fuzzer PRIVATE -DUNICODE)
 
