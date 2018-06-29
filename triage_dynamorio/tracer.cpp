@@ -23,6 +23,10 @@ extern "C" {
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
 
+#include <fstream>
+#include <json.hpp>
+using json = nlohmann::json;
+
 #include <Dbghelp.h>
 #include <Windows.h>
 #include <winsock2.h>
@@ -53,6 +57,20 @@ static droption_t<std::string> op_target(
     "target",
     "Specific call to target.");
 
+struct targetFunction {
+  bool selected;
+  UINT64 index;
+  std::string functionName;
+};
+
+void from_json(const json& j, targetFunction& t) {
+    t.selected = j.at("selected").get<bool>();
+    t.index = j.at("index").get<int>();
+    t.functionName = j.at("func_name").get<std::string>();
+}
+
+json parsedJson;
+
 /* Mostly used to debug if taint tracking is too slow */
 static droption_t<unsigned int> op_no_taint(
     DROPTION_SCOPE_CLIENT,
@@ -82,6 +100,30 @@ enum class Function {
 };
 
 std::map<Function, UINT64> call_counts;
+
+/* Translates function names into strings */
+char *get_function_name(Function function) {
+    switch(function) {
+        case Function::ReadFile:
+            return "ReadFile";
+        case Function::recv:
+            return "recv";
+        case Function::WinHttpReadData:
+            return "WinHttpReadData";
+        case Function::InternetReadFile:
+            return "InternetReadFile";
+        case Function::WinHttpWebSocketReceive:
+            return "WinHttpWebSocketReceive";
+        case Function::RegQueryValueEx:
+            return "RegQueryValueEx";
+        case Function::ReadEventLog:
+            return "ReadEventLog";
+        case Function::fread:
+            return "fread";
+    }
+
+    return "unknown";
+}
 
 /* Currently unused as this runs on 64 bit applications */
 static reg_id_t reg_to_full_width32(reg_id_t reg) {
@@ -1297,12 +1339,11 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
 
     // Identify whether this is the function we want to target
     BOOL targeted = false;
-    std::string target = op_target.get_value();
-
-    char *end;
-    UINT64 num = strtoull(target.c_str(), &end, 10);
-    if(call_counts[function] == num) {
+    std::string strFunctionName(get_function_name(function));
+    for (targetFunction t: parsedJson){
+      if (t.selected and t.functionName == strFunctionName and call_counts[function] == t.index){
         targeted = true;
+      }
     }
 
     call_counts[function]++;
@@ -1392,18 +1433,23 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     std::map<char *, PREPROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
+        bool hook = false;
 
-        // if our toHookPre function matches -t target
-        std::string target = op_target.get_value();
+        // Look for function matching the target specified on the command line
         std::string strFunctionName(functionName);
-
-        if(strFunctionName == "RegQueryValueExW" || strFunctionName == "RegQueryValueExA") {
-            if(target.find(",RegQueryValueEx") == std::string::npos) {
-                continue;
+        for (targetFunction t: parsedJson){
+          if (t.selected and t.functionName == strFunctionName){
+            hook = true;
+          }
+          else if(t.selected and (strFunctionName == "RegQueryValueExW" or strFunctionName == "RegQueryValueExA")) {
+            if(t.functionName != "RegQueryValueEx") {
+              hook = false;
             }
-        } else if(target != "" && target.find("," + strFunctionName) == std::string::npos) {
-            continue;
+          }
         }
+
+        if (!hook)
+          continue;
 
         void(__cdecl *hookFunctionPre)(void *, void **);
         hookFunctionPre = it->second;
@@ -1511,6 +1557,11 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_fprintf(STDERR, "ERROR: arg -t (target) required");
         dr_abort();
     }
+
+    std::ifstream jsonStream(target); // TODO ifstream can sometimes cause performance issues
+    jsonStream >> parsedJson;
+    if (!parsedJson.is_array())
+      dr_fprintf(STDERR, "Document root is not an array\n");
 
     tracer(id, argc, argv);
 }
