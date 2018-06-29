@@ -131,7 +131,17 @@ def select_and_dump_wizard_findings(wizard_findings, target_file):
             print_l("   ...")
 
     # Let the user select a finding, add it to the config
-    index = int(input("Choose a function to fuzz> "))
+    index = -1
+    done = False
+    while not done:
+        try:
+            index = int(input("Choose a function to fuzz> "))
+        except ValueError:
+            pass
+        if index <0 or index>=len(wizard_findings):
+            print_l("Function number is invalid.")
+        else:
+            done = True
     wizard_findings[index]['selected'] = True
 
     with open(target_file, 'w') as json_file:
@@ -182,8 +192,6 @@ def wizard_run(_config):
                 wizard_findings.append(results)
 
         results['index'] = int(results['index'])
-
-    return wizard_findings
 
 
 def fuzzer_run(_config):

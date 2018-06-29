@@ -48,7 +48,7 @@ First, clone the repository:
 
 #### Dependencies
 Next, install the following dependencies
-* CMake
+* [CMake](https://cmake.org/download/)
 * Visual Studio 2017 (Install components for Windows Console dev)
 * DynamoRIO (As of 6/2018, you can just extract the [precompiled 7.0-RC1 binaries](https://github.com/DynamoRIO/dynamorio/releases/tag/release_7_0_0_rc1))
 * Python (3.6+)
@@ -69,7 +69,11 @@ If you're not familiar with cmake - the first invocation configures it, the seco
 You might need to use the Visual Studio Developer Command Prompt in order for cmake to be able to see the VS compiler.
 
 ### Configuring
-Open up powershell in the project root and run harness.py for the first time. It'll create a default configuration file in `%APPDATA\Trail of Bits\fuzzkit\`. You can leave everything in there and it will work, but you might want to update the file paths to be relative to C: so that you can invoke it from anywhere. If you want to create a new profile, just copy the default one and change the name. Then you can use the `-p` flag to harness.py to change which profile it pulls settings from.
+Open up powershell in the project root and run harness.py for the first time. 
+
+`PS C:\proj\sl2\sienna-locomotive> pythonw.exe .\harness.py` 
+
+It'll create a default configuration file in `%APPDATA\Trail of Bits\fuzzkit\`. You can leave everything in there and it will work, but you might want to update the file paths to be relative to C: so that you can invoke it from anywhere. If you want to create a new profile, just copy the default one and change the name. Then you can use the `-p` flag to harness.py to change which profile it pulls settings from.
 
 Using -h on the harness will print out the list of command line options it supports. You can set a number of things permanently by adding lines to the configuration file. As a general rule though, the command line parameters will overwrite what's in the config file if you explicitly pass them in. This isn't the case for everything, so if a command isn't working the way you expect, run fuzzer_config.py with the same arguments to see exactly what settings are getting passed to the harness.
 
