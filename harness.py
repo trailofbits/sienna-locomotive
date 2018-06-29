@@ -169,7 +169,19 @@ def wizard_run(_config):
             print_l("   ...")
 
     # Let the user select a finding, add it to the config
-    index = int(input("Choose a function to fuzz> "))
+    index = -1
+    done = False
+    while not done:
+        try:
+            index = int(input("Choose a function to fuzz> "))
+        except ValueError:
+            pass
+        if index <0 or index>=len(wizard_findings):
+            print_l("Function number is invalid.")
+        else:
+            done = True
+            
+
     _config['client_args'].append('-t')
     _config['client_args'].append("{},{}".format(wizard_findings[index]['index'], wizard_findings[index]['func_name']))
 
