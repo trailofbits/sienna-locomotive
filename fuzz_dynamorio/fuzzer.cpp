@@ -7,6 +7,7 @@
 #include <Windows.h>
 #include <Winternl.h>
 #include <Rpc.h>
+#include <io.h>
 
 #include "dr_api.h"
 #include "drmgr.h"
@@ -330,7 +331,7 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
     DWORD pathSize = 0;
 
     // Check that ReadFile calls are to something actually valid
-    if(function == Function::ReadFile) {
+    if(function == Function::ReadFile || function == Function::fread) {
         if (hFile == INVALID_HANDLE_VALUE) {
             dr_log(NULL, LOG_ALL, ERROR, "fuzzer#mutate: Invalid source for mutation?\n");
             return false;
@@ -706,10 +707,11 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
     size_t size = (size_t)drwrap_get_arg(wrapcxt, 1);
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
+    FILE *file = (FILE *)drwrap_get_arg(wrapcxt, 3);
 
     *user_data = malloc(sizeof(read_info));
     ((read_info *)*user_data)->function = Function::fread;
-    ((read_info *)*user_data)->hFile = NULL;
+    ((read_info *)*user_data)->hFile = (HANDLE) _get_osfhandle(_fileno(file));
     ((read_info *)*user_data)->lpBuffer = buffer;
     ((read_info *)*user_data)->nNumberOfBytesToRead = size * count;
     ((read_info *)*user_data)->lpNumberOfBytesRead = NULL;
