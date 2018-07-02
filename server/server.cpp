@@ -4,114 +4,90 @@
 #include <set>
 #include <map>
 #include <unordered_map>
-
-#define LOGURU_IMPLEMENTATION 1
-#include "loguru.hpp"
+#include <string.h>
+#include <strsafe.h>
 
 #define BUFSIZE 100000
 
 #include <ShlObj.h>
 #include <PathCch.h>
 #pragma comment(lib, "Pathcch.lib")
+#include <Rpc.h>
+#pragma comment(lib, "Rpcrt4.lib")
+#include <shellapi.h>
+
+#define LOGURU_IMPLEMENTATION 1
+#include "loguru.hpp"
+
+#include "server.hpp"
 
 CRITICAL_SECTION critId;
 CRITICAL_SECTION critLog;
 
 HANDLE hLog = INVALID_HANDLE_VALUE;
 
-WCHAR FUZZ_WORKING_STAR[MAX_PATH] = L"";
-WCHAR FUZZ_WORKING_FMT[MAX_PATH] = L"";
-WCHAR FUZZ_WORKING_FMT_PROGRAM[MAX_PATH] = L"";
-WCHAR FUZZ_WORKING_FMT_ARGS[MAX_PATH] = L"";
-WCHAR FUZZ_WORKING_FMT_FKT[MAX_PATH] = L"";
-WCHAR FUZZ_WORKING_FMT_STAR[MAX_PATH] = L"";
-WCHAR FUZZ_WORKING_FMT_FMT[MAX_PATH] = L"";
-WCHAR FUZZ_WORKING_FMT_EXECUTION[MAX_PATH] = L"";
-WCHAR FUZZ_WORKING_FMT_MEM[MAX_PATH] = L"";
-WCHAR FUZZ_WORKING_FMT_CRASH[MAX_PATH] = L"";
-WCHAR FUZZ_WORKING_FMT_JSON[MAX_PATH] = L"";
+WCHAR FUZZ_WORKING_PATH[MAX_PATH] = L"";
 WCHAR FUZZ_LOG[MAX_PATH] = L"";
 
-// Initialize global variables containing relevant file/folder paths
-VOID initDirs() {
+// Initialize the global variable (FUZZ_LOG) containing the path to the logging file.
+// NOTE(ww): We separate this from initWorkingDir so that we can log any errors that
+// happen to occur in initWorkingDir.
+VOID initLoggingFile() {
     PWSTR roamingPath;
     SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roamingPath);
-    WCHAR workingLocalPath[MAX_PATH] = L"Trail of Bits\\fuzzkit\\working";
-    WCHAR combinedPath[MAX_PATH] = L"";
-    PathCchCombine(combinedPath, MAX_PATH, roamingPath, workingLocalPath);
 
-    PathCchCombine(FUZZ_WORKING_STAR, MAX_PATH, combinedPath, L"*");
-    PathCchCombine(FUZZ_WORKING_FMT, MAX_PATH, combinedPath, L"%d");
-    PathCchCombine(FUZZ_WORKING_FMT_PROGRAM, MAX_PATH, FUZZ_WORKING_FMT, L"program.txt");
-    PathCchCombine(FUZZ_WORKING_FMT_ARGS, MAX_PATH, FUZZ_WORKING_FMT, L"arguments.txt");
-    PathCchCombine(FUZZ_WORKING_FMT_FKT, MAX_PATH, FUZZ_WORKING_FMT, L"%d.fkt");
-    PathCchCombine(FUZZ_WORKING_FMT_STAR, MAX_PATH, FUZZ_WORKING_FMT, L"*");
-    PathCchCombine(FUZZ_WORKING_FMT_FMT, MAX_PATH, FUZZ_WORKING_FMT, L"%s");
-    PathCchCombine(FUZZ_WORKING_FMT_EXECUTION, MAX_PATH, FUZZ_WORKING_FMT, L"execution.trc");
-    PathCchCombine(FUZZ_WORKING_FMT_MEM, MAX_PATH, FUZZ_WORKING_FMT, L"mem.dmp");
-    PathCchCombine(FUZZ_WORKING_FMT_CRASH, MAX_PATH, FUZZ_WORKING_FMT, L"execution.csh");
-    PathCchCombine(FUZZ_WORKING_FMT_JSON, MAX_PATH, FUZZ_WORKING_FMT, L"crash.json");
-
-    SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roamingPath);
-    WCHAR logLocalPath[MAX_PATH] = L"Trail of Bits\\fuzzkit\\log\\server.log";
-    PathCchCombine(FUZZ_LOG, MAX_PATH, roamingPath, logLocalPath);
+    if (PathCchCombine(FUZZ_LOG, MAX_PATH, roamingPath, L"Trail of Bits\\fuzzkit\\log\\server.log") != S_OK) {
+        LOG_F(ERROR, "initDirs (0x%x)", GetLastError());
+        exit(1);
+    }
 
     CoTaskMemFree(roamingPath);
 }
 
-/* Checks the working directory and finds a new unique run ID for the current fuzzing run */
-DWORD findUnusedId() {
-    HANDLE hFind;
-    WIN32_FIND_DATA findData;
-    std::set<UINT64> usedIds;
+// Initialize the global variables containins the paths to the working directory,
+// as well as the subdirectories and files we expect individual runs to produce.
+// NOTE(ww): This should be kept up-to-date with fuzzer_config.py.
+VOID initWorkingDir() {
+    PWSTR roamingPath;
+    SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roamingPath);
+    WCHAR workingLocalPath[MAX_PATH] = L"Trail of Bits\\fuzzkit\\working";
 
-    EnterCriticalSection(&critId);
-
-    hFind = FindFirstFile(FUZZ_WORKING_STAR, &findData);
-    if (hFind != INVALID_HANDLE_VALUE) {
-        do {
-            if (findData.cFileName[0] >= 0x30 && findData.cFileName[0] <= 0x39) {
-                UINT64 runId = wcstoul(findData.cFileName, NULL, 0);
-                usedIds.insert(runId);
-            }
-        } while (FindNextFile(hFind, &findData));
-        FindClose(hFind);
-    }
-
-    DWORD id = 0;
-    for (id = 0; id <= UINT64_MAX; id++) {
-        if (usedIds.find(id) == usedIds.end()) {
-            LOG_F(INFO, "Found run id 0x%x", id);
-            break;
-        }
-    }
-
-    WCHAR targetDir[MAX_PATH];
-    wsprintf(targetDir, FUZZ_WORKING_FMT, id);
-    if(!CreateDirectory(targetDir, NULL)) {
-        LOG_F(ERROR, "FindUnusedId (0x%x)", GetLastError());
+    if (PathCchCombine(FUZZ_WORKING_PATH, MAX_PATH, roamingPath, workingLocalPath) != S_OK) {
+        LOG_F(ERROR, "initDirs (0x%x)", GetLastError());
         exit(1);
     }
 
-    LeaveCriticalSection(&critId);
-
-    return id;
+    CoTaskMemFree(roamingPath);
 }
 
-/* Calls findUnusedId to get a new run ID, writes relevant run metadata files into the corresponding run metadata dir
+/* Generates a new run UUID, writes relevant run metadata files into the corresponding run metadata dir
     This, like many things in the server, is pretty overzealous about exiting after any errors, often without an
     explanation of what happened. TODO - fix this */
 DWORD generateRunId(HANDLE hPipe) {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
+    UUID runId;
+    WCHAR *runId_s;
 
     LOG_F(INFO, "Run id requested");
-    DWORD runId = findUnusedId();
+    // NOTE(ww): On recent versions of Windows, UuidCreate generates a v4 UUID that
+    // is sufficiently diffuse for our purposes (avoiding conflicts between runs).
+    // See: https://stackoverflow.com/questions/35366368/does-uuidcreate-use-a-csprng
+    UuidCreate(&runId);
+    UuidToString(&runId, (RPC_WSTR *)&runId_s);
 
-    BOOL success = WriteFile(hPipe, &runId, sizeof(DWORD), &dwBytesWritten, NULL);
+    WCHAR targetDir[MAX_PATH + 1] = {0};
+    PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
+    if (!CreateDirectory(targetDir, NULL)) {
+        LOG_F(ERROR, "generateRunId (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    WriteFile(hPipe, &runId, sizeof(UUID), &dwBytesWritten, NULL);
+    LOG_F(INFO, "Run id: %S", runId_s);
 
     // get program name
-    TCHAR commandLine[8192] = { 0 };
+    WCHAR commandLine[8192] = { 0 };
     DWORD size = 0;
     if(!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
@@ -129,8 +105,10 @@ DWORD generateRunId(HANDLE hPipe) {
     }
 
     WCHAR targetFile[MAX_PATH + 1] = { 0 };
-    wsprintf(targetFile, FUZZ_WORKING_FMT_PROGRAM, runId);
-    HANDLE hFile = CreateFile(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
+    PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_PROGRAM_TXT);
+    HANDLE hFile = CreateFileW(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
+
+    LOG_F(INFO, "target file: %S", targetFile);
 
     if(hFile == INVALID_HANDLE_VALUE) {
         LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
@@ -147,7 +125,7 @@ DWORD generateRunId(HANDLE hPipe) {
         exit(1);
     }
 
-    ZeroMemory(commandLine, 8192 * sizeof(TCHAR));
+    ZeroMemory(commandLine, 8192 * sizeof(WCHAR));
 
     // get program arguments
     size = 0;
@@ -166,8 +144,8 @@ DWORD generateRunId(HANDLE hPipe) {
         exit(1);
     }
 
-    ZeroMemory(targetFile, (MAX_PATH + 1)*sizeof(WCHAR));
-    wsprintf(targetFile, FUZZ_WORKING_FMT_ARGS, runId);
+    ZeroMemory(targetFile, (MAX_PATH + 1) * sizeof(WCHAR));
+    PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_ARGUMENTS_TXT);
     hFile = CreateFile(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
     if(hFile == INVALID_HANDLE_VALUE) {
@@ -184,6 +162,10 @@ DWORD generateRunId(HANDLE hPipe) {
         LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
         exit(1);
     }
+
+    RpcStringFree((RPC_WSTR *)&runId_s);
+
+    LOG_F(INFO, "finished generateRunId");
 
     return 0;
 }
@@ -277,7 +259,7 @@ VOID strategyDeleteBytes(BYTE *buf, DWORD size) {
     // pos -> zero to second to last byte
     DWORD pos = 0;
     if(size > 1) {
-        getRand() % (size - 1);
+        pos = getRand() % (size - 1);
     }
 
     // delete_length -> 1 to (remaining_size - 1)
@@ -301,7 +283,7 @@ VOID strategyRandValues(BYTE *buf, DWORD size) {
     INT max = 0;
     while(max < 1) {
         // rand_size -> 1, 2, 4, 8
-        rand_size = pow(2, getRand() % 4);
+        rand_size = (DWORD) pow(2, getRand() % 4);
         max = (size + 1);
         max -= rand_size;
     }
@@ -336,7 +318,7 @@ VOID strategyKnownValues(BYTE *buf, DWORD size) {
     INT max = 0;
     while(max < 1) {
         // size -> 1, 2, 4, 8
-        rand_size = pow(2, getRand() % 4);
+        rand_size = (DWORD) pow(2, getRand() % 4);
         max = (size + 1);
         max -= rand_size;
     }
@@ -390,7 +372,7 @@ VOID strategyAddSubKnownValues(BYTE *buf, DWORD size) {
     DWORD max = 0;
     while(max < 1) {
         // size -> 1, 2, 4, 8
-        rand_size = pow(2, getRand() % 4);
+        rand_size = (DWORD) pow(2, getRand() % 4);
         max = (size + 1) - rand_size;
     }
 
@@ -443,7 +425,7 @@ VOID strategyEndianSwap(BYTE *buf, DWORD size) {
     DWORD max = 0;
     while(max < 1) {
         // size -> 1, 2, 4, 8
-        rand_size = pow(2, getRand() % 4);
+        rand_size = (DWORD) pow(2, getRand() % 4);
         max = (size + 1) - rand_size;
     }
 
@@ -530,7 +512,7 @@ DWORD mutate(BYTE *buf, DWORD size) {
 }
 
 /* Writes the fkt file in the event we found a crash. Stores information about the mutation that caused it */
-DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, TCHAR *filePath, DWORD64 position, DWORD size, BYTE* buf) {
+DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, WCHAR *filePath, DWORD64 position, DWORD size, BYTE* buf) {
     DWORD dwBytesWritten = 0;
 
     if (!WriteFile(hFile, "FKT\0", 4, &dwBytesWritten, NULL)) {
@@ -549,7 +531,7 @@ DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, TCHAR *filePath, DWORD6
         exit(1);
     }
 
-    if (!WriteFile(hFile, filePath, pathSize * sizeof(TCHAR), &dwBytesWritten, NULL)) {
+    if (!WriteFile(hFile, filePath, pathSize * sizeof(WCHAR), &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
         exit(1);
     }
@@ -579,14 +561,19 @@ DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, TCHAR *filePath, DWORD6
 
 /* handles mutation requests over the named pipe from the fuzzing harness */
 DWORD handleMutation(HANDLE hPipe) {
+    LOG_F(INFO, "starting handleMutation");
+
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
+    UUID runId;
+    WCHAR *runId_s;
 
-    DWORD runId = 0;
-    if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
+    if(!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
         exit(1);
     }
+
+    UuidToString(&runId, (RPC_WSTR *)&runId_s);
 
     DWORD type = 0;
     if(!ReadFile(hPipe, &type, sizeof(DWORD), &dwBytesRead, NULL)) {
@@ -594,11 +581,13 @@ DWORD handleMutation(HANDLE hPipe) {
         exit(1);
     }
 
-    DWORD mutateCount = 0;
-    if(!ReadFile(hPipe, &mutateCount, sizeof(DWORD), &dwBytesRead, NULL)) {
+    DWORD mutate_count = 0;
+    WCHAR mutate_fname[MAX_PATH + 1] = {0};
+    if(!ReadFile(hPipe, &mutate_count, sizeof(DWORD), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
         exit(1);
     }
+    StringCchPrintfW(mutate_fname, MAX_PATH, FUZZ_RUN_FKT_FMT, mutate_count);
 
     DWORD pathSize = 0;
     if (!ReadFile(hPipe, &pathSize, sizeof(DWORD), &dwBytesRead, NULL)) {
@@ -611,14 +600,14 @@ DWORD handleMutation(HANDLE hPipe) {
         exit(1);
     }
 
-    TCHAR filePath[MAX_PATH + 1];
-    if (!ReadFile(hPipe, &filePath, pathSize * sizeof(TCHAR), &dwBytesRead, NULL)) {
+    WCHAR filePath[MAX_PATH + 1];
+    if (!ReadFile(hPipe, &filePath, pathSize * sizeof(WCHAR), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
         exit(1);
     }
 
     filePath[pathSize] = 0;
-    LOG_F(INFO, "file path: %s\n", filePath);
+    LOG_F(INFO, "file path: %S\n", filePath);
 
     DWORD64 position = 0;
     if (!ReadFile(hPipe, &position, sizeof(DWORD64), &dwBytesRead, NULL)) {
@@ -662,8 +651,12 @@ DWORD handleMutation(HANDLE hPipe) {
         exit(1);
     }
 
-    WCHAR targetFile[MAX_PATH+1];
-    wsprintf(targetFile, FUZZ_WORKING_FMT_FKT, runId, mutateCount);
+    WCHAR targetDir[MAX_PATH + 1] = {0};
+    WCHAR targetFile[MAX_PATH + 1] = {0};
+
+    PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
+    PathCchCombine(targetFile, MAX_PATH, targetDir, mutate_fname);
+
     HANDLE hFile = CreateFile(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
     if(hFile == INVALID_HANDLE_VALUE) {
@@ -677,6 +670,8 @@ DWORD handleMutation(HANDLE hPipe) {
         LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
         exit(1);
     }
+
+    RpcStringFree((RPC_WSTR *)&runId_s);
 
     return 0;
 }
@@ -712,21 +707,25 @@ DWORD getBytesFKT(HANDLE hFile, BYTE *buf, DWORD size) {
 DWORD handleReplay(HANDLE hPipe) {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
+    UUID runId;
+    WCHAR *runId_s;
 
-    DWORD runId = 0;
-    if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
+    if(!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
         exit(1);
     }
 
-    LOG_F(INFO, "Replaying for run id %d", runId);
+    UuidToString(&runId, (RPC_WSTR *)&runId_s);
 
-    DWORD mutateCount = 0;
+    LOG_F(INFO, "Replaying for run id %S", runId_s);
 
-    if(!ReadFile(hPipe, &mutateCount, sizeof(DWORD), &dwBytesRead, NULL)) {
+    DWORD mutate_count = 0;
+    WCHAR mutate_fname[MAX_PATH + 1] = {0};
+    if(!ReadFile(hPipe, &mutate_count, sizeof(DWORD), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
         exit(1);
     }
+    StringCchPrintfW(mutate_fname, MAX_PATH, FUZZ_RUN_FKT_FMT, mutate_count);
 
     DWORD size = 0;
     if(!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
@@ -749,7 +748,10 @@ DWORD handleReplay(HANDLE hPipe) {
     }
 
     WCHAR targetFile[MAX_PATH + 1];
-    wsprintf(targetFile, FUZZ_WORKING_FMT_FKT, runId, mutateCount);
+    WCHAR targetDir[MAX_PATH + 1];
+    PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
+    PathCchCombine(targetFile, MAX_PATH, targetDir, mutate_fname);
+
     // TODO: validate file exists
     HANDLE hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 
@@ -775,6 +777,8 @@ DWORD handleReplay(HANDLE hPipe) {
         exit(1);
     }
 
+    RpcStringFree((RPC_WSTR *)&runId_s);
+
     return 0;
 }
 
@@ -782,17 +786,22 @@ DWORD handleReplay(HANDLE hPipe) {
 DWORD serveRunInfo(HANDLE hPipe) {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
+    UUID runId;
+    WCHAR *runId_s;
 
-    DWORD runId = 0;
-    if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
+    if(!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
         exit(1);
     }
 
-    TCHAR commandLine[8192] = { 0 };
-    WCHAR targetFile[MAX_PATH + 1] = { 0 };
+    UuidToString(&runId, (RPC_WSTR *)&runId_s);
 
-    wsprintf(targetFile, FUZZ_WORKING_FMT_PROGRAM, runId);
+    WCHAR commandLine[8192] = {0};
+    WCHAR targetDir[MAX_PATH + 1] = {0};
+    WCHAR targetFile[MAX_PATH + 1] = {0};
+
+    PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
+    PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_PROGRAM_TXT);
     HANDLE hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 
     if(hFile == INVALID_HANDLE_VALUE) {
@@ -800,7 +809,7 @@ DWORD serveRunInfo(HANDLE hPipe) {
         exit(1);
     }
 
-    if(!ReadFile(hFile, commandLine, 8191 * sizeof(TCHAR), &dwBytesRead, NULL)) {
+    if(!ReadFile(hFile, commandLine, 8191 * sizeof(WCHAR), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
         exit(1);
     }
@@ -820,9 +829,9 @@ DWORD serveRunInfo(HANDLE hPipe) {
         exit(1);
     }
 
-    ZeroMemory(commandLine, 8192 * sizeof(TCHAR));
+    ZeroMemory(commandLine, 8192 * sizeof(WCHAR));
     ZeroMemory(targetFile, (MAX_PATH + 1) * sizeof(WCHAR));
-    wsprintf(targetFile, FUZZ_WORKING_FMT_ARGS, runId);
+    PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_ARGUMENTS_TXT);
 
     hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 
@@ -831,7 +840,7 @@ DWORD serveRunInfo(HANDLE hPipe) {
         exit(1);
     }
 
-    if(!ReadFile(hFile, commandLine, 8191 * sizeof(TCHAR), &dwBytesRead, NULL)) {
+    if(!ReadFile(hFile, commandLine, 8191 * sizeof(WCHAR), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
         exit(1);
     }
@@ -851,55 +860,60 @@ DWORD serveRunInfo(HANDLE hPipe) {
         exit(1);
     }
 
+    RpcStringFree((RPC_WSTR *)&runId_s);
+
     return 0;
 }
 
 /* Deletes the run files to free up a Run ID if the last run didn't find a crash */
 DWORD finalizeRun(HANDLE hPipe) {
     DWORD dwBytesRead = 0;
+    UUID runId;
+    WCHAR *runId_s;
 
-    DWORD runId = 0;
-    if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
+    if(!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "FinalizeRun (0x%x)", GetLastError());
         exit(1);
     }
+
+    UuidToString(&runId, (RPC_WSTR *)&runId_s);
 
     BOOL crash = false;
     if(!ReadFile(hPipe, &crash, sizeof(BOOL), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "FinalizeRun (0x%x)", GetLastError());
         exit(1);
     }
-    LOG_F(INFO, "Finalizing run 0x%x", runId);
+
+    // TODO(ww): Add a flag/option that allows us to override removal.
+
+    LOG_F(INFO, "Finalizing run %S", runId_s);
 
     if (!crash) {
-        LOG_F(INFO, "No crash removing run 0x%x", runId);
+        LOG_F(INFO, "No crash, removing run %S", runId_s);
         EnterCriticalSection(&critId);
-        WIN32_FIND_DATA findData;
-        WCHAR targetFile[MAX_PATH + 1] = { 0 };
-        wsprintf(targetFile, FUZZ_WORKING_FMT_STAR, runId);
 
-        // empty directory
-        HANDLE hFind = FindFirstFile(targetFile, &findData);
-        if (hFind != INVALID_HANDLE_VALUE) {
-            do {
-                // TODO: this will fail on directories, but we don't have any directories yet
-                wsprintf(targetFile, FUZZ_WORKING_FMT_FMT, runId, findData.cFileName);
-                DeleteFile(targetFile);
-            } while (FindNextFile(hFind, &findData));
-            FindClose(hFind);
-        }
+        WCHAR targetDir[MAX_PATH + 1] = {0};
+        PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
 
-        wsprintf(targetFile, FUZZ_WORKING_FMT, runId);
-        if(!RemoveDirectory(targetFile)) {
-            LOG_F(ERROR, "FinalizeRun (0x%x)", GetLastError());
-            exit(1);
-        }
+        SHFILEOPSTRUCT remove_op = {
+            NULL,
+            FO_DELETE,
+            targetDir,
+            L"",
+            FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT,
+            false,
+            NULL,
+            L""
+        };
 
+        SHFileOperation(&remove_op);
         LeaveCriticalSection(&critId);
     }
     else {
-        LOG_F(INFO, "Crash found for run 0x%x", runId);
+        LOG_F(INFO, "Crash found for run %S", runId_s);
     }
+
+    RpcStringFree((RPC_WSTR *)&runId_s);
 
     return 0;
 }
@@ -908,21 +922,30 @@ DWORD finalizeRun(HANDLE hPipe) {
 DWORD crashPath(HANDLE hPipe) {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
+    UUID runId;
+    WCHAR *runId_s;
 
-    DWORD runId = 0;
-    if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
+    if(!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "crashPath (0x%x)", GetLastError());
         exit(1);
     }
 
-    WCHAR targetFile[MAX_PATH + 1] = { 0 };
-    int len = wsprintf(targetFile, FUZZ_WORKING_FMT_JSON, runId);
+    UuidToString(&runId, (RPC_WSTR *)&runId_s);
+
+    WCHAR targetDir[MAX_PATH + 1] = {0};
+    WCHAR targetFile[MAX_PATH + 1] = {0};
+
+    PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
+    PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_CRASH_JSON);
+
     DWORD size = (wcslen(targetFile) + 1) * sizeof(WCHAR);
 
     if(!WriteFile(hPipe, &targetFile, size, &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "crashPath (0x%x)", GetLastError());
         exit(1);
     }
+
+    RpcStringFree((RPC_WSTR *)&runId_s);
 
     return 0;
 }
@@ -956,6 +979,8 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe) {
             return 0;
         }
     }
+
+    LOG_F(INFO, "got event ID: %d", eventId);
 
     // Dispatch individual requests based on which event the client requested
     switch (eventId) {
@@ -1020,12 +1045,14 @@ void lockProcess() {
 // Init dirs and create a new thread to handle input from the named pipe
 int main(int mArgc, char **mArgv)
 {
-    initDirs();
+    initLoggingFile();
 
     loguru::init(mArgc, mArgv);
     CHAR logLocalPathA[MAX_PATH];
     wcstombs(logLocalPathA, FUZZ_LOG, MAX_PATH);
     loguru::add_file(logLocalPathA, loguru::Append, loguru::Verbosity_MAX);
+
+    initWorkingDir();
 
     LOG_F(INFO, "Server started!");
 
