@@ -51,6 +51,11 @@ static droption_t<std::string> op_target(
     "targetfile",
     "JSON file in which to look for targets");
 
+static json parsedJson;
+static UUID runId;
+static BOOL crashed = false;
+static std::map<Function, UINT64> call_counts;
+
 struct targetFunction {
   bool selected;
   UINT64 index;
