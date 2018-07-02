@@ -71,7 +71,9 @@ You might need to use the Visual Studio Developer Command Prompt in order for cm
 ### Configuring
 Open up powershell in the project root and run harness.py for the first time. 
 
-`PS C:\proj\sl2\sienna-locomotive> pythonw.exe .\harness.py` 
+`PS C:\proj\sl2\sienna-locomotive> python .\harness.py` 
+
+:warning: Python version 3 is required, although on some systems this could be `python.exe` or `python3.exe` .
 
 It'll create a default configuration file in `%APPDATA\Trail of Bits\fuzzkit\`. You can leave everything in there and it will work, but you might want to update the file paths to be relative to C: so that you can invoke it from anywhere. If you want to create a new profile, just copy the default one and change the name. Then you can use the `-p` flag to harness.py to change which profile it pulls settings from.
 
