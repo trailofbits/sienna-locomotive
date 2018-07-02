@@ -282,7 +282,6 @@ static void
 hex_dump(LPVOID lpBuffer, DWORD nNumberOfBytesToRead) {
     DWORD size = nNumberOfBytesToRead > 256 ? 256 : nNumberOfBytesToRead;
 
-    DWORD bytesWritten;
     for(DWORD i = 0; i < size; i++) {
         BYTE ch = ((BYTE *)lpBuffer)[i];
 
