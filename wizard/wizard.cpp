@@ -452,7 +452,7 @@ void wizard(client_id_t id, int argc, const char *argv[]) {
         DR_ASSERT(false);
     }
 
-    dr_log(NULL, LOG_ALL, 1, "Client 'Wizard' initializing\n");
+    dr_log(NULL, DR_LOG_ALL, 1, "Client 'Wizard' initializing\n");
 }
 
 /* Parses options and calls wizard helper */

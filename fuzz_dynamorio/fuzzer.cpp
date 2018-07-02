@@ -79,42 +79,42 @@ std::map<Function, UINT64> call_counts;
 //TODO: Fix logging
 /* Tries to get a new Run ID from the fuzz server */
 UUID getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs) {
-    dr_log(NULL, LOG_ALL, ERROR, "Requesting run id");
+    dr_log(NULL, DR_LOG_ALL, ERROR, "Requesting run id");
     DWORD bytesRead = 0;
     DWORD bytesWritten = 0;
 
     BYTE eventId = EVT_RUN_ID;
     UUID runId;
     if (!TransactNamedPipe(hPipe, &eventId, sizeof(BYTE), &runId, sizeof(UUID), &bytesRead, NULL)) {
-        dr_log(NULL, LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
+        dr_log(NULL, DR_LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
         dr_exit_process(1);
     }
 
     WCHAR runId_s[SL2_UUID_SIZE];
     sl2_uuid_to_wstring(runId, runId_s);
 
-    dr_log(NULL, LOG_ALL, ERROR, "Run id %S", runId_s);
+    dr_log(NULL, DR_LOG_ALL, ERROR, "Run id %S", runId_s);
 
     DWORD size = lstrlenW(targetName) * sizeof(WCHAR);
 
     if (!WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL)) {
-        dr_log(NULL, LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
+        dr_log(NULL, DR_LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
         dr_exit_process(1);
     }
 
     if (!WriteFile(hPipe, targetName, size, &bytesWritten, NULL)) {
-        dr_log(NULL, LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
+        dr_log(NULL, DR_LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
         dr_exit_process(1);
     }
 
     size = lstrlen(targetArgs) * sizeof(WCHAR);
     if (!WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL)) {
-        dr_log(NULL, LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
+        dr_log(NULL, DR_LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
         dr_exit_process(1);
     }
 
     if (!WriteFile(hPipe, targetArgs, size, &bytesWritten, NULL)) {
-        dr_log(NULL, LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
+        dr_log(NULL, DR_LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
         dr_exit_process(1);
     }
 
@@ -141,7 +141,7 @@ HANDLE getPipe() {
         // This is basically just a check that the server is running
         DWORD err = GetLastError();
         if (err != ERROR_PIPE_BUSY) {
-            dr_log(NULL, LOG_ALL, ERROR, "Could not open pipe (%x)", err);
+            dr_log(NULL, DR_LOG_ALL, ERROR, "Could not open pipe (%x)", err);
             dr_fprintf(STDERR, "Could not open pipe (0x%x)\n", err);
             dr_fprintf(STDERR, "Is the server running?\n");
             dr_exit_process(1);
@@ -171,7 +171,7 @@ DWORD finalize(HANDLE hPipe, UUID runId, BOOL crashed) {
 
     if (crashed) {
         dr_fprintf(STDERR, "<crash found for run id %S>\n", runId_s);
-        dr_log(NULL, LOG_ALL, ERROR, "fuzzer#finalize: Crash found for run id %S!", runId_s);
+        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#finalize: Crash found for run id %S!", runId_s);
     }
 
     DWORD bytesWritten;
@@ -179,18 +179,18 @@ DWORD finalize(HANDLE hPipe, UUID runId, BOOL crashed) {
 
     // write the event ID (4 for finalize)
     if (!WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL)) {
-        dr_log(NULL, LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write event ID (0x%x)", GetLastError());
+        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write event ID (0x%x)", GetLastError());
         dr_exit_process(1);
     }
     // Write the run ID
     if (!WriteFile(hPipe, &runId, sizeof(UUID), &bytesWritten, NULL)) {
-        dr_log(NULL, LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write run ID (0x%x)", GetLastError());
+        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write run ID (0x%x)", GetLastError());
         dr_exit_process(1);
     }
 
     // write whether the run found a crash
     if (!WriteFile(hPipe, &crashed, sizeof(BOOL), &bytesWritten, NULL)) {
-        dr_log(NULL, LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write crash status (%x)", GetLastError());
+        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write crash status (%x)", GetLastError());
         dr_exit_process(1);
     }
 
@@ -198,7 +198,7 @@ DWORD finalize(HANDLE hPipe, UUID runId, BOOL crashed) {
     // For now we don't, but this can be flipped to help with debugging.
     BOOL remove = 1;
     if (!WriteFile(hPipe, &remove, sizeof(BOOL), &bytesWritten, NULL)) {
-        dr_log(NULL, LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write remove code (%x)", GetLastError());
+        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write remove code (%x)", GetLastError());
         dr_exit_process(1);
     }
 
@@ -216,7 +216,7 @@ get_target_command_line() {
 
     // Read process parameter block from PEB
     if (!dr_safe_read(clientPEB->ProcessParameters, sizeof(_RTL_USER_PROCESS_PARAMETERS), &parameterBlock, &byte_counter)) {
-        dr_log(NULL, LOG_ALL, ERROR, "fuzzer#get_target_command_line: Could not read process parameter block");
+        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#get_target_command_line: Could not read process parameter block");
         dr_exit_process(1);
     }
 
@@ -225,7 +225,7 @@ get_target_command_line() {
 
     // Read the command line from the parameter block
     if (!dr_safe_read(parameterBlock.CommandLine.Buffer, parameterBlock.CommandLine.Length, commandLineContents, &byte_counter)) {
-        dr_log(NULL, LOG_ALL, ERROR, "fuzzer#get_target_command_line: Could not read command line buffer");
+        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#get_target_command_line: Could not read command line buffer");
         dr_exit_process(1);
     }
 
@@ -235,8 +235,7 @@ get_target_command_line() {
 /* Maps exception code to an exit status. Print it out, then exit. */
 static bool
 onexception(void *drcontext, dr_exception_t *excpt) {
-    dr_log(NULL, LOG_ALL, ERROR, "fuzzer#onexception: Exception occurred!\n");
-
+    dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#onexception: Exception occurred!\n");
     crashed = true;
     DWORD exceptionCode = excpt->record->ExceptionCode;
 
@@ -312,12 +311,13 @@ onexception(void *drcontext, dr_exception_t *excpt) {
 /* Runs after the target application has exited */
 static void
 event_exit(void) {
+    dr_fprintf(STDERR, "Dynamorio exiting (fuzzer)\n");
     HANDLE hPipe = getPipe();
     finalize(hPipe, runId, crashed); // Delete the fuzzing run if we didn't find a crash
     CloseHandle(hPipe); // Close out connection to server
 
     // Clean up DynamoRIO
-    dr_log(NULL, LOG_ALL, ERROR, "fuzzer#event_exit: Dynamorio Exiting\n");
+    dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#event_exit: Dynamorio Exiting\n");
     drwrap_exit();
     drmgr_exit();
 }
@@ -333,14 +333,14 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
     // Check that ReadFile calls are to something actually valid
     if(function == Function::ReadFile || function == Function::fread) {
         if (hFile == INVALID_HANDLE_VALUE) {
-            dr_log(NULL, LOG_ALL, ERROR, "fuzzer#mutate: Invalid source for mutation?\n");
+            dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#mutate: Invalid source for mutation?\n");
             return false;
         }
 
         pathSize = GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, 0);
 
         if (pathSize > MAX_PATH || pathSize == 0) {
-            dr_log(NULL, LOG_ALL, ERROR, "fuzzer#mutate: Pathsize %d is out of bounds\n", pathSize);
+            dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#mutate: Pathsize %d is out of bounds\n", pathSize);
             return false;
         }
     }
@@ -712,6 +712,7 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     *user_data = malloc(sizeof(read_info));
     ((read_info *)*user_data)->function = Function::fread;
     ((read_info *)*user_data)->hFile = (HANDLE) _get_osfhandle(_fileno(file));
+    // ((read_info *)*user_data)->hFile = NULL;
     ((read_info *)*user_data)->lpBuffer = buffer;
     ((read_info *)*user_data)->nNumberOfBytesToRead = size * count;
     ((read_info *)*user_data)->lpNumberOfBytesRead = NULL;
@@ -895,12 +896,12 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
       dr_fprintf(STDERR, "Document root is not an array\n");
 
     // Set up console printing
-    dr_log(NULL, LOG_ALL, 1, "DR client 'SL Fuzzer' initializing\n");
+    dr_log(NULL, DR_LOG_ALL, 1, "DR client 'SL Fuzzer' initializing\n");
     if (dr_is_notify_on()) {
 #ifdef WINDOWS
         dr_enable_console_printing();  // TODO - necessary?
 #endif
-        dr_log(NULL, LOG_ALL, ERROR, "Client SL Fuzzer is running\n");
+        dr_log(NULL, DR_LOG_ALL, ERROR, "Client SL Fuzzer is running\n");
     }
 
     //TODO: support multiple passes over one binary without re-running drrun

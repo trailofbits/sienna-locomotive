@@ -1509,7 +1509,7 @@ void tracer(client_id_t id, int argc, const char *argv[]) {
         DR_ASSERT(false);
     }
 
-    dr_log(NULL, LOG_ALL, 1, "Client 'instrace' initializing\n");
+    dr_log(NULL, DR_LOG_ALL, 1, "Client 'instrace' initializing\n");
 }
 
 DR_EXPORT void
