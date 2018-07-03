@@ -15,6 +15,17 @@
 #include <winsock2.h>
 #include <winhttp.h>
 
+#include <json.hpp>
+using json = nlohmann::json;
+
+
+
+void jsonLog( json* j ) 
+{
+    auto s = j->dump();
+    dr_fprintf( STDERR, s.c_str() );
+}
+
 // Use for parsing command line options
 static droption_t<std::string> op_include(
     DROPTION_SCOPE_CLIENT,
