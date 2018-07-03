@@ -163,6 +163,9 @@ def wizard_run(_config):
                                save_stderr=True,
                                verbose=_config['verbose'])
     wizard_output = completed_process.stderr.decode('utf-8')
+    print_l("*"*77)
+    print_l(wizard_output)
+    print_l("*"*77)
     wizard_findings = []
     sections = re.split(r"--------\n", wizard_output)
 

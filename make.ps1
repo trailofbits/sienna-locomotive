@@ -41,7 +41,6 @@ Push-Location
 DynamioRioInstall
 
 #if not exist "build" mkdir build
-
 New-Item -ItemType Directory -Force -Path build
 cd build
 $dynamorioCmake="${cwd}\dynamorio\cmake"

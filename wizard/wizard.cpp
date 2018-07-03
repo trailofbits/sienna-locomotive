@@ -15,15 +15,19 @@
 #include <winsock2.h>
 #include <winhttp.h>
 
+#include <iostream>
+#include <codecvt>
+#include <locale>
+
 #include <json.hpp>
 using json = nlohmann::json;
+using namespace std;
 
 
-
-void jsonLog( json* j ) 
+void logObject(  json obj )
 {
-    auto s = j->dump();
-    dr_fprintf( STDERR, s.c_str() );
+    auto str = obj.dump();
+    dr_fprintf( STDERR, "%s\n", str.c_str() );
 }
 
 // Use for parsing command line options
@@ -124,7 +128,13 @@ Below we have a number of functions that instrument metadata retreival for the i
 
 static void
 wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
-    dr_fprintf(STDERR, "<in wrap_pre_ReadEventLog>\n");
+
+    //dr_fprintf(STDERR, "<in wrap_pre_ReadEventLog>\n");
+    json j;
+    j["type"]       = "in";
+    j["function"]   = "wrap_pre_ReadEventLog";
+    logObject (j);
+
     HANDLE hEventLog = (HANDLE)drwrap_get_arg(wrapcxt, 0);
     DWORD  dwReadFlags = (DWORD)drwrap_get_arg(wrapcxt, 1);
     DWORD  dwRecordOffset = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -144,7 +154,13 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
-    dr_fprintf(STDERR, "<in wrap_pre_RegQueryValueEx>\n");
+    //dr_fprintf(STDERR, "<in wrap_pre_RegQueryValueEx>\n");
+    json j;
+    j["type"]       = "in";
+    j["function"]   = "wrap_pre_RegQueryValueEx";
+    logObject (j);
+
+
     HKEY    hKey = (HKEY)drwrap_get_arg(wrapcxt, 0);
     LPCTSTR lpValueName = (LPCTSTR)drwrap_get_arg(wrapcxt, 1);
     LPDWORD lpReserved = (LPDWORD)drwrap_get_arg(wrapcxt, 2);
@@ -168,7 +184,12 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
-    dr_fprintf(STDERR, "<in wrap_pre_WinHttpWebSocketReceive>\n");
+    // dr_fprintf(STDERR, "<in wrap_pre_WinHttpWebSocketReceive>\n");
+    json j;
+    j["type"]       = "in";
+    j["function"]   = "wrap_pre_WinHttpWebSocketReceive";
+    logObject (j);
+
     HINTERNET hRequest = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     PVOID pvBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD dwBufferLength = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -188,7 +209,12 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
-    dr_fprintf(STDERR, "<in wrap_pre_InternetReadFile>\n");
+    // dr_fprintf(STDERR, "<in wrap_pre_InternetReadFile>\n");
+    json j;
+    j["type"]       = "in";
+    j["function"]   = "wrap_pre_InternetReadFile";
+    logObject (j);
+
     HINTERNET hFile = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -207,7 +233,12 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
-    dr_fprintf(STDERR, "<in wrap_pre_WinHttpReadData>\n");
+    // dr_fprintf(STDERR, "<in wrap_pre_WinHttpReadData>\n");
+    json j;
+    j["type"]       = "in";
+    j["function"]   = "wrap_pre_WinHttpReadData";
+    logObject (j);
+
     HINTERNET hRequest = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -226,7 +257,12 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
-    dr_fprintf(STDERR, "<in wrap_pre_recv>\n");
+    // dr_fprintf(STDERR, "<in wrap_pre_recv>\n");
+    json j;
+    j["type"]       = "in";
+    j["function"]   = "wrap_pre_recv";
+    logObject (j);
+
     SOCKET s = (SOCKET)drwrap_get_arg(wrapcxt, 0);
     char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
     int len = (int)drwrap_get_arg(wrapcxt, 2);
@@ -254,7 +290,12 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
-    dr_fprintf(STDERR, "<in wrap_pre_ReadFile>\n");
+    // dr_fprintf(STDERR, "<in wrap_pre_ReadFile>\n");
+    json j;
+    j["type"]       = "in";
+    j["function"]   = "wrap_pre_ReadFile";
+    logObject (j);
+
     HANDLE hFile = drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -275,7 +316,12 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
-    dr_fprintf(STDERR, "<in wrap_pre_fread>\n");
+    // dr_fprintf(STDERR, "<in wrap_pre_fread>\n");
+    json j;
+    j["type"]       = "in";
+    j["function"]   = "wrap_pre_fread";
+    logObject (j);
+
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
     size_t size = (size_t)drwrap_get_arg(wrapcxt, 1);
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
@@ -289,52 +335,52 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
 }
 
 /* helper function for dumping memory contents to stderr */
-static void
-hex_dump(LPVOID lpBuffer, DWORD nNumberOfBytesToRead) {
-    DWORD size = nNumberOfBytesToRead > 256 ? 256 : nNumberOfBytesToRead;
+// static void
+// hex_dump(LPVOID lpBuffer, DWORD nNumberOfBytesToRead) {
+//     DWORD size = nNumberOfBytesToRead > 256 ? 256 : nNumberOfBytesToRead;
 
-    for(DWORD i = 0; i < size; i++) {
-        BYTE ch = ((BYTE *)lpBuffer)[i];
+//     for(DWORD i = 0; i < size; i++) {
+//         BYTE ch = ((BYTE *)lpBuffer)[i];
 
-        if(i % 16 == 0) {
-            if(i != 0) {
-                dr_fprintf(STDERR, "|");
-                for(DWORD j = i - 16; j < i; j++) {
-                    BYTE pch = ((BYTE *)lpBuffer)[j];
-                    if(pch > 0x1f && pch < 0x7f) {
-                        dr_fprintf(STDERR, "%c", pch);
-                    } else {
-                        dr_fprintf(STDERR, ".");
-                    }
-                }
-                dr_fprintf(STDERR, "\n");
-            }
-            dr_fprintf(STDERR, "%4d | ", i);
+//         if(i % 16 == 0) {
+//             if(i != 0) {
+//                 dr_fprintf(STDERR, "|");
+//                 for(DWORD j = i - 16; j < i; j++) {
+//                     BYTE pch = ((BYTE *)lpBuffer)[j];
+//                     if(pch > 0x1f && pch < 0x7f) {
+//                         dr_fprintf(STDERR, "%c", pch);
+//                     } else {
+//                         dr_fprintf(STDERR, ".");
+//                     }
+//                 }
+//                 dr_fprintf(STDERR, "\n");
+//             }
+//             dr_fprintf(STDERR, "%4d | ", i);
 
-        }
-        dr_fprintf(STDERR, "%02X ", ch);
-    }
+//         }
+//         dr_fprintf(STDERR, "%02X ", ch);
+//     }
 
-    DWORD i = size;
-    while(i % 16 != 0) {
-        dr_fprintf(STDERR, "   ");
-        i++;
-    }
+//     DWORD i = size;
+//     while(i % 16 != 0) {
+//         dr_fprintf(STDERR, "   ");
+//         i++;
+//     }
 
-    if(i != 0) {
-        dr_fprintf(STDERR, "|");
-        for(DWORD j = i - 16; j < i && j < size; j++) {
-            BYTE pch = ((BYTE *)lpBuffer)[j];
-            if(pch > 0x1f && pch < 0x7f) {
-                dr_fprintf(STDERR, "%c", pch);
-            } else {
-                dr_fprintf(STDERR, ".");
-            }
-        }
-        dr_fprintf(STDERR, "\n");
-    }
-    dr_fprintf(STDERR, "\n");
-}
+//     if(i != 0) {
+//         dr_fprintf(STDERR, "|");
+//         for(DWORD j = i - 16; j < i && j < size; j++) {
+//             BYTE pch = ((BYTE *)lpBuffer)[j];
+//             if(pch > 0x1f && pch < 0x7f) {
+//                 dr_fprintf(STDERR, "%c", pch);
+//             } else {
+//                 dr_fprintf(STDERR, ".");
+//             }
+//         }
+//         dr_fprintf(STDERR, "\n");
+//     }
+//     dr_fprintf(STDERR, "\n");
+// }
 
 /* prints information about the function call to stderr so the harness can ingest it */
 static void
@@ -364,15 +410,26 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
         }
     }
 
-    dr_fprintf(STDERR, "--------\n");
-    dr_fprintf(STDERR, "<id: %llu%s>\n", call_counts[info->function], functionName);
-    call_counts[info->function]++;
+    // dr_fprintf(STDERR, "--------\n");
+    
+    // dr_fprintf(STDERR, "<id: %llu%s>\n", call_counts[info->function], functionName);
+    json j;
+    j["type"]               = "id";
+    j["callCount"]          = call_counts[info->function];
+    j["functionName"]       = functionName;
 
+    call_counts[info->function]++;
+    
     if(info->source != NULL) {
-        dr_fprintf(STDERR, "source: \"%S\"\n", info->source);
+        wstring_convert<std::codecvt_utf8<wchar_t>> utf8Convert;
+        wstring wstr =  wstring(info->source);
+        // dr_fprintf(STDERR, "source: \"%S\"\n", info->source);
+        j["source"] = utf8Convert.to_bytes(wstr);
         free(info->source);
         DWORD end = info->position + info->nNumberOfBytesToRead;
-        dr_fprintf(STDERR, "range: 0x%x,0x%x\n", info->position, end);
+        // dr_fprintf(STDERR, "range: 0x%x,0x%x\n", info->position, end);        
+        j["range"] = { info->position, end }  ;
+
 
     }
 
@@ -381,9 +438,16 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     free(user_data);
 
     if(targeted) {
-        hex_dump(lpBuffer, nNumberOfBytesToRead);
-        dr_fprintf(STDERR, "--------\n");
+        //hex_dump(lpBuffer, nNumberOfBytesToRead);
+        //logObject ( { { "type", "targetBuffer" }, {"buffer", });
+        vector<unsigned char> x;
+        x.resize(nNumberOfBytesToRead);
+        memcpy( &x[0], lpBuffer, nNumberOfBytesToRead );
+        j["buffer"]  = x;
+        // dr_fprintf(STDERR, "--------\n");
     }
+
+    logObject(j);
 }
 
 /* Runs every time we load a new module. Wraps functions we can target. See fuzzer.cpp for a more-detailed version */
@@ -469,9 +533,21 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
             bool ok = drwrap_wrap(towrap, hookFunctionPre, hookFunctionPost);
             // bool ok = false;
             if (ok) {
-                dr_fprintf(STDERR, "<wrapped %s @ 0x%p in %s\n", functionName, towrap, mod_name);
+                // dr_fprintf(STDERR, "<wrapped %s @ %p in %s\n", functionName, towrap, mod_name);
+                json j;
+                j["type"]           = "wrapped";
+                j["functionName"]   = functionName;
+                j["toWrap"]         = (uint64_t)towrap;
+                j["modName"]        = mod_name;
+                logObject(j);
             } else {
-                dr_fprintf(STDERR, "<FAILED to wrap %s @ 0x%p: already wrapped?\n", functionName, towrap);
+                json j;
+                j["type"] = "error";
+                ostringstream s;
+                s << "FAILED to wrap " << functionName <<  " @ " << towrap << " already wrapped?";
+                j["msg"] = s.str();
+                logObject(j);
+                //dr_fprintf(STDERR, "<FAILED to wrap %s @ %p: already wrapped?\n", functionName, towrap);
             }
         }
     }
