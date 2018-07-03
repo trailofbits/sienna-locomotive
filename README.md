@@ -56,13 +56,11 @@ Next, install the following dependencies
 #### Build Commands
 
 Then, from the root of the Sienna Locomotive repository:
+In powershell, run make.ps1:
 
-```
-mkdir build
-cd build
-cmake -G"Visual Studio 15 Win64" -DDynamoRIO_DIR=C:\path\to\DynamoRIO\cmake ..
-cmake --build .
-```
+`PS C:\proj\sl2\sienna-locomotive> \.make.ps1` 
+
+This should download and install DynamoRIO in the sienna-locomotive directive if it does not already exist.  It will then compile the project.  
 
 If you're not familiar with cmake - the first invocation configures it, the second compiles the project. To recompile, just run the final command again.
 
