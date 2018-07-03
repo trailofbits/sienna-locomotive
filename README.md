@@ -50,7 +50,7 @@ First, clone the repository:
 Next, install the following dependencies
 * [CMake](https://cmake.org/download/)
 * Visual Studio 2017 (Install components for Windows Console dev)
-* DynamoRIO (As of 6/2018, you can just extract the [precompiled 7.0-RC1 binaries](https://github.com/DynamoRIO/dynamorio/releases/tag/release_7_0_0_rc1))
+* DynamoRIO (Automatically installed with make.ps1)
 * Python (3.6+)
 
 #### Build Commands
