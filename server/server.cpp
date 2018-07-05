@@ -710,7 +710,7 @@ DWORD handleReplay(HANDLE hPipe) {
     WCHAR *runId_s;
 
     if(!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleReplay: failed to read run ID (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -721,28 +721,28 @@ DWORD handleReplay(HANDLE hPipe) {
     DWORD mutate_count = 0;
     WCHAR mutate_fname[MAX_PATH + 1] = {0};
     if(!ReadFile(hPipe, &mutate_count, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleReplay: failed to read mutate count (0x%x)", GetLastError());
         exit(1);
     }
     StringCchPrintfW(mutate_fname, MAX_PATH, FUZZ_RUN_FKT_FMT, mutate_count);
 
     DWORD size = 0;
     if(!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleReplay: failed to read size of replay buffer (0x%x)", GetLastError());
         exit(1);
     }
 
     HANDLE hHeap = GetProcessHeap();
 
     if(hHeap == NULL) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleReplay: failed to get process heap (0x%x)", GetLastError());
         exit(1);
     }
 
     BYTE* buf = (BYTE*)HeapAlloc(hHeap, 0, size * sizeof(BYTE));
 
     if(buf == NULL) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleReplay: failed to allocate replay buffer (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -751,28 +751,34 @@ DWORD handleReplay(HANDLE hPipe) {
     PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
     PathCchCombine(targetFile, MAX_PATH, targetDir, mutate_fname);
 
-    // TODO: validate file exists
+    DWORD attrs = GetFileAttributes(targetFile);
+
+    if (attrs == INVALID_FILE_ATTRIBUTES || (attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+        LOG_F(ERROR, "handleReplay: missing FKT or is a directory: %S", targetFile);
+        exit(1);
+    }
+
     HANDLE hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 
     if(hFile == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleReplay: failed to open FKT: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
     getBytesFKT(hFile, buf, size);
 
     if(!WriteFile(hPipe, buf, size, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleReplay: failed to write replay buffer (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!CloseHandle(hFile)) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleReplay: failed to close FKT (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!HeapFree(hHeap, NULL, buf)) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleReplay: failed to deallocate replay buffer (0x%x)", GetLastError());
         exit(1);
     }
 
