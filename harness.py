@@ -13,6 +13,7 @@ import time
 import signal
 import struct
 import json
+import uuid
 
 import fuzzer_config
 from state import get_target_dir, get_targets
@@ -112,7 +113,7 @@ def finalize(run_id, crashed):
     f = open("\\\\.\\pipe\\fuzz_server", 'w+b', buffering=0)
     f.write(struct.pack('B', 0x4))  # Write the event ID (4)
     f.seek(0)
-    f.write(struct.pack('I', run_id))  # Write the run ID
+    f.write(run_id.bytes)  # Write the run ID
     f.seek(0)
     f.write(struct.pack('?', 1 if crashed else 0))  # Write a bool indicating a crash
     f.close()
@@ -204,9 +205,11 @@ def fuzzer_run(_config):
     # Parse run ID from fuzzer output
     run_id = 'ERR'
     proc_stderr = completed_process.stderr.decode('utf-8')
+
     for line in str.splitlines(proc_stderr):
         if 'Beginning fuzzing run' in line:
-            run_id = int(line.replace('Beginning fuzzing run ', '').strip())
+            uuid_s = line.replace('Beginning fuzzing run ', '').strip()
+            run_id = uuid.UUID(uuid_s)
     if run_id == 'ERR':
         print_l("Error: No run ID could be parsed from the server output")
         return False, -1
@@ -219,7 +222,7 @@ def fuzzer_run(_config):
         # TODO fix issue #40
         write_output_files(completed_process, run_id, 'fuzz')
     elif _config['verbose']:
-        print_l("Run %d did not find a crash" % run_id)
+        print_l("Run %s did not find a crash" % run_id)
 
     # Handle orphaned pipes after a timeout
     if completed_process.timed_out:

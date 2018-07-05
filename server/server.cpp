@@ -1,189 +1,170 @@
 #include <random>
-#define NOMINMAX
-#include <Windows.h>
 #include <set>
 #include <map>
 #include <unordered_map>
+#include <string.h>
+#include <stdio.h>
+
+#define NOMINMAX
+#include <Windows.h>
+#include <ShlObj.h>
+#include <PathCch.h>
+#include <Rpc.h>
+#include <shellapi.h>
+#include <Strsafe.h>
 
 #define LOGURU_IMPLEMENTATION 1
 #include "loguru.hpp"
 
-#define BUFSIZE 100000
+#include "server.hpp"
 
-#include <ShlObj.h>
-#include <PathCch.h>
-#pragma comment(lib, "Pathcch.lib")
+static CRITICAL_SECTION critId;
+static CRITICAL_SECTION critLog;
+static HANDLE hProcessMutex = INVALID_HANDLE_VALUE;
 
-CRITICAL_SECTION critId;
-CRITICAL_SECTION critLog;
+static HANDLE hLog = INVALID_HANDLE_VALUE;
 
-HANDLE hLog = INVALID_HANDLE_VALUE;
+static WCHAR FUZZ_WORKING_PATH[MAX_PATH] = L"";
+static WCHAR FUZZ_LOG[MAX_PATH] = L"";
 
-WCHAR FUZZ_WORKING_STAR[MAX_PATH] = L"";
-WCHAR FUZZ_WORKING_FMT[MAX_PATH] = L"";
-WCHAR FUZZ_WORKING_FMT_PROGRAM[MAX_PATH] = L"";
-WCHAR FUZZ_WORKING_FMT_ARGS[MAX_PATH] = L"";
-WCHAR FUZZ_WORKING_FMT_FKT[MAX_PATH] = L"";
-WCHAR FUZZ_WORKING_FMT_STAR[MAX_PATH] = L"";
-WCHAR FUZZ_WORKING_FMT_FMT[MAX_PATH] = L"";
-WCHAR FUZZ_WORKING_FMT_EXECUTION[MAX_PATH] = L"";
-WCHAR FUZZ_WORKING_FMT_MEM[MAX_PATH] = L"";
-WCHAR FUZZ_WORKING_FMT_CRASH[MAX_PATH] = L"";
-WCHAR FUZZ_WORKING_FMT_JSON[MAX_PATH] = L"";
-WCHAR FUZZ_LOG[MAX_PATH] = L"";
-
-// Initialize global variables containing relevant file/folder paths
-VOID initDirs() {
+// Initialize the global variable (FUZZ_LOG) containing the path to the logging file.
+// NOTE(ww): We separate this from initWorkingDir so that we can log any errors that
+// happen to occur in initWorkingDir.
+VOID initLoggingFile() {
     PWSTR roamingPath;
     SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roamingPath);
-    WCHAR workingLocalPath[MAX_PATH] = L"Trail of Bits\\fuzzkit\\working";
-    WCHAR combinedPath[MAX_PATH] = L"";
-    PathCchCombine(combinedPath, MAX_PATH, roamingPath, workingLocalPath);
 
-    PathCchCombine(FUZZ_WORKING_STAR, MAX_PATH, combinedPath, L"*");
-    PathCchCombine(FUZZ_WORKING_FMT, MAX_PATH, combinedPath, L"%d");
-    PathCchCombine(FUZZ_WORKING_FMT_PROGRAM, MAX_PATH, FUZZ_WORKING_FMT, L"program.txt");
-    PathCchCombine(FUZZ_WORKING_FMT_ARGS, MAX_PATH, FUZZ_WORKING_FMT, L"arguments.txt");
-    PathCchCombine(FUZZ_WORKING_FMT_FKT, MAX_PATH, FUZZ_WORKING_FMT, L"%d.fkt");
-    PathCchCombine(FUZZ_WORKING_FMT_STAR, MAX_PATH, FUZZ_WORKING_FMT, L"*");
-    PathCchCombine(FUZZ_WORKING_FMT_FMT, MAX_PATH, FUZZ_WORKING_FMT, L"%s");
-    PathCchCombine(FUZZ_WORKING_FMT_EXECUTION, MAX_PATH, FUZZ_WORKING_FMT, L"execution.trc");
-    PathCchCombine(FUZZ_WORKING_FMT_MEM, MAX_PATH, FUZZ_WORKING_FMT, L"mem.dmp");
-    PathCchCombine(FUZZ_WORKING_FMT_CRASH, MAX_PATH, FUZZ_WORKING_FMT, L"execution.csh");
-    PathCchCombine(FUZZ_WORKING_FMT_JSON, MAX_PATH, FUZZ_WORKING_FMT, L"crash.json");
-
-    SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roamingPath);
-    WCHAR logLocalPath[MAX_PATH] = L"Trail of Bits\\fuzzkit\\log\\server.log";
-    PathCchCombine(FUZZ_LOG, MAX_PATH, roamingPath, logLocalPath);
+    if (PathCchCombine(FUZZ_LOG, MAX_PATH, roamingPath, L"Trail of Bits\\fuzzkit\\log\\server.log") != S_OK) {
+        LOG_F(ERROR, "initLoggingFile: failed to combine logfile path (0x%x)", GetLastError());
+        exit(1);
+    }
 
     CoTaskMemFree(roamingPath);
 }
 
-/* Checks the working directory and finds a new unique run ID for the current fuzzing run */
-DWORD findUnusedId() {
-    HANDLE hFind;
-    WIN32_FIND_DATA findData;
-    std::set<UINT64> usedIds;
+// Initialize the global variables containins the paths to the working directory,
+// as well as the subdirectories and files we expect individual runs to produce.
+// NOTE(ww): This should be kept up-to-date with fuzzer_config.py.
+VOID initWorkingDir() {
+    PWSTR roamingPath;
+    SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roamingPath);
+    WCHAR workingLocalPath[MAX_PATH] = L"Trail of Bits\\fuzzkit\\working";
 
-    EnterCriticalSection(&critId);
-
-    hFind = FindFirstFile(FUZZ_WORKING_STAR, &findData);
-    if (hFind != INVALID_HANDLE_VALUE) {
-        do {
-            if (findData.cFileName[0] >= 0x30 && findData.cFileName[0] <= 0x39) {
-                UINT64 runId = wcstoul(findData.cFileName, NULL, 0);
-                usedIds.insert(runId);
-            }
-        } while (FindNextFile(hFind, &findData));
-        FindClose(hFind);
-    }
-
-    DWORD id = 0;
-    for (id = 0; id <= UINT64_MAX; id++) {
-        if (usedIds.find(id) == usedIds.end()) {
-            LOG_F(INFO, "Found run id 0x%x", id);
-            break;
-        }
-    }
-
-    WCHAR targetDir[MAX_PATH];
-    wsprintf(targetDir, FUZZ_WORKING_FMT, id);
-    if(!CreateDirectory(targetDir, NULL)) {
-        LOG_F(ERROR, "FindUnusedId (0x%x)", GetLastError());
+    if (PathCchCombine(FUZZ_WORKING_PATH, MAX_PATH, roamingPath, workingLocalPath) != S_OK) {
+        LOG_F(ERROR, "initWorkingDir: failed to combine working dir path (0x%x)", GetLastError());
         exit(1);
     }
 
-    LeaveCriticalSection(&critId);
-
-    return id;
+    CoTaskMemFree(roamingPath);
 }
 
-/* Calls findUnusedId to get a new run ID, writes relevant run metadata files into the corresponding run metadata dir
+/* Generates a new run UUID, writes relevant run metadata files into the corresponding run metadata dir
     This, like many things in the server, is pretty overzealous about exiting after any errors, often without an
     explanation of what happened. TODO - fix this */
 DWORD generateRunId(HANDLE hPipe) {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
+    UUID runId;
+    WCHAR *runId_s;
 
-    LOG_F(INFO, "Run id requested");
-    DWORD runId = findUnusedId();
+    LOG_F(INFO, "generateRunId: received request");
 
-    BOOL success = WriteFile(hPipe, &runId, sizeof(DWORD), &dwBytesWritten, NULL);
+    // NOTE(ww): On recent versions of Windows, UuidCreate generates a v4 UUID that
+    // is sufficiently diffuse for our purposes (avoiding conflicts between runs).
+    // See: https://stackoverflow.com/questions/35366368/does-uuidcreate-use-a-csprng
+    UuidCreate(&runId);
+    UuidToString(&runId, (RPC_WSTR *)&runId_s);
+
+    WCHAR targetDir[MAX_PATH + 1] = {0};
+    PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
+    if (!CreateDirectory(targetDir, NULL)) {
+        LOG_F(ERROR, "generateRunId: couldn't create working directory (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    WriteFile(hPipe, &runId, sizeof(UUID), &dwBytesWritten, NULL);
+    LOG_F(INFO, "generateRunId: generated ID %S", runId_s);
 
     // get program name
-    TCHAR commandLine[8192] = { 0 };
+    // TODO(ww): 8192 is the correct buffer size for the Windows command line, but
+    // we should try to find a macro in the WINAPI for it here.
+    WCHAR commandLine[8192] = {0};
     DWORD size = 0;
     if(!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
+        LOG_F(ERROR, "generateRunId: failed to read size of program name (0x%x)", GetLastError());
         exit(1);
     }
 
     if (size > 8191) {
-        LOG_F(ERROR, "Invalid size for command name");
-        return 1;
+        LOG_F(ERROR, "generateRunId: program name length > 8191");
+        exit(1);
     }
 
     if(!ReadFile(hPipe, commandLine, size, &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
+        LOG_F(ERROR, "generateRunId: failed to read size of argument list (0x%x)", GetLastError());
         exit(1);
     }
 
     WCHAR targetFile[MAX_PATH + 1] = { 0 };
-    wsprintf(targetFile, FUZZ_WORKING_FMT_PROGRAM, runId);
-    HANDLE hFile = CreateFile(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
+    PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_PROGRAM_TXT);
+    HANDLE hFile = CreateFileW(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
     if(hFile == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
+        LOG_F(ERROR, "generateRunId: failed to open program.txt: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
     if(!WriteFile(hFile, commandLine, size, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
+        LOG_F(ERROR, "generateRunId: failed to write program name to program.txt (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!CloseHandle(hFile)) {
-        LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
+        LOG_F(ERROR, "generateRunId: failed to close program.txt (0x%x)", GetLastError());
         exit(1);
     }
 
-    ZeroMemory(commandLine, 8192 * sizeof(TCHAR));
+    ZeroMemory(commandLine, 8192 * sizeof(WCHAR));
 
     // get program arguments
     size = 0;
     if(!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
+        LOG_F(ERROR, "generateRunId: failed to read program argument list length (0x%x)", GetLastError());
         exit(1);
     }
 
     if (size > 8191) {
-        LOG_F(ERROR, "Invalid size for command name");
-        return 1;
-    }
-
-    if(!ReadFile(hPipe, commandLine, size, &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
+        LOG_F(ERROR, "generateRunId: program argument list length > 8191");
         exit(1);
     }
 
-    ZeroMemory(targetFile, (MAX_PATH + 1)*sizeof(WCHAR));
-    wsprintf(targetFile, FUZZ_WORKING_FMT_ARGS, runId);
+    if(!ReadFile(hPipe, commandLine, size, &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "generateRunId: failed to read program argument list (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    ZeroMemory(targetFile, (MAX_PATH + 1) * sizeof(WCHAR));
+    PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_ARGUMENTS_TXT);
     hFile = CreateFile(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
     if(hFile == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
+        LOG_F(ERROR, "generateRunId: failed to open arguments.txt: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
     if(!WriteFile(hFile, commandLine, size, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
+        LOG_F(ERROR, "generateRunId: failed to write argument list to arguments.txt (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!CloseHandle(hFile)) {
-        LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
+        LOG_F(ERROR, "generateRunId: failed to close arguments.txt (0x%x)", GetLastError());
         exit(1);
     }
+
+    RpcStringFree((RPC_WSTR *)&runId_s);
+
+    LOG_F(INFO, "generateRunId: finished");
 
     return 0;
 }
@@ -192,6 +173,7 @@ DWORD generateRunId(HANDLE hPipe) {
   Mutation strategies. The server selects one each time the fuzzing harness requests mutated bytes
 */
 
+// TODO(ww): Why are we doing this?
 DWORD getRand() {
     DWORD random = rand();
     random <<= 15;
@@ -277,7 +259,7 @@ VOID strategyDeleteBytes(BYTE *buf, DWORD size) {
     // pos -> zero to second to last byte
     DWORD pos = 0;
     if(size > 1) {
-        getRand() % (size - 1);
+        pos = getRand() % (size - 1);
     }
 
     // delete_length -> 1 to (remaining_size - 1)
@@ -301,7 +283,7 @@ VOID strategyRandValues(BYTE *buf, DWORD size) {
     INT max = 0;
     while(max < 1) {
         // rand_size -> 1, 2, 4, 8
-        rand_size = pow(2, getRand() % 4);
+        rand_size = (DWORD) pow(2, getRand() % 4);
         max = (size + 1);
         max -= rand_size;
     }
@@ -336,7 +318,7 @@ VOID strategyKnownValues(BYTE *buf, DWORD size) {
     INT max = 0;
     while(max < 1) {
         // size -> 1, 2, 4, 8
-        rand_size = pow(2, getRand() % 4);
+        rand_size = (DWORD) pow(2, getRand() % 4);
         max = (size + 1);
         max -= rand_size;
     }
@@ -390,7 +372,7 @@ VOID strategyAddSubKnownValues(BYTE *buf, DWORD size) {
     DWORD max = 0;
     while(max < 1) {
         // size -> 1, 2, 4, 8
-        rand_size = pow(2, getRand() % 4);
+        rand_size = (DWORD) pow(2, getRand() % 4);
         max = (size + 1) - rand_size;
     }
 
@@ -443,7 +425,7 @@ VOID strategyEndianSwap(BYTE *buf, DWORD size) {
     DWORD max = 0;
     while(max < 1) {
         // size -> 1, 2, 4, 8
-        rand_size = pow(2, getRand() % 4);
+        rand_size = (DWORD) pow(2, getRand() % 4);
         max = (size + 1) - rand_size;
     }
 
@@ -486,91 +468,93 @@ DWORD mutate(BYTE *buf, DWORD size) {
     DWORD choice = getRand() % 8;
     switch(choice) {
         case 0:
-            LOG_F(INFO, "strategyFlipBit");
+            LOG_F(INFO, "mutate: strategyFlipBit");
             strategyFlipBit(buf, size);
             break;
         case 1:
-            LOG_F(INFO, "strategyRandValues");
+            LOG_F(INFO, "mutate: strategyRandValues");
             strategyRandValues(buf, size);
             break;
         case 2:
-            LOG_F(INFO, "strategyRepeatBytes");
+            LOG_F(INFO, "mutate: strategyRepeatBytes");
             strategyRepeatBytes(buf, size);
             break;
         case 3:
-            LOG_F(INFO, "strategyKnownValues");
+            LOG_F(INFO, "mutate: strategyKnownValues");
             strategyKnownValues(buf, size);
             break;
         case 4:
-            LOG_F(INFO, "strategyAddSubKnownValues");
+            LOG_F(INFO, "mutate: strategyAddSubKnownValues");
             strategyAddSubKnownValues(buf, size);
             break;
         case 5:
-            LOG_F(INFO, "strategyEndianSwap");
+            LOG_F(INFO, "mutate: strategyEndianSwap");
             strategyEndianSwap(buf, size);
             break;
         case 6:
-            LOG_F(INFO, "strategyDeleteBytes");
+            LOG_F(INFO, "mutate: strategyDeleteBytes");
             strategyDeleteBytes(buf, size);
             break;
         case 7:
-            LOG_F(INFO, "strategyRepeatBytesBackward");
+            LOG_F(INFO, "mutate: strategyRepeatBytesBackward");
             strategyRepeatBytesBackward(buf, size);
             break;
         default:
+            LOG_F(INFO, "mutate: strategyAAAA");
             strategyAAAA(buf, size);
             break;
     }
 
+    // TODO(ww): Additional strategies:
     // insert bytes
-        // move bytes
-        // add random bytes to space
+    // move bytes
+    // add random bytes to space
 
     return 0;
 }
 
 /* Writes the fkt file in the event we found a crash. Stores information about the mutation that caused it */
-DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, TCHAR *filePath, DWORD64 position, DWORD size, BYTE* buf) {
+DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, WCHAR *filePath, DWORD64 position, DWORD size, BYTE* buf) {
     DWORD dwBytesWritten = 0;
 
     if (!WriteFile(hFile, "FKT\0", 4, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "writeFKT: failed to write FKT header (0x%x)", GetLastError());
         exit(1);
     }
 
     // only one type for right now, files
     if (!WriteFile(hFile, &type, sizeof(DWORD), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "writeFKT: failed to write type (0x%x)", GetLastError());
         exit(1);
     }
 
     if (!WriteFile(hFile, &pathSize, sizeof(DWORD), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "writeFKT: failed to write path size (0x%x)", GetLastError());
         exit(1);
     }
 
-    if (!WriteFile(hFile, filePath, pathSize * sizeof(TCHAR), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+    if (!WriteFile(hFile, filePath, pathSize * sizeof(WCHAR), &dwBytesWritten, NULL)) {
+        LOG_F(ERROR, "writeFKT: failed to write path (0x%x)", GetLastError());
         exit(1);
     }
 
     if (!WriteFile(hFile, &position, sizeof(DWORD64), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "writeFKT: failed to write offset (0x%x)", GetLastError());
         exit(1);
     }
 
     if (!WriteFile(hFile, &size, sizeof(DWORD), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "writeFKT: failed to write buffer size (0x%x)", GetLastError());
         exit(1);
     }
 
     if (!WriteFile(hFile, buf, size, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "writeFKT: failed to write buffer (0x%x)", GetLastError());
         exit(1);
     }
 
     if (!CloseHandle(hFile)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "writeFKT: failed to close FKT (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -579,104 +563,119 @@ DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, TCHAR *filePath, DWORD6
 
 /* handles mutation requests over the named pipe from the fuzzing harness */
 DWORD handleMutation(HANDLE hPipe) {
+    LOG_F(INFO, "handleMutation: starting mutation request");
+
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
+    UUID runId;
+    WCHAR *runId_s;
 
-    DWORD runId = 0;
-    if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+    if(!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "handleMutation: failed to read run ID (0x%x)", GetLastError());
         exit(1);
     }
+
+    UuidToString(&runId, (RPC_WSTR *)&runId_s);
 
     DWORD type = 0;
     if(!ReadFile(hPipe, &type, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to read mutation type (0x%x)", GetLastError());
         exit(1);
     }
 
-    DWORD mutateCount = 0;
-    if(!ReadFile(hPipe, &mutateCount, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+    DWORD mutate_count = 0;
+    WCHAR mutate_fname[MAX_PATH + 1] = {0};
+    if(!ReadFile(hPipe, &mutate_count, sizeof(DWORD), &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "handleMutation: failed to read mutation count (0x%x)", GetLastError());
         exit(1);
     }
+    StringCchPrintfW(mutate_fname, MAX_PATH, FUZZ_RUN_FKT_FMT, mutate_count);
 
     DWORD pathSize = 0;
     if (!ReadFile(hPipe, &pathSize, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to read size of mutation filepath (0x%x)", GetLastError());
         exit(1);
     }
 
     if (pathSize > MAX_PATH) {
-        LOG_F(ERROR, "HandleMutation MAX_PATH", GetLastError());
+        LOG_F(ERROR, "handleMutation: pathSize > MAX_PATH", GetLastError());
         exit(1);
     }
 
-    TCHAR filePath[MAX_PATH + 1];
-    if (!ReadFile(hPipe, &filePath, pathSize * sizeof(TCHAR), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+    WCHAR filePath[MAX_PATH + 1];
+    if (!ReadFile(hPipe, &filePath, pathSize * sizeof(WCHAR), &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "handleMutation: failed to read mutation filepath (0x%x)", GetLastError());
         exit(1);
     }
 
     filePath[pathSize] = 0;
-    LOG_F(INFO, "file path: %s\n", filePath);
+    LOG_F(INFO, "handleMutation: mutation file path: %S\n", filePath);
 
     DWORD64 position = 0;
     if (!ReadFile(hPipe, &position, sizeof(DWORD64), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to read mutation offset (0x%x)", GetLastError());
         exit(1);
     }
 
     DWORD size = 0;
     if(!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to read size of mutation buffer (0x%x)", GetLastError());
         exit(1);
     }
 
     HANDLE hHeap = GetProcessHeap();
     if(hHeap == NULL) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to get proces heap (0x%x)", GetLastError());
         exit(1);
     }
 
     BYTE* buf = (BYTE*)HeapAlloc(hHeap, 0, size * sizeof(BYTE));
 
     if(buf == NULL) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to allocate mutation buffer (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!ReadFile(hPipe, buf, size, &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to read mutation buffer from pipe (0x%x)", GetLastError());
         exit(1);
     }
 
+    // TODO(ww): Shouldn't this be dwBytesRead < size?
     if (dwBytesRead != size) {
         size = dwBytesRead;
     }
 
-    if(size > 0)
+    if (size > 0) {
         mutate(buf, size);
+    }
 
-    if(!WriteFile(hPipe, buf, size, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+    if (!WriteFile(hPipe, buf, size, &dwBytesWritten, NULL)) {
+        LOG_F(ERROR, "handleMutation: failed to write mutation buffer to pipe (0x%x)", GetLastError());
         exit(1);
     }
 
-    WCHAR targetFile[MAX_PATH+1];
-    wsprintf(targetFile, FUZZ_WORKING_FMT_FKT, runId, mutateCount);
+    WCHAR targetDir[MAX_PATH + 1] = {0};
+    WCHAR targetFile[MAX_PATH + 1] = {0};
+
+    PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
+    PathCchCombine(targetFile, MAX_PATH, targetDir, mutate_fname);
+
     HANDLE hFile = CreateFile(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
     if(hFile == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to create FTK: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
     writeFKT(hFile, type, pathSize, filePath, position, size, buf);
 
     if(!HeapFree(hHeap, NULL, buf)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to deallocate mutation buffer (0x%x)", GetLastError());
         exit(1);
     }
+
+    RpcStringFree((RPC_WSTR *)&runId_s);
 
     return 0;
 }
@@ -688,7 +687,7 @@ DWORD getBytesFKT(HANDLE hFile, BYTE *buf, DWORD size) {
     DWORD buf_size = 0;
     SetFilePointer(hFile, 0x14, NULL, FILE_BEGIN);
     if (!ReadFile(hFile, &buf_size, 4, &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+        LOG_F(ERROR, "getBytesFKT: failed to read replay buffer size from FKT (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -699,7 +698,7 @@ DWORD getBytesFKT(HANDLE hFile, BYTE *buf, DWORD size) {
     SetFilePointer(hFile, -(LONG)size, NULL, FILE_END);
 
     if (!ReadFile(hFile, buf, size, &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+        LOG_F(ERROR, "getBytesFKT: failed to read replay buffer from FKT (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -712,68 +711,83 @@ DWORD getBytesFKT(HANDLE hFile, BYTE *buf, DWORD size) {
 DWORD handleReplay(HANDLE hPipe) {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
+    UUID runId;
+    WCHAR *runId_s;
 
-    DWORD runId = 0;
-    if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+    if(!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "handleReplay: failed to read run ID (0x%x)", GetLastError());
         exit(1);
     }
 
-    LOG_F(INFO, "Replaying for run id %d", runId);
+    UuidToString(&runId, (RPC_WSTR *)&runId_s);
 
-    DWORD mutateCount = 0;
+    LOG_F(INFO, "Replaying for run id %S", runId_s);
 
-    if(!ReadFile(hPipe, &mutateCount, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+    DWORD mutate_count = 0;
+    WCHAR mutate_fname[MAX_PATH + 1] = {0};
+    if(!ReadFile(hPipe, &mutate_count, sizeof(DWORD), &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "handleReplay: failed to read mutate count (0x%x)", GetLastError());
         exit(1);
     }
+    StringCchPrintfW(mutate_fname, MAX_PATH, FUZZ_RUN_FKT_FMT, mutate_count);
 
     DWORD size = 0;
     if(!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleReplay: failed to read size of replay buffer (0x%x)", GetLastError());
         exit(1);
     }
 
     HANDLE hHeap = GetProcessHeap();
 
     if(hHeap == NULL) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleReplay: failed to get process heap (0x%x)", GetLastError());
         exit(1);
     }
 
     BYTE* buf = (BYTE*)HeapAlloc(hHeap, 0, size * sizeof(BYTE));
 
     if(buf == NULL) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleReplay: failed to allocate replay buffer (0x%x)", GetLastError());
         exit(1);
     }
 
     WCHAR targetFile[MAX_PATH + 1];
-    wsprintf(targetFile, FUZZ_WORKING_FMT_FKT, runId, mutateCount);
-    // TODO: validate file exists
+    WCHAR targetDir[MAX_PATH + 1];
+    PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
+    PathCchCombine(targetFile, MAX_PATH, targetDir, mutate_fname);
+
+    DWORD attrs = GetFileAttributes(targetFile);
+
+    if (attrs == INVALID_FILE_ATTRIBUTES || (attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+        LOG_F(ERROR, "handleReplay: missing FKT or is a directory: %S", targetFile);
+        exit(1);
+    }
+
     HANDLE hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 
     if(hFile == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleReplay: failed to open FKT: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
     getBytesFKT(hFile, buf, size);
 
     if(!WriteFile(hPipe, buf, size, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleReplay: failed to write replay buffer (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!CloseHandle(hFile)) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleReplay: failed to close FKT (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!HeapFree(hHeap, NULL, buf)) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleReplay: failed to deallocate replay buffer (0x%x)", GetLastError());
         exit(1);
     }
+
+    RpcStringFree((RPC_WSTR *)&runId_s);
 
     return 0;
 }
@@ -782,74 +796,81 @@ DWORD handleReplay(HANDLE hPipe) {
 DWORD serveRunInfo(HANDLE hPipe) {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
+    UUID runId;
+    WCHAR *runId_s;
 
-    DWORD runId = 0;
-    if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+    if(!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "serveRunInfo: failed to read run ID (0x%x)", GetLastError());
         exit(1);
     }
 
-    TCHAR commandLine[8192] = { 0 };
-    WCHAR targetFile[MAX_PATH + 1] = { 0 };
+    UuidToString(&runId, (RPC_WSTR *)&runId_s);
 
-    wsprintf(targetFile, FUZZ_WORKING_FMT_PROGRAM, runId);
+    WCHAR commandLine[8192] = {0};
+    WCHAR targetDir[MAX_PATH + 1] = {0};
+    WCHAR targetFile[MAX_PATH + 1] = {0};
+
+    PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
+    PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_PROGRAM_TXT);
     HANDLE hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 
     if(hFile == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+        LOG_F(ERROR, "serveRunInfo: failed to open program.txt: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
-    if(!ReadFile(hFile, commandLine, 8191 * sizeof(TCHAR), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+    if(!ReadFile(hFile, commandLine, 8191 * sizeof(WCHAR), &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "serveRunInfo: failed to read program name (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!CloseHandle(hFile)) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+        LOG_F(ERROR, "serveRunInfo: failed to close program.txt (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!WriteFile(hPipe, &dwBytesRead, sizeof(DWORD), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+        LOG_F(ERROR, "serveRunInfo: failed to write program name size (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!WriteFile(hPipe, commandLine, dwBytesRead, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+        LOG_F(ERROR, "serveRunInfo: failed to write program name (0x%x)", GetLastError());
         exit(1);
     }
 
-    ZeroMemory(commandLine, 8192 * sizeof(TCHAR));
+    ZeroMemory(commandLine, 8192 * sizeof(WCHAR));
     ZeroMemory(targetFile, (MAX_PATH + 1) * sizeof(WCHAR));
-    wsprintf(targetFile, FUZZ_WORKING_FMT_ARGS, runId);
+    PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_ARGUMENTS_TXT);
 
     hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 
     if(hFile == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+        LOG_F(ERROR, "serveRunInfo: failed to open arguments.txt: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
-    if(!ReadFile(hFile, commandLine, 8191 * sizeof(TCHAR), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+    if(!ReadFile(hFile, commandLine, 8191 * sizeof(WCHAR), &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "serveRunInfo: failed to read command line argument list (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!CloseHandle(hFile)) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+        LOG_F(ERROR, "serveRunInfo: failed to close arguments.txt (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!WriteFile(hPipe, &dwBytesRead, sizeof(DWORD), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+        LOG_F(ERROR, "serveRunInfo: failed to write argument list size (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!WriteFile(hPipe, commandLine, dwBytesRead, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+        LOG_F(ERROR, "serveRunInfo: faield to write argument list (0x%x)", GetLastError());
         exit(1);
     }
+
+    RpcStringFree((RPC_WSTR *)&runId_s);
 
     return 0;
 }
@@ -857,49 +878,52 @@ DWORD serveRunInfo(HANDLE hPipe) {
 /* Deletes the run files to free up a Run ID if the last run didn't find a crash */
 DWORD finalizeRun(HANDLE hPipe) {
     DWORD dwBytesRead = 0;
+    UUID runId;
+    WCHAR *runId_s;
 
-    DWORD runId = 0;
-    if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "FinalizeRun (0x%x)", GetLastError());
+    if(!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "finalizeRun: failed to read run ID (0x%x)", GetLastError());
         exit(1);
     }
+
+    UuidToString(&runId, (RPC_WSTR *)&runId_s);
 
     BOOL crash = false;
     if(!ReadFile(hPipe, &crash, sizeof(BOOL), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "FinalizeRun (0x%x)", GetLastError());
+        LOG_F(ERROR, "finalizeRun: failed to read crash status (0x%x)", GetLastError());
         exit(1);
     }
-    LOG_F(INFO, "Finalizing run 0x%x", runId);
+
+    // TODO(ww): Add a flag/option that allows us to override removal.
+
+    LOG_F(INFO, "finalizeRun: finalizing %S", runId_s);
 
     if (!crash) {
-        LOG_F(INFO, "No crash removing run 0x%x", runId);
+        LOG_F(INFO, "finalizeRun: no crash, removing run %S", runId_s);
         EnterCriticalSection(&critId);
-        WIN32_FIND_DATA findData;
-        WCHAR targetFile[MAX_PATH + 1] = { 0 };
-        wsprintf(targetFile, FUZZ_WORKING_FMT_STAR, runId);
 
-        // empty directory
-        HANDLE hFind = FindFirstFile(targetFile, &findData);
-        if (hFind != INVALID_HANDLE_VALUE) {
-            do {
-                // TODO: this will fail on directories, but we don't have any directories yet
-                wsprintf(targetFile, FUZZ_WORKING_FMT_FMT, runId, findData.cFileName);
-                DeleteFile(targetFile);
-            } while (FindNextFile(hFind, &findData));
-            FindClose(hFind);
-        }
+        WCHAR targetDir[MAX_PATH + 1] = {0};
+        PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
 
-        wsprintf(targetFile, FUZZ_WORKING_FMT, runId);
-        if(!RemoveDirectory(targetFile)) {
-            LOG_F(ERROR, "FinalizeRun (0x%x)", GetLastError());
-            exit(1);
-        }
+        SHFILEOPSTRUCT remove_op = {
+            NULL,
+            FO_DELETE,
+            targetDir,
+            L"",
+            FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT,
+            false,
+            NULL,
+            L""
+        };
 
+        SHFileOperation(&remove_op);
         LeaveCriticalSection(&critId);
     }
     else {
-        LOG_F(INFO, "Crash found for run 0x%x", runId);
+        LOG_F(INFO, "finalizeRun: crash found for run %S", runId_s);
     }
+
+    RpcStringFree((RPC_WSTR *)&runId_s);
 
     return 0;
 }
@@ -908,34 +932,33 @@ DWORD finalizeRun(HANDLE hPipe) {
 DWORD crashPath(HANDLE hPipe) {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
+    UUID runId;
+    WCHAR *runId_s;
 
-    DWORD runId = 0;
-    if(!ReadFile(hPipe, &runId, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "crashPath (0x%x)", GetLastError());
+    if(!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "crashPath: failed to read UUID (0x%x)", GetLastError());
         exit(1);
     }
 
-    WCHAR targetFile[MAX_PATH + 1] = { 0 };
-    int len = wsprintf(targetFile, FUZZ_WORKING_FMT_JSON, runId);
+    UuidToString(&runId, (RPC_WSTR *)&runId_s);
+
+    WCHAR targetDir[MAX_PATH + 1] = {0};
+    WCHAR targetFile[MAX_PATH + 1] = {0};
+
+    PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
+    PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_CRASH_JSON);
+
     DWORD size = (wcslen(targetFile) + 1) * sizeof(WCHAR);
 
     if(!WriteFile(hPipe, &targetFile, size, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "crashPath (0x%x)", GetLastError());
+        LOG_F(ERROR, "crashPath: failed to write crash.json path to pipe (0x%x)", GetLastError());
         exit(1);
     }
 
+    RpcStringFree((RPC_WSTR *)&runId_s);
+
     return 0;
 }
-
-// TODO: check then delete all the tracing stuff
-enum Event {
-    EVT_RUN_ID,             // 0
-    EVT_MUTATION,           // 1
-    EVT_REPLAY,             // 2
-    EVT_RUN_INFO,           // 3
-    EVT_RUN_COMPLETE,       // 4
-    EVT_CRASH_PATH,         // 5
-};
 
 /* Handles incoming connections from clients */
 DWORD WINAPI threadHandler(LPVOID lpvPipe) {
@@ -947,7 +970,7 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe) {
     BYTE eventId = 255;
     if(!ReadFile(hPipe, &eventId, sizeof(BYTE), &dwBytesRead, NULL)) {
         if (GetLastError() != ERROR_BROKEN_PIPE){
-            LOG_F(ERROR, "ThreadHandler (0x%x)", GetLastError());
+            LOG_F(ERROR, "threadHandler: failed to read eventId (0x%x)", GetLastError());
             exit(1);
         }
         else{
@@ -956,6 +979,8 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe) {
             return 0;
         }
     }
+
+    LOG_F(INFO, "threadHandler: got event ID: %d", eventId);
 
     // Dispatch individual requests based on which event the client requested
     switch (eventId) {
@@ -983,36 +1008,34 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe) {
     }
 
     if(!FlushFileBuffers(hPipe)) {
-        LOG_F(ERROR, "ThreadHandler (0x%x)", GetLastError());
+        LOG_F(ERROR, "threadHandler: failed to flush pipe (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!DisconnectNamedPipe(hPipe)) {
-        LOG_F(ERROR, "ThreadHandler (0x%x)", GetLastError());
+        LOG_F(ERROR, "threadHandler: failed to disconnect pipe (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!CloseHandle(hPipe)) {
-        LOG_F(ERROR, "ThreadHandler (0x%x)", GetLastError());
+        LOG_F(ERROR, "threadHandler: failed to close pipe (0x%x)", GetLastError());
         exit(1);
     }
 
     return 0;
 }
 
-HANDLE hProcessMutex = INVALID_HANDLE_VALUE;
-
 /* concurrency protection */
 void lockProcess() {
     hProcessMutex = CreateMutex(NULL, FALSE, L"fuzz_server_mutex");
     if(!hProcessMutex || hProcessMutex == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "Could not get process lock (handle)");
+        LOG_F(ERROR, "lockProcess: could not get process lock (handle)");
         exit(1);
     }
 
     DWORD result = WaitForSingleObject(hProcessMutex, 0);
     if(result != WAIT_OBJECT_0) {
-        LOG_F(ERROR, "Could not get process lock (lock)");
+        LOG_F(ERROR, "lockProcess: could not get process lock (lock)");
         exit(1);
     }
 }
@@ -1020,14 +1043,16 @@ void lockProcess() {
 // Init dirs and create a new thread to handle input from the named pipe
 int main(int mArgc, char **mArgv)
 {
-    initDirs();
+    initLoggingFile();
 
     loguru::init(mArgc, mArgv);
-    CHAR logLocalPathA[MAX_PATH];
+    CHAR logLocalPathA[MAX_PATH]= {0};
     wcstombs(logLocalPathA, FUZZ_LOG, MAX_PATH);
     loguru::add_file(logLocalPathA, loguru::Append, loguru::Verbosity_MAX);
 
-    LOG_F(INFO, "Server started!");
+    initWorkingDir();
+
+    LOG_F(INFO, "main: server started!");
 
     lockProcess();
 
@@ -1035,21 +1060,19 @@ int main(int mArgc, char **mArgv)
     InitializeCriticalSection(&critLog);
 
     while (1) {
-        DWORD outSize = BUFSIZE;
-        DWORD inSize = BUFSIZE;
         HANDLE hPipe = CreateNamedPipe(
             L"\\\\.\\pipe\\fuzz_server",
             PIPE_ACCESS_DUPLEX,
             PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT | PIPE_ACCEPT_REMOTE_CLIENTS,
             PIPE_UNLIMITED_INSTANCES,
-            outSize,
-            inSize,
+            BUFSIZ,
+            BUFSIZ,
             0,
             NULL
         );
 
         if (hPipe == INVALID_HANDLE_VALUE) {
-            LOG_F(ERROR, "Could not create pipe");
+            LOG_F(ERROR, "main: could not create pipe");
             return 1;
         }
 
@@ -1068,7 +1091,7 @@ int main(int mArgc, char **mArgv)
 
             if (hThread == NULL)
             {
-                LOG_F(ERROR, "CreateThread (0x%x)\n", GetLastError());
+                LOG_F(ERROR, "main: CreateThread failed (0x%x)\n", GetLastError());
                 return -1;
             }
             else {
@@ -1076,7 +1099,7 @@ int main(int mArgc, char **mArgv)
             }
         }
         else {
-            LOG_F(ERROR, "Could not connect to hPipe");
+            LOG_F(ERROR, "main: could not connect to hPipe");
             CloseHandle(hPipe);
         }
     }

@@ -1,21 +1,26 @@
 #include <map>
-
 #include <stdio.h>
+#include <fstream>
 
 #include <winsock2.h>
 #include <winhttp.h>
 #include <Windows.h>
 #include <Winternl.h>
+#include <Rpc.h>
 
 #include "dr_api.h"
 #include "drmgr.h"
 #include "drwrap.h"
 #include "droption.h"
 
-#include <fstream>
 #include <json.hpp>
 using json = nlohmann::json;
 
+extern "C" {
+    #include "common/uuid.h"
+}
+
+#include "server.hpp"
 
 #ifdef WINDOWS
 #define IF_WINDOWS_ELSE(x,y) x
@@ -70,7 +75,7 @@ enum class Function {
     fread,
 };
 
-DWORD runId;
+UUID runId;
 BOOL crashed = false;
 
 std::map<Function, UINT64> call_counts;
@@ -101,19 +106,25 @@ char *get_function_name(Function function) {
 
 //TODO: Fix logging
 /* Tries to get a new Run ID from the fuzz server */
-DWORD getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs) {
+UUID getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs) {
     dr_log(NULL, LOG_ALL, ERROR, "Requesting run id");
     DWORD bytesRead = 0;
     DWORD bytesWritten = 0;
 
-    BYTE eventId = 0;
-    DWORD runId = 0;
-    if (!TransactNamedPipe(hPipe, &eventId, sizeof(BYTE), &runId, sizeof(DWORD), &bytesRead, NULL)) {
+    BYTE eventId = EVT_RUN_ID;
+    UUID runId;
+    if (!TransactNamedPipe(hPipe, &eventId, sizeof(BYTE), &runId, sizeof(UUID), &bytesRead, NULL)) {
         dr_log(NULL, LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
         dr_exit_process(1);
     }
 
-    DWORD size = lstrlen(targetName) * sizeof(TCHAR);
+    WCHAR runId_s[SL2_UUID_SIZE];
+    sl2_uuid_to_wstring(runId, runId_s);
+
+    dr_log(NULL, LOG_ALL, ERROR, "Run id %S", runId_s);
+
+    DWORD size = lstrlenW(targetName) * sizeof(WCHAR);
+
     if (!WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL)) {
         dr_log(NULL, LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
         dr_exit_process(1);
@@ -124,7 +135,7 @@ DWORD getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs) {
         dr_exit_process(1);
     }
 
-    size = lstrlen(targetArgs) * sizeof(TCHAR);
+    size = lstrlen(targetArgs) * sizeof(WCHAR);
     if (!WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL)) {
         dr_log(NULL, LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
         dr_exit_process(1);
@@ -134,8 +145,6 @@ DWORD getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs) {
         dr_log(NULL, LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
         dr_exit_process(1);
     }
-
-    dr_log(NULL, LOG_ALL, ERROR, "Run id %x", runId);
 
     return runId;
 }
@@ -184,14 +193,16 @@ HANDLE getPipe() {
 }
 
 /* Close out the fuzzing run with the server */
-DWORD finalize(HANDLE hPipe, DWORD runId, BOOL crashed) {
+DWORD finalize(HANDLE hPipe, UUID runId, BOOL crashed) {
+    WCHAR runId_s[SL2_UUID_SIZE];
+    sl2_uuid_to_wstring(runId, runId_s);
     if (crashed) {
-        dr_fprintf(STDERR, "<crash found for run id %d>\n", runId);
-        dr_log(NULL, LOG_ALL, ERROR, "Crash found for run id %d!", runId);
+        dr_fprintf(STDERR, "<crash found for run id %S>\n", runId_s);
+        dr_log(NULL, LOG_ALL, ERROR, "Crash found for run id %S!", runId_s);
     }
 
     DWORD bytesWritten;
-    BYTE eventId = 4;
+    BYTE eventId = EVT_RUN_COMPLETE;
 
     // write the event ID (4 for finalize)
     if (!WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL)) {
@@ -199,7 +210,7 @@ DWORD finalize(HANDLE hPipe, DWORD runId, BOOL crashed) {
         dr_exit_process(1);
     }
     // Write the run ID
-    if (!WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL)) {
+    if (!WriteFile(hPipe, &runId, sizeof(UUID), &bytesWritten, NULL)) {
         dr_log(NULL, LOG_ALL, ERROR, "Error finalizing (%x)", GetLastError());
         dr_exit_process(1);
     }
@@ -333,8 +344,8 @@ event_exit(void) {
 static DWORD mutateCount = 0;
 static BOOL
 mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
-    TCHAR filePath[MAX_PATH+1];
-    TCHAR *new_buf = (TCHAR *)buf;
+    WCHAR filePath[MAX_PATH+1];
+    WCHAR *new_buf = (WCHAR *)buf;
     DWORD pathSize = 0;
 
     // Check that ReadFile calls are to something actually valid
@@ -347,13 +358,13 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
         pathSize = GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, 0);
 
         if (pathSize > MAX_PATH || pathSize == 0) {
+            dr_fprintf(STDERR, "pathSize out of bounds\n");
             dr_log(NULL, LOG_ALL, ERROR, "Pathsize %d is out of bounds\n", pathSize);
             return false;
         }
 
         dr_fprintf(STDERR, "FILE PATH: %s\n", filePath);
     }
-
 
     // initialize output variables
     filePath[pathSize] = 0;
@@ -363,17 +374,17 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
     DWORD bytesRead = 0;
     DWORD bytesWritten = 0;
 
-    BYTE eventId = 1;
+    BYTE eventId = EVT_MUTATION;
     DWORD type = static_cast<DWORD>(function);
 
     // Send state information to the fuzz server
     WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL);
-    WriteFile(hPipe, &runId, sizeof(DWORD), &bytesWritten, NULL);
+    WriteFile(hPipe, &runId, sizeof(UUID), &bytesWritten, NULL);
     WriteFile(hPipe, &type, sizeof(DWORD), &bytesWritten, NULL);
     WriteFile(hPipe, &mutateCount, sizeof(DWORD), &bytesWritten, NULL);
 
     WriteFile(hPipe, &pathSize, sizeof(DWORD), &bytesWritten, NULL);
-    WriteFile(hPipe, &filePath, pathSize * sizeof(TCHAR), &bytesWritten, NULL);
+    WriteFile(hPipe, &filePath, pathSize * sizeof(WCHAR), &bytesWritten, NULL);
 
     WriteFile(hPipe, &position, sizeof(DWORD64), &bytesWritten, NULL);
     WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL);
@@ -902,15 +913,17 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
     // Get application name
     HANDLE hPipe = getPipe();
     const char* mbsAppName = dr_get_application_name();
-    TCHAR wcsAppName[MAX_PATH];
+    WCHAR wcsAppName[MAX_PATH];
     mbstowcs(wcsAppName, mbsAppName, MAX_PATH);
 
     // Send application name and invokation to fuzz server, get back the run ID
     runId = getRunID(hPipe, wcsAppName, get_target_command_line());
     CloseHandle(hPipe);
 
+    WCHAR runId_s[SL2_UUID_SIZE];
+    sl2_uuid_to_wstring(runId, runId_s);
     // Initialize DynamoRIO and register callbacks
-    dr_fprintf(STDERR, "Beginning fuzzing run %d\n", runId);
+    dr_fprintf(STDERR, "Beginning fuzzing run %S\n\n", runId_s);
     drmgr_init();
     drwrap_init();
 
