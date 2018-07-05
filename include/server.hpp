@@ -22,4 +22,14 @@
 // The format for files (under the run directory) containing replayable mutations.
 #define FUZZ_RUN_FKT_FMT (L"%d.fkt")
 
+// TODO: check then delete all the tracing stuff
+enum Event {
+    EVT_RUN_ID,             // 0
+    EVT_MUTATION,           // 1
+    EVT_REPLAY,             // 2
+    EVT_RUN_INFO,           // 3
+    EVT_RUN_COMPLETE,       // 4
+    EVT_CRASH_PATH,         // 5
+};
+
 #endif

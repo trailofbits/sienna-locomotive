@@ -960,16 +960,6 @@ DWORD crashPath(HANDLE hPipe) {
     return 0;
 }
 
-// TODO: check then delete all the tracing stuff
-enum Event {
-    EVT_RUN_ID,             // 0
-    EVT_MUTATION,           // 1
-    EVT_REPLAY,             // 2
-    EVT_RUN_INFO,           // 3
-    EVT_RUN_COMPLETE,       // 4
-    EVT_CRASH_PATH,         // 5
-};
-
 /* Handles incoming connections from clients */
 DWORD WINAPI threadHandler(LPVOID lpvPipe) {
     HANDLE hPipe = (HANDLE)lpvPipe;
@@ -1056,7 +1046,7 @@ int main(int mArgc, char **mArgv)
     initLoggingFile();
 
     loguru::init(mArgc, mArgv);
-    CHAR logLocalPathA[MAX_PATH];
+    CHAR logLocalPathA[MAX_PATH]= {0};
     wcstombs(logLocalPathA, FUZZ_LOG, MAX_PATH);
     loguru::add_file(logLocalPathA, loguru::Append, loguru::Verbosity_MAX);
 
