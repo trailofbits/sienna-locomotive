@@ -12,7 +12,7 @@ function Unzip
 
 
 Function InstallDependencies {
-    $deps = @("hexdump")
+    $deps = @()
     foreach ( $dep in $deps ) {
         "Installing $dep"
         pip install "${dep}"

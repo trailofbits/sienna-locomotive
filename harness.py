@@ -15,7 +15,7 @@ import struct
 import json
 import uuid
 import fuzzer_config
-import hexdump
+import binascii
 from state import get_target_dir
 
 print_lock = threading.Lock()
@@ -128,8 +128,7 @@ def select_and_dump_wizard_findings(wizard_findings, target_file):
         else:
             print_l("{}) {func_name}".format(i, **finding))
         buffer = bytearray(finding['buffer'])
-        hex = hexdump.hexdump( buffer, "return" )
-        print_l(hex)
+        hexdump(buffer)
 
     # Let the user select a finding, add it to the config
     index = -1
@@ -149,6 +148,29 @@ def select_and_dump_wizard_findings(wizard_findings, target_file):
         json.dump(wizard_findings, json_file)
 
     return wizard_findings
+
+
+############################################################################
+# chunkify()
+#
+# Breaks bytes into chunks for hexdump
+############################################################################
+
+def chunkify(x, size):
+    d, m = divmod( len(x), 16 )
+    for i in range(d):
+        yield x[i*size:(i+1)*size]
+    if m:
+        yield x[d*size:]
+
+############################################################################
+# hexdump()
+#
+############################################################################
+def hexdump(x):
+    for addy, d in enumerate(chunkify(x, 16)):
+        print_l( "%08X: %s" % (addy,  binascii.hexlify(d).decode() )  )
+
 
 ############################################################################
 # wizard_json2results()
