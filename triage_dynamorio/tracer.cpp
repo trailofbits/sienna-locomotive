@@ -8,6 +8,12 @@
 #include <stddef.h> /* for offsetof */
 #include <map>
 #include <set>
+#include <fstream>
+
+#include <Windows.h>
+#include <Dbghelp.h>
+#include <winhttp.h>
+#include <Rpc.h>
 
 #include "dr_api.h"
 #include "drmgr.h"
@@ -16,20 +22,15 @@
 #include "dr_ir_instr.h"
 #include "droption.h"
 
+#include <json.hpp>
+using json = nlohmann::json;
+
 extern "C" {
     #include "utils.h"
     #include "common/uuid.h"
 }
 
-#include <fstream>
-#include <json.hpp>
-using json = nlohmann::json;
-
-#include <Dbghelp.h>
-#include <Windows.h>
-#include <winsock2.h>
-#include <winhttp.h>
-#include <Rpc.h>
+#include "server.hpp"
 
 void *mutatex;
 bool replay;
@@ -969,7 +970,7 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
             DWORD bytes_read = 0;
             DWORD bytes_written = 0;
 
-            BYTE event_id = 5;
+            BYTE event_id = EVT_CRASH_PATH;
 
             WriteFile(h_pipe, &event_id, sizeof(BYTE), &bytes_written, NULL);
             TransactNamedPipe(h_pipe, &run_id, sizeof(UUID), targetFile, MAX_PATH + 1, &bytes_read, NULL);
@@ -1334,7 +1335,7 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
             DWORD bytes_read = 0;
             DWORD bytes_written = 0;
 
-            BYTE event_id = 2;
+            BYTE event_id = EVT_REPLAY;
 
             // Send the run ID and request the mutation
             WriteFile(h_pipe, &event_id, sizeof(BYTE), &bytes_written, NULL);

@@ -1,6 +1,6 @@
 #include <map>
-
 #include <stdio.h>
+#include <fstream>
 
 #include <winsock2.h>
 #include <winhttp.h>
@@ -13,13 +13,14 @@
 #include "drwrap.h"
 #include "droption.h"
 
-#include <fstream>
 #include <json.hpp>
 using json = nlohmann::json;
 
 extern "C" {
     #include "common/uuid.h"
 }
+
+#include "server.hpp"
 
 #ifdef WINDOWS
 #define IF_WINDOWS_ELSE(x,y) x
@@ -110,7 +111,7 @@ UUID getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs) {
     DWORD bytesRead = 0;
     DWORD bytesWritten = 0;
 
-    BYTE eventId = 0;
+    BYTE eventId = EVT_RUN_ID;
     UUID runId;
     if (!TransactNamedPipe(hPipe, &eventId, sizeof(BYTE), &runId, sizeof(UUID), &bytesRead, NULL)) {
         dr_log(NULL, LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
@@ -201,7 +202,7 @@ DWORD finalize(HANDLE hPipe, UUID runId, BOOL crashed) {
     }
 
     DWORD bytesWritten;
-    BYTE eventId = 4;
+    BYTE eventId = EVT_RUN_COMPLETE;
 
     // write the event ID (4 for finalize)
     if (!WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL)) {
@@ -373,7 +374,7 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
     DWORD bytesRead = 0;
     DWORD bytesWritten = 0;
 
-    BYTE eventId = 1;
+    BYTE eventId = EVT_MUTATION;
     DWORD type = static_cast<DWORD>(function);
 
     // Send state information to the fuzz server
