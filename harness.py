@@ -16,7 +16,7 @@ import json
 import uuid
 
 import fuzzer_config
-from state import get_target_dir, get_targets
+from state import get_target_dir, get_targets, get_runs, stringify_program_array
 
 print_lock = threading.Lock()
 can_fuzz = True
@@ -119,6 +119,19 @@ def finalize(run_id, crashed):
     f.close()
 
 
+def select_from_range(max_range, message):
+    index = -1
+    while True:
+        try:
+            index = int(input(message))
+        except ValueError:
+            pass
+        if index not in range(max_range):
+            print_l("Invalid selection.")
+        else:
+            return index
+
+
 def select_and_dump_wizard_findings(wizard_findings, target_file):
     """ Print and select findings, then write to disk """
     print_l("Functions found:")
@@ -132,17 +145,7 @@ def select_and_dump_wizard_findings(wizard_findings, target_file):
             print_l("   ...")
 
     # Let the user select a finding, add it to the config
-    index = -1
-    done = False
-    while not done:
-        try:
-            index = int(input("Choose a function to fuzz> "))
-        except ValueError:
-            pass
-        if index not in range(len(wizard_findings)):
-            print_l("Function number is invalid.")
-        else:
-            done = True
+    index = select_from_range(len(wizard_findings), "Choose a function to fuzz> ")
     wizard_findings[index]['selected'] = True
 
     with open(target_file, 'w') as json_file:
@@ -293,15 +296,29 @@ def main():
         if config['stage'] == 'WIZARD':
             select_and_dump_wizard_findings(wizard_run(config), os.path.join(get_target_dir(config), 'targets.json'))
         if config['stage'] == 'FUZZER':
-            pass
-            # select target
-            # update config with selections from target
-            # fuzzer_run(config)
+            targets = get_targets()
+            mapping = []
+            for target in targets:
+                print("{}) [{}]  {}".format(len(mapping),
+                                            target[-40:][:8],
+                                            stringify_program_array(targets[target][0], targets[target][1])))
+                mapping.append(target)
+            target_id = mapping[select_from_range(len(mapping), "Select a target to fuzz> ")]
+            config['target_application_path'], config['target_args'] = targets[target_id]
+            config['client_args'].append('-t')
+            config['client_args'].append(os.path.join(target_id, 'targets.json'))
+            fuzzer_run(config)
         if config['stage'] == 'TRIAGE':
-            pass
-            # select run id
-            # Update triage run with config from run id
-            # triage_run(config, run_id)
+            runs = get_runs()
+            mapping = []
+            for run_id in runs:
+                print("{}) [{}]  {}".format(len(mapping),
+                                            run_id[-36:][:8],
+                                            stringify_program_array(runs[run_id][0], runs[run_id][1])))
+                mapping.append(run_id)
+            run_id = mapping[select_from_range(len(mapping), "Select a run to triage> ")]
+            config['target_application_path'], config['target_args'] = runs[run_id]
+            triage_run(config, run_id)
         return
 
     # Run the wizard to select a target function if we don't have one saved
