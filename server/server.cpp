@@ -6,8 +6,7 @@
 #include <unordered_map>
 #include <string.h>
 #include <strsafe.h>
-
-#define BUFSIZE 100000
+#include <stdio.h>
 
 #include <ShlObj.h>
 #include <PathCch.h>
@@ -1062,15 +1061,13 @@ int main(int mArgc, char **mArgv)
     InitializeCriticalSection(&critLog);
 
     while (1) {
-        DWORD outSize = BUFSIZE;
-        DWORD inSize = BUFSIZE;
         HANDLE hPipe = CreateNamedPipe(
             L"\\\\.\\pipe\\fuzz_server",
             PIPE_ACCESS_DUPLEX,
             PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT | PIPE_ACCEPT_REMOTE_CLIENTS,
             PIPE_UNLIMITED_INSTANCES,
-            outSize,
-            inSize,
+            BUFSIZ,
+            BUFSIZ,
             0,
             NULL
         );
