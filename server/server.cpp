@@ -568,7 +568,7 @@ DWORD handleMutation(HANDLE hPipe) {
     WCHAR *runId_s;
 
     if(!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to read run ID (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -576,77 +576,79 @@ DWORD handleMutation(HANDLE hPipe) {
 
     DWORD type = 0;
     if(!ReadFile(hPipe, &type, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to read mutation type (0x%x)", GetLastError());
         exit(1);
     }
 
     DWORD mutate_count = 0;
     WCHAR mutate_fname[MAX_PATH + 1] = {0};
     if(!ReadFile(hPipe, &mutate_count, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to read mutation count (0x%x)", GetLastError());
         exit(1);
     }
     StringCchPrintfW(mutate_fname, MAX_PATH, FUZZ_RUN_FKT_FMT, mutate_count);
 
     DWORD pathSize = 0;
     if (!ReadFile(hPipe, &pathSize, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to read size of mutation filepath (0x%x)", GetLastError());
         exit(1);
     }
 
     if (pathSize > MAX_PATH) {
-        LOG_F(ERROR, "HandleMutation MAX_PATH", GetLastError());
+        LOG_F(ERROR, "handleMutation: pathSize > MAX_PATH", GetLastError());
         exit(1);
     }
 
     WCHAR filePath[MAX_PATH + 1];
     if (!ReadFile(hPipe, &filePath, pathSize * sizeof(WCHAR), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to read mutation filepath (0x%x)", GetLastError());
         exit(1);
     }
 
     filePath[pathSize] = 0;
-    LOG_F(INFO, "file path: %S\n", filePath);
+    LOG_F(INFO, "handleMutation: mutation file path: %S\n", filePath);
 
     DWORD64 position = 0;
     if (!ReadFile(hPipe, &position, sizeof(DWORD64), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to read mutation offset (0x%x)", GetLastError());
         exit(1);
     }
 
     DWORD size = 0;
     if(!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to read size of mutation buffer (0x%x)", GetLastError());
         exit(1);
     }
 
     HANDLE hHeap = GetProcessHeap();
     if(hHeap == NULL) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to get proces heap (0x%x)", GetLastError());
         exit(1);
     }
 
     BYTE* buf = (BYTE*)HeapAlloc(hHeap, 0, size * sizeof(BYTE));
 
     if(buf == NULL) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to allocate mutation buffer (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!ReadFile(hPipe, buf, size, &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to read mutation buffer from pipe (0x%x)", GetLastError());
         exit(1);
     }
 
+    // TODO(ww): Shouldn't this be dwBytesRead < size?
     if (dwBytesRead != size) {
         size = dwBytesRead;
     }
 
-    if(size > 0)
+    if (size > 0) {
         mutate(buf, size);
+    }
 
-    if(!WriteFile(hPipe, buf, size, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+    if (!WriteFile(hPipe, buf, size, &dwBytesWritten, NULL)) {
+        LOG_F(ERROR, "handleMutation: failed to write mutation buffer to pipe (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -659,14 +661,14 @@ DWORD handleMutation(HANDLE hPipe) {
     HANDLE hFile = CreateFile(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
     if(hFile == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to create FTK: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
     writeFKT(hFile, type, pathSize, filePath, position, size, buf);
 
     if(!HeapFree(hHeap, NULL, buf)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to deallocate mutation buffer (0x%x)", GetLastError());
         exit(1);
     }
 
