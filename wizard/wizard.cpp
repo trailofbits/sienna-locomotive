@@ -24,7 +24,12 @@ using json = nlohmann::json;
 using namespace std;
 
 
-void logObject(  json obj )
+////////////////////////////////////////////////////////////////////////////
+// logObject()
+//
+// Takes a json object and prints it to stderr for consumption by the harness
+////////////////////////////////////////////////////////////////////////////
+void logObject( json obj )
 {
     auto str = obj.dump();
     dr_fprintf( STDERR, "%s\n", str.c_str() );
@@ -129,11 +134,10 @@ Below we have a number of functions that instrument metadata retreival for the i
 static void
 wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
 
-    //dr_fprintf(STDERR, "<in wrap_pre_ReadEventLog>\n");
     json j;
     j["type"]       = "in";
     j["function"]   = "wrap_pre_ReadEventLog";
-    logObject (j);
+    logObject(j);
 
     HANDLE hEventLog = (HANDLE)drwrap_get_arg(wrapcxt, 0);
     DWORD  dwReadFlags = (DWORD)drwrap_get_arg(wrapcxt, 1);
@@ -154,11 +158,10 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
-    //dr_fprintf(STDERR, "<in wrap_pre_RegQueryValueEx>\n");
     json j;
     j["type"]       = "in";
     j["function"]   = "wrap_pre_RegQueryValueEx";
-    logObject (j);
+    logObject(j);
 
 
     HKEY    hKey = (HKEY)drwrap_get_arg(wrapcxt, 0);
@@ -184,11 +187,10 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
-    // dr_fprintf(STDERR, "<in wrap_pre_WinHttpWebSocketReceive>\n");
     json j;
     j["type"]       = "in";
     j["function"]   = "wrap_pre_WinHttpWebSocketReceive";
-    logObject (j);
+    logObject(j);
 
     HINTERNET hRequest = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     PVOID pvBuffer = drwrap_get_arg(wrapcxt, 1);
@@ -209,11 +211,10 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
-    // dr_fprintf(STDERR, "<in wrap_pre_InternetReadFile>\n");
     json j;
     j["type"]       = "in";
     j["function"]   = "wrap_pre_InternetReadFile";
-    logObject (j);
+    logObject(j);
 
     HINTERNET hFile = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
@@ -233,11 +234,10 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
-    // dr_fprintf(STDERR, "<in wrap_pre_WinHttpReadData>\n");
     json j;
     j["type"]       = "in";
     j["function"]   = "wrap_pre_WinHttpReadData";
-    logObject (j);
+    logObject(j);
 
     HINTERNET hRequest = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
@@ -257,11 +257,10 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
-    // dr_fprintf(STDERR, "<in wrap_pre_recv>\n");
     json j;
     j["type"]       = "in";
     j["function"]   = "wrap_pre_recv";
-    logObject (j);
+    logObject(j);
 
     SOCKET s = (SOCKET)drwrap_get_arg(wrapcxt, 0);
     char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
@@ -290,11 +289,10 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
-    // dr_fprintf(STDERR, "<in wrap_pre_ReadFile>\n");
     json j;
     j["type"]       = "in";
     j["function"]   = "wrap_pre_ReadFile";
-    logObject (j);
+    logObject(j);
 
     HANDLE hFile = drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
@@ -316,11 +314,10 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
-    // dr_fprintf(STDERR, "<in wrap_pre_fread>\n");
     json j;
     j["type"]       = "in";
     j["function"]   = "wrap_pre_fread";
-    logObject (j);
+    logObject(j);
 
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
     size_t size = (size_t)drwrap_get_arg(wrapcxt, 1);
@@ -410,25 +407,23 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
         }
     }
 
-    // dr_fprintf(STDERR, "--------\n");
-    
-    // dr_fprintf(STDERR, "<id: %llu%s>\n", call_counts[info->function], functionName);
+
     json j;
     j["type"]               = "id";
     j["callCount"]          = call_counts[info->function];
-    j["functionName"]       = functionName;
+    // wizard prefixes functionName with a ,
+    j["func_name"]          = functionName+1;
 
     call_counts[info->function]++;
     
     if(info->source != NULL) {
         wstring_convert<std::codecvt_utf8<wchar_t>> utf8Convert;
         wstring wstr =  wstring(info->source);
-        // dr_fprintf(STDERR, "source: \"%S\"\n", info->source);
         j["source"] = utf8Convert.to_bytes(wstr);
         free(info->source);
         DWORD end = info->position + info->nNumberOfBytesToRead;
-        // dr_fprintf(STDERR, "range: 0x%x,0x%x\n", info->position, end);        
-        j["range"] = { info->position, end }  ;
+        j["start"]  = info->position;
+        j["end"]    = end;
 
 
     }
@@ -438,13 +433,10 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     free(user_data);
 
     if(targeted) {
-        //hex_dump(lpBuffer, nNumberOfBytesToRead);
-        //logObject ( { { "type", "targetBuffer" }, {"buffer", });
         vector<unsigned char> x;
         x.resize(nNumberOfBytesToRead);
         memcpy( &x[0], lpBuffer, nNumberOfBytesToRead );
         j["buffer"]  = x;
-        // dr_fprintf(STDERR, "--------\n");
     }
 
     logObject(j);
@@ -533,10 +525,10 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
             bool ok = drwrap_wrap(towrap, hookFunctionPre, hookFunctionPost);
             // bool ok = false;
             if (ok) {
-                // dr_fprintf(STDERR, "<wrapped %s @ %p in %s\n", functionName, towrap, mod_name);
                 json j;
                 j["type"]           = "wrapped";
-                j["functionName"]   = functionName;
+                // wizard prefixes functionName with a ,
+                j["func_name"]      = functionName+1;
                 j["toWrap"]         = (uint64_t)towrap;
                 j["modName"]        = mod_name;
                 logObject(j);
@@ -547,7 +539,6 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
                 s << "FAILED to wrap " << functionName <<  " @ " << towrap << " already wrapped?";
                 j["msg"] = s.str();
                 logObject(j);
-                //dr_fprintf(STDERR, "<FAILED to wrap %s @ %p: already wrapped?\n", functionName, towrap);
             }
         }
     }

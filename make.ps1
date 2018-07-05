@@ -11,6 +11,13 @@ function Unzip
 }
 
 
+Function InstallDependencies {
+    $deps = @("hexdump")
+    foreach ( $dep in $deps ) {
+        "Installing $dep"
+        pip install "${dep}"
+    }
+}
 
 Function DynamioRioInstall {
 
@@ -38,6 +45,7 @@ Function DynamioRioInstall {
 
 
 Push-Location
+InstallDependencies
 DynamioRioInstall
 
 #if not exist "build" mkdir build
