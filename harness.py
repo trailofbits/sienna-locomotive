@@ -14,8 +14,8 @@ import signal
 import struct
 import json
 import uuid
-
 import fuzzer_config
+import binascii
 from state import get_target_dir
 
 print_lock = threading.Lock()
@@ -127,9 +127,8 @@ def select_and_dump_wizard_findings(wizard_findings, target_file):
             print_l("{}) {func_name} from {source}:{start}-{end}".format(i, **finding))
         else:
             print_l("{}) {func_name}".format(i, **finding))
-        print_l("   ", '\n   '.join(line for line in finding['hexdump_lines'][:4]))
-        if len(finding['hexdump_lines']) > 4:
-            print_l("   ...")
+        buffer = bytearray(finding['buffer'])
+        hexdump(buffer)
 
     # Let the user select a finding, add it to the config
     index = -1
@@ -151,6 +150,40 @@ def select_and_dump_wizard_findings(wizard_findings, target_file):
     return wizard_findings
 
 
+############################################################################
+# chunkify()
+#
+# Breaks bytes into chunks for hexdump
+############################################################################
+
+def chunkify(x, size):
+    d, m = divmod( len(x), 16 )
+    for i in range(d):
+        yield x[i*size:(i+1)*size]
+    if m:
+        yield x[d*size:]
+
+############################################################################
+# hexdump()
+#
+############################################################################
+def hexdump(x):
+    for addy, d in enumerate(chunkify(x, 16)):
+        print_l( "%08X: %s" % (addy,  binascii.hexlify(d).decode() )  )
+
+
+############################################################################
+# wizard_json2results()
+#
+# Converts a wizard json object to python object for the harness
+############################################################################
+def wizard_json2results(j):
+    ret = j
+
+    ret['index'] = -1
+    ret['selected'] = False
+    return ret
+
 def wizard_run(_config):
     """ Runs the wizard and lets the user select a target function """
     completed_process = run_dr({'drrun_path': _config['drrun_path'],
@@ -164,35 +197,29 @@ def wizard_run(_config):
                                verbose=_config['verbose'])
     wizard_output = completed_process.stderr.decode('utf-8')
     wizard_findings = []
+    # hash table to keep track of unique function names
+    wizard_findings_hash = {}
     sections = re.split(r"--------\n", wizard_output)
 
-    # Enumerate wrapped functions -- TODO use
-    for line in str.splitlines(sections[0]):
-        if '<wrapped ' in line:
-            re.search(r"<wrapped (?P<func_name>\S+) @ (?P<address>\S+) in (?P<module>\S+)", line).groupdict()
-
-    # Get function names, ID's, and contents, if applicable
-    for section in sections[1:]:
-        # Create result dict from parsing applicable lines
-        results = {'index': -123, 'func_name': 'PARSE ERROR', 'hexdump_lines': [], 'selected': False}
-        for line in section.splitlines():
-            if '<id:' in line:
-                results.update(re.search(r"<id: (?P<index>\d+),(?P<func_name>\S+)>", line).groupdict())
-            elif 'source:' in line:
-                results.update(re.search(r"source: (?P<source>[\S ]+)", line).groupdict())
-            elif 'range:' in line:
-                results.update(re.search(r"range: (?P<start>\S+),(?P<end>\S+)", line).groupdict())
-            else:
-                if len(line.strip()) > 0:
-                    results['hexdump_lines'].append(line.strip())
-
-        # Add function to wizard findings if it's not already there
-        if not any((lambda l, r: l['index'] == r['index'] and l['func_name'] == r['func_name'])(results, finding)
-                   for finding in wizard_findings):
-            if 'ERROR' not in results['func_name']:
-                wizard_findings.append(results)
-
-        results['index'] = int(results['index'])
+    for line in wizard_output.splitlines():
+        obj = json.loads(line)
+        print(obj)
+        if      "wrapped"   == obj["type"] :
+            # TODO do something here later
+            pass
+        elif    "in"        == obj["type"] :
+            # TODO do something here later
+            pass
+        elif    "id"        == obj["type"] :
+            results = wizard_json2results(obj)
+            func_name = results['func_name']
+            wizard_findings_hash[func_name] = results    
+    
+    i = 0
+    for results in wizard_findings_hash.values():
+        results['index'] = i
+        i += 1
+        wizard_findings.append(results)
 
     return wizard_findings
 
