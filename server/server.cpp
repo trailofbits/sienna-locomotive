@@ -468,38 +468,39 @@ DWORD mutate(BYTE *buf, DWORD size) {
     DWORD choice = getRand() % 8;
     switch(choice) {
         case 0:
-            LOG_F(INFO, "strategyFlipBit");
+            LOG_F(INFO, "mutate: strategyFlipBit");
             strategyFlipBit(buf, size);
             break;
         case 1:
-            LOG_F(INFO, "strategyRandValues");
+            LOG_F(INFO, "mutate: strategyRandValues");
             strategyRandValues(buf, size);
             break;
         case 2:
-            LOG_F(INFO, "strategyRepeatBytes");
+            LOG_F(INFO, "mutate: strategyRepeatBytes");
             strategyRepeatBytes(buf, size);
             break;
         case 3:
-            LOG_F(INFO, "strategyKnownValues");
+            LOG_F(INFO, "mutate: strategyKnownValues");
             strategyKnownValues(buf, size);
             break;
         case 4:
-            LOG_F(INFO, "strategyAddSubKnownValues");
+            LOG_F(INFO, "mutate: strategyAddSubKnownValues");
             strategyAddSubKnownValues(buf, size);
             break;
         case 5:
-            LOG_F(INFO, "strategyEndianSwap");
+            LOG_F(INFO, "mutate: strategyEndianSwap");
             strategyEndianSwap(buf, size);
             break;
         case 6:
-            LOG_F(INFO, "strategyDeleteBytes");
+            LOG_F(INFO, "mutate: strategyDeleteBytes");
             strategyDeleteBytes(buf, size);
             break;
         case 7:
-            LOG_F(INFO, "strategyRepeatBytesBackward");
+            LOG_F(INFO, "mutate: strategyRepeatBytesBackward");
             strategyRepeatBytesBackward(buf, size);
             break;
         default:
+            LOG_F(INFO: "mutate: strategyAAAA")
             strategyAAAA(buf, size);
             break;
     }
@@ -561,7 +562,7 @@ DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, WCHAR *filePath, DWORD6
 
 /* handles mutation requests over the named pipe from the fuzzing harness */
 DWORD handleMutation(HANDLE hPipe) {
-    LOG_F(INFO, "starting handleMutation");
+    LOG_F(INFO, "handleMutation: starting mutation request");
 
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
