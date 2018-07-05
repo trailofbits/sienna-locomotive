@@ -500,7 +500,7 @@ DWORD mutate(BYTE *buf, DWORD size) {
             strategyRepeatBytesBackward(buf, size);
             break;
         default:
-            LOG_F(INFO: "mutate: strategyAAAA")
+            LOG_F(INFO, "mutate: strategyAAAA");
             strategyAAAA(buf, size);
             break;
     }
