@@ -18,13 +18,14 @@
 
 #include "server.hpp"
 
-CRITICAL_SECTION critId;
-CRITICAL_SECTION critLog;
+static CRITICAL_SECTION critId;
+static CRITICAL_SECTION critLog;
+static HANDLE hProcessMutex = INVALID_HANDLE_VALUE;
 
-HANDLE hLog = INVALID_HANDLE_VALUE;
+static HANDLE hLog = INVALID_HANDLE_VALUE;
 
-WCHAR FUZZ_WORKING_PATH[MAX_PATH] = L"";
-WCHAR FUZZ_LOG[MAX_PATH] = L"";
+static WCHAR FUZZ_WORKING_PATH[MAX_PATH] = L"";
+static WCHAR FUZZ_LOG[MAX_PATH] = L"";
 
 // Initialize the global variable (FUZZ_LOG) containing the path to the logging file.
 // NOTE(ww): We separate this from initWorkingDir so that we can log any errors that
@@ -977,7 +978,7 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe) {
     BYTE eventId = 255;
     if(!ReadFile(hPipe, &eventId, sizeof(BYTE), &dwBytesRead, NULL)) {
         if (GetLastError() != ERROR_BROKEN_PIPE){
-            LOG_F(ERROR, "ThreadHandler (0x%x)", GetLastError());
+            LOG_F(ERROR, "threadHandler: failed to read eventId (0x%x)", GetLastError());
             exit(1);
         }
         else{
@@ -987,7 +988,7 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe) {
         }
     }
 
-    LOG_F(INFO, "got event ID: %d", eventId);
+    LOG_F(INFO, "threadHandler: got event ID: %d", eventId);
 
     // Dispatch individual requests based on which event the client requested
     switch (eventId) {
@@ -1015,36 +1016,34 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe) {
     }
 
     if(!FlushFileBuffers(hPipe)) {
-        LOG_F(ERROR, "ThreadHandler (0x%x)", GetLastError());
+        LOG_F(ERROR, "threadHandler: failed to flush pipe (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!DisconnectNamedPipe(hPipe)) {
-        LOG_F(ERROR, "ThreadHandler (0x%x)", GetLastError());
+        LOG_F(ERROR, "threadHandler: failed to disconnect pipe (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!CloseHandle(hPipe)) {
-        LOG_F(ERROR, "ThreadHandler (0x%x)", GetLastError());
+        LOG_F(ERROR, "threadHandler: failed to close pipe (0x%x)", GetLastError());
         exit(1);
     }
 
     return 0;
 }
 
-HANDLE hProcessMutex = INVALID_HANDLE_VALUE;
-
 /* concurrency protection */
 void lockProcess() {
     hProcessMutex = CreateMutex(NULL, FALSE, L"fuzz_server_mutex");
     if(!hProcessMutex || hProcessMutex == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "Could not get process lock (handle)");
+        LOG_F(ERROR, "lockProcess: could not get process lock (handle)");
         exit(1);
     }
 
     DWORD result = WaitForSingleObject(hProcessMutex, 0);
     if(result != WAIT_OBJECT_0) {
-        LOG_F(ERROR, "Could not get process lock (lock)");
+        LOG_F(ERROR, "lockProcess: could not get process lock (lock)");
         exit(1);
     }
 }
@@ -1061,7 +1060,7 @@ int main(int mArgc, char **mArgv)
 
     initWorkingDir();
 
-    LOG_F(INFO, "Server started!");
+    LOG_F(INFO, "main: server started!");
 
     lockProcess();
 
@@ -1081,7 +1080,7 @@ int main(int mArgc, char **mArgv)
         );
 
         if (hPipe == INVALID_HANDLE_VALUE) {
-            LOG_F(ERROR, "Could not create pipe");
+            LOG_F(ERROR, "main: could not create pipe");
             return 1;
         }
 
@@ -1100,7 +1099,7 @@ int main(int mArgc, char **mArgv)
 
             if (hThread == NULL)
             {
-                LOG_F(ERROR, "CreateThread (0x%x)\n", GetLastError());
+                LOG_F(ERROR, "main: CreateThread failed (0x%x)\n", GetLastError());
                 return -1;
             }
             else {
@@ -1108,7 +1107,7 @@ int main(int mArgc, char **mArgv)
             }
         }
         else {
-            LOG_F(ERROR, "Could not connect to hPipe");
+            LOG_F(ERROR, "main: could not connect to hPipe");
             CloseHandle(hPipe);
         }
     }
