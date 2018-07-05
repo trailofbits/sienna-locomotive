@@ -36,7 +36,7 @@ VOID initLoggingFile() {
     SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roamingPath);
 
     if (PathCchCombine(FUZZ_LOG, MAX_PATH, roamingPath, L"Trail of Bits\\fuzzkit\\log\\server.log") != S_OK) {
-        LOG_F(ERROR, "initDirs (0x%x)", GetLastError());
+        LOG_F(ERROR, "initLoggingFile: failed to combine logfile path (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -52,7 +52,7 @@ VOID initWorkingDir() {
     WCHAR workingLocalPath[MAX_PATH] = L"Trail of Bits\\fuzzkit\\working";
 
     if (PathCchCombine(FUZZ_WORKING_PATH, MAX_PATH, roamingPath, workingLocalPath) != S_OK) {
-        LOG_F(ERROR, "initDirs (0x%x)", GetLastError());
+        LOG_F(ERROR, "initWorkingDir: failed to combine working dir path (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -68,7 +68,7 @@ DWORD generateRunId(HANDLE hPipe) {
     UUID runId;
     WCHAR *runId_s;
 
-    LOG_F(INFO, "Run id requested");
+    LOG_F(INFO, "generateRunId: received request");
 
     // NOTE(ww): On recent versions of Windows, UuidCreate generates a v4 UUID that
     // is sufficiently diffuse for our purposes (avoiding conflicts between runs).
@@ -79,28 +79,30 @@ DWORD generateRunId(HANDLE hPipe) {
     WCHAR targetDir[MAX_PATH + 1] = {0};
     PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
     if (!CreateDirectory(targetDir, NULL)) {
-        LOG_F(ERROR, "generateRunId (0x%x)", GetLastError());
+        LOG_F(ERROR, "generateRunId: couldn't create working directory (0x%x)", GetLastError());
         exit(1);
     }
 
     WriteFile(hPipe, &runId, sizeof(UUID), &dwBytesWritten, NULL);
-    LOG_F(INFO, "Run id: %S", runId_s);
+    LOG_F(INFO, "generateRunId: generated ID %S", runId_s);
 
     // get program name
-    WCHAR commandLine[8192] = { 0 };
+    // TODO(ww): 8192 is the correct buffer size for the Windows command line, but
+    // we should try to find a macro in the WINAPI for it here.
+    WCHAR commandLine[8192] = {0};
     DWORD size = 0;
     if(!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
+        LOG_F(ERROR, "generateRunId: failed to read size of program name (0x%x)", GetLastError());
         exit(1);
     }
 
     if (size > 8191) {
-        LOG_F(ERROR, "Invalid size for command name");
-        return 1;
+        LOG_F(ERROR, "generateRunId: program name length > 8191");
+        exit(1);
     }
 
     if(!ReadFile(hPipe, commandLine, size, &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
+        LOG_F(ERROR, "generateRunId: failed to read size of argument list (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -108,20 +110,18 @@ DWORD generateRunId(HANDLE hPipe) {
     PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_PROGRAM_TXT);
     HANDLE hFile = CreateFileW(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
-    LOG_F(INFO, "target file: %S", targetFile);
-
     if(hFile == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
+        LOG_F(ERROR, "generateRunId: failed to open program.txt: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
     if(!WriteFile(hFile, commandLine, size, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
+        LOG_F(ERROR, "generateRunId: failed to write program name to program.txt (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!CloseHandle(hFile)) {
-        LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
+        LOG_F(ERROR, "generateRunId: failed to close program.txt (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -130,17 +130,17 @@ DWORD generateRunId(HANDLE hPipe) {
     // get program arguments
     size = 0;
     if(!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
+        LOG_F(ERROR, "generateRunId: failed to read program argument list length (0x%x)", GetLastError());
         exit(1);
     }
 
     if (size > 8191) {
-        LOG_F(ERROR, "Invalid size for command name");
-        return 1;
+        LOG_F(ERROR, "generateRunId: program argument list length > 8191");
+        exit(1);
     }
 
     if(!ReadFile(hPipe, commandLine, size, &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
+        LOG_F(ERROR, "generateRunId: failed to read program argument list (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -149,23 +149,23 @@ DWORD generateRunId(HANDLE hPipe) {
     hFile = CreateFile(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
     if(hFile == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
+        LOG_F(ERROR, "generateRunId: failed to open arguments.txt: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
     if(!WriteFile(hFile, commandLine, size, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
+        LOG_F(ERROR, "generateRunId: failed to write argument list to arguments.txt (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!CloseHandle(hFile)) {
-        LOG_F(ERROR, "GenerateRunId (0x%x)", GetLastError());
+        LOG_F(ERROR, "generateRunId: failed to close arguments.txt (0x%x)", GetLastError());
         exit(1);
     }
 
     RpcStringFree((RPC_WSTR *)&runId_s);
 
-    LOG_F(INFO, "finished generateRunId");
+    LOG_F(INFO, "generateRunId: finished");
 
     return 0;
 }
