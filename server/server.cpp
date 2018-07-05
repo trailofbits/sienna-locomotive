@@ -682,7 +682,7 @@ DWORD getBytesFKT(HANDLE hFile, BYTE *buf, DWORD size) {
     DWORD buf_size = 0;
     SetFilePointer(hFile, 0x14, NULL, FILE_BEGIN);
     if (!ReadFile(hFile, &buf_size, 4, &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+        LOG_F(ERROR, "getBytesFKT: failed to read replay buffer size from FKT (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -693,7 +693,7 @@ DWORD getBytesFKT(HANDLE hFile, BYTE *buf, DWORD size) {
     SetFilePointer(hFile, -(LONG)size, NULL, FILE_END);
 
     if (!ReadFile(hFile, buf, size, &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "HandleReplay (0x%x)", GetLastError());
+        LOG_F(ERROR, "getBytesFKT: failed to read replay buffer from FKT (0x%x)", GetLastError());
         exit(1);
     }
 
