@@ -933,7 +933,7 @@ DWORD crashPath(HANDLE hPipe) {
     WCHAR *runId_s;
 
     if(!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "crashPath (0x%x)", GetLastError());
+        LOG_F(ERROR, "crashPath: failed to read UUID (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -948,7 +948,7 @@ DWORD crashPath(HANDLE hPipe) {
     DWORD size = (wcslen(targetFile) + 1) * sizeof(WCHAR);
 
     if(!WriteFile(hPipe, &targetFile, size, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "crashPath (0x%x)", GetLastError());
+        LOG_F(ERROR, "crashPath: failed to write crash.json path to pipe (0x%x)", GetLastError());
         exit(1);
     }
 
