@@ -951,7 +951,7 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
 
     if(replay) {
         HANDLE h_pipe = CreateFile(
-            L"\\\\.\\pipe\\fuzz_server",
+            FUZZ_SERVER_PATH,
             GENERIC_READ | GENERIC_WRITE,
             0,
             NULL,
@@ -1316,7 +1316,7 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
         dr_mutex_lock(mutatex);
         // Open handle to server
         HANDLE h_pipe = CreateFile(
-            L"\\\\.\\pipe\\fuzz_server",
+            FUZZ_SERVER_PATH,
             GENERIC_READ | GENERIC_WRITE,
             0,
             NULL,

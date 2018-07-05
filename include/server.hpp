@@ -1,6 +1,9 @@
 #ifndef SL2_SERVER_HPP
 #define SL2_SERVER_HPP
 
+// The path to the local named pipe, used by the server to communicate with clients.
+#define FUZZ_SERVER_PATH (L"\\\\.\\pipe\\fuzz_server")
+
 // The file (under the run directory) in which the name of the program is stored.
 #define FUZZ_RUN_PROGRAM_TXT (L"program.txt")
 
