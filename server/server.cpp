@@ -69,6 +69,7 @@ DWORD generateRunId(HANDLE hPipe) {
     WCHAR *runId_s;
 
     LOG_F(INFO, "Run id requested");
+
     // NOTE(ww): On recent versions of Windows, UuidCreate generates a v4 UUID that
     // is sufficiently diffuse for our purposes (avoiding conflicts between runs).
     // See: https://stackoverflow.com/questions/35366368/does-uuidcreate-use-a-csprng
@@ -173,6 +174,7 @@ DWORD generateRunId(HANDLE hPipe) {
   Mutation strategies. The server selects one each time the fuzzing harness requests mutated bytes
 */
 
+// TODO(ww): Why are we doing this?
 DWORD getRand() {
     DWORD random = rand();
     random <<= 15;
