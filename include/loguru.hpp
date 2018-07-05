@@ -48,6 +48,11 @@ Website: www.ilikebigbits.com
 	* Version 1.4.1 - 2016-09-29 - Customize formating with LOGURU_FILENAME_WIDTH
 	* Version 1.5.0 - 2016-12-22 - LOGURU_USE_FMTLIB by kolis and LOGURU_WITH_FILEABS by scinart
 	* Version 1.5.1 - 2017-08-08 - Terminal colors on Windows 10 thanks to looki
+	* Version 1.6.0 - 2018-01-03 - Add LOGURU_RTTI and LOGURU_STACKTRACES settings
+	* Version 1.7.0 - 2018-01-03 - Add ability to turn off the preamble with loguru::g_preamble
+	* Version 1.7.1 - 2018-04-05 - Add function get_fatal_handler
+	* Version 1.7.2 - 2018-04-22 - Fix a bug where large file names could cause stack corruption (thanks @ccamporesi)
+	* Version 1.8.0 - 2018-04-23 - Shorten long file names to keep preamble fixed width
 
 # Compiling
 	Just include <loguru.hpp> where you want to use Loguru.
@@ -149,6 +154,12 @@ Website: www.ilikebigbits.com
 		Such a scheme is useful if you have a daemon program that moves the log file every 24 hours and expects new file to be created.
 		Feature by scinart (https://github.com/emilk/loguru/pull/23).
 
+	LOGURU_STACKTRACES (default 1 on supported platforms):
+		Print stack traces on abort.
+
+	LOGURU_RTTI (try to detect automatically by default):
+		Set to 0 if your platform does not support runtime type information (-fno-rtti).
+
 	You can also configure:
 	loguru::g_flush_interval_ms:
 		If set to zero Loguru will flush on every line (unbuffered mode).
@@ -170,6 +181,11 @@ Website: www.ilikebigbits.com
 
 #ifndef LOGURU_HAS_DECLARED_FORMAT_HEADER
 #define LOGURU_HAS_DECLARED_FORMAT_HEADER
+
+// Semantic versioning. Loguru version can be printed with printf("%d.%d.%d", LOGURU_VERSION_MAJOR, LOGURU_VERSION_MINOR, LOGURU_VERSION_PATCH);
+#define LOGURU_VERSION_MAJOR 1
+#define LOGURU_VERSION_MINOR 8
+#define LOGURU_VERSION_PATCH 0
 
 #if defined(_MSC_VER)
 #include <sal.h>	// Needed for _In_z_ etc annotations
@@ -232,6 +248,22 @@ Website: www.ilikebigbits.com
 	#define LOGURU_WITH_FILEABS 0
 #endif
 
+#ifndef LOGURU_RTTI
+#if defined(__clang__)
+	#if __has_feature(cxx_rtti)
+		#define LOGURU_RTTI 1
+	#endif
+#elif defined(__GNUG__)
+	#if defined(__GXX_RTTI)
+		#define LOGURU_RTTI 1
+	#endif
+#elif defined(_MSC_VER)
+	#if defined(_CPPRTTI)
+		#define LOGURU_RTTI 1
+	#endif
+#endif
+#endif
+
 // --------------------------------------------------------------------
 // Utility macros
 
@@ -270,10 +302,6 @@ Website: www.ilikebigbits.com
 #else
 #define LOGURU_PREDICT_FALSE(x) (__builtin_expect(x,     0))
 #define LOGURU_PREDICT_TRUE(x)  (__builtin_expect(!!(x), 1))
-#endif
-
-#if defined(_MSC_VER) && !defined(__PRETTY_FUNCTION__)
-#define __PRETTY_FUNCTION__ __FUNCTION__
 #endif
 
 #if LOGURU_USE_FMTLIB
@@ -379,6 +407,16 @@ namespace loguru
 	extern Verbosity g_stderr_verbosity;
 	extern bool      g_colorlogtostderr; // True by default.
 	extern unsigned  g_flush_interval_ms; // 0 (unbuffered) by default.
+	extern bool      g_preamble; // Prefix each log line with date, time etc? True by default.
+
+	// Turn off individual parts of the preamble
+	extern bool      g_preamble_date; // The date field
+	extern bool      g_preamble_time; // The time of the current day
+	extern bool      g_preamble_uptime; // The time since init call
+	extern bool      g_preamble_thread; // The logging thread
+	extern bool      g_preamble_file; // The file from which the log originates from
+	extern bool      g_preamble_verbose; // The verbosity field
+	extern bool      g_preamble_pipe; // The pipe symbol right before the message
 
 	// May not throw!
 	typedef void (*log_handler_t)(void* user_data, const Message& message);
@@ -418,6 +456,7 @@ namespace loguru
 	void init(int& argc, char* argv[], const char* verbosity_flag = "-v");
 
 	// Will call remove_all_callbacks(). After calling this, logging will still go to stderr.
+	// You generally don't need to call this.
 	void shutdown();
 
 	// What ~ will be replaced with, e.g. "/home/your_user_name/"
@@ -469,14 +508,20 @@ namespace loguru
 		Feel free to call LOG:ing function from this, but not FATAL ones! */
 	void set_fatal_handler(fatal_handler_t handler);
 
+	// Get the current fatal handler, if any. Default value is nullptr.
+	fatal_handler_t get_fatal_handler();
+
 	/*  Will be called on each log messages with a verbosity less or equal to the given one.
 		Useful for displaying messages on-screen in a game, for example.
 		The given on_close is also expected to flush (if desired).
 	*/
-	void add_callback(const char* id, log_handler_t callback, void* user_data,
-					  Verbosity verbosity,
-					  close_handler_t on_close = nullptr,
-					  flush_handler_t on_flush = nullptr);
+	void add_callback(
+		const char*     id,
+		log_handler_t   callback,
+		void*           user_data,
+		Verbosity       verbosity,
+		close_handler_t on_close = nullptr,
+		flush_handler_t on_flush = nullptr);
 
 	// Returns true iff the callback was found (and removed).
 	bool remove_callback(const char* id);
@@ -533,7 +578,7 @@ namespace loguru
 
 	// Flush output to stderr and files.
 	// If g_flush_interval_ms is set to non-zero, this will be called automatically this often.
-	// If not set, you do not need to call this at al.
+	// If not set, you do not need to call this at all.
 	void flush();
 
 	template<class T> inline Text format_value(const T&)                    { return textprintf("N/A");     }
@@ -555,7 +600,7 @@ namespace loguru
 	void set_thread_name(const char* name);
 
 	/* Returns the thread name for this thread.
-	   On OSX this will return the system thread name (setable from both within and without Loguru).
+	   On OSX this will return the system thread name (settable from both within and without Loguru).
 	   On other systems it will return whatever you set in set_thread_name();
 	   If no thread name is set, this will return a hexadecimal thread id.
 	   length should be the number of bytes available in the buffer.
@@ -765,7 +810,7 @@ namespace loguru
 		Get a light-weight handle to the error context stack on this thread.
 		The handle is valid as long as the current thread has no changes to its error context stack.
 		You can pass the handle to loguru::get_error_context on another thread.
-		This can be very useful for when you have a parent thread spawning several working thread,
+		This can be very useful for when you have a parent thread spawning several working threads,
 		and you want the error context of the parent thread to get printed (too) when there is an
 		error on the child thread. You can accomplish this thusly:
 
@@ -820,14 +865,14 @@ namespace loguru
 			{
 				// Called only when needed, i.e. on a crash.
 				std::string str = small_value.as_string(); // Format 'small_value' here somehow.
-				return Text{_strdup(str.c_str())};
+				return Text{strdup(str.c_str())};
 			}
 
 			Text ec_to_text(const MyBigType* big_value)
 			{
 				// Called only when needed, i.e. on a crash.
 				std::string str = big_value->as_string(); // Format 'big_value' here somehow.
-				return Text{_strdup(str.c_str())};
+				return Text{strdup(str.c_str())};
 			}
 		} // namespace loguru
 
@@ -876,7 +921,7 @@ namespace loguru
 #define LOG_SCOPE_F(verbosity_name, ...)                                                           \
 	VLOG_SCOPE_F(loguru::Verbosity_ ## verbosity_name, __VA_ARGS__)
 
-#define LOG_SCOPE_FUNCTION(verbosity_name) LOG_SCOPE_F(verbosity_name, __PRETTY_FUNCTION__)
+#define LOG_SCOPE_FUNCTION(verbosity_name) LOG_SCOPE_F(verbosity_name, __func__)
 
 // -----------------------------------------------
 // ABORT_F macro. Usage:  ABORT_F("Cause of error: %s", error_str);
@@ -907,11 +952,11 @@ namespace loguru
 		{                                                                                          \
 			auto str_left = loguru::format_value(val_left);                                        \
 			auto str_right = loguru::format_value(val_right);                                      \
-			auto fail_info = loguru::textprintf("CHECK FAILED:  %s %s %s  (%s %s %s)  ",            \
+			auto fail_info = loguru::textprintf("CHECK FAILED:  %s %s %s  (%s %s %s)  ",           \
 				#expr_left, #op, #expr_right, str_left.c_str(), #op, str_right.c_str());           \
-			auto user_msg = loguru::textprintf(__VA_ARGS__);                                        \
+			auto user_msg = loguru::textprintf(__VA_ARGS__);                                       \
 			loguru::log_and_abort(0, fail_info.c_str(), __FILE__, __LINE__,                        \
-								  "%s", user_msg.c_str());                                         \
+			                      "%s", user_msg.c_str());                                         \
 		}                                                                                          \
 	} while (false)
 
@@ -1002,7 +1047,7 @@ namespace loguru
 #define LOGURU_HAS_DECLARED_STREAMS_HEADER
 
 /* This file extends loguru to enable std::stream-style logging, a la Glog.
-   It's an optional feature beind the LOGURU_WITH_STREAMS settings
+   It's an optional feature behind the LOGURU_WITH_STREAMS settings
    because including it everywhere will slow down compilation times.
 */
 
@@ -1279,6 +1324,8 @@ This will define all the Loguru functions so that the linker may find them.
 #if defined(LOGURU_IMPLEMENTATION) && !defined(LOGURU_HAS_BEEN_IMPLEMENTED)
 #define LOGURU_HAS_BEEN_IMPLEMENTED
 
+#define LOGURU_PREAMBLE_WIDTH (53 + LOGURU_THREADNAME_WIDTH + LOGURU_FILENAME_WIDTH)
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -1292,7 +1339,7 @@ This will define all the Loguru functions so that the linker may find them.
 #include <thread>
 #include <vector>
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 	#include <direct.h>
 
 	#define localtime_r(a, b) localtime_s(b, a) // No localtime_r with MSVC, but arguments are swapped for localtime_s
@@ -1321,15 +1368,21 @@ This will define all the Loguru functions so that the linker may find them.
 #if defined(_WIN32) || defined(__CYGWIN__)
 	#define LOGURU_PTHREADS    0
 	#define LOGURU_WINTHREADS  1
-	#define LOGURU_STACKTRACES 0
+	#ifndef LOGURU_STACKTRACES
+		#define LOGURU_STACKTRACES 0
+	#endif
 #elif defined(__rtems__)
 	#define LOGURU_PTHREADS    1
 	#define LOGURU_WINTHREADS  0
-	#define LOGURU_STACKTRACES 0
+	#ifndef LOGURU_STACKTRACES
+		#define LOGURU_STACKTRACES 0
+	#endif
 #else
 	#define LOGURU_PTHREADS    1
 	#define LOGURU_WINTHREADS  0
-	#define LOGURU_STACKTRACES 1
+	#ifndef LOGURU_STACKTRACES
+		#define LOGURU_STACKTRACES 1
+	#endif
 #endif
 
 #if LOGURU_STACKTRACES
@@ -1340,6 +1393,12 @@ This will define all the Loguru functions so that the linker may find them.
 
 #if LOGURU_PTHREADS
 	#include <pthread.h>
+	#if defined(__FreeBSD__)
+		#include <pthread_np.h>
+		#include <sys/thr.h>
+	#elif defined(__OpenBSD__)
+		#include <pthread_np.h>
+	#endif
 
 	#ifdef __linux__
 		/* On Linux, the default thread name is the same as the name of the binary.
@@ -1405,6 +1464,16 @@ namespace loguru
 	Verbosity g_stderr_verbosity  = Verbosity_0;
 	bool      g_colorlogtostderr  = true;
 	unsigned  g_flush_interval_ms = 0;
+	bool      g_preamble          = true;
+
+	// Preamble details
+	bool      g_preamble_date     = true;
+	bool      g_preamble_time     = true;
+	bool      g_preamble_uptime   = true;
+	bool      g_preamble_thread   = true;
+	bool      g_preamble_file     = true;
+	bool      g_preamble_verbose  = true;
+	bool      g_preamble_pipe     = true;
 
 	static std::recursive_mutex  s_mutex;
 	static Verbosity             s_max_out_verbosity = Verbosity_OFF;
@@ -1453,9 +1522,7 @@ namespace loguru
 		#endif
 	}();
 
-	const auto PREAMBLE_EXPLAIN = textprintf("date       time         ( uptime  ) [%-*s]%*s:line     v| ",
-											 LOGURU_THREADNAME_WIDTH, " thread name/id",
-											 LOGURU_FILENAME_WIDTH, "file");
+	static void print_preamble_header(char* out_buff, size_t out_buff_size);
 
 	#if LOGURU_PTLS_NAMES
 		static pthread_once_t s_pthread_key_once = PTHREAD_ONCE_INIT;
@@ -1596,7 +1663,7 @@ namespace loguru
 	LOGURU_PRINTF_LIKE(1, 0)
 	static Text vtextprintf(const char* format, va_list vlist)
 	{
-#ifdef _MSC_VER
+#ifdef _WIN32
 		int bytes_needed = _vscprintf(format, vlist);
 		CHECK_F(bytes_needed >= 0, "Bad string format: '%s'", format);
 		char* buff = (char*)malloc(bytes_needed+1);
@@ -1748,17 +1815,19 @@ namespace loguru
 	Text errno_as_text()
 	{
 		char buff[256];
-	#ifdef __linux__
-		return Text(_strdup(strerror_r(errno, buff, sizeof(buff))));
-	#elif __APPLE__
+	#if defined(__GLIBC__) && defined(_GNU_SOURCE)
+		// GNU Version
+		return Text(strdup(strerror_r(errno, buff, sizeof(buff))));
+	#elif defined(__APPLE__) || _POSIX_C_SOURCE >= 200112L
+		// XSI Version
 		strerror_r(errno, buff, sizeof(buff));
-		return Text(_strdup(buff));
-	#elif _WIN32
+		return Text(strdup(buff));
+	#elif defined(_WIN32)
 		strerror_s(buff, sizeof(buff), errno);
-		return Text(_strdup(buff));
+		return Text(strdup(buff));
 	#else
 		// Not thread-safe.
-		return Text(_strdup(strerror(errno)));
+		return Text(strdup(strerror(errno)));
 	#endif
 	}
 
@@ -1796,21 +1865,29 @@ namespace loguru
 		#elif LOGURU_PTHREADS
 			char old_thread_name[16] = {0};
 			auto this_thread = pthread_self();
-			pthread_getname_np(this_thread, old_thread_name, sizeof(old_thread_name));
+			#if defined(__APPLE__) || defined(__linux__)
+				pthread_getname_np(this_thread, old_thread_name, sizeof(old_thread_name));
+			#endif
 			if (old_thread_name[0] == 0) {
 				#ifdef __APPLE__
 					pthread_setname_np("main thread");
-				#else
+				#elif defined(__FreeBSD__) || defined(__OpenBSD__)
+					pthread_set_name_np(this_thread, "main thread");
+				#elif defined(__linux__)
 					pthread_setname_np(this_thread, "main thread");
 				#endif
 			}
 		#endif // LOGURU_PTHREADS
 
 		if (g_stderr_verbosity >= Verbosity_INFO) {
-			if (g_colorlogtostderr && s_terminal_has_color) {
-				fprintf(stderr, "%s%s%s\n", terminal_reset(), terminal_dim(), PREAMBLE_EXPLAIN.c_str());
-			} else {
-				fprintf(stderr, "%s\n", PREAMBLE_EXPLAIN.c_str());
+			if (g_preamble) {
+				char preamble_explain[LOGURU_PREAMBLE_WIDTH];
+				print_preamble_header(preamble_explain, sizeof(preamble_explain));
+				if (g_colorlogtostderr && s_terminal_has_color) {
+					fprintf(stderr, "%s%s%s\n", terminal_reset(), terminal_dim(), preamble_explain);
+				} else {
+					fprintf(stderr, "%s\n", preamble_explain);
+				}
 			}
 			fflush(stderr);
 		}
@@ -1901,11 +1978,11 @@ namespace loguru
 	bool create_directories(const char* file_path_const)
 	{
 		CHECK_F(file_path_const && *file_path_const);
-		char* file_path = _strdup(file_path_const);
+		char* file_path = strdup(file_path_const);
 		for (char* p = strchr(file_path + 1, '/'); p; p = strchr(p + 1, '/')) {
 			*p = '\0';
 
-	#ifdef _MSC_VER
+	#ifdef _WIN32
 			if (_mkdir(file_path) == -1) {
 	#else
 			if (mkdir(file_path, 0755) == -1) {
@@ -1969,7 +2046,11 @@ namespace loguru
 			fprintf(file, "Current dir: %s\n", s_current_dir);
 		}
 		fprintf(file, "File verbosity level: %d\n", verbosity);
-		fprintf(file, "%s\n", PREAMBLE_EXPLAIN.c_str());
+		if (g_preamble) {
+			char preamble_explain[LOGURU_PREAMBLE_WIDTH];
+			print_preamble_header(preamble_explain, sizeof(preamble_explain));
+			fprintf(file, "%s\n", preamble_explain);
+		}
 		fflush(file);
 
 		LOG_F(INFO, "Logging to '%s', mode: '%s', verbosity: %d", path, mode_str, verbosity);
@@ -1980,6 +2061,11 @@ namespace loguru
 	void set_fatal_handler(fatal_handler_t handler)
 	{
 		s_fatal_handler = handler;
+	}
+
+	fatal_handler_t get_fatal_handler()
+	{
+		return s_fatal_handler;
 	}
 
 	void add_stack_cleanup(const char* find_this, const char* replace_with_this)
@@ -2000,8 +2086,13 @@ namespace loguru
 		}
 	}
 
-	void add_callback(const char* id, log_handler_t callback, void* user_data,
-					  Verbosity verbosity, close_handler_t on_close, flush_handler_t on_flush)
+	void add_callback(
+		const char*     id,
+		log_handler_t   callback,
+		void*           user_data,
+		Verbosity       verbosity,
+		close_handler_t on_close,
+		flush_handler_t on_flush)
 	{
 		std::lock_guard<std::recursive_mutex> lock(s_mutex);
 		s_callbacks.push_back(Callback{id, callback, user_data, verbosity, on_close, on_flush, 0});
@@ -2054,12 +2145,14 @@ namespace loguru
 	{
 		#if LOGURU_PTLS_NAMES
 			(void)pthread_once(&s_pthread_key_once, make_pthread_key_name);
-			(void)pthread_setspecific(s_pthread_key_name, _strdup(name));
+			(void)pthread_setspecific(s_pthread_key_name, strdup(name));
 
 		#elif LOGURU_PTHREADS
 			#ifdef __APPLE__
 				pthread_setname_np(name);
-			#else
+			#elif defined(__FreeBSD__) || defined(__OpenBSD__)
+				pthread_set_name_np(pthread_self(), name);
+			#elif defined(__linux__)
 				pthread_setname_np(pthread_self(), name);
 			#endif
 		#elif LOGURU_WINTHREADS
@@ -2089,14 +2182,21 @@ namespace loguru
 			} else {
 				buffer[0] = 0;
 			}
-		#else
+		#elif defined(__APPLE__) || defined(__linux__)
 			pthread_getname_np(thread, buffer, length);
+		#else
+			buffer[0] = 0;
 		#endif
 
 		if (buffer[0] == 0) {
 			#ifdef __APPLE__
 				uint64_t thread_id;
 				pthread_threadid_np(thread, &thread_id);
+			#elif defined(__FreeBSD__)
+				long thread_id;
+				(void)thr_self(&thread_id);
+			#elif defined(__OpenBSD__)
+				unsigned thread_id = -1;
 			#else
 				uint64_t thread_id = thread;
 			#endif
@@ -2126,21 +2226,26 @@ namespace loguru
 	{
 		int status = -1;
 		char* demangled = abi::__cxa_demangle(name, 0, 0, &status);
-		Text result{status == 0 ? demangled : _strdup(name)};
+		Text result{status == 0 ? demangled : strdup(name)};
 		return result;
 	}
 
-	template <class T>
-	std::string type_name() {
-		auto demangled = demangle(typeid(T).name());
-		return demangled.c_str();
-	}
+	#if LOGURU_RTTI
+		template <class T>
+		std::string type_name()
+		{
+			auto demangled = demangle(typeid(T).name());
+			return demangled.c_str();
+		}
+	#endif // LOGURU_RTTI
 
 	static const StringPairList REPLACE_LIST = {
-		{ type_name<std::string>(),    "std::string"    },
-		{ type_name<std::wstring>(),   "std::wstring"   },
-		{ type_name<std::u16string>(), "std::u16string" },
-		{ type_name<std::u32string>(), "std::u32string" },
+		#if LOGURU_RTTI
+			{ type_name<std::string>(),    "std::string"    },
+			{ type_name<std::wstring>(),   "std::wstring"   },
+			{ type_name<std::u16string>(), "std::u16string" },
+			{ type_name<std::u32string>(), "std::u32string" },
+		#endif // LOGURU_RTTI
 		{ "std::__1::",                "std::"          },
 		{ "__thiscall ",               ""               },
 		{ "__cdecl ",                  ""               },
@@ -2229,16 +2334,12 @@ namespace loguru
 #else // LOGURU_STACKTRACES
 	Text demangle(const char* name)
 	{
-		return Text(_strdup(name));
+		return Text(strdup(name));
 	}
 
 	std::string stacktrace_as_stdstring(int)
 	{
-		#if defined(_MSC_VER)
-		#pragma message ( "Loguru: No stacktraces available on this platform" )
-		#else
-		#warning "Loguru: No stacktraces available on this platform"
-		#endif
+		// No stacktraces available on this platform"
 		return "";
 	}
 
@@ -2247,13 +2348,44 @@ namespace loguru
 	Text stacktrace(int skip)
 	{
 		auto str = stacktrace_as_stdstring(skip + 1);
-		return Text(_strdup(str.c_str()));
+		return Text(strdup(str.c_str()));
 	}
 
 	// ------------------------------------------------------------------------
 
+	static void print_preamble_header(char* out_buff, size_t out_buff_size)
+	{
+		long pos = 0;
+		snprintf(out_buff, out_buff_size, ""); // Make sure there is a '\0' and handle out_buff_size==0
+		if (g_preamble_date && pos < out_buff_size) {
+			pos += snprintf(out_buff + pos, out_buff_size - pos, "date       ");
+		}
+		if (g_preamble_time && pos < out_buff_size) {
+			pos += snprintf(out_buff + pos, out_buff_size - pos, "time         ");
+		}
+		if (g_preamble_uptime && pos < out_buff_size) {
+			pos += snprintf(out_buff + pos, out_buff_size - pos, "( uptime  ) ");
+		}
+		if (g_preamble_thread && pos < out_buff_size) {
+			pos += snprintf(out_buff + pos, out_buff_size - pos, "[%-*s]", LOGURU_THREADNAME_WIDTH, " thread name/id");
+		}
+		if (g_preamble_file && pos < out_buff_size) {
+			pos += snprintf(out_buff + pos, out_buff_size - pos, "%*s:line  ", LOGURU_FILENAME_WIDTH, "file");
+		}
+		if (g_preamble_verbose && pos < out_buff_size) {
+			pos += snprintf(out_buff + pos, out_buff_size - pos, "   v");
+		}
+		if (g_preamble_pipe && pos < out_buff_size) {
+			pos += snprintf(out_buff + pos, out_buff_size - pos, "| ");
+		}
+	}
+
 	static void print_preamble(char* out_buff, size_t out_buff_size, Verbosity verbosity, const char* file, unsigned line)
 	{
+		if (!g_preamble) {
+			out_buff[0] = '\0';
+			return;
+		}
 		long long ms_since_epoch = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 		time_t sec_since_epoch = time_t(ms_since_epoch / 1000);
 		tm time_info;
@@ -2280,13 +2412,38 @@ namespace loguru
 			snprintf(level_buff, sizeof(level_buff) - 1, "% 4d", verbosity);
 		}
 
-		snprintf(out_buff, out_buff_size, "%04d-%02d-%02d %02d:%02d:%02d.%03lld (%8.3fs) [%-*s]%*s:%-5u %4s| ",
-			1900 + time_info.tm_year, 1 + time_info.tm_mon, time_info.tm_mday,
-			time_info.tm_hour, time_info.tm_min, time_info.tm_sec, ms_since_epoch % 1000,
-			uptime_sec,
-			LOGURU_THREADNAME_WIDTH, thread_name,
-			LOGURU_FILENAME_WIDTH,
-			file, line, level_buff);
+		long pos = 0;
+
+		snprintf(out_buff, out_buff_size, ""); // Make sure there is a '\0' and handle out_buff_size==0
+		if (g_preamble_date && pos < out_buff_size) {
+			pos += snprintf(out_buff + pos, out_buff_size - pos, "%04d-%02d-%02d ",
+				             1900 + time_info.tm_year, 1 + time_info.tm_mon, time_info.tm_mday);
+		}
+		if (g_preamble_time && pos < out_buff_size) {
+			pos += snprintf(out_buff + pos, out_buff_size - pos, "%02d:%02d:%02d.%03lld ",
+			               time_info.tm_hour, time_info.tm_min, time_info.tm_sec, ms_since_epoch % 1000);
+		}
+		if (g_preamble_uptime && pos < out_buff_size) {
+			pos += snprintf(out_buff + pos, out_buff_size - pos, "(%8.3fs) ",
+			               uptime_sec);
+		}
+		if (g_preamble_thread && pos < out_buff_size) {
+			pos += snprintf(out_buff + pos, out_buff_size - pos, "[%-*s]",
+			               LOGURU_THREADNAME_WIDTH, thread_name);
+		}
+		if (g_preamble_file && pos < out_buff_size) {
+			char shortened_filename[LOGURU_FILENAME_WIDTH + 1];
+			snprintf(shortened_filename, LOGURU_FILENAME_WIDTH + 1, "%s", file);
+			pos += snprintf(out_buff + pos, out_buff_size - pos, "%*s:%-5u ",
+			               LOGURU_FILENAME_WIDTH, shortened_filename, line);
+		}
+		if (g_preamble_verbose && pos < out_buff_size) {
+			pos += snprintf(out_buff + pos, out_buff_size - pos, "%4s",
+			               level_buff);
+		}
+		if (g_preamble_pipe && pos < out_buff_size) {
+			pos += snprintf(out_buff + pos, out_buff_size - pos, "| ");
+		}
 	}
 
 	// stack_trace_skip is just if verbosity == FATAL.
@@ -2392,10 +2549,10 @@ namespace loguru
 
 	// stack_trace_skip is just if verbosity == FATAL.
 	void log_to_everywhere(int stack_trace_skip, Verbosity verbosity,
-						   const char* file, unsigned line,
-						   const char* prefix, const char* buff)
+	                       const char* file, unsigned line,
+	                       const char* prefix, const char* buff)
 	{
-		char preamble_buff[128];
+		char preamble_buff[LOGURU_PREAMBLE_WIDTH];
 		print_preamble(preamble_buff, sizeof(preamble_buff), verbosity, file, line);
 		auto message = Message{verbosity, file, line, preamble_buff, "", prefix, buff};
 		log_message(stack_trace_skip + 1, message, true, true);
@@ -2493,7 +2650,8 @@ namespace loguru
 				}
 			}
 			auto duration_sec = (now_ns() - _start_time_ns) / 1e9;
-			log(_verbosity, _file, _line, "} %.*f s: %s", SCOPE_TIME_PRECISION, duration_sec, _name);
+			auto buff = textprintf("%.*f s: %s", SCOPE_TIME_PRECISION, duration_sec, _name);
+			log_to_everywhere(1, _verbosity, _file, _line, "} ", buff.c_str());
 		}
 	}
 
@@ -2641,7 +2799,7 @@ namespace loguru
 			}
 			result.str += "------------------------------------------------";
 		}
-		return Text(_strdup(result.str.c_str()));
+		return Text(strdup(result.str.c_str()));
 	}
 
 	EcEntryBase::EcEntryBase(const char* file, unsigned line, const char* descr)
@@ -2664,7 +2822,7 @@ namespace loguru
 		// Add quotes around the string to make it obvious where it begin and ends.
 		// This is great for detecting erroneous leading or trailing spaces in e.g. an identifier.
 		auto str = "\"" + std::string(value) + "\"";
-		return Text{_strdup(str.c_str())};
+		return Text{strdup(str.c_str())};
 	}
 
 	Text ec_to_text(char c)
@@ -2702,14 +2860,14 @@ namespace loguru
 
 		str += "'";
 
-		return Text{_strdup(str.c_str())};
+		return Text{strdup(str.c_str())};
 	}
 
 	#define DEFINE_EC(Type)                        \
 		Text ec_to_text(Type value)                \
 		{                                          \
 			auto str = std::to_string(value);      \
-			return Text{_strdup(str.c_str())};      \
+			return Text{strdup(str.c_str())};      \
 		}
 
 	DEFINE_EC(int)
@@ -2839,7 +2997,7 @@ namespace loguru
 		*/
 
 		flush();
-		char preamble_buff[128];
+		char preamble_buff[LOGURU_PREAMBLE_WIDTH];
 		print_preamble(preamble_buff, sizeof(preamble_buff), Verbosity_FATAL, "", 0);
 		auto message = Message{Verbosity_FATAL, "", 0, preamble_buff, "", "Signal: ", signal_name};
 		try {
