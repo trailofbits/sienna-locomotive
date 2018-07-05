@@ -1,19 +1,17 @@
 #include <random>
-#define NOMINMAX
-#include <Windows.h>
 #include <set>
 #include <map>
 #include <unordered_map>
 #include <string.h>
-#include <strsafe.h>
 #include <stdio.h>
 
+#define NOMINMAX
+#include <Windows.h>
 #include <ShlObj.h>
 #include <PathCch.h>
-#pragma comment(lib, "Pathcch.lib")
 #include <Rpc.h>
-#pragma comment(lib, "Rpcrt4.lib")
 #include <shellapi.h>
+#include <Strsafe.h>
 
 #define LOGURU_IMPLEMENTATION 1
 #include "loguru.hpp"
