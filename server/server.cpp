@@ -505,9 +505,10 @@ DWORD mutate(BYTE *buf, DWORD size) {
             break;
     }
 
+    // TODO(ww): Additional strategies:
     // insert bytes
-        // move bytes
-        // add random bytes to space
+    // move bytes
+    // add random bytes to space
 
     return 0;
 }
