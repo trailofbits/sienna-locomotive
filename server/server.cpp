@@ -515,43 +515,43 @@ DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, WCHAR *filePath, DWORD6
     DWORD dwBytesWritten = 0;
 
     if (!WriteFile(hFile, "FKT\0", 4, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "writeFKT: failed to write FKT header (0x%x)", GetLastError());
         exit(1);
     }
 
     // only one type for right now, files
     if (!WriteFile(hFile, &type, sizeof(DWORD), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "writeFKT: failed to write type (0x%x)", GetLastError());
         exit(1);
     }
 
     if (!WriteFile(hFile, &pathSize, sizeof(DWORD), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "writeFKT: failed to write path size (0x%x)", GetLastError());
         exit(1);
     }
 
     if (!WriteFile(hFile, filePath, pathSize * sizeof(WCHAR), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "writeFKT: failed to write path (0x%x)", GetLastError());
         exit(1);
     }
 
     if (!WriteFile(hFile, &position, sizeof(DWORD64), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "writeFKT: failed to write offset (0x%x)", GetLastError());
         exit(1);
     }
 
     if (!WriteFile(hFile, &size, sizeof(DWORD), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "writeFKT: failed to write buffer size (0x%x)", GetLastError());
         exit(1);
     }
 
     if (!WriteFile(hFile, buf, size, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "writeFKT: failed to write buffer (0x%x)", GetLastError());
         exit(1);
     }
 
     if (!CloseHandle(hFile)) {
-        LOG_F(ERROR, "HandleMutation (0x%x)", GetLastError());
+        LOG_F(ERROR, "writeFKT: failed to close FKT (0x%x)", GetLastError());
         exit(1);
     }
 
