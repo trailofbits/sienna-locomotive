@@ -291,10 +291,15 @@ def main():
     if not os.path.isfile("\\\\.\\pipe\\fuzz_server"):
         subprocess.Popen(["powershell", "start", "powershell",
                           "{-NoExit", "-Command", "\"{}\"}}".format(config['server_path'])])
+    while not os.path.isfile("\\\\.\\pipe\\fuzz_server"):
+        time.sleep(1)
 
+    # If the user selected a single stage, do that instead of running anything else
     if 'stage' in config:
+        # Re-run the wizard stage and dump the output in the target directory
         if config['stage'] == 'WIZARD':
             select_and_dump_wizard_findings(wizard_run(config), os.path.join(get_target_dir(config), 'targets.json'))
+        # Parse the list of targets and select one to fuzz
         if config['stage'] == 'FUZZER':
             targets = get_targets()
             mapping = []
@@ -308,6 +313,7 @@ def main():
             config['client_args'].append('-t')
             config['client_args'].append(os.path.join(target_id, 'targets.json'))
             fuzzer_run(config)
+        # Parse the list of run ID's and select one to triage
         if config['stage'] == 'TRIAGE':
             runs = get_runs()
             mapping = []
