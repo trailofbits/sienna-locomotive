@@ -797,7 +797,7 @@ DWORD serveRunInfo(HANDLE hPipe) {
     WCHAR *runId_s;
 
     if(!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+        LOG_F(ERROR, "serveRunInfo: failed to read run ID (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -812,27 +812,27 @@ DWORD serveRunInfo(HANDLE hPipe) {
     HANDLE hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 
     if(hFile == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+        LOG_F(ERROR, "serveRunInfo: failed to open program.txt: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
     if(!ReadFile(hFile, commandLine, 8191 * sizeof(WCHAR), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+        LOG_F(ERROR, "serveRunInfo: failed to read program name (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!CloseHandle(hFile)) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+        LOG_F(ERROR, "serveRunInfo: failed to close program.txt (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!WriteFile(hPipe, &dwBytesRead, sizeof(DWORD), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+        LOG_F(ERROR, "serveRunInfo: failed to write program name size (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!WriteFile(hPipe, commandLine, dwBytesRead, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+        LOG_F(ERROR, "serveRunInfo: failed to write program name (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -843,27 +843,27 @@ DWORD serveRunInfo(HANDLE hPipe) {
     hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 
     if(hFile == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+        LOG_F(ERROR, "serveRunInfo: failed to open arguments.txt: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
     if(!ReadFile(hFile, commandLine, 8191 * sizeof(WCHAR), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+        LOG_F(ERROR, "serveRunInfo: failed to read command line argument list (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!CloseHandle(hFile)) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+        LOG_F(ERROR, "serveRunInfo: failed to close arguments.txt (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!WriteFile(hPipe, &dwBytesRead, sizeof(DWORD), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+        LOG_F(ERROR, "serveRunInfo: failed to write argument list size (0x%x)", GetLastError());
         exit(1);
     }
 
     if(!WriteFile(hPipe, commandLine, dwBytesRead, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "serveRunInfo (0x%x)", GetLastError());
+        LOG_F(ERROR, "serveRunInfo: faield to write argument list (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -879,7 +879,7 @@ DWORD finalizeRun(HANDLE hPipe) {
     WCHAR *runId_s;
 
     if(!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "FinalizeRun (0x%x)", GetLastError());
+        LOG_F(ERROR, "finalizeRun: failed to read run ID (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -887,16 +887,16 @@ DWORD finalizeRun(HANDLE hPipe) {
 
     BOOL crash = false;
     if(!ReadFile(hPipe, &crash, sizeof(BOOL), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "FinalizeRun (0x%x)", GetLastError());
+        LOG_F(ERROR, "finalizeRun: failed to read crash status (0x%x)", GetLastError());
         exit(1);
     }
 
     // TODO(ww): Add a flag/option that allows us to override removal.
 
-    LOG_F(INFO, "Finalizing run %S", runId_s);
+    LOG_F(INFO, "finalizeRun: finalizing %S", runId_s);
 
     if (!crash) {
-        LOG_F(INFO, "No crash, removing run %S", runId_s);
+        LOG_F(INFO, "finalizeRun: no crash, removing run %S", runId_s);
         EnterCriticalSection(&critId);
 
         WCHAR targetDir[MAX_PATH + 1] = {0};
@@ -917,7 +917,7 @@ DWORD finalizeRun(HANDLE hPipe) {
         LeaveCriticalSection(&critId);
     }
     else {
-        LOG_F(INFO, "Crash found for run %S", runId_s);
+        LOG_F(INFO, "finalizeRun: crash found for run %S", runId_s);
     }
 
     RpcStringFree((RPC_WSTR *)&runId_s);
