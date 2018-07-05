@@ -15,7 +15,7 @@ import struct
 import json
 
 import fuzzer_config
-from state import get_target_dir
+from state import get_target_dir, get_targets
 
 print_lock = threading.Lock()
 can_fuzz = True
@@ -39,7 +39,7 @@ def run_dr(_config, save_stdout=False, save_stderr=False, verbose=False, timeout
         ['--', _config['target_application_path']] + _config['target_args']
 
     if verbose:
-        print_l("Executing drrun: %s" % ' '.join(program_arr))
+        print_l("Executing drrun: %s" % ' '.join((k if " " not in k else "\"{}\"".format(k)) for k in program_arr))
 
     # Run client on target application
     started = time.time()
@@ -138,7 +138,7 @@ def select_and_dump_wizard_findings(wizard_findings, target_file):
             index = int(input("Choose a function to fuzz> "))
         except ValueError:
             pass
-        if index <0 or index>=len(wizard_findings):
+        if index not in range(len(wizard_findings)):
             print_l("Function number is invalid.")
         else:
             done = True
@@ -194,6 +194,7 @@ def wizard_run(_config):
         results['index'] = int(results['index'])
 
     return wizard_findings
+
 
 def fuzzer_run(_config):
     """ Runs the fuzzer """
@@ -285,9 +286,24 @@ def main():
         subprocess.Popen(["powershell", "start", "powershell",
                           "{-NoExit", "-Command", "\"{}\"}}".format(config['server_path'])])
 
+    if 'stage' in config:
+        if config['stage'] == 'WIZARD':
+            select_and_dump_wizard_findings(wizard_run(config), os.path.join(get_target_dir(config), 'targets.json'))
+        if config['stage'] == 'FUZZER':
+            pass
+            # select target
+            # update config with selections from target
+            # fuzzer_run(config)
+        if config['stage'] == 'TRIAGE':
+            pass
+            # select run id
+            # Update triage run with config from run id
+            # triage_run(config, run_id)
+        return
+
     # Run the wizard to select a target function if we don't have one saved
     target_file = os.path.join(get_target_dir(config), 'targets.json')
-    if config['wizard'] or not os.path.exists(target_file):
+    if not os.path.exists(target_file):
         select_and_dump_wizard_findings(wizard_run(config), target_file)
 
     config['client_args'].append('-t')
