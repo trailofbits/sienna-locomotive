@@ -154,7 +154,7 @@ HANDLE getPipe() {
     HANDLE hPipe;
     while (1) {
         hPipe = CreateFile(
-            L"\\\\.\\pipe\\fuzz_server",
+            FUZZ_SERVER_PATH,
             GENERIC_READ | GENERIC_WRITE,
             0,
             NULL,
@@ -175,7 +175,7 @@ HANDLE getPipe() {
             dr_exit_process(1);
         }
 
-        if (!WaitNamedPipe(L"\\\\.\\pipe\\fuzz_server", 5000)) {
+        if (!WaitNamedPipe(FUZZ_SERVER_PATH, 5000)) {
             dr_log(NULL, LOG_ALL, ERROR, "Could not connect, timeout");
             dr_fprintf(STDERR, "Could not connect, timeout\n", err);
             dr_exit_process(1);
