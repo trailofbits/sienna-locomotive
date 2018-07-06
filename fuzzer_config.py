@@ -41,7 +41,6 @@ _config.read(config_path)
 
 # Set up argument parser
 parser = argparse.ArgumentParser(description='Run the DynamoRIO fuzzing harness. You can pass arguments to the command line to override the defaults in config.ini')
-parser.add_argument('-w', '--wizard', action='store_true', dest='wizard', default=False, help="Run the wizard before fuzzing to select a function to fuzz. Ignores saved target selection.")
 parser.add_argument('-v', '--verbose', action='store_true', dest='verbose', default=False, help="Tell drrun to run in verbose mode")
 parser.add_argument('-n', '--nopersist', action='store_true', dest='nopersist', default=False, help="Tell drrun not to use persistent code caches (slower)")
 parser.add_argument('-p', '--profile', action='store', dest='profile', default='DEFAULT', type=str, help="Pull configuration from a specific section in config.ini. Defaults to DEFAULT")
@@ -52,6 +51,7 @@ parser.add_argument('-i', '--triagetimeout', action='store', dest='triage_timeou
 parser.add_argument('-r', '--runs', action='store', dest='runs', type=int, help="Number of times to run the target application")
 parser.add_argument('-s', '--simultaneous', action='store', dest='simultaneous', type=int, help="Number of simultaneous instances of the target application that can run")
 parser.add_argument('-t', '--target', action='store', dest='target_application_path', type=str, help="Path to the target application. Note: Ignores arguments in the config file")
+parser.add_argument('-e', '--stage', action='store', dest='stage', type=str, choices=['WIZARD', 'FUZZER', 'TRIAGE'], help="Synchronously re-run a single stage (for debugging purposes)")
 parser.add_argument('-a', '--arguments', action='store', dest='target_args', nargs=argparse.REMAINDER, type=str, help="Arguments for the target application (supports multiple, must come last)")
 args = parser.parse_args()
 

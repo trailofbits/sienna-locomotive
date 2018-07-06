@@ -67,9 +67,9 @@ If you're not familiar with cmake - the first invocation configures it, the seco
 You might need to use the Visual Studio Developer Command Prompt in order for cmake to be able to see the VS compiler.
 
 ### Configuring
-Open up powershell in the project root and run harness.py for the first time. 
+Open up powershell in the project root and run harness.py for the first time.
 
-`PS C:\proj\sl2\sienna-locomotive> python .\harness.py` 
+`PS C:\proj\sl2\sienna-locomotive> python .\harness.py`
 
 :warning: Python version 3 is required, although on some systems this could be `python.exe` or `python3.exe` .
 
@@ -80,7 +80,7 @@ Using -h on the harness will print out the list of command line options it suppo
 ### Running
 
 #### Via the harness
-`python3 harness.py -w` will run the test application in fuzzing mode. By default, the test application will crash after a few fuzzing attempts, so if it doesn't do so when you need it to, you can pass `-a 0` to the harness (as the last argument) and it will crash every time. Play around with the command flags to see what else you can do.
+`python3 harness.py` will run the test application in fuzzing mode. By default, the test application will crash after a few fuzzing attempts, so if it doesn't do so when you need it to, you can pass `-a 0` to the harness (as the last argument) and it will crash every time. Play around with the command flags to see what else you can do.
 
 #### To run individual components manually
 From the root of the project -

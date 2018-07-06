@@ -16,7 +16,7 @@ import json
 import uuid
 import fuzzer_config
 import binascii
-from state import get_target_dir
+from state import get_target_dir, get_targets, get_runs, stringify_program_array
 
 print_lock = threading.Lock()
 can_fuzz = True
@@ -40,7 +40,7 @@ def run_dr(_config, save_stdout=False, save_stderr=False, verbose=False, timeout
         ['--', _config['target_application_path']] + _config['target_args']
 
     if verbose:
-        print_l("Executing drrun: %s" % ' '.join(program_arr))
+        print_l("Executing drrun: %s" % ' '.join((k if " " not in k else "\"{}\"".format(k)) for k in program_arr))
 
     # Run client on target application
     started = time.time()
@@ -119,6 +119,19 @@ def finalize(run_id, crashed):
     f.close()
 
 
+def select_from_range(max_range, message):
+    index = -1
+    while True:
+        try:
+            index = int(input(message))
+        except ValueError:
+            pass
+        if index not in range(max_range):
+            print_l("Invalid selection.")
+        else:
+            return index
+
+
 def select_and_dump_wizard_findings(wizard_findings, target_file):
     """ Print and select findings, then write to disk """
     print_l("Functions found:")
@@ -131,17 +144,7 @@ def select_and_dump_wizard_findings(wizard_findings, target_file):
         hexdump(buffer)
 
     # Let the user select a finding, add it to the config
-    index = -1
-    done = False
-    while not done:
-        try:
-            index = int(input("Choose a function to fuzz> "))
-        except ValueError:
-            pass
-        if index <0 or index>=len(wizard_findings):
-            print_l("Function number is invalid.")
-        else:
-            done = True
+    index = select_from_range(len(wizard_findings), "Choose a function to fuzz> ")
     wizard_findings[index]['selected'] = True
 
     with open(target_file, 'w') as json_file:
@@ -150,39 +153,28 @@ def select_and_dump_wizard_findings(wizard_findings, target_file):
     return wizard_findings
 
 
-############################################################################
-# chunkify()
-#
-# Breaks bytes into chunks for hexdump
-############################################################################
-
 def chunkify(x, size):
-    d, m = divmod( len(x), 16 )
+    """ Breaks bytes into chunks for hexdump """
+    d, m = divmod(len(x), 16)
     for i in range(d):
         yield x[i*size:(i+1)*size]
     if m:
         yield x[d*size:]
 
-############################################################################
-# hexdump()
-#
-############################################################################
+
 def hexdump(x):
     for addy, d in enumerate(chunkify(x, 16)):
-        print_l( "%08X: %s" % (addy,  binascii.hexlify(d).decode() )  )
+        print_l("%08X: %s" % (addy, binascii.hexlify(d).decode()))
 
 
-############################################################################
-# wizard_json2results()
-#
-# Converts a wizard json object to python object for the harness
-############################################################################
 def wizard_json2results(j):
+    """ Converts a wizard json object to python object for the harness """
     ret = j
 
     ret['index'] = -1
     ret['selected'] = False
     return ret
+
 
 def wizard_run(_config):
     """ Runs the wizard and lets the user select a target function """
@@ -204,17 +196,17 @@ def wizard_run(_config):
     for line in wizard_output.splitlines():
         obj = json.loads(line)
         print(obj)
-        if      "wrapped"   == obj["type"] :
+        if "wrapped" == obj["type"]:
             # TODO do something here later
             pass
-        elif    "in"        == obj["type"] :
+        elif "in" == obj["type"]:
             # TODO do something here later
             pass
-        elif    "id"        == obj["type"] :
+        elif "id" == obj["type"]:
             results = wizard_json2results(obj)
             func_name = results['func_name']
-            wizard_findings_hash[func_name] = results    
-    
+            wizard_findings_hash[func_name] = results
+
     i = 0
     for results in wizard_findings_hash.values():
         results['index'] = i
@@ -222,6 +214,7 @@ def wizard_run(_config):
         wizard_findings.append(results)
 
     return wizard_findings
+
 
 def fuzzer_run(_config):
     """ Runs the fuzzer """
@@ -314,10 +307,45 @@ def main():
     if not os.path.isfile("\\\\.\\pipe\\fuzz_server"):
         subprocess.Popen(["powershell", "start", "powershell",
                           "{-NoExit", "-Command", "\"{}\"}}".format(config['server_path'])])
+    while not os.path.isfile("\\\\.\\pipe\\fuzz_server"):
+        time.sleep(1)
+
+    # If the user selected a single stage, do that instead of running anything else
+    if 'stage' in config:
+        # Re-run the wizard stage and dump the output in the target directory
+        if config['stage'] == 'WIZARD':
+            select_and_dump_wizard_findings(wizard_run(config), os.path.join(get_target_dir(config), 'targets.json'))
+        # Parse the list of targets and select one to fuzz
+        if config['stage'] == 'FUZZER':
+            targets = get_targets()
+            mapping = []
+            for target in targets:
+                print("{}) [{}]  {}".format(len(mapping),
+                                            target[-40:][:8],
+                                            stringify_program_array(targets[target][0], targets[target][1])))
+                mapping.append(target)
+            target_id = mapping[select_from_range(len(mapping), "Select a target to fuzz> ")]
+            config['target_application_path'], config['target_args'] = targets[target_id]
+            config['client_args'].append('-t')
+            config['client_args'].append(os.path.join(target_id, 'targets.json'))
+            fuzzer_run(config)
+        # Parse the list of run ID's and select one to triage
+        if config['stage'] == 'TRIAGE':
+            runs = get_runs()
+            mapping = []
+            for run_id in runs:
+                print("{}) [{}]  {}".format(len(mapping),
+                                            run_id[-36:][:8],
+                                            stringify_program_array(runs[run_id][0], runs[run_id][1])))
+                mapping.append(run_id)
+            run_id = mapping[select_from_range(len(mapping), "Select a run to triage> ")]
+            config['target_application_path'], config['target_args'] = runs[run_id]
+            triage_run(config, run_id)
+        return
 
     # Run the wizard to select a target function if we don't have one saved
     target_file = os.path.join(get_target_dir(config), 'targets.json')
-    if config['wizard'] or not os.path.exists(target_file):
+    if not os.path.exists(target_file):
         select_and_dump_wizard_findings(wizard_run(config), target_file)
 
     config['client_args'].append('-t')
