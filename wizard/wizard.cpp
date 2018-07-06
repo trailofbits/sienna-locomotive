@@ -23,6 +23,7 @@
 using json = nlohmann::json;
 using namespace std;
 
+#include "common/enums.h"
 
 ////////////////////////////////////////////////////////////////////////////
 // logObject()
@@ -77,17 +78,6 @@ event_exit_trace(void)
     drmgr_exit();
 }
 
-// All the functions we can hook
-enum class Function {
-    ReadFile,
-    recv,
-    WinHttpReadData,
-    InternetReadFile,
-    WinHttpWebSocketReceive,
-    RegQueryValueEx,
-    ReadEventLog,
-    fread,
-};
 
 std::map<Function, UINT64> call_counts;
 
@@ -122,6 +112,7 @@ struct read_info {
     Function function;
     TCHAR *source;
     DWORD position;
+    PBYTE caller;
 };
 
 /*
@@ -294,6 +285,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     j["function"]   = "wrap_pre_ReadFile";
     logObject(j);
 
+    dr_mcontext_t* dynamorio_context = drwrap_get_mcontext(wrapcxt);
     HANDLE hFile = drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -305,6 +297,8 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->function = Function::ReadFile;
     ((read_info *)*user_data)->source = NULL;
     ((read_info *)*user_data)->position = NULL;
+    ((read_info *)*user_data)->caller = dynamorio_context->rip;
+    dr_fprintf(STDERR, "\nRIP: 0x%x\n\n", dynamorio_context);
 
     LPWSTR filePath = (LPWSTR)malloc(sizeof(WCHAR) * (MAX_PATH+1));
     DWORD pathSize = GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, FILE_NAME_NORMALIZED);
@@ -411,11 +405,12 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     json j;
     j["type"]               = "id";
     j["callCount"]          = call_counts[info->function];
+    j["caller"]             = (UINT64) info->caller;
     // wizard prefixes functionName with a ,
     j["func_name"]          = functionName+1;
 
     call_counts[info->function]++;
-    
+
     if(info->source != NULL) {
         wstring_convert<std::codecvt_utf8<wchar_t>> utf8Convert;
         wstring wstr =  wstring(info->source);
