@@ -50,19 +50,17 @@ First, clone the repository:
 Next, install the following dependencies
 * [CMake](https://cmake.org/download/)
 * Visual Studio 2017 (Install components for Windows Console dev)
-* DynamoRIO (As of 6/2018, you can just extract the [precompiled 7.0-RC1 binaries](https://github.com/DynamoRIO/dynamorio/releases/tag/release_7_0_0_rc1))
+* DynamoRIO (Automatically installed with make.ps1)
 * Python (3.6+)
 
 #### Build Commands
 
 Then, from the root of the Sienna Locomotive repository:
+In powershell, run make.ps1:
 
-```
-mkdir build
-cd build
-cmake -G"Visual Studio 15 Win64" -DDynamoRIO_DIR=C:\path\to\DynamoRIO\cmake ..
-cmake --build .
-```
+`PS C:\proj\sl2\sienna-locomotive> \.make.ps1` 
+
+This should download and install DynamoRIO in the sienna-locomotive directive if it does not already exist.  It will then compile the project.  
 
 If you're not familiar with cmake - the first invocation configures it, the second compiles the project. To recompile, just run the final command again.
 
