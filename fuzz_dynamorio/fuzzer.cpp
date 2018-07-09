@@ -54,6 +54,7 @@ struct targetFunction {
   bool selected;
   UINT64 index;
   UINT64 mode;
+  UINT64 retAddrOffset;
   std::string functionName;
 };
 
@@ -62,6 +63,7 @@ void from_json(const json& j, targetFunction& t) {
     t.selected = j.at("selected").get<bool>();
     t.index = j.at("callCount").get<int>();
     t.mode = j.at("mode").get<int>();
+    t.retAddrOffset = j.at("retAddrOffset").get<int>();
     t.functionName = j.at("func_name").get<std::string>();
 }
 
@@ -70,6 +72,7 @@ json parsedJson;
 UUID runId;
 BOOL crashed = false;
 
+static DWORD64 baseAddr;
 std::map<Function, UINT64> call_counts;
 
 //TODO: Fix logging
@@ -455,6 +458,7 @@ struct read_info {
     DWORD nNumberOfBytesToRead;
     LPDWORD lpNumberOfBytesRead;
     DWORD64 position;
+    DWORD64 retAddrOffset;
 };
 
 /*
@@ -493,6 +497,7 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
     ((read_info *)*user_data)->lpNumberOfBytesRead = pnBytesRead;
     ((read_info *)*user_data)->position = 0;
+    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 }
 
 
@@ -526,6 +531,7 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
         ((read_info *)*user_data)->nNumberOfBytesToRead = *lpcbData;
         ((read_info *)*user_data)->lpNumberOfBytesRead = lpcbData;
         ((read_info *)*user_data)->position = 0;
+        ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
     } else {
         *user_data = NULL;
     }
@@ -564,6 +570,7 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->nNumberOfBytesToRead = dwBufferLength;
     ((read_info *)*user_data)->lpNumberOfBytesRead = pdwBytesRead;
     ((read_info *)*user_data)->position = 0;
+    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 }
 
 /*
@@ -595,6 +602,7 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
     ((read_info *)*user_data)->lpNumberOfBytesRead = lpNumberOfBytesRead;
     ((read_info *)*user_data)->position = 0;
+    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 }
 
 /*
@@ -626,6 +634,7 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
     ((read_info *)*user_data)->lpNumberOfBytesRead = lpNumberOfBytesRead;
     ((read_info *)*user_data)->position = 0;
+    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 }
 
 
@@ -654,6 +663,7 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->nNumberOfBytesToRead = len;
     ((read_info *)*user_data)->lpNumberOfBytesRead = NULL;
     ((read_info *)*user_data)->position = 0;
+    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 }
 
 /*
@@ -686,6 +696,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
     ((read_info *)*user_data)->lpNumberOfBytesRead = lpNumberOfBytesRead;
     ((read_info *)*user_data)->position = (position << 32) | positionLow;
+    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 }
 
 // TODO fill out this function prototype
@@ -703,6 +714,7 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->nNumberOfBytesToRead = size * count;
     ((read_info *)*user_data)->lpNumberOfBytesRead = NULL;
     ((read_info *)*user_data)->position = NULL;
+    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 }
 
 /* Mutates whatever data the hooked function wrote */
@@ -721,14 +733,19 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     DWORD nNumberOfBytesToRead = info->nNumberOfBytesToRead;
     LPDWORD lpNumberOfBytesRead = info->lpNumberOfBytesRead;
     DWORD64 position = info->position;
+    DWORD64 retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
     free(user_data);
 
-    // Double check that this is the specific function call we're supposed to be targeting
     BOOL targeted = false;
     std::string strFunctionName(get_function_name(function));
     for (targetFunction t: parsedJson){
-      if (t.selected and t.functionName == strFunctionName and call_counts[function] == t.index){
-        targeted = true;
+      if (t.selected and t.functionName == strFunctionName){
+        if (t.mode & MATCH_INDEX and call_counts[function] == t.index){
+          targeted = true;
+        }
+        else if (t.mode & MATCH_CALL_ADDRESS and t.retAddrOffset == retAddrOffset){
+          targeted = true;
+        }
       }
     }
     call_counts[function]++; // increment the call counter
@@ -753,6 +770,10 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     // void(__cdecl *)(void *, OUT void **)
 #define PREPROTO void(__cdecl *)(void *, void **)
 #define POSTPROTO void(__cdecl *)(void *, void *)
+
+    if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))){
+      baseAddr = (DWORD64) mod->start;
+    }
 
     // Build list of pre-function hooks
     std::map<char *, PREPROTO> toHookPre;
