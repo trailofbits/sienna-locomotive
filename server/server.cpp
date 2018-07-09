@@ -318,10 +318,10 @@ VOID strategyRandValues(BYTE *buf, DWORD size) {
 #define VALUES8  -9151314442816848000, -2147483649, 2147483648, 4294967296, 432345564227567365, 18446744073709551615
 
 VOID strategyKnownValues(BYTE *buf, DWORD size) {
-    UINT8 values1[] = { VALUES1 };
-    UINT16 values2[] = { VALUES1, VALUES2 };
-    UINT32 values4[] = { VALUES1, VALUES2, VALUES4 };
-    UINT64 values8[] = { VALUES1, VALUES2, VALUES4, VALUES8 };
+    INT8 values1[] = { VALUES1 };
+    INT16 values2[] = { VALUES1, VALUES2 };
+    INT32 values4[] = { VALUES1, VALUES2, VALUES4 };
+    INT64 values8[] = { VALUES1, VALUES2, VALUES4, VALUES8 };
 
     std::random_device rd;
     srand(rd());
@@ -372,10 +372,10 @@ VOID strategyKnownValues(BYTE *buf, DWORD size) {
 }
 
 VOID strategyAddSubKnownValues(BYTE *buf, DWORD size) {
-    UINT8 values1[] = { VALUES1 };
-    UINT16 values2[] = { VALUES1, VALUES2 };
-    UINT32 values4[] = { VALUES1, VALUES2, VALUES4 };
-    UINT64 values8[] = { VALUES1, VALUES2, VALUES4, VALUES8 };
+    INT8 values1[] = { VALUES1 };
+    INT16 values2[] = { VALUES1, VALUES2 };
+    INT32 values4[] = { VALUES1, VALUES2, VALUES4 };
+    INT64 values8[] = { VALUES1, VALUES2, VALUES4, VALUES8 };
 
     std::random_device rd;
     srand(rd());
