@@ -6,7 +6,6 @@ Imports harness/state.py for utility functions.
 
 import os
 import concurrent.futures
-import re
 import subprocess
 import json
 import traceback
