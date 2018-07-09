@@ -10,6 +10,7 @@ enum class Function {
     RegQueryValueEx,
     ReadEventLog,
     fread,
+    fread_s,
 };
 
 enum {

@@ -33,6 +33,8 @@ enum Event {
     EVT_RUN_INFO,           // 3
     EVT_RUN_COMPLETE,       // 4
     EVT_CRASH_PATH,         // 5
+    // TODO(ww): Allow the user to shut the server down via an event.
+    // EVT_SHUTDOWN,           // 6
 };
 
 #endif

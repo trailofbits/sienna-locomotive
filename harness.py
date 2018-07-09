@@ -1,10 +1,11 @@
 """
-Fuzzing harness for DynamoRIO client. Imports fuzzer_config.py for argument and config file handling.
+Fuzzing harness for DynamoRIO client.
+Imports harness/config.py for argument and config file handling.
+Imports harness/state.py for utility functions.
 """
 
 import os
 import concurrent.futures
-import re
 import subprocess
 import json
 import traceback
@@ -12,16 +13,24 @@ import threading
 import time
 import signal
 import struct
-import json
 import uuid
-import fuzzer_config
 import binascii
-
 from enums import Mode
-from state import get_target_dir, get_targets, get_runs, stringify_program_array
+import atexit
+
+import harness.config
+from harness.state import get_target_dir, get_targets, get_runs, stringify_program_array
 
 print_lock = threading.Lock()
 can_fuzz = True
+
+
+@atexit.register
+def goodbye():
+    print_l("Exit handler called")
+    # We use os._exit instead of sys.exit here to make sure that we totally
+    # kill the harness, even when inside of the non-main thread.
+    os._exit(0)
 
 
 def print_l(*args):
@@ -32,7 +41,7 @@ def print_l(*args):
 
 def get_path_to_run_file(run_id, filename):
     """ Helper function for easily getting the full path to a file in the current run's directory """
-    return os.path.join(fuzzer_config.sl2_dir, 'working', str(run_id), filename)
+    return os.path.join(harness.config.sl2_dir, 'working', str(run_id), filename)
 
 
 def run_dr(_config, save_stdout=False, save_stderr=False, verbose=False, timeout=None):
@@ -112,7 +121,7 @@ def write_output_files(proc, run_id, stage_name):
 def finalize(run_id, crashed):
     """ Manually closes out a fuzzing run. Only necessary if we killed the target binary before DynamoRIO could
     close out the run """
-    f = open("\\\\.\\pipe\\fuzz_server", 'w+b', buffering=0)
+    f = open(harness.config.sl2_server_path, 'w+b', buffering=0)
     f.write(struct.pack('B', 0x4))  # Write the event ID (4)
     f.seek(0)
     f.write(run_id.bytes)  # Write the run ID
@@ -295,13 +304,13 @@ def fuzz_and_triage(_config):
 
 
 def main():
-    config = fuzzer_config.config
+    config = harness.config.config
 
     # Start the server if it's not already running
-    if not os.path.isfile("\\\\.\\pipe\\fuzz_server"):
+    if not os.path.isfile(harness.config.sl2_server_path):
         subprocess.Popen(["powershell", "start", "powershell",
                           "{-NoExit", "-Command", "\"{}\"}}".format(config['server_path'])])
-    while not os.path.isfile("\\\\.\\pipe\\fuzz_server"):
+    while not os.path.isfile(harness.config.sl2_server_path):
         time.sleep(1)
 
     # If the user selected a single stage, do that instead of running anything else

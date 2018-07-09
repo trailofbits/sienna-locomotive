@@ -1,6 +1,7 @@
 #include <random>
 #include <set>
 #include <map>
+#include <cstdlib>
 #include <unordered_map>
 #include <string.h>
 #include <stdio.h>
@@ -19,13 +20,24 @@
 #include "server.hpp"
 
 static CRITICAL_SECTION critId;
-static CRITICAL_SECTION critLog;
 static HANDLE hProcessMutex = INVALID_HANDLE_VALUE;
 
 static HANDLE hLog = INVALID_HANDLE_VALUE;
 
 static WCHAR FUZZ_WORKING_PATH[MAX_PATH] = L"";
 static WCHAR FUZZ_LOG[MAX_PATH] = L"";
+
+// Called on process termination (by atexit).
+static VOID server_cleanup()
+{
+    LOG_F(INFO, "server_cleanup: Called, cleaning things up");
+
+    // NOTE(ww): We could probably check return codes here, but there's
+    // no point -- the process is about to be destroyed anyways.
+    ReleaseMutex(hProcessMutex);
+    CloseHandle(hProcessMutex);
+    DeleteCriticalSection(&critId);
+}
 
 // Initialize the global variable (FUZZ_LOG) containing the path to the logging file.
 // NOTE(ww): We separate this from initWorkingDir so that we can log any errors that
@@ -1044,11 +1056,12 @@ void lockProcess() {
 int main(int mArgc, char **mArgv)
 {
     initLoggingFile();
-
     loguru::init(mArgc, mArgv);
     CHAR logLocalPathA[MAX_PATH]= {0};
     wcstombs(logLocalPathA, FUZZ_LOG, MAX_PATH);
     loguru::add_file(logLocalPathA, loguru::Append, loguru::Verbosity_MAX);
+
+    std::atexit(server_cleanup);
 
     initWorkingDir();
 
@@ -1057,7 +1070,6 @@ int main(int mArgc, char **mArgv)
     lockProcess();
 
     InitializeCriticalSection(&critId);
-    InitializeCriticalSection(&critLog);
 
     while (1) {
         HANDLE hPipe = CreateNamedPipe(
@@ -1104,10 +1116,5 @@ int main(int mArgc, char **mArgv)
         }
     }
 
-    // TODO: stop gracefully?
-    ReleaseMutex(hProcessMutex);
-    CloseHandle(hProcessMutex);
-    DeleteCriticalSection(&critId);
-    DeleteCriticalSection(&critLog);
     return 0;
 }

@@ -10,16 +10,21 @@ import argparse
 import configparser
 
 
+# NOTE(ww): Keep these up-to-data with include/server.hpp!
+sl2_server_path = "\\\\.\\pipe\\fuzz_server"
 sl2_dir = os.path.join(os.getenv('APPDATA'), 'Trail of Bits', 'fuzzkit')
-if not os.path.isdir(sl2_dir):
-    os.makedirs(os.path.join(sl2_dir, 'working'))
-    os.mkdir(os.path.join(sl2_dir, 'log'))
-    os.mkdir(os.path.join(sl2_dir, 'targets'))
+sl2_working_dir = os.path.join(sl2_dir, 'working')
+sl2_log_dir = os.path.join(sl2_dir, 'log')
+sl2_targets_dir = os.path.join(sl2_dir, 'targets')
+sl2_config_path = os.path.join(sl2_dir, 'config.ini')
 
-config_path = os.path.join(sl2_dir, 'config.ini')
+if not os.path.isdir(sl2_dir):
+    os.makedirs(sl2_working_dir)
+    os.mkdir(sl2_log_dir)
+    os.mkdir(sl2_targets_dir)
 
 # Create a default config file if one doesn't exist
-if not os.path.exists(config_path):
+if not os.path.exists(sl2_config_path):
     default_config = configparser.ConfigParser()
     default_config['DEFAULT'] = {'drrun_path': 'dynamorio\\bin64\\drrun.exe',
                                  'drrun_args': '',
@@ -32,12 +37,12 @@ if not os.path.exists(config_path):
                                  'target_args': '0 -f',
                                  'runs': 1,
                                  'simultaneous': 1}
-    with open(config_path, 'w') as configfile:
+    with open(sl2_config_path, 'w') as configfile:
         default_config.write(configfile)
 
 # Read the config file
 _config = configparser.ConfigParser()
-_config.read(config_path)
+_config.read(sl2_config_path)
 
 # Set up argument parser
 parser = argparse.ArgumentParser(description='Run the DynamoRIO fuzzing harness. You can pass arguments to the command line to override the defaults in config.ini')
