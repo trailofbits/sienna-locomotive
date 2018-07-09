@@ -699,6 +699,25 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 }
 
+static void
+wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
+{
+    dr_fprintf(STDERR, "<in wrap_pre_fread_s>\n");
+    void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
+    size_t size = (size_t)drwrap_get_arg(wrapcxt, 2);
+    size_t count = (size_t)drwrap_get_arg(wrapcxt, 3);
+    FILE *file = (FILE *)drwrap_get_arg(wrapcxt, 4);
+
+    *user_data = malloc(sizeof(read_info));
+    ((read_info *)*user_data)->function = Function::fread_s;
+    ((read_info *)*user_data)->hFile = (HANDLE) _get_osfhandle(_fileno(file));
+    // ((read_info *)*user_data)->hFile = NULL;
+    ((read_info *)*user_data)->lpBuffer = buffer;
+    ((read_info *)*user_data)->nNumberOfBytesToRead = size * count;
+    ((read_info *)*user_data)->lpNumberOfBytesRead = NULL;
+    ((read_info *)*user_data)->position = NULL;
+}
+
 // TODO fill out this function prototype
 static void
 wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
@@ -787,6 +806,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPre["WinHttpWebSocketReceive"] = wrap_pre_WinHttpWebSocketReceive;
     toHookPre["WinHttpReadData"] = wrap_pre_WinHttpReadData;
     toHookPre["recv"] = wrap_pre_recv;
+    toHookPre["fread_s"] = wrap_pre_fread_s;
     toHookPre["fread"] = wrap_pre_fread;
 
     // Build list of post-function hooks
@@ -799,6 +819,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPost["WinHttpWebSocketReceive"] = wrap_post_Generic;
     toHookPost["WinHttpReadData"] = wrap_post_Generic;
     toHookPost["recv"] = wrap_post_Generic;
+    toHookPost["fread_s"] = wrap_post_Generic;
     toHookPost["fread"] = wrap_post_Generic;
 
     // Iterate over list of hooks and register them with DynamoRIO
