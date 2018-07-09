@@ -416,8 +416,9 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     j["type"]               = "id";
     j["callCount"]          = call_counts[info->function];
     j["caller"]             = (UINT64) info->caller;
-    // wizard prefixes functionName with a ,
-    j["func_name"]          = functionName+1;
+
+    // TODO(ww): Fix the ,-prefixing that happens on some function names.
+    j["func_name"] = functionName[0] == ',' ? functionName + 1 : functionName;
 
     call_counts[info->function]++;
 
@@ -532,8 +533,8 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
             if (ok) {
                 json j;
                 j["type"]           = "wrapped";
-                // wizard prefixes functionName with a ,
-                j["func_name"]      = functionName+1;
+                // TODO(ww): Fix the ,-prefixing that happens on some function names.
+                j["func_name"] = functionName[0] == ',' ? functionName + 1 : functionName;
                 j["toWrap"]         = (uint64_t)towrap;
                 j["modName"]        = mod_name;
                 logObject(j);
