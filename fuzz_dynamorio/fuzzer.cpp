@@ -73,14 +73,6 @@ void from_json(const json& j, targetFunction& t) {
     t.functionName = j.at("func_name").get<std::string>();
 }
 
-json parsedJson;
-
-UUID runId;
-BOOL crashed = false;
-
-static DWORD64 baseAddr;
-std::map<Function, UINT64> call_counts;
-
 //TODO: Fix logging
 /* Tries to get a new Run ID from the fuzz server */
 UUID getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs) {
