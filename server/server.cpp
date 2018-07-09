@@ -714,7 +714,7 @@ DWORD getBytesFKT(HANDLE hFile, BYTE *buf, DWORD size) {
         exit(1);
     }
 
-    LOG_F(INFO, "Read in %02x %02x %02x %02x %02x %02x %02x %02x\n", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
+    LOG_F(INFO, "getBytesFKT: read in %02x %02x %02x %02x %02x %02x %02x %02x\n", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
 
     return 0;
 }
