@@ -1,5 +1,7 @@
 """
-Fuzzing harness for DynamoRIO client. Imports fuzzer_config.py for argument and config file handling.
+Fuzzing harness for DynamoRIO client.
+Imports fuzzer_config.py for argument and config file handling.
+Imports state.py for utility functions.
 """
 
 import os
@@ -12,16 +14,23 @@ import threading
 import time
 import signal
 import struct
-import json
 import uuid
 import fuzzer_config
 import binascii
-
 from enums import Mode
+import atexit
 from state import get_target_dir, get_targets, get_runs, stringify_program_array
 
 print_lock = threading.Lock()
 can_fuzz = True
+
+
+@atexit.register
+def goodbye():
+    print_l("Exit handler called")
+    # We use os._exit instead of sys.exit here to make sure that we totally
+    # kill the harness, even when inside of the non-main thread.
+    os._exit(0)
 
 
 def print_l(*args):

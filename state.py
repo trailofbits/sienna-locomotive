@@ -3,6 +3,9 @@ import glob
 import re
 from hashlib import sha1
 
+# TODO(ww): Import fuzzer_config here and use the variables in it
+# for some of the state below (sl2_dir, etc).
+
 target_dir = os.path.join(os.getenv('APPDATA'), 'Trail of Bits', 'fuzzkit', 'targets')
 if not os.path.isdir(target_dir):
     os.makedirs(target_dir)
