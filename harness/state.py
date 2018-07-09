@@ -1,21 +1,32 @@
 import os
 import glob
 import re
-import shlex
 from hashlib import sha1
 
 from . import config
 
 
+# TODO(ww): Use shlex or something similar here.
 def stringify_program_array(target_application_path, target_args_array):
     """ Escape paths with spaces in them by surrounding them with quotes """
-    return "{} {}\n".format(shlex.quote(target_application_path)), ' '.join(shlex.quote(arg) for arg in target_args_array)
+    return "{} {}\n".format(target_application_path if " " not in target_application_path
+                                                    else "\"{}\"".format(target_application_path),
+                            ' '.join((k if " " not in k else "\"{}\"".format(k))for k in target_args_array))
 
 
+# TODO: Use shlex or something similar here.
 def unstringify_program_array(stringified):
     """ Turn a stringified program array back into the tokens that went in. Treates quoted entities as atomic,
          splits all others on spaces. """
-    invoke = shlex.split(stringified)
+    invoke = []
+    split = re.split('(\".*?\")', stringified)  # TODO use this for config file parsing
+    for token in split:
+        if len(token) > 0:
+            if "\"" in token:
+                invoke.append(token)
+            else:
+                for inner_token in token.split(' '):
+                    invoke.append(inner_token)
 
     return invoke[0], invoke[1:]
 
