@@ -21,7 +21,7 @@ extern "C" {
 }
 
 #include "server.hpp"
-#include "common/enums.h"
+#include "common/function_lookup.hpp"
 
 #ifdef WINDOWS
 #define IF_WINDOWS_ELSE(x,y) x
@@ -71,30 +71,6 @@ UUID runId;
 BOOL crashed = false;
 
 std::map<Function, UINT64> call_counts;
-
-/* Translates function names into strings */
-char *get_function_name(Function function) {
-    switch(function) {
-        case Function::ReadFile:
-            return "ReadFile";
-        case Function::recv:
-            return "recv";
-        case Function::WinHttpReadData:
-            return "WinHttpReadData";
-        case Function::InternetReadFile:
-            return "InternetReadFile";
-        case Function::WinHttpWebSocketReceive:
-            return "WinHttpWebSocketReceive";
-        case Function::RegQueryValueEx:
-            return "RegQueryValueEx";
-        case Function::ReadEventLog:
-            return "ReadEventLog";
-        case Function::fread:
-            return "fread";
-    }
-
-    return "unknown";
-}
 
 //TODO: Fix logging
 /* Tries to get a new Run ID from the fuzz server */

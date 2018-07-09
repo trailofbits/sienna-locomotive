@@ -6,6 +6,7 @@ endif(NOT DynamoRIO_FOUND)
 
 add_library(wizard SHARED wizard.cpp)
 target_compile_definitions(wizard PRIVATE -DUNICODE)
+target_link_libraries(wizard slcommon)
 
 configure_DynamoRIO_client(wizard)
 
