@@ -23,7 +23,7 @@
 using json = nlohmann::json;
 using namespace std;
 
-#include "common/enums.h"
+#include "common/function_lookup.hpp"
 
 ////////////////////////////////////////////////////////////////////////////
 // logObject()
@@ -45,21 +45,6 @@ void logObject( json obj )
 
     dr_fprintf(STDERR, "\n");
 }
-
-// Use for parsing command line options
-static droption_t<std::string> op_include(
-    DROPTION_SCOPE_CLIENT,
-    "i",
-    "",
-    "include",
-    "Functions to be included in hooking.");
-
-static droption_t<std::string> op_target(
-    DROPTION_SCOPE_CLIENT,
-    "t",
-    "",
-    "target",
-    "Specific call to target.");
 
 /* Run whenever a thread inits/exits */
 static void
@@ -90,33 +75,6 @@ event_exit_trace(void)
 
 
 std::map<Function, UINT64> call_counts;
-
-// Maps functions to strings
-// TODO(ww): Move to common, dedup with fuzzer.cpp#get_function_name
-char *get_function_name(Function function) {
-    switch(function) {
-        case Function::ReadFile:
-            return ",ReadFile";
-        case Function::recv:
-            return ",recv";
-        case Function::WinHttpReadData:
-            return ",WinHttpReadData";
-        case Function::InternetReadFile:
-            return ",InternetReadFile";
-        case Function::WinHttpWebSocketReceive:
-            return ",WinHttpWebSocketReceive";
-        case Function::RegQueryValueEx:
-            return ",RegQueryValueEx";
-        case Function::ReadEventLog:
-            return ",ReadEventLog";
-        case Function::fread:
-            return ",fread";
-        case Function::fread_s:
-            return ",fread_s";
-    }
-
-    return "unknown";
-}
 
 // function metadata structure
 struct read_info {
@@ -415,21 +373,6 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     read_info *info = ((read_info *)user_data);
     CHAR *functionName = get_function_name(info->function);
 
-    BOOL targeted = true;
-    std::string target = op_target.get_value();
-
-    if(target != "") {
-        targeted = false;
-        if(target.find(functionName) != std::string::npos) {
-            char *end;
-            UINT64 num = strtoull(target.c_str(), &end, 10);
-            if(call_counts[info->function] == num) {
-                targeted = true;
-            }
-        }
-    }
-
-
     json j;
     j["type"]               = "id";
     j["callCount"]          = call_counts[info->function];
@@ -454,12 +397,10 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
     free(user_data);
 
-    if(targeted) {
-        vector<unsigned char> x;
-        x.resize(nNumberOfBytesToRead);
-        memcpy( &x[0], lpBuffer, nNumberOfBytesToRead );
-        j["buffer"]  = x;
-    }
+    vector<unsigned char> x;
+    x.resize(nNumberOfBytesToRead);
+    memcpy( &x[0], lpBuffer, nNumberOfBytesToRead );
+    j["buffer"]  = x;
 
     logObject(j);
 }
@@ -503,23 +444,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     std::map<char *, PREPROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
-        std::string include = op_include.get_value();
-
-        std::string target = op_target.get_value();
         std::string strFunctionName(functionName);
-
-        if(strFunctionName == "RegQueryValueExW" || strFunctionName == "RegQueryValueExA") {
-            if(target != "" && target.find(",RegQueryValueEx") == std::string::npos) {
-                continue;
-            }
-        } else if(target != "" && target.find("," + strFunctionName) == std::string::npos) {
-            continue;
-        }
-
-        bool contains = include.find(functionName) == 0 || include.find("," + strFunctionName) != std::string::npos;
-        if(include != "" && !contains) {
-            continue;
-        }
 
         void(__cdecl *hookFunctionPre)(void *, void **);
         hookFunctionPre = it->second;
