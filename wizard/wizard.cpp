@@ -25,12 +25,21 @@ using namespace std;
 
 #include "common/function_lookup.hpp"
 
+#define JSON_VAR (j##__COUNTER__)
+
+#define JSON_WRAP_PRE_LOG() do { \
+    json JSON_VAR; \
+    JSON_VAR["type"] = "in"; \
+    JSON_VAR["function"] = __FUNCTION__; \
+    logObject(JSON_VAR); \
+} while (0)
+
 ////////////////////////////////////////////////////////////////////////////
 // logObject()
 //
 // Takes a json object and prints it to stderr for consumption by the harness
 ////////////////////////////////////////////////////////////////////////////
-void logObject( json obj )
+void logObject(json obj)
 {
     auto str = obj.dump();
 
@@ -95,11 +104,7 @@ Below we have a number of functions that instrument metadata retreival for the i
 
 static void
 wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
-
-    json j;
-    j["type"]       = "in";
-    j["function"]   = "wrap_pre_ReadEventLog";
-    logObject(j);
+    JSON_WRAP_PRE_LOG();
 
     HANDLE hEventLog                 = (HANDLE)drwrap_get_arg(wrapcxt, 0);
     DWORD  dwReadFlags               = (DWORD)drwrap_get_arg(wrapcxt, 1);
@@ -120,11 +125,7 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
-    json j;
-    j["type"]       = "in";
-    j["function"]   = "wrap_pre_RegQueryValueEx";
-    logObject(j);
-
+    JSON_WRAP_PRE_LOG();
 
     HKEY    hKey        = (HKEY)drwrap_get_arg(wrapcxt, 0);
     LPCTSTR lpValueName = (LPCTSTR)drwrap_get_arg(wrapcxt, 1);
@@ -149,16 +150,13 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
-    json j;
-    j["type"]       = "in";
-    j["function"]   = "wrap_pre_WinHttpWebSocketReceive";
-    logObject(j);
+    JSON_WRAP_PRE_LOG();
 
     HINTERNET hRequest                          = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     PVOID pvBuffer                              = drwrap_get_arg(wrapcxt, 1);
     DWORD dwBufferLength                        = (DWORD)drwrap_get_arg(wrapcxt, 2);
     PDWORD pdwBytesRead                         = (PDWORD)drwrap_get_arg(wrapcxt, 3);
-    WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE)drwrap_get_arg(wrapcxt, 3);
+    WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE)(int)drwrap_get_arg(wrapcxt, 3);
 
     // get url
     // InternetQueryOption
@@ -173,10 +171,7 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
-    json j;
-    j["type"]       = "in";
-    j["function"]   = "wrap_pre_InternetReadFile";
-    logObject(j);
+    JSON_WRAP_PRE_LOG();
 
     HINTERNET hFile             = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer             = drwrap_get_arg(wrapcxt, 1);
@@ -196,10 +191,7 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
-    json j;
-    j["type"]       = "in";
-    j["function"]   = "wrap_pre_WinHttpReadData";
-    logObject(j);
+    JSON_WRAP_PRE_LOG();
 
     HINTERNET hRequest          = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer             = drwrap_get_arg(wrapcxt, 1);
@@ -219,10 +211,7 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
-    json j;
-    j["type"]       = "in";
-    j["function"]   = "wrap_pre_recv";
-    logObject(j);
+    JSON_WRAP_PRE_LOG();
 
     SOCKET s  = (SOCKET)drwrap_get_arg(wrapcxt, 0);
     char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
@@ -251,10 +240,7 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
-    json j;
-    j["type"]       = "in";
-    j["function"]   = "wrap_pre_ReadFile";
-    logObject(j);
+    JSON_WRAP_PRE_LOG();
 
     dr_mcontext_t* dynamorio_context = drwrap_get_mcontext(wrapcxt);
     HANDLE hFile                     = drwrap_get_arg(wrapcxt, 0);
@@ -280,10 +266,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
-    json j;
-    j["type"]       = "in";
-    j["function"]   = "wrap_pre_fread";
-    logObject(j);
+    JSON_WRAP_PRE_LOG();
 
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 1);
@@ -299,10 +282,7 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
 
 static void
 wrap_pre_fread_s(void *wrapcxt, OUT void **user_data) {
-    json j;
-    j["type"]       = "in";
-    j["function"]   = "wrap_pre_fread_s";
-    logObject(j);
+    JSON_WRAP_PRE_LOG();
 
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 2);
