@@ -1,7 +1,7 @@
 """
 Fuzzing harness for DynamoRIO client.
-Imports fuzzer_config.py for argument and config file handling.
-Imports state.py for utility functions.
+Imports harness/config.py for argument and config file handling.
+Imports harness/state.py for utility functions.
 """
 
 import os
@@ -15,11 +15,12 @@ import time
 import signal
 import struct
 import uuid
-import fuzzer_config
 import binascii
 from enums import Mode
 import atexit
-from state import get_target_dir, get_targets, get_runs, stringify_program_array
+
+import harness.config
+from harness.state import get_target_dir, get_targets, get_runs, stringify_program_array
 
 print_lock = threading.Lock()
 can_fuzz = True
@@ -41,7 +42,7 @@ def print_l(*args):
 
 def get_path_to_run_file(run_id, filename):
     """ Helper function for easily getting the full path to a file in the current run's directory """
-    return os.path.join(fuzzer_config.sl2_dir, 'working', str(run_id), filename)
+    return os.path.join(harness.config.sl2_dir, 'working', str(run_id), filename)
 
 
 def run_dr(_config, save_stdout=False, save_stderr=False, verbose=False, timeout=None):
@@ -304,7 +305,7 @@ def fuzz_and_triage(_config):
 
 
 def main():
-    config = fuzzer_config.config
+    config = harness.config.config
 
     # Start the server if it's not already running
     if not os.path.isfile("\\\\.\\pipe\\fuzz_server"):
