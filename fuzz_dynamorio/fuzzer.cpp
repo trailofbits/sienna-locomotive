@@ -153,7 +153,7 @@ HANDLE getPipe() {
         }
 
         if (!WaitNamedPipe(FUZZ_SERVER_PATH, 5000)) {
-            dr_log(NULL, LOG_ALL, ERROR, "Could not connect, timeout");
+            dr_log(NULL, DR_LOG_ALL, ERROR, "Could not connect, timeout");
             dr_fprintf(STDERR, "Could not connect, timeout\n", err);
             dr_exit_process(1);
         }
