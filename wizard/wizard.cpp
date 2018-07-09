@@ -121,6 +121,7 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->function             = Function::ReadEventLog;
     ((read_info *)*user_data)->source               = NULL;
     ((read_info *)*user_data)->position             = NULL;
+    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 }
 
 
@@ -144,6 +145,7 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
         ((read_info *)*user_data)->function             = Function::RegQueryValueEx;
         ((read_info *)*user_data)->source               = NULL;
         ((read_info *)*user_data)->position             = NULL;
+        ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
     } else {
         *user_data = NULL;
     }
@@ -168,6 +170,7 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->function             = Function::WinHttpWebSocketReceive;
     ((read_info *)*user_data)->source               = NULL;
     ((read_info *)*user_data)->position             = NULL;
+    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 }
 
 static void
@@ -188,6 +191,7 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->function             = Function::InternetReadFile;
     ((read_info *)*user_data)->source               = NULL;
     ((read_info *)*user_data)->position             = NULL;
+    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 }
 
 static void
@@ -208,6 +212,7 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->function             = Function::WinHttpReadData;
     ((read_info *)*user_data)->source               = NULL;
     ((read_info *)*user_data)->position             = NULL;
+    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 }
 
 static void
@@ -228,6 +233,7 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->function             = Function::recv;
     ((read_info *)*user_data)->source               = NULL;
     ((read_info *)*user_data)->position             = NULL;
+    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
     // get peer name doesn't work
     // https://github.com/DynamoRIO/dynamorio/issues/1883
@@ -276,6 +282,7 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->function             = Function::fread;
     ((read_info *)*user_data)->source               = NULL;
     ((read_info *)*user_data)->position             = NULL;
+    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 }
 
 static void
@@ -292,6 +299,7 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->function             = Function::fread_s;
     ((read_info *)*user_data)->source               = NULL;
     ((read_info *)*user_data)->position             = NULL;
+    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 }
 
 /* prints information about the function call to stderr so the harness can ingest it */
