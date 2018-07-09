@@ -78,6 +78,7 @@ event_exit_trace(void)
     drmgr_exit();
 }
 
+static DWORD64 baseAddr;
 
 std::map<Function, UINT64> call_counts;
 
@@ -112,7 +113,7 @@ struct read_info {
     Function function;
     TCHAR *source;
     DWORD position;
-    PBYTE caller;
+    DWORD64 retAddrOffset;
 };
 
 /*
@@ -285,7 +286,6 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     j["function"]   = "wrap_pre_ReadFile";
     logObject(j);
 
-    dr_mcontext_t* dynamorio_context = drwrap_get_mcontext(wrapcxt);
     HANDLE hFile = drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -297,8 +297,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->function = Function::ReadFile;
     ((read_info *)*user_data)->source = NULL;
     ((read_info *)*user_data)->position = NULL;
-    ((read_info *)*user_data)->caller = dynamorio_context->rip;
-    dr_fprintf(STDERR, "\nRIP: 0x%x\n\n", dynamorio_context);
+    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
     LPWSTR filePath = (LPWSTR)malloc(sizeof(WCHAR) * (MAX_PATH+1));
     DWORD pathSize = GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, FILE_NAME_NORMALIZED);
@@ -386,9 +385,6 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     BOOL targeted = true;
     std::string target = op_target.get_value();
 
-    dr_printf("target: %s\n", target.c_str());
-    dr_printf("function: %s\n", functionName);
-
     if(target != "") {
         targeted = false;
         if(target.find(functionName) != std::string::npos) {
@@ -405,7 +401,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     json j;
     j["type"]               = "id";
     j["callCount"]          = call_counts[info->function];
-    j["caller"]             = (UINT64) info->caller;
+    j["retAddrOffset"]             = (UINT64) info->retAddrOffset;
     // wizard prefixes functionName with a ,
     j["func_name"]          = functionName+1;
 
@@ -423,7 +419,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
 
     }
 
-    LPVOID lpBuffer = info->lpBuffer;
+    LPVOID lpBuffer = info->lpBuffer; // TODO cast to char * so we don't need to memcpy this
     DWORD nNumberOfBytesToRead = info->nNumberOfBytesToRead;
     free(user_data);
 
@@ -448,6 +444,10 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
         kernelbase is forwarded to kernel32, so if we want to filter
             to only one hook make sure we hook kernel32.
     */
+
+    if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))){
+      baseAddr = (DWORD64) mod->start;
+    }
 
     std::map<char *, PREPROTO> toHookPre;
     toHookPre["ReadEventLog"] = wrap_pre_ReadEventLog;
