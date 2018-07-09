@@ -92,6 +92,7 @@ event_exit_trace(void)
 std::map<Function, UINT64> call_counts;
 
 // Maps functions to strings
+// TODO(ww): Move to common, dedup with fuzzer.cpp#get_function_name
 char *get_function_name(Function function) {
     switch(function) {
         case Function::ReadFile:
@@ -110,6 +111,8 @@ char *get_function_name(Function function) {
             return ",ReadEventLog";
         case Function::fread:
             return ",fread";
+        case Function::fread_s:
+            return ",fread_s";
     }
 
     return "unknown";
@@ -118,7 +121,7 @@ char *get_function_name(Function function) {
 // function metadata structure
 struct read_info {
     LPVOID lpBuffer;
-    DWORD nNumberOfBytesToRead;
+    size_t nNumberOfBytesToRead;
     Function function;
     TCHAR *source;
     DWORD position;
@@ -335,6 +338,25 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->position = NULL;
 }
 
+static void
+wrap_pre_fread_s(void *wrapcxt, OUT void **user_data) {
+    json j;
+    j["type"]       = "in";
+    j["function"]   = "wrap_pre_fread_s";
+    logObject(j);
+
+    void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
+    size_t size = (size_t)drwrap_get_arg(wrapcxt, 2);
+    size_t count = (size_t)drwrap_get_arg(wrapcxt, 3);
+
+    *user_data = malloc(sizeof(read_info));
+    ((read_info *)*user_data)->lpBuffer = buffer;
+    ((read_info *)*user_data)->nNumberOfBytesToRead = size * count;
+    ((read_info *)*user_data)->function = Function::fread_s;
+    ((read_info *)*user_data)->source = NULL;
+    ((read_info *)*user_data)->position = NULL;
+}
+
 /* helper function for dumping memory contents to stderr */
 // static void
 // hex_dump(LPVOID lpBuffer, DWORD nNumberOfBytesToRead) {
@@ -396,13 +418,9 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     BOOL targeted = true;
     std::string target = op_target.get_value();
 
-    dr_printf("target: %s\n", target.c_str());
-    dr_printf("function: %s\n", functionName);
-
     if(target != "") {
         targeted = false;
         if(target.find(functionName) != std::string::npos) {
-            dr_printf("targeted: %s\n", functionName);
             char *end;
             UINT64 num = strtoull(target.c_str(), &end, 10);
             if(call_counts[info->function] == num) {
@@ -427,15 +445,13 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
         wstring wstr =  wstring(info->source);
         j["source"] = utf8Convert.to_bytes(wstr);
         free(info->source);
-        DWORD end = info->position + info->nNumberOfBytesToRead;
+        size_t end = info->position + info->nNumberOfBytesToRead;
         j["start"]  = info->position;
         j["end"]    = end;
-
-
     }
 
     LPVOID lpBuffer = info->lpBuffer;
-    DWORD nNumberOfBytesToRead = info->nNumberOfBytesToRead;
+    size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
     free(user_data);
 
     if(targeted) {
@@ -469,7 +485,8 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPre["WinHttpReadData"] = wrap_pre_WinHttpReadData;
     toHookPre["recv"] = wrap_pre_recv;
     toHookPre["ReadFile"] = wrap_pre_ReadFile;
-    toHookPre["fread_s"] = wrap_pre_fread;
+    toHookPre["fread_s"] = wrap_pre_fread_s;
+    toHookPre["fread"] = wrap_pre_fread;
 
     std::map<char *, POSTPROTO> toHookPost;
     toHookPost["ReadFile"] = wrap_post_Generic;
@@ -481,6 +498,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPost["WinHttpReadData"] = wrap_post_Generic;
     toHookPost["recv"] = wrap_post_Generic;
     toHookPost["fread_s"] = wrap_post_Generic;
+    toHookPost["fread"] = wrap_post_Generic;
 
     std::map<char *, PREPROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
