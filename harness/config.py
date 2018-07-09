@@ -10,6 +10,8 @@ import argparse
 import configparser
 
 
+# NOTE(ww): Keep these up-to-data with include/server.hpp!
+sl2_server_path = "\\\\.\\pipe\\fuzz_server"
 sl2_dir = os.path.join(os.getenv('APPDATA'), 'Trail of Bits', 'fuzzkit')
 sl2_working_dir = os.path.join(sl2_dir, 'working')
 sl2_log_dir = os.path.join(sl2_dir, 'log')

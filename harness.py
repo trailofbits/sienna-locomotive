@@ -121,7 +121,7 @@ def write_output_files(proc, run_id, stage_name):
 def finalize(run_id, crashed):
     """ Manually closes out a fuzzing run. Only necessary if we killed the target binary before DynamoRIO could
     close out the run """
-    f = open("\\\\.\\pipe\\fuzz_server", 'w+b', buffering=0)
+    f = open(harness.config.sl2_server_path, 'w+b', buffering=0)
     f.write(struct.pack('B', 0x4))  # Write the event ID (4)
     f.seek(0)
     f.write(run_id.bytes)  # Write the run ID
@@ -307,10 +307,10 @@ def main():
     config = harness.config.config
 
     # Start the server if it's not already running
-    if not os.path.isfile("\\\\.\\pipe\\fuzz_server"):
+    if not os.path.isfile(harness.config.sl2_server_path):
         subprocess.Popen(["powershell", "start", "powershell",
                           "{-NoExit", "-Command", "\"{}\"}}".format(config['server_path'])])
-    while not os.path.isfile("\\\\.\\pipe\\fuzz_server"):
+    while not os.path.isfile(harness.config.sl2_server_path):
         time.sleep(1)
 
     # If the user selected a single stage, do that instead of running anything else
