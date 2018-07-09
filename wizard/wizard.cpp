@@ -33,7 +33,17 @@ using namespace std;
 void logObject( json obj )
 {
     auto str = obj.dump();
-    dr_fprintf( STDERR, "%s\n", str.c_str() );
+
+    // TODO(ww): Replace this with a separate channel for JSON.
+    // NOTE(ww): This loop is here because dr_fprintf has an internal buffer
+    // of 2048, and our JSON objects frequently exceed that. When that happens,
+    // dr_fprintf silently truncates them and confuses the harness with invalid JSON.
+    // We circumvent this by chunking the output.
+    for (int i = 0; i < str.length(); i += 1024) {
+        dr_fprintf(STDERR, "%s", str.substr(i, 1024).c_str());
+    }
+
+    dr_fprintf(STDERR, "\n");
 }
 
 // Use for parsing command line options
