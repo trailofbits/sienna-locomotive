@@ -325,13 +325,11 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
         j["end"]     = end;
     }
 
-    LPVOID lpBuffer = info->lpBuffer; // TODO cast to char * so we don't need to memcpy this
+    char * lpBuffer = (char *) info->lpBuffer;
     DWORD nNumberOfBytesToRead = info->nNumberOfBytesToRead;
     free(user_data);
 
-    vector<unsigned char> x;
-    x.resize(nNumberOfBytesToRead);
-    memcpy(&x[0], lpBuffer, nNumberOfBytesToRead);
+    vector<unsigned char> x(lpBuffer, lpBuffer + nNumberOfBytesToRead);
     j["buffer"] = x;
 
     logObject(j);
