@@ -31,6 +31,7 @@ extern "C" {
 }
 
 #include "server.hpp"
+#include "common/enums.h"
 
 void *mutatex;
 bool replay;
@@ -60,12 +61,14 @@ static droption_t<std::string> op_target(
 struct targetFunction {
   bool selected;
   UINT64 index;
+  UINT64 mode;
   std::string functionName;
 };
 
 void from_json(const json& j, targetFunction& t) {
     t.selected = j.at("selected").get<bool>();
-    t.index = j.at("index").get<int>();
+    t.index = j.at("callCount").get<int>();
+    t.mode = j.at("mode").get<int>();
     t.functionName = j.at("func_name").get<std::string>();
 }
 
@@ -86,17 +89,6 @@ static droption_t<std::string> op_replay(
     "",
     "replay",
     "The run id for a crash to replay.");
-
-enum class Function {
-    ReadFile,
-    recv,
-    WinHttpReadData,
-    InternetReadFile,
-    WinHttpWebSocketReceive,
-    RegQueryValueEx,
-    ReadEventLog,
-    fread,
-};
 
 std::map<Function, UINT64> call_counts;
 

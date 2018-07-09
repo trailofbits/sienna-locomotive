@@ -21,6 +21,7 @@ extern "C" {
 }
 
 #include "server.hpp"
+#include "common/enums.h"
 
 #ifdef WINDOWS
 #define IF_WINDOWS_ELSE(x,y) x
@@ -52,28 +53,19 @@ static droption_t<std::string> op_target(
 struct targetFunction {
   bool selected;
   UINT64 index;
+  UINT64 mode;
   std::string functionName;
 };
 
+// TODO throw error messages if this doesn't work
 void from_json(const json& j, targetFunction& t) {
     t.selected = j.at("selected").get<bool>();
-    t.index = j.at("index").get<int>();
+    t.index = j.at("callCount").get<int>();
+    t.mode = j.at("mode").get<int>();
     t.functionName = j.at("func_name").get<std::string>();
 }
 
 json parsedJson;
-
-// All the functions we support
-enum class Function {
-    ReadFile,
-    recv,
-    WinHttpReadData,
-    InternetReadFile,
-    WinHttpWebSocketReceive,
-    RegQueryValueEx,
-    ReadEventLog,
-    fread,
-};
 
 UUID runId;
 BOOL crashed = false;

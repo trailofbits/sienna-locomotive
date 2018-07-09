@@ -16,6 +16,8 @@ import json
 import uuid
 import fuzzer_config
 import binascii
+
+from enums import Mode
 from state import get_target_dir, get_targets, get_runs, stringify_program_array
 
 print_lock = threading.Lock()
@@ -171,7 +173,7 @@ def wizard_json2results(j):
     """ Converts a wizard json object to python object for the harness """
     ret = j
 
-    ret['index'] = -1
+    ret['mode'] = Mode.MATCH_INDEX
     ret['selected'] = False
     return ret
 
@@ -189,29 +191,21 @@ def wizard_run(_config):
                                verbose=_config['verbose'])
     wizard_output = completed_process.stderr.decode('utf-8')
     wizard_findings = []
-    # hash table to keep track of unique function names
-    wizard_findings_hash = {}
-    sections = re.split(r"--------\n", wizard_output)
 
     for line in wizard_output.splitlines():
-        obj = json.loads(line)
-        print(obj)
-        if "wrapped" == obj["type"]:
-            # TODO do something here later
+        try:
+            obj = json.loads(line)
+            print(obj)
+            if "wrapped" == obj["type"]:
+                # TODO do something here later
+                pass
+            elif "in" == obj["type"]:
+                # TODO do something here later
+                pass
+            elif "id" == obj["type"]:
+                wizard_findings.append(wizard_json2results(obj))
+        except Exception:
             pass
-        elif "in" == obj["type"]:
-            # TODO do something here later
-            pass
-        elif "id" == obj["type"]:
-            results = wizard_json2results(obj)
-            func_name = results['func_name']
-            wizard_findings_hash[func_name] = results
-
-    i = 0
-    for results in wizard_findings_hash.values():
-        results['index'] = i
-        i += 1
-        wizard_findings.append(results)
 
     return wizard_findings
 
@@ -340,7 +334,9 @@ def main():
                 mapping.append(run_id)
             run_id = mapping[select_from_range(len(mapping), "Select a run to triage> ")]
             config['target_application_path'], config['target_args'] = runs[run_id]
-            triage_run(config, run_id)
+            config['client_args'].append('-t')
+            config['client_args'].append(os.path.join(get_target_dir(config), 'targets.json'))  # TODO make this less hacky
+            triage_run(config, run_id[-36:])
         return
 
     # Run the wizard to select a target function if we don't have one saved
