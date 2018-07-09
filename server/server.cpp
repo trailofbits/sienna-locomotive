@@ -906,11 +906,15 @@ DWORD finalizeRun(HANDLE hPipe) {
         exit(1);
     }
 
-    // TODO(ww): Add a flag/option that allows us to override removal.
+    BOOL remove = true;
+    if (!ReadFile(hPipe, &remove, sizeof(BOOL), &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "finalizeRun: failed to read remove flag (0x%x)", GetLastError());
+        exit(1);
+    }
 
     LOG_F(INFO, "finalizeRun: finalizing %S", runId_s);
 
-    if (!crash) {
+    if (!crash && remove) {
         LOG_F(INFO, "finalizeRun: no crash, removing run %S", runId_s);
         EnterCriticalSection(&critId);
 
@@ -930,6 +934,9 @@ DWORD finalizeRun(HANDLE hPipe) {
 
         SHFileOperation(&remove_op);
         LeaveCriticalSection(&critId);
+    }
+    else if (!crash && !remove) {
+        LOG_F(INFO, "finalizeRun: no crash, but not removing files (requested)");
     }
     else {
         LOG_F(INFO, "finalizeRun: crash found for run %S", runId_s);
