@@ -256,8 +256,6 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->position             = NULL;
     ((read_info *)*user_data)->caller               = dynamorio_context->rip;
 
-    dr_fprintf(STDERR, "\nRIP: 0x%x\n\n", dynamorio_context);
-
     LPWSTR filePath                     = (LPWSTR)malloc(sizeof(WCHAR) * (MAX_PATH+1));
     DWORD pathSize                      = GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, FILE_NAME_NORMALIZED);
     ((read_info *)*user_data)->source   = filePath;
