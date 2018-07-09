@@ -164,9 +164,10 @@ HANDLE getPipe() {
 DWORD finalize(HANDLE hPipe, UUID runId, BOOL crashed) {
     WCHAR runId_s[SL2_UUID_SIZE];
     sl2_uuid_to_wstring(runId, runId_s);
+
     if (crashed) {
         dr_fprintf(STDERR, "<crash found for run id %S>\n", runId_s);
-        dr_log(NULL, LOG_ALL, ERROR, "Crash found for run id %S!", runId_s);
+        dr_log(NULL, LOG_ALL, ERROR, "fuzzer#finalize: Crash found for run id %S!", runId_s);
     }
 
     DWORD bytesWritten;
@@ -174,17 +175,26 @@ DWORD finalize(HANDLE hPipe, UUID runId, BOOL crashed) {
 
     // write the event ID (4 for finalize)
     if (!WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL)) {
-        dr_log(NULL, LOG_ALL, ERROR, "Error finalizing (%x)", GetLastError());
+        dr_log(NULL, LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write event ID (0x%x)", GetLastError());
         dr_exit_process(1);
     }
     // Write the run ID
     if (!WriteFile(hPipe, &runId, sizeof(UUID), &bytesWritten, NULL)) {
-        dr_log(NULL, LOG_ALL, ERROR, "Error finalizing (%x)", GetLastError());
+        dr_log(NULL, LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write run ID (0x%x)", GetLastError());
         dr_exit_process(1);
     }
-     // write whether the run found a crash
+
+    // write whether the run found a crash
     if (!WriteFile(hPipe, &crashed, sizeof(BOOL), &bytesWritten, NULL)) {
-        dr_log(NULL, LOG_ALL, ERROR, "Error finalizing (%x)", GetLastError());
+        dr_log(NULL, LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write crash status (%x)", GetLastError());
+        dr_exit_process(1);
+    }
+
+    // Write whether to preserve the files, even without a crash.
+    // For now we don't, but this can be flipped to help with debugging.
+    BOOL remove = 1;
+    if (!WriteFile(hPipe, &remove, sizeof(BOOL), &bytesWritten, NULL)) {
+        dr_log(NULL, LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write remove code (%x)", GetLastError());
         dr_exit_process(1);
     }
 
@@ -202,7 +212,7 @@ get_target_command_line() {
 
     // Read process parameter block from PEB
     if (!dr_safe_read(clientPEB->ProcessParameters, sizeof(_RTL_USER_PROCESS_PARAMETERS), &parameterBlock, &byte_counter)) {
-        dr_log(NULL, LOG_ALL, ERROR, "Could not read process parameter block");
+        dr_log(NULL, LOG_ALL, ERROR, "fuzzer#get_target_command_line: Could not read process parameter block");
         dr_exit_process(1);
     }
 
@@ -211,7 +221,7 @@ get_target_command_line() {
 
     // Read the command line from the parameter block
     if (!dr_safe_read(parameterBlock.CommandLine.Buffer, parameterBlock.CommandLine.Length, commandLineContents, &byte_counter)) {
-        dr_log(NULL, LOG_ALL, ERROR, "Could not read command line buffer");
+        dr_log(NULL, LOG_ALL, ERROR, "fuzzer#get_target_command_line: Could not read command line buffer");
         dr_exit_process(1);
     }
 
@@ -221,7 +231,7 @@ get_target_command_line() {
 /* Maps exception code to an exit status. Print it out, then exit. */
 static bool
 onexception(void *drcontext, dr_exception_t *excpt) {
-    dr_log(NULL, LOG_ALL, ERROR, "Exception occurred!\n");
+    dr_log(NULL, LOG_ALL, ERROR, "fuzzer#onexception: Exception occurred!\n");
 
     crashed = true;
     DWORD exceptionCode = excpt->record->ExceptionCode;
@@ -303,7 +313,7 @@ event_exit(void) {
     CloseHandle(hPipe); // Close out connection to server
 
     // Clean up DynamoRIO
-    dr_log(NULL, LOG_ALL, ERROR, "Dynamorio Exiting\n");
+    dr_log(NULL, LOG_ALL, ERROR, "fuzzer#event_exit: Dynamorio Exiting\n");
     drwrap_exit();
     drmgr_exit();
 }
@@ -312,30 +322,24 @@ event_exit(void) {
 static DWORD mutateCount = 0;
 static BOOL
 mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
-    WCHAR filePath[MAX_PATH+1];
+    WCHAR filePath[MAX_PATH + 1] = {0};
     WCHAR *new_buf = (WCHAR *)buf;
     DWORD pathSize = 0;
 
     // Check that ReadFile calls are to something actually valid
     if(function == Function::ReadFile) {
         if (hFile == INVALID_HANDLE_VALUE) {
-            dr_log(NULL, LOG_ALL, ERROR, "The file we're trying to read from doesn't appear to be valid\n");
+            dr_log(NULL, LOG_ALL, ERROR, "fuzzer#mutate: Invalid source for mutation?\n");
             return false;
         }
 
         pathSize = GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, 0);
 
         if (pathSize > MAX_PATH || pathSize == 0) {
-            dr_fprintf(STDERR, "pathSize out of bounds\n");
-            dr_log(NULL, LOG_ALL, ERROR, "Pathsize %d is out of bounds\n", pathSize);
+            dr_log(NULL, LOG_ALL, ERROR, "fuzzer#mutate: Pathsize %d is out of bounds\n", pathSize);
             return false;
         }
-
-        dr_fprintf(STDERR, "FILE PATH: %s\n", filePath);
     }
-
-    // initialize output variables
-    filePath[pathSize] = 0;
 
     HANDLE hPipe = getPipe();
 

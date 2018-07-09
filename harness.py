@@ -126,7 +126,10 @@ def finalize(run_id, crashed):
     f.seek(0)
     f.write(run_id.bytes)  # Write the run ID
     f.seek(0)
-    f.write(struct.pack('?', 1 if crashed else 0))  # Write a bool indicating a crash
+    # Write a bool indicating a crash
+    f.write(struct.pack('?', 1 if crashed else 0))
+    # Write a bool indicating whether to preserve run files (without a crash)
+    f.write(struct.pack('?', 1 if True else 0))
     f.close()
 
 
