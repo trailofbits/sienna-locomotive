@@ -336,7 +336,9 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
     DWORD pathSize = 0;
 
     // Check that ReadFile calls are to something actually valid
-    if(function == Function::ReadFile || function == Function::fread) {
+    if(function == Function::ReadFile ||
+        function == Function::fread ||
+        function == Function::fread_s) {
         if (hFile == INVALID_HANDLE_VALUE) {
             dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#mutate: Invalid source for mutation?\n");
             return false;
