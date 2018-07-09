@@ -22,20 +22,20 @@ Function InstallDependencies {
 Function DynamioRioInstall {
 
     $dynamorioDir = "dynamorio"
-    $dynamorioBase = "DynamoRIO-Windows-7.0.0-RC1"
+    $dynamorioBase = "DynamoRIO-Windows-7.0.17721-0"
 
     If ( Test-Path $dynamorioDir ) {
         $dynamorioDir + " already exists "
         return
-    } 
+    }
 
-    $url="https://github.com/DynamoRIO/dynamorio/releases/download/release_7_0_0_rc1/${dynamorioBase}.zip"
+    $url="https://github.com/DynamoRIO/dynamorio/releases/download/cronbuild-7.0.17721/${dynamorioBase}.zip"
     [Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]'Tls,Tls11,Tls12'
     $client = New-Object System.Net.WebClient
 
     $zip = $cwd + "\dr.zip"
-    "Downloading " + $url 
+    "Downloading " + $url
     $client.DownloadFile($url, $zip)
     "Unzipping " + $zip
     Unzip $zip $cwd
