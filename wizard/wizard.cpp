@@ -25,6 +25,7 @@ using json = nlohmann::json;
 using namespace std;
 
 #include "common/function_lookup.hpp"
+#include "common/hook_protos.h"
 
 #define JSON_VAR (j##__COUNTER__)
 
@@ -361,9 +362,6 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
 /* Runs every time we load a new module. Wraps functions we can target. See fuzzer.cpp for a more-detailed version */
 static void
 module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
-#define PREPROTO void(__cdecl *)(void *, void **)
-#define POSTPROTO void(__cdecl *)(void *, void *)
-
     /*
         ReadFile is hooked twice, in kernel32 and kernelbase.
         kernelbase is forwarded to kernel32, so if we want to filter
@@ -374,7 +372,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
       baseAddr = (DWORD64) mod->start;
     }
 
-    std::map<char *, PREPROTO> toHookPre;
+    std::map<char *, SL2_PRE_PROTO> toHookPre;
     toHookPre["ReadEventLog"]            = wrap_pre_ReadEventLog;
     toHookPre["RegQueryValueExW"]        = wrap_pre_RegQueryValueEx;
     toHookPre["RegQueryValueExA"]        = wrap_pre_RegQueryValueEx;
@@ -386,7 +384,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPre["fread_s"]                 = wrap_pre_fread_s;
     toHookPre["fread"]                   = wrap_pre_fread;
 
-    std::map<char *, POSTPROTO> toHookPost;
+    std::map<char *, SL2_POST_PROTO> toHookPost;
     toHookPost["ReadFile"]                = wrap_post_Generic;
     toHookPost["InternetReadFile"]        = wrap_post_Generic;
     toHookPost["ReadEventLog"]            = wrap_post_Generic;
@@ -398,7 +396,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPost["fread_s"]                 = wrap_post_Generic;
     toHookPost["fread"]                   = wrap_post_Generic;
 
-    std::map<char *, PREPROTO>::iterator it;
+    std::map<char *, SL2_PRE_PROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
         std::string strFunctionName(functionName);
@@ -467,7 +465,7 @@ void wizard(client_id_t id, int argc, const char *argv[]) {
         DR_ASSERT(false);
     }
 
-    dr_log(NULL, LOG_ALL, 1, "Client 'Wizard' initializing\n");
+    dr_log(NULL, DR_LOG_ALL, 1, "Client 'Wizard' initializing\n");
 }
 
 /* Parses options and calls wizard helper */

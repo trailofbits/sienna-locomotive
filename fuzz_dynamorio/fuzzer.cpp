@@ -7,6 +7,7 @@
 #include <Windows.h>
 #include <Winternl.h>
 #include <Rpc.h>
+#include <io.h>
 
 #include "dr_api.h"
 #include "drmgr.h"
@@ -23,6 +24,7 @@ extern "C" {
 
 #include "server.hpp"
 #include "common/function_lookup.hpp"
+#include "common/hook_protos.h"
 
 #ifdef WINDOWS
 #define IF_WINDOWS_ELSE(x,y) x
@@ -51,6 +53,12 @@ static droption_t<std::string> op_target(
     "targetfile",
     "JSON file in which to look for targets");
 
+static json parsedJson;
+static UUID runId;
+static BOOL crashed = false;
+static std::map<Function, UINT64> call_counts;
+static DWORD64 baseAddr;
+
 struct targetFunction {
   bool selected;
   UINT64 index;
@@ -76,53 +84,45 @@ void from_json(const json& j, targetFunction& t) {
     t.argHash = j.at("argHash").get<std::string>();
 }
 
-json parsedJson;
-
-UUID runId;
-BOOL crashed = false;
-
-static DWORD64 baseAddr;
-std::map<Function, UINT64> call_counts;
-
 //TODO: Fix logging
 /* Tries to get a new Run ID from the fuzz server */
 UUID getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs) {
-    dr_log(NULL, LOG_ALL, ERROR, "Requesting run id");
+    dr_log(NULL, DR_LOG_ALL, ERROR, "Requesting run id");
     DWORD bytesRead = 0;
     DWORD bytesWritten = 0;
 
     BYTE eventId = EVT_RUN_ID;
     UUID runId;
     if (!TransactNamedPipe(hPipe, &eventId, sizeof(BYTE), &runId, sizeof(UUID), &bytesRead, NULL)) {
-        dr_log(NULL, LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
+        dr_log(NULL, DR_LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
         dr_exit_process(1);
     }
 
     WCHAR runId_s[SL2_UUID_SIZE];
     sl2_uuid_to_wstring(runId, runId_s);
 
-    dr_log(NULL, LOG_ALL, ERROR, "Run id %S", runId_s);
+    dr_log(NULL, DR_LOG_ALL, ERROR, "Run id %S", runId_s);
 
     DWORD size = lstrlenW(targetName) * sizeof(WCHAR);
 
     if (!WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL)) {
-        dr_log(NULL, LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
+        dr_log(NULL, DR_LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
         dr_exit_process(1);
     }
 
     if (!WriteFile(hPipe, targetName, size, &bytesWritten, NULL)) {
-        dr_log(NULL, LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
+        dr_log(NULL, DR_LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
         dr_exit_process(1);
     }
 
     size = lstrlen(targetArgs) * sizeof(WCHAR);
     if (!WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL)) {
-        dr_log(NULL, LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
+        dr_log(NULL, DR_LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
         dr_exit_process(1);
     }
 
     if (!WriteFile(hPipe, targetArgs, size, &bytesWritten, NULL)) {
-        dr_log(NULL, LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
+        dr_log(NULL, DR_LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
         dr_exit_process(1);
     }
 
@@ -149,14 +149,14 @@ HANDLE getPipe() {
         // This is basically just a check that the server is running
         DWORD err = GetLastError();
         if (err != ERROR_PIPE_BUSY) {
-            dr_log(NULL, LOG_ALL, ERROR, "Could not open pipe (%x)", err);
+            dr_log(NULL, DR_LOG_ALL, ERROR, "Could not open pipe (%x)", err);
             dr_fprintf(STDERR, "Could not open pipe (0x%x)\n", err);
             dr_fprintf(STDERR, "Is the server running?\n");
             dr_exit_process(1);
         }
 
         if (!WaitNamedPipe(FUZZ_SERVER_PATH, 5000)) {
-            dr_log(NULL, LOG_ALL, ERROR, "Could not connect, timeout");
+            dr_log(NULL, DR_LOG_ALL, ERROR, "Could not connect, timeout");
             dr_fprintf(STDERR, "Could not connect, timeout\n", err);
             dr_exit_process(1);
         }
@@ -179,7 +179,7 @@ DWORD finalize(HANDLE hPipe, UUID runId, BOOL crashed) {
 
     if (crashed) {
         dr_fprintf(STDERR, "<crash found for run id %S>\n", runId_s);
-        dr_log(NULL, LOG_ALL, ERROR, "fuzzer#finalize: Crash found for run id %S!", runId_s);
+        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#finalize: Crash found for run id %S!", runId_s);
     }
 
     DWORD bytesWritten;
@@ -187,18 +187,18 @@ DWORD finalize(HANDLE hPipe, UUID runId, BOOL crashed) {
 
     // write the event ID (4 for finalize)
     if (!WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL)) {
-        dr_log(NULL, LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write event ID (0x%x)", GetLastError());
+        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write event ID (0x%x)", GetLastError());
         dr_exit_process(1);
     }
     // Write the run ID
     if (!WriteFile(hPipe, &runId, sizeof(UUID), &bytesWritten, NULL)) {
-        dr_log(NULL, LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write run ID (0x%x)", GetLastError());
+        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write run ID (0x%x)", GetLastError());
         dr_exit_process(1);
     }
 
     // write whether the run found a crash
     if (!WriteFile(hPipe, &crashed, sizeof(BOOL), &bytesWritten, NULL)) {
-        dr_log(NULL, LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write crash status (%x)", GetLastError());
+        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write crash status (%x)", GetLastError());
         dr_exit_process(1);
     }
 
@@ -206,7 +206,7 @@ DWORD finalize(HANDLE hPipe, UUID runId, BOOL crashed) {
     // For now we don't, but this can be flipped to help with debugging.
     BOOL remove = 1;
     if (!WriteFile(hPipe, &remove, sizeof(BOOL), &bytesWritten, NULL)) {
-        dr_log(NULL, LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write remove code (%x)", GetLastError());
+        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write remove code (%x)", GetLastError());
         dr_exit_process(1);
     }
 
@@ -224,7 +224,7 @@ get_target_command_line() {
 
     // Read process parameter block from PEB
     if (!dr_safe_read(clientPEB->ProcessParameters, sizeof(_RTL_USER_PROCESS_PARAMETERS), &parameterBlock, &byte_counter)) {
-        dr_log(NULL, LOG_ALL, ERROR, "fuzzer#get_target_command_line: Could not read process parameter block");
+        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#get_target_command_line: Could not read process parameter block");
         dr_exit_process(1);
     }
 
@@ -233,7 +233,7 @@ get_target_command_line() {
 
     // Read the command line from the parameter block
     if (!dr_safe_read(parameterBlock.CommandLine.Buffer, parameterBlock.CommandLine.Length, commandLineContents, &byte_counter)) {
-        dr_log(NULL, LOG_ALL, ERROR, "fuzzer#get_target_command_line: Could not read command line buffer");
+        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#get_target_command_line: Could not read command line buffer");
         dr_exit_process(1);
     }
 
@@ -243,8 +243,7 @@ get_target_command_line() {
 /* Maps exception code to an exit status. Print it out, then exit. */
 static bool
 onexception(void *drcontext, dr_exception_t *excpt) {
-    dr_log(NULL, LOG_ALL, ERROR, "fuzzer#onexception: Exception occurred!\n");
-
+    dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#onexception: Exception occurred!\n");
     crashed = true;
     DWORD exceptionCode = excpt->record->ExceptionCode;
 
@@ -320,12 +319,13 @@ onexception(void *drcontext, dr_exception_t *excpt) {
 /* Runs after the target application has exited */
 static void
 event_exit(void) {
+    dr_fprintf(STDERR, "Dynamorio exiting (fuzzer)\n");
     HANDLE hPipe = getPipe();
     finalize(hPipe, runId, crashed); // Delete the fuzzing run if we didn't find a crash
     CloseHandle(hPipe); // Close out connection to server
 
     // Clean up DynamoRIO
-    dr_log(NULL, LOG_ALL, ERROR, "fuzzer#event_exit: Dynamorio Exiting\n");
+    dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#event_exit: Dynamorio Exiting\n");
     drwrap_exit();
     drmgr_exit();
 }
@@ -339,16 +339,18 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
     DWORD pathSize = 0;
 
     // Check that ReadFile calls are to something actually valid
-    if(function == Function::ReadFile) {
+    // TODO(ww): Add fread and fread_s here once the _getosfhandle problem is fixed.
+    if (function == Function::ReadFile) {
         if (hFile == INVALID_HANDLE_VALUE) {
-            dr_log(NULL, LOG_ALL, ERROR, "fuzzer#mutate: Invalid source for mutation?\n");
+            dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#mutate: Invalid source for mutation?\n");
             return false;
         }
 
         pathSize = GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, 0);
+        dr_fprintf(STDERR, "mutate: filePath: %S", filePath);
 
         if (pathSize > MAX_PATH || pathSize == 0) {
-            dr_log(NULL, LOG_ALL, ERROR, "fuzzer#mutate: Pathsize %d is out of bounds\n", pathSize);
+            dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#mutate: Pathsize %d is out of bounds\n", pathSize);
             return false;
         }
     }
@@ -717,16 +719,38 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     picosha2::hash256_hex_string((unsigned char *)&fStruct, (unsigned char *)&fStruct+sizeof(fileArgHash), ((read_info *)*user_data)->argHash);
 }
 
-// TODO fill out this function prototype
+static void
+wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
+{
+    dr_fprintf(STDERR, "<in wrap_pre_fread_s>\n");
+    void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
+    size_t size = (size_t)drwrap_get_arg(wrapcxt, 2);
+    size_t count = (size_t)drwrap_get_arg(wrapcxt, 3);
+    FILE *file = (FILE *)drwrap_get_arg(wrapcxt, 4);
+
+    *user_data = malloc(sizeof(read_info));
+    ((read_info *)*user_data)->function = Function::fread_s;
+    // TODO(ww): Figure out why _get_osfhandle breaks DR.
+    // ((read_info *)*user_data)->hFile = (HANDLE) _get_osfhandle(_fileno(file));
+    ((read_info *)*user_data)->hFile = NULL;
+    ((read_info *)*user_data)->lpBuffer = buffer;
+    ((read_info *)*user_data)->nNumberOfBytesToRead = size * count;
+    ((read_info *)*user_data)->lpNumberOfBytesRead = NULL;
+    ((read_info *)*user_data)->position = NULL;
+}
+
 static void
 wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     dr_fprintf(STDERR, "<in wrap_pre_fread>\n");
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
     size_t size = (size_t)drwrap_get_arg(wrapcxt, 1);
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
+    FILE *file = (FILE *)drwrap_get_arg(wrapcxt, 3);
 
     *user_data = malloc(sizeof(read_info));
     ((read_info *)*user_data)->function = Function::fread;
+    // TODO(ww): Figure out why _get_osfhandle breaks DR.
+    // ((read_info *)*user_data)->hFile = (HANDLE) _get_osfhandle(_fileno(file));
     ((read_info *)*user_data)->hFile = NULL;
     ((read_info *)*user_data)->lpBuffer = buffer;
     ((read_info *)*user_data)->nNumberOfBytesToRead = size * count;
@@ -789,16 +813,14 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     in that module. */
 static void
 module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
-    // void(__cdecl *)(void *, OUT void **)
-#define PREPROTO void(__cdecl *)(void *, void **)
-#define POSTPROTO void(__cdecl *)(void *, void *)
+
 
     if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))){
       baseAddr = (DWORD64) mod->start;
     }
 
     // Build list of pre-function hooks
-    std::map<char *, PREPROTO> toHookPre;
+    std::map<char *, SL2_PRE_PROTO> toHookPre;
     toHookPre["ReadFile"] = wrap_pre_ReadFile;
     toHookPre["InternetReadFile"] = wrap_pre_InternetReadFile;
     toHookPre["ReadEventLog"] = wrap_pre_ReadEventLog;
@@ -807,10 +829,11 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPre["WinHttpWebSocketReceive"] = wrap_pre_WinHttpWebSocketReceive;
     toHookPre["WinHttpReadData"] = wrap_pre_WinHttpReadData;
     toHookPre["recv"] = wrap_pre_recv;
+    toHookPre["fread_s"] = wrap_pre_fread_s;
     toHookPre["fread"] = wrap_pre_fread;
 
     // Build list of post-function hooks
-    std::map<char *, POSTPROTO> toHookPost;
+    std::map<char *, SL2_POST_PROTO> toHookPost;
     toHookPost["ReadFile"] = wrap_post_Generic;
     toHookPost["InternetReadFile"] = wrap_post_Generic;
     toHookPost["ReadEventLog"] = wrap_post_Generic;
@@ -819,10 +842,11 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPost["WinHttpWebSocketReceive"] = wrap_post_Generic;
     toHookPost["WinHttpReadData"] = wrap_post_Generic;
     toHookPost["recv"] = wrap_post_Generic;
+    toHookPost["fread_s"] = wrap_post_Generic;
     toHookPost["fread"] = wrap_post_Generic;
 
     // Iterate over list of hooks and register them with DynamoRIO
-    std::map<char *, PREPROTO>::iterator it;
+    std::map<char *, SL2_PRE_PROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
         bool hook = false;
@@ -855,15 +879,23 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
         // Only hook ReadFile calls from the kernel (TODO - investigate fuzzgoat results)
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
         const char *mod_name = dr_module_preferred_name(mod);
+
         if(strFunctionName == "ReadFile") {
-            if(strcmp(mod_name, "KERNELBASE.dll") != 0) {
+            if(_stricmp(mod_name, "KERNELBASE.dll") != 0) {
                 continue;
             }
         }
 
         // Only hook registry queries in the kernel
         if(strFunctionName == "RegQueryValueExA" or strFunctionName == "RegQueryValueExW") {
-            if(strcmp(mod_name, "KERNELBASE.dll") != 0) {
+            if(_stricmp(mod_name, "KERNELBASE.dll") != 0) {
+                continue;
+            }
+        }
+
+        // Only hook fread(_s) calls from the C runtime
+        if (strFunctionName == "fread" || strFunctionName == "fread_s") {
+            if (_stricmp(mod_name, "UCRTBASE.DLL") != 0) {
                 continue;
             }
         }
@@ -872,7 +904,6 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
         if (towrap != NULL) {
             dr_flush_region(towrap, 0x1000);
             bool ok = drwrap_wrap(towrap, hookFunctionPre, hookFunctionPost);
-            // bool ok = false;
             if (ok) {
                 dr_fprintf(STDERR, "<wrapped %s @ 0x%p in %s\n", functionName, towrap, mod_name);
             } else {
@@ -915,12 +946,12 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
       dr_fprintf(STDERR, "Document root is not an array\n");
 
     // Set up console printing
-    dr_log(NULL, LOG_ALL, 1, "DR client 'SL Fuzzer' initializing\n");
+    dr_log(NULL, DR_LOG_ALL, 1, "DR client 'SL Fuzzer' initializing\n");
     if (dr_is_notify_on()) {
 #ifdef WINDOWS
         dr_enable_console_printing();  // TODO - necessary?
 #endif
-        dr_log(NULL, LOG_ALL, ERROR, "Client SL Fuzzer is running\n");
+        dr_log(NULL, DR_LOG_ALL, ERROR, "Client SL Fuzzer is running\n");
     }
 
     //TODO: support multiple passes over one binary without re-running drrun

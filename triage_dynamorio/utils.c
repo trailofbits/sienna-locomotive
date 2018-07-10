@@ -41,11 +41,11 @@
 
 file_t
 generic_file_open(
-    client_id_t id, 
+    client_id_t id,
     void *drcontext,
-    const char *path, 
-    const char *name, 
-    const char *suffix, 
+    const char *path,
+    const char *name,
+    const char *suffix,
     uint flags)
 {
     file_t log;
@@ -56,8 +56,8 @@ generic_file_open(
 
     DR_ASSERT(name != NULL);
     len = dr_snprintf(
-        log_dir, 
-        BUFFER_SIZE_ELEMENTS(log_dir), 
+        log_dir,
+        BUFFER_SIZE_ELEMENTS(log_dir),
         "%s",
         path == NULL ? dr_get_client_path(id) : path);
 
@@ -82,20 +82,20 @@ generic_file_open(
     NULL_TERMINATE_BUFFER(log_dir);
     /* we do not need call drx_init before using drx_open_unique_appid_file */
     log = drx_open_unique_appid_file(
-        log_dir, 
+        log_dir,
         dr_get_process_id(),
-        name, 
-        suffix, 
+        name,
+        suffix,
         flags,
-        buf, 
+        buf,
         BUFFER_SIZE_ELEMENTS(buf));
-    
+
     if (log != INVALID_FILE) {
         char msg[MAXIMUM_PATH];
         len = dr_snprintf(msg, BUFFER_SIZE_ELEMENTS(msg), "Data file %s created", buf);
         DR_ASSERT(len > 0);
         NULL_TERMINATE_BUFFER(msg);
-        dr_log(drcontext, LOG_ALL, 1, "%s", msg);
+        dr_log(drcontext, DR_LOG_ALL, 1, "%s", msg);
 #ifdef SHOW_RESULTS
         DISPLAY_STRING(msg);
 # ifdef WINDOWS
@@ -111,10 +111,10 @@ generic_file_open(
 
 file_t
 log_file_open(
-    client_id_t id, 
+    client_id_t id,
     void *drcontext,
-    const char *path, 
-    const char *name, 
+    const char *path,
+    const char *name,
     uint flags)
 {
     return generic_file_open(id, drcontext, path, name, "log", flags);
