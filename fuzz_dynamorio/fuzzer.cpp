@@ -13,6 +13,7 @@
 #include "drwrap.h"
 #include "droption.h"
 
+#include <picosha2.h>
 #include <json.hpp>
 using json = nlohmann::json;
 
@@ -56,6 +57,13 @@ struct targetFunction {
   UINT64 mode;
   UINT64 retAddrOffset;
   std::string functionName;
+  std::string argHash;
+};
+
+struct fileArgHash{
+  WCHAR fileName[(MAX_PATH + 1) * sizeof(WCHAR)];
+  DWORD64 position;
+  DWORD readSize;
 };
 
 // TODO throw error messages if this doesn't work
@@ -65,6 +73,7 @@ void from_json(const json& j, targetFunction& t) {
     t.mode = j.at("mode").get<int>();
     t.retAddrOffset = j.at("retAddrOffset").get<int>();
     t.functionName = j.at("func_name").get<std::string>();
+    t.argHash = j.at("argHash").get<std::string>();
 }
 
 json parsedJson;
@@ -459,6 +468,7 @@ struct read_info {
     LPDWORD lpNumberOfBytesRead;
     DWORD64 position;
     DWORD64 retAddrOffset;
+    std::string argHash;
 };
 
 /*
@@ -697,6 +707,14 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->lpNumberOfBytesRead = lpNumberOfBytesRead;
     ((read_info *)*user_data)->position = (position << 32) | positionLow;
     ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+
+    fileArgHash fStruct;
+    memset(&fStruct, 0, sizeof(fileArgHash));
+    DWORD pathSize = GetFinalPathNameByHandle(hFile, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
+    fStruct.position = ((read_info *)*user_data)->position;
+    fStruct.readSize = nNumberOfBytesToRead;
+
+    picosha2::hash256_hex_string((unsigned char *)&fStruct, (unsigned char *)&fStruct+sizeof(fileArgHash), ((read_info *)*user_data)->argHash);
 }
 
 // TODO fill out this function prototype
@@ -734,6 +752,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     LPDWORD lpNumberOfBytesRead = info->lpNumberOfBytesRead;
     DWORD64 position = info->position;
     DWORD64 retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    std::string argHash = info->argHash;
     free(user_data);
 
     BOOL targeted = false;
@@ -743,8 +762,11 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
         if (t.mode & MATCH_INDEX and call_counts[function] == t.index){
           targeted = true;
         }
-        else if (t.mode & MATCH_CALL_ADDRESS and t.retAddrOffset == retAddrOffset){
+        else if (t.mode & MATCH_RETN_ADDRESS and t.retAddrOffset == retAddrOffset){
           targeted = true;
+        }
+        else if (t.mode & MATCH_ARG_HASH and t.argHash == argHash){
+            targeted = true;
         }
       }
     }
