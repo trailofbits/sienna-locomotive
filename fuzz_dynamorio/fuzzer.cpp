@@ -337,6 +337,7 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
         }
 
         pathSize = GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, 0);
+        dr_fprintf(STDERR, "mutate: filePath: %S", filePath);
 
         if (pathSize > MAX_PATH || pathSize == 0) {
             dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#mutate: Pathsize %d is out of bounds\n", pathSize);
@@ -856,15 +857,23 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
         // Only hook ReadFile calls from the kernel (TODO - investigate fuzzgoat results)
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
         const char *mod_name = dr_module_preferred_name(mod);
+
         if(strFunctionName == "ReadFile") {
-            if(strcmp(mod_name, "KERNELBASE.dll") != 0) {
+            if(_stricmp(mod_name, "KERNELBASE.dll") != 0) {
                 continue;
             }
         }
 
         // Only hook registry queries in the kernel
         if(strFunctionName == "RegQueryValueExA" or strFunctionName == "RegQueryValueExW") {
-            if(strcmp(mod_name, "KERNELBASE.dll") != 0) {
+            if(_stricmp(mod_name, "KERNELBASE.dll") != 0) {
+                continue;
+            }
+        }
+
+        // Only hook fread(_s) calls from the C runtime
+        if (strFunctionName == "fread" || strFunctionName == "fread_s") {
+            if (_stricmp(mod_name, "UCRTBASE.DLL") != 0) {
                 continue;
             }
         }
@@ -873,7 +882,6 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
         if (towrap != NULL) {
             dr_flush_region(towrap, 0x1000);
             bool ok = drwrap_wrap(towrap, hookFunctionPre, hookFunctionPost);
-            // bool ok = false;
             if (ok) {
                 dr_fprintf(STDERR, "<wrapped %s @ 0x%p in %s\n", functionName, towrap, mod_name);
             } else {
