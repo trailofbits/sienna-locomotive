@@ -318,10 +318,10 @@ VOID strategyRandValues(BYTE *buf, DWORD size) {
 #define VALUES8  -9151314442816848000, -2147483649, 2147483648, 4294967296, 432345564227567365, 18446744073709551615
 
 VOID strategyKnownValues(BYTE *buf, DWORD size) {
-    UINT8 values1[] = { VALUES1 };
-    UINT16 values2[] = { VALUES1, VALUES2 };
-    UINT32 values4[] = { VALUES1, VALUES2, VALUES4 };
-    UINT64 values8[] = { VALUES1, VALUES2, VALUES4, VALUES8 };
+    INT8 values1[] = { VALUES1 };
+    INT16 values2[] = { VALUES1, VALUES2 };
+    INT32 values4[] = { VALUES1, VALUES2, VALUES4 };
+    INT64 values8[] = { VALUES1, VALUES2, VALUES4, VALUES8 };
 
     std::random_device rd;
     srand(rd());
@@ -372,10 +372,10 @@ VOID strategyKnownValues(BYTE *buf, DWORD size) {
 }
 
 VOID strategyAddSubKnownValues(BYTE *buf, DWORD size) {
-    UINT8 values1[] = { VALUES1 };
-    UINT16 values2[] = { VALUES1, VALUES2 };
-    UINT32 values4[] = { VALUES1, VALUES2, VALUES4 };
-    UINT64 values8[] = { VALUES1, VALUES2, VALUES4, VALUES8 };
+    INT8 values1[] = { VALUES1 };
+    INT16 values2[] = { VALUES1, VALUES2 };
+    INT32 values4[] = { VALUES1, VALUES2, VALUES4 };
+    INT64 values8[] = { VALUES1, VALUES2, VALUES4, VALUES8 };
 
     std::random_device rd;
     srand(rd());
@@ -714,7 +714,7 @@ DWORD getBytesFKT(HANDLE hFile, BYTE *buf, DWORD size) {
         exit(1);
     }
 
-    LOG_F(INFO, "Read in %02x %02x %02x %02x %02x %02x %02x %02x\n", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
+    LOG_F(INFO, "getBytesFKT: read in %02x %02x %02x %02x %02x %02x %02x %02x\n", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
 
     return 0;
 }
@@ -906,11 +906,15 @@ DWORD finalizeRun(HANDLE hPipe) {
         exit(1);
     }
 
-    // TODO(ww): Add a flag/option that allows us to override removal.
+    BOOL remove = true;
+    if (!ReadFile(hPipe, &remove, sizeof(BOOL), &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "finalizeRun: failed to read remove flag (0x%x)", GetLastError());
+        exit(1);
+    }
 
     LOG_F(INFO, "finalizeRun: finalizing %S", runId_s);
 
-    if (!crash) {
+    if (!crash && remove) {
         LOG_F(INFO, "finalizeRun: no crash, removing run %S", runId_s);
         EnterCriticalSection(&critId);
 
@@ -930,6 +934,9 @@ DWORD finalizeRun(HANDLE hPipe) {
 
         SHFileOperation(&remove_op);
         LeaveCriticalSection(&critId);
+    }
+    else if (!crash && !remove) {
+        LOG_F(INFO, "finalizeRun: no crash, but not removing files (requested)");
     }
     else {
         LOG_F(INFO, "finalizeRun: crash found for run %S", runId_s);

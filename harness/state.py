@@ -57,7 +57,7 @@ def get_targets():
 def get_runs():
     """ Returns a dict mapping run ID's to the contents of the argument file """
     runs = {}
-    for _dir in glob.glob(os.path.join(os.getenv('APPDATA'), 'Trail of Bits', 'fuzzkit', 'working', '*')):
+    for _dir in glob.glob(os.path.join(config.sl2_working_dir, '*')):
         with open(os.path.join(_dir, 'arguments.txt'), 'rb') as program_string_file:
             runs[_dir] = unstringify_program_array(program_string_file.read().decode('utf-16').strip())
     return runs
