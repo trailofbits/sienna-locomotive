@@ -1250,6 +1250,20 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
 }
 
 static void
+wrap_pre_fread_s(void *wrapcxt, OUT void **user_data) {
+    dr_fprintf(STDERR, "<in wrap_pre_fread_s>\n");
+    void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
+    size_t size = (size_t)drwrap_get_arg(wrapcxt, 2);
+    size_t count = (size_t)drwrap_get_arg(wrapcxt, 3);
+
+    *user_data = malloc(sizeof(read_info));
+    ((read_info *)*user_data)->function = Function::fread;
+    ((read_info *)*user_data)->lpBuffer = buffer;
+    ((read_info *)*user_data)->nNumberOfBytesToRead = size * count;
+    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+}
+
+static void
 wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     dr_fprintf(STDERR, "<in wrap_pre_fread>\n");
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
@@ -1355,6 +1369,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPre["WinHttpReadData"] = wrap_pre_WinHttpReadData;
     toHookPre["recv"] = wrap_pre_recv;
     toHookPre["ReadFile"] = wrap_pre_ReadFile;
+    toHookPre["fread_s"] = wrap_pre_fread_s;
     toHookPre["fread"] = wrap_pre_fread;
 
     std::map<char *, SL2_POST_PROTO> toHookPost;
