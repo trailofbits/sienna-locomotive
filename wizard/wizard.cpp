@@ -19,6 +19,7 @@
 #include <codecvt>
 #include <locale>
 
+#include <picosha2.h>
 #include <json.hpp>
 using json = nlohmann::json;
 using namespace std;
@@ -94,6 +95,13 @@ struct read_info {
     TCHAR *source;
     DWORD position;
     DWORD64 retAddrOffset;
+    std::string argHash;
+};
+
+struct fileArgHash{
+  WCHAR fileName[(MAX_PATH + 1) * sizeof(WCHAR)];
+  DWORD64 position;
+  DWORD readSize;
 };
 
 /*
@@ -261,11 +269,17 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->source = NULL;
     ((read_info *)*user_data)->position = NULL;
     ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
-
-    LPWSTR filePath = (LPWSTR)malloc(sizeof(WCHAR) * (MAX_PATH+1));
-    DWORD pathSize = GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, FILE_NAME_NORMALIZED);
-    ((read_info *)*user_data)->source = filePath;
     ((read_info *)*user_data)->position = SetFilePointer(hFile, 0, NULL, FILE_CURRENT);
+
+    fileArgHash *fStruct = (fileArgHash *)malloc(sizeof(fileArgHash));
+    memset(fStruct, 0, sizeof(fileArgHash));
+
+    DWORD pathSize = GetFinalPathNameByHandle(hFile, fStruct->fileName, MAX_PATH, FILE_NAME_NORMALIZED);
+        ((read_info *)*user_data)->source = fStruct->fileName;
+    fStruct->position = ((read_info *)*user_data)->position;
+    fStruct->readSize = nNumberOfBytesToRead;
+
+    picosha2::hash256_hex_string((unsigned char *)fStruct, (unsigned char *)fStruct+sizeof(fileArgHash), ((read_info *)*user_data)->argHash);
 }
 
 static void
@@ -315,7 +329,8 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     json j;
     j["type"]               = "id";
     j["callCount"]          = call_counts[info->function];
-    j["retAddrOffset"]             = (UINT64) info->retAddrOffset;
+    j["retAddrOffset"]      = (UINT64) info->retAddrOffset;
+    j["argHash"]            = info->argHash;
     // wizard prefixes functionName with a ,
     j["func_name"]          = functionName;
 

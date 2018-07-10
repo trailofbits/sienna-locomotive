@@ -15,7 +15,8 @@ enum class Function {
 
 enum {
     MATCH_INDEX = 1 << 0,
-    MATCH_CALL_ADDRESS = 1 << 1,
+    MATCH_RETN_ADDRESS = 1 << 1,
+    MATCH_ARG_HASH = 1 << 2,
 };
 
 #endif

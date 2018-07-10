@@ -22,6 +22,7 @@
 #include "dr_ir_instr.h"
 #include "droption.h"
 
+#include <picosha2.h>
 #include <json.hpp>
 using json = nlohmann::json;
 
@@ -65,6 +66,13 @@ struct targetFunction {
   UINT64 mode;
   UINT64 retAddrOffset;
   std::string functionName;
+  std::string argHash;
+};
+
+struct fileArgHash{
+  WCHAR fileName[(MAX_PATH + 1) * sizeof(WCHAR)];
+  DWORD64 position;
+  DWORD readSize;
 };
 
 void from_json(const json& j, targetFunction& t) {
@@ -73,6 +81,7 @@ void from_json(const json& j, targetFunction& t) {
     t.mode = j.at("mode").get<int>();
     t.retAddrOffset = j.at("retAddrOffset").get<int>();
     t.functionName = j.at("func_name").get<std::string>();
+    t.argHash = j.at("argHash").get<std::string>();
 }
 
 json parsedJson;
@@ -1148,6 +1157,7 @@ struct read_info {
     DWORD nNumberOfBytesToRead;
     Function function;
     DWORD64 retAddrOffset;
+    std::string argHash;
 };
 
 /*
@@ -1269,6 +1279,17 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
     ((read_info *)*user_data)->function = Function::ReadFile;
     ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+
+    LONG positionHigh = 0;
+    DWORD positionLow = SetFilePointer(hFile, 0, &positionHigh, FILE_CURRENT);
+
+    fileArgHash fStruct;
+    memset(&fStruct, 0, sizeof(fileArgHash));
+    DWORD pathSize = GetFinalPathNameByHandle(hFile, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
+    fStruct.position = (positionHigh << 32) | positionLow;;
+    fStruct.readSize = nNumberOfBytesToRead;
+
+    picosha2::hash256_hex_string((unsigned char *)&fStruct, (unsigned char *)&fStruct+sizeof(fileArgHash), ((read_info *)*user_data)->argHash);
 }
 
 static void
@@ -1298,6 +1319,7 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
     DWORD nNumberOfBytesToRead = ((read_info *)user_data)->nNumberOfBytesToRead;
     Function function = ((read_info *)user_data)->function;
     DWORD64 retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    std::string argHash = ((read_info *)user_data)->argHash;
     free(user_data);
 
     // Identify whether this is the function we want to target
@@ -1308,8 +1330,11 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
         if (t.mode & MATCH_INDEX and call_counts[function] == t.index){
           targeted = true;
         }
-        else if (t.mode & MATCH_CALL_ADDRESS and t.retAddrOffset == retAddrOffset){
+        else if (t.mode & MATCH_RETN_ADDRESS and t.retAddrOffset == retAddrOffset){
           targeted = true;
+        }
+        else if (t.mode & MATCH_ARG_HASH and t.argHash == argHash){
+            targeted = true;
         }
       }
     }
