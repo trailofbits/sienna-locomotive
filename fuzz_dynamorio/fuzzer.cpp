@@ -330,9 +330,8 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
     DWORD pathSize = 0;
 
     // Check that ReadFile calls are to something actually valid
-    if(function == Function::ReadFile ||
-        function == Function::fread ||
-        function == Function::fread_s) {
+    // TODO(ww): Add fread and fread_s here once the _getosfhandle problem is fixed.
+    if (function == Function::ReadFile) {
         if (hFile == INVALID_HANDLE_VALUE) {
             dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#mutate: Invalid source for mutation?\n");
             return false;
@@ -713,15 +712,15 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
 
     *user_data = malloc(sizeof(read_info));
     ((read_info *)*user_data)->function = Function::fread_s;
-    ((read_info *)*user_data)->hFile = (HANDLE) _get_osfhandle(_fileno(file));
-    // ((read_info *)*user_data)->hFile = NULL;
+    // TODO(ww): Figure out why _get_osfhandle breaks DR.
+    // ((read_info *)*user_data)->hFile = (HANDLE) _get_osfhandle(_fileno(file));
+    ((read_info *)*user_data)->hFile = NULL;
     ((read_info *)*user_data)->lpBuffer = buffer;
     ((read_info *)*user_data)->nNumberOfBytesToRead = size * count;
     ((read_info *)*user_data)->lpNumberOfBytesRead = NULL;
     ((read_info *)*user_data)->position = NULL;
 }
 
-// TODO fill out this function prototype
 static void
 wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     dr_fprintf(STDERR, "<in wrap_pre_fread>\n");
@@ -732,8 +731,9 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
 
     *user_data = malloc(sizeof(read_info));
     ((read_info *)*user_data)->function = Function::fread;
-    ((read_info *)*user_data)->hFile = (HANDLE) _get_osfhandle(_fileno(file));
-    // ((read_info *)*user_data)->hFile = NULL;
+    // TODO(ww): Figure out why _get_osfhandle breaks DR.
+    // ((read_info *)*user_data)->hFile = (HANDLE) _get_osfhandle(_fileno(file));
+    ((read_info *)*user_data)->hFile = NULL;
     ((read_info *)*user_data)->lpBuffer = buffer;
     ((read_info *)*user_data)->nNumberOfBytesToRead = size * count;
     ((read_info *)*user_data)->lpNumberOfBytesRead = NULL;
