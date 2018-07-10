@@ -32,6 +32,8 @@ extern "C" {
 
 #include "server.hpp"
 #include "common/enums.h"
+#include "common/function_lookup.hpp"
+#include "common/hook_protos.h"
 
 void *mutatex;
 bool replay;
@@ -94,30 +96,6 @@ static droption_t<std::string> op_replay(
     "The run id for a crash to replay.");
 
 std::map<Function, UINT64> call_counts;
-
-/* Translates function names into strings */
-char *get_function_name(Function function) {
-    switch(function) {
-        case Function::ReadFile:
-            return "ReadFile";
-        case Function::recv:
-            return "recv";
-        case Function::WinHttpReadData:
-            return "WinHttpReadData";
-        case Function::InternetReadFile:
-            return "InternetReadFile";
-        case Function::WinHttpWebSocketReceive:
-            return "WinHttpWebSocketReceive";
-        case Function::RegQueryValueEx:
-            return "RegQueryValueEx";
-        case Function::ReadEventLog:
-            return "ReadEventLog";
-        case Function::fread:
-            return "fread";
-    }
-
-    return "unknown";
-}
 
 /* Currently unused as this runs on 64 bit applications */
 static reg_id_t reg_to_full_width32(reg_id_t reg) {
@@ -1363,16 +1341,12 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
 /* Register function pre/post callbacks in each module */
 static void
 module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
-    // void(__cdecl *)(void *, OUT void **)
-#define PREPROTO void(__cdecl *)(void *, void **)
-#define POSTPROTO void(__cdecl *)(void *, void *)
-
     if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))){
       baseAddr = (DWORD64) mod->start;
     }
 
     // set up pre and post hooks for each target function
-    std::map<char *, PREPROTO> toHookPre;
+    std::map<char *, SL2_PRE_PROTO> toHookPre;
     toHookPre["ReadEventLog"] = wrap_pre_ReadEventLog;
     toHookPre["RegQueryValueExW"] = wrap_pre_RegQueryValueEx;
     toHookPre["RegQueryValueExA"] = wrap_pre_RegQueryValueEx;
@@ -1383,7 +1357,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPre["ReadFile"] = wrap_pre_ReadFile;
     toHookPre["fread"] = wrap_pre_fread;
 
-    std::map<char *, POSTPROTO> toHookPost;
+    std::map<char *, SL2_POST_PROTO> toHookPost;
     toHookPost["fread"] = wrap_post_GenericTaint;
     toHookPost["ReadFile"] = wrap_post_GenericTaint;
     toHookPost["InternetReadFile"] = wrap_post_GenericTaint;
@@ -1402,7 +1376,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     }
 
     // when a module is loaded, iterate its functions looking for matches in toHookPre
-    std::map<char *, PREPROTO>::iterator it;
+    std::map<char *, SL2_PRE_PROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
         bool hook = false;

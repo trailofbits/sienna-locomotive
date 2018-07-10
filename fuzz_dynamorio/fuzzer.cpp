@@ -23,6 +23,7 @@ extern "C" {
 
 #include "server.hpp"
 #include "common/function_lookup.hpp"
+#include "common/hook_protos.h"
 
 #ifdef WINDOWS
 #define IF_WINDOWS_ELSE(x,y) x
@@ -55,6 +56,7 @@ static json parsedJson;
 static UUID runId;
 static BOOL crashed = false;
 static std::map<Function, UINT64> call_counts;
+static DWORD64 baseAddr;
 
 struct targetFunction {
   bool selected;
@@ -789,16 +791,14 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     in that module. */
 static void
 module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
-    // void(__cdecl *)(void *, OUT void **)
-#define PREPROTO void(__cdecl *)(void *, void **)
-#define POSTPROTO void(__cdecl *)(void *, void *)
+
 
     if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))){
       baseAddr = (DWORD64) mod->start;
     }
 
     // Build list of pre-function hooks
-    std::map<char *, PREPROTO> toHookPre;
+    std::map<char *, SL2_PRE_PROTO> toHookPre;
     toHookPre["ReadFile"] = wrap_pre_ReadFile;
     toHookPre["InternetReadFile"] = wrap_pre_InternetReadFile;
     toHookPre["ReadEventLog"] = wrap_pre_ReadEventLog;
@@ -811,7 +811,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPre["fread"] = wrap_pre_fread;
 
     // Build list of post-function hooks
-    std::map<char *, POSTPROTO> toHookPost;
+    std::map<char *, SL2_POST_PROTO> toHookPost;
     toHookPost["ReadFile"] = wrap_post_Generic;
     toHookPost["InternetReadFile"] = wrap_post_Generic;
     toHookPost["ReadEventLog"] = wrap_post_Generic;
@@ -824,7 +824,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPost["fread"] = wrap_post_Generic;
 
     // Iterate over list of hooks and register them with DynamoRIO
-    std::map<char *, PREPROTO>::iterator it;
+    std::map<char *, SL2_PRE_PROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
         bool hook = false;
