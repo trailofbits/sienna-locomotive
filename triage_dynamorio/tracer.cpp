@@ -78,6 +78,14 @@ static droption_t<std::string> op_replay(
 
 static std::map<Function, UINT64> call_counts;
 
+struct tracer_read_info {
+    LPVOID lpBuffer;
+    DWORD nNumberOfBytesToRead;
+    Function function;
+    DWORD64 retAddrOffset;
+    std::string argHash;
+};
+
 /* Currently unused as this runs on 64 bit applications */
 static reg_id_t reg_to_full_width32(reg_id_t reg) {
     switch(reg){
@@ -1102,14 +1110,6 @@ onexception(void *drcontext, dr_exception_t *excpt) {
     return true;
 }
 
-struct read_info {
-    LPVOID lpBuffer;
-    DWORD nNumberOfBytesToRead;
-    Function function;
-    DWORD64 retAddrOffset;
-    std::string argHash;
-};
-
 /*
 *
   Large block of pre-function callbacks that collect metadata about the target call
@@ -1127,8 +1127,8 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
     DWORD  *pnBytesRead              = (DWORD *)drwrap_get_arg(wrapcxt, 5);
     DWORD  *pnMinNumberOfBytesNeeded = (DWORD *)drwrap_get_arg(wrapcxt, 6);
 
-    *user_data      = malloc(sizeof(read_info));
-    read_info *info = (read_info *) *user_data;
+    *user_data             = malloc(sizeof(tracer_read_info));
+    tracer_read_info *info = (tracer_read_info *) *user_data;
 
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
@@ -1147,8 +1147,8 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
     LPDWORD lpcbData    = (LPDWORD)drwrap_get_arg(wrapcxt, 5);
 
     if(lpData != NULL && lpcbData != NULL) {
-        *user_data      = malloc(sizeof(read_info));
-        read_info *info = (read_info *) *user_data;
+        *user_data             = malloc(sizeof(tracer_read_info));
+        tracer_read_info *info = (tracer_read_info *) *user_data;
 
         info->lpBuffer = lpData;
         info->nNumberOfBytesToRead = *lpcbData;
@@ -1168,8 +1168,8 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
     PDWORD pdwBytesRead                         = (PDWORD)drwrap_get_arg(wrapcxt, 3);
     WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE)(int)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data      = malloc(sizeof(read_info));
-    read_info *info = (read_info *) *user_data;
+    *user_data             = malloc(sizeof(tracer_read_info));
+    tracer_read_info *info = (tracer_read_info *) *user_data;
 
     info->lpBuffer = pvBuffer;
     info->nNumberOfBytesToRead = dwBufferLength;
@@ -1185,8 +1185,8 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data      = malloc(sizeof(read_info));
-    read_info *info = (read_info *) *user_data;
+    *user_data             = malloc(sizeof(tracer_read_info));
+    tracer_read_info *info = (tracer_read_info *) *user_data;
 
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
@@ -1202,8 +1202,8 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data      = malloc(sizeof(read_info));
-    read_info *info = (read_info *) *user_data;
+    *user_data             = malloc(sizeof(tracer_read_info));
+    tracer_read_info *info = (tracer_read_info *) *user_data;
 
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
@@ -1219,8 +1219,8 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
     int len   = (int)drwrap_get_arg(wrapcxt, 2);
     int flags = (int)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data      = malloc(sizeof(read_info));
-    read_info *info = (read_info *) *user_data;
+    *user_data             = malloc(sizeof(tracer_read_info));
+    tracer_read_info *info = (tracer_read_info *) *user_data;
 
     info->lpBuffer             = buf;
     info->nNumberOfBytesToRead = len;
@@ -1236,8 +1236,8 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data      = malloc(sizeof(read_info));
-    read_info *info = (read_info *) *user_data;
+    *user_data             = malloc(sizeof(tracer_read_info));
+    tracer_read_info *info = (tracer_read_info *) *user_data;
 
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
@@ -1254,7 +1254,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     fStruct.position = (positionHigh << 32) | positionLow;;
     fStruct.readSize = nNumberOfBytesToRead;
 
-    picosha2::hash256_hex_string((unsigned char *)&fStruct, (unsigned char *)&fStruct+sizeof(fileArgHash), ((read_info *)*user_data)->argHash);
+    picosha2::hash256_hex_string((unsigned char *)&fStruct, (unsigned char *)&fStruct+sizeof(fileArgHash), ((tracer_read_info *)*user_data)->argHash);
 }
 
 static void
@@ -1264,8 +1264,8 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data) {
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 2);
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data      = malloc(sizeof(read_info));
-    read_info *info = (read_info *) *user_data;
+    *user_data             = malloc(sizeof(tracer_read_info));
+    tracer_read_info *info = (tracer_read_info *) *user_data;
 
     info->function             = Function::fread;
     info->lpBuffer             = buffer;
@@ -1280,8 +1280,8 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 1);
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
 
-    *user_data      = malloc(sizeof(read_info));
-    read_info *info = (read_info *) *user_data;
+    *user_data             = malloc(sizeof(tracer_read_info));
+    tracer_read_info *info = (tracer_read_info *) *user_data;
 
     info->function = Function::fread;
     info->lpBuffer = buffer;
@@ -1297,7 +1297,7 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
         return;
     }
 
-    read_info *info = (read_info *) user_data;
+    tracer_read_info *info = (tracer_read_info *) user_data;
 
     // Grab stored metadata
     LPVOID lpBuffer            = info->lpBuffer;
