@@ -37,6 +37,28 @@ using namespace std;
 } while (0)
 
 
+// function metadata structure
+struct read_info {
+    LPVOID lpBuffer;
+    size_t nNumberOfBytesToRead;
+    Function function;
+    WCHAR *source;
+    DWORD position;
+    DWORD64 retAddrOffset;
+    // TODO(ww): Make this a WCHAR * for consistency.
+    char *argHash;
+};
+
+// the data used to construct an identifying hash for a function
+struct fileArgHash {
+  WCHAR fileName[MAX_PATH + 1];
+  DWORD64 position;
+  DWORD readSize;
+};
+
+static DWORD64 baseAddr;
+static std::map<Function, UINT64> call_counts;
+
 ////////////////////////////////////////////////////////////////////////////
 // logObject()
 //
@@ -62,13 +84,13 @@ void logObject(json obj)
 static void
 event_thread_init(void *drcontext)
 {
-
+    dr_fprintf(STDERR, "wizard: event_thread_init\n");
 }
 
 static void
 event_thread_exit(void *drcontext)
 {
-
+    dr_fprintf(STDERR, "wizard: event_thread_exit\n");
 }
 
 /* Clean up after the target binary exits */
@@ -85,28 +107,6 @@ event_exit_trace(void)
     drmgr_exit();
 }
 
-static DWORD64 baseAddr;
-
-std::map<Function, UINT64> call_counts;
-
-// function metadata structure
-struct read_info {
-    LPVOID lpBuffer;
-    size_t nNumberOfBytesToRead;
-    Function function;
-    WCHAR *source;
-    DWORD position;
-    DWORD64 retAddrOffset;
-    // TODO(ww): Make this a WCHAR * for consistency.
-    char *argHash;
-};
-
-struct fileArgHash {
-  WCHAR fileName[MAX_PATH + 1];
-  DWORD64 position;
-  DWORD readSize;
-};
-
 /*
 Below we have a number of functions that instrument metadata retreival for the individual functions we can hook.
 */
@@ -118,7 +118,7 @@ static void
 wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
     JSON_WRAP_PRE_LOG();
 
-    *user_data = malloc(sizeof(read_info));
+    *user_data      = malloc(sizeof(read_info));
     read_info *info = (read_info *) *user_data;
 
     HANDLE hEventLog                 = (HANDLE)drwrap_get_arg(wrapcxt, 0);
@@ -153,7 +153,7 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
     // get registry key path (maybe hook open key?)
 
     if (lpData != NULL && lpcbData != NULL) {
-        *user_data = malloc(sizeof(read_info));
+        *user_data      = malloc(sizeof(read_info));
         read_info *info = (read_info *) *user_data;
 
         info->lpBuffer             = lpData;
@@ -173,7 +173,7 @@ static void
 wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
     JSON_WRAP_PRE_LOG();
 
-    *user_data = malloc(sizeof(read_info));
+    *user_data      = malloc(sizeof(read_info));
     read_info *info = (read_info *) *user_data;
 
     HINTERNET hRequest                          = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
@@ -198,7 +198,7 @@ static void
 wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
     JSON_WRAP_PRE_LOG();
 
-    *user_data = malloc(sizeof(read_info));
+    *user_data      = malloc(sizeof(read_info));
     read_info *info = (read_info *) *user_data;
 
     HINTERNET hFile             = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
@@ -222,7 +222,7 @@ static void
 wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
     JSON_WRAP_PRE_LOG();
 
-    *user_data = malloc(sizeof(read_info));
+    *user_data      = malloc(sizeof(read_info));
     read_info *info = (read_info *) *user_data;
 
     HINTERNET hRequest          = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
@@ -246,7 +246,7 @@ static void
 wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
     JSON_WRAP_PRE_LOG();
 
-    *user_data = malloc(sizeof(read_info));
+    *user_data      = malloc(sizeof(read_info));
     read_info *info = (read_info *) *user_data;
 
     SOCKET s  = (SOCKET)drwrap_get_arg(wrapcxt, 0);
