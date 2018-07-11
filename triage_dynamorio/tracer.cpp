@@ -5,7 +5,6 @@
 // #define EVENT_THREAD_EXIT event_thread_exit
 
 #include <stdio.h>
-#include <stddef.h> /* for offsetof */
 #include <map>
 #include <set>
 #include <fstream>
