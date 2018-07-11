@@ -44,7 +44,7 @@ struct read_info {
     Function function;
     WCHAR *source;
     DWORD position;
-    DWORD64 retAddrOffset;
+    UINT64 retAddrOffset;
     // TODO(ww): Make this a WCHAR * for consistency.
     char *argHash;
 };
@@ -52,11 +52,11 @@ struct read_info {
 // the data used to construct an identifying hash for a function
 struct fileArgHash {
   WCHAR fileName[MAX_PATH + 1];
-  DWORD64 position;
+  UINT64 position;
   DWORD readSize;
 };
 
-static DWORD64 baseAddr;
+static UINT64 baseAddr;
 static std::map<Function, UINT64> call_counts;
 
 ////////////////////////////////////////////////////////////////////////////
@@ -134,7 +134,7 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
     info->function             = Function::ReadEventLog;
     info->source               = NULL;
     info->position             = NULL;
-    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (UINT64) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
@@ -161,7 +161,7 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
         info->function             = Function::RegQueryValueEx;
         info->source               = NULL;
         info->position             = NULL;
-        info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+        info->retAddrOffset        = (UINT64) drwrap_get_retaddr(wrapcxt) - baseAddr;
         info->argHash              = NULL;
     }
     else {
@@ -190,7 +190,7 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
     info->function             = Function::WinHttpWebSocketReceive;
     info->source               = NULL;
     info->position             = NULL;
-    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (UINT64) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
@@ -214,7 +214,7 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
     info->function             = Function::InternetReadFile;
     info->source               = NULL;
     info->position             = NULL;
-    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (UINT64) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
@@ -238,7 +238,7 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
     info->function             = Function::WinHttpReadData;
     info->source               = NULL;
     info->position             = NULL;
-    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (UINT64) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
@@ -262,7 +262,7 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
     info->function             = Function::recv;
     info->source               = NULL;
     info->position             = NULL;
-    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (UINT64) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 
     // get peer name doesn't work
@@ -290,7 +290,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
     info->function             = Function::ReadFile;
-    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (UINT64) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->position             = SetFilePointer(hFile, 0, NULL, FILE_CURRENT);
 
     fileArgHash fStruct;
@@ -329,7 +329,7 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     info->function             = Function::fread;
     info->source               = NULL;
     info->position             = NULL;
-    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (UINT64) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
@@ -349,7 +349,7 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data) {
     info->function             = Function::fread_s;
     info->source               = NULL;
     info->position             = NULL;
-    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (UINT64) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
@@ -410,7 +410,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     */
 
     if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))){
-      baseAddr = (DWORD64) mod->start;
+      baseAddr = (UINT64) mod->start;
     }
 
     std::map<char *, SL2_PRE_PROTO> toHookPre;
