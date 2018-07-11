@@ -544,14 +544,16 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
     // DWORD positionLow = InternetSetFilePointer(hRequest, 0, &positionHigh, FILE_CURRENT);
     // DWORD64 position = positionHigh;
 
-    *user_data = malloc(sizeof(read_info));
-    ((read_info *)*user_data)->function = Function::WinHttpWebSocketReceive;
-    ((read_info *)*user_data)->hFile = hRequest;
-    ((read_info *)*user_data)->lpBuffer = pvBuffer;
-    ((read_info *)*user_data)->nNumberOfBytesToRead = dwBufferLength;
-    ((read_info *)*user_data)->lpNumberOfBytesRead = pdwBytesRead;
-    ((read_info *)*user_data)->position = 0;
-    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    *user_data      = malloc(sizeof(read_info));
+    read_info *info = (read_info *) *user_data;
+
+    info->function             = Function::WinHttpWebSocketReceive;
+    info->hFile                = hRequest;
+    info->lpBuffer             = pvBuffer;
+    info->nNumberOfBytesToRead = dwBufferLength;
+    info->lpNumberOfBytesRead  = pdwBytesRead;
+    info->position             = 0;
+    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 }
 
 /*
@@ -576,14 +578,16 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
     // DWORD positionLow = InternetSetFilePointer(hFile, 0, &positionHigh, FILE_CURRENT);
     // DWORD64 position = positionHigh;
 
-    *user_data = malloc(sizeof(read_info));
-    ((read_info *)*user_data)->function = Function::InternetReadFile;
-    ((read_info *)*user_data)->hFile = hFile;
-    ((read_info *)*user_data)->lpBuffer = lpBuffer;
-    ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
-    ((read_info *)*user_data)->lpNumberOfBytesRead = lpNumberOfBytesRead;
-    ((read_info *)*user_data)->position = 0;
-    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    *user_data      = malloc(sizeof(read_info));
+    read_info *info = (read_info *) *user_data;
+
+    info->function             = Function::InternetReadFile;
+    info->hFile                = hFile;
+    info->lpBuffer             = lpBuffer;
+    info->nNumberOfBytesToRead = nNumberOfBytesToRead;
+    info->lpNumberOfBytesRead  = lpNumberOfBytesRead;
+    info->position             = 0;
+    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 }
 
 /*
@@ -608,14 +612,16 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
     // DWORD positionLow = InternetSetFilePointer(hRequest, 0, &positionHigh, FILE_CURRENT);
     // DWORD64 position = positionHigh;
 
-    *user_data = malloc(sizeof(read_info));
-    ((read_info *)*user_data)->function = Function::WinHttpReadData;
-    ((read_info *)*user_data)->hFile = hRequest;
-    ((read_info *)*user_data)->lpBuffer = lpBuffer;
-    ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
-    ((read_info *)*user_data)->lpNumberOfBytesRead = lpNumberOfBytesRead;
-    ((read_info *)*user_data)->position = 0;
-    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    *user_data      = malloc(sizeof(read_info));
+    read_info *info = (read_info *) *user_data;
+
+    info->function             = Function::WinHttpReadData;
+    info->hFile                = hRequest;
+    info->lpBuffer             = lpBuffer;
+    info->nNumberOfBytesToRead = nNumberOfBytesToRead;
+    info->lpNumberOfBytesRead  = lpNumberOfBytesRead;
+    info->position             = 0;
+    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 }
 
 
@@ -637,14 +643,16 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
     int len = (int)drwrap_get_arg(wrapcxt, 2);
     int flags = (int)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data = malloc(sizeof(read_info));
-    ((read_info *)*user_data)->function = Function::recv;
-    ((read_info *)*user_data)->hFile = NULL;
-    ((read_info *)*user_data)->lpBuffer = buf;
-    ((read_info *)*user_data)->nNumberOfBytesToRead = len;
-    ((read_info *)*user_data)->lpNumberOfBytesRead = NULL;
-    ((read_info *)*user_data)->position = 0;
-    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    *user_data      = malloc(sizeof(read_info));
+    read_info *info = (read_info *) *user_data;
+
+    info->function             = Function::recv;
+    info->hFile                = NULL;
+    info->lpBuffer             = buf;
+    info->nNumberOfBytesToRead = len;
+    info->lpNumberOfBytesRead  = NULL;
+    info->position             = 0;
+    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 }
 
 /*
@@ -670,14 +678,16 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     DWORD positionLow = SetFilePointer(hFile, 0, &positionHigh, FILE_CURRENT);
     DWORD64 position = positionHigh;
 
-    *user_data = malloc(sizeof(read_info));
-    ((read_info *)*user_data)->function = Function::ReadFile;
-    ((read_info *)*user_data)->hFile = hFile;
-    ((read_info *)*user_data)->lpBuffer = lpBuffer;
-    ((read_info *)*user_data)->nNumberOfBytesToRead = nNumberOfBytesToRead;
-    ((read_info *)*user_data)->lpNumberOfBytesRead = lpNumberOfBytesRead;
-    ((read_info *)*user_data)->position = (position << 32) | positionLow;
-    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    *user_data      = malloc(sizeof(read_info));
+    read_info *info = (read_info *) *user_data;
+
+    info->function = Function::ReadFile;
+    info->hFile = hFile;
+    info->lpBuffer = lpBuffer;
+    info->nNumberOfBytesToRead = nNumberOfBytesToRead;
+    info->lpNumberOfBytesRead = lpNumberOfBytesRead;
+    info->position = (position << 32) | positionLow;
+    info->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
     fileArgHash fStruct;
     memset(&fStruct, 0, sizeof(fileArgHash));
@@ -697,15 +707,17 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 3);
     FILE *file = (FILE *)drwrap_get_arg(wrapcxt, 4);
 
-    *user_data = malloc(sizeof(read_info));
-    ((read_info *)*user_data)->function = Function::fread_s;
+    *user_data      = malloc(sizeof(read_info));
+    read_info *info = (read_info *) *user_data;
+
+    info->function = Function::fread_s;
     // TODO(ww): Figure out why _get_osfhandle breaks DR.
-    // ((read_info *)*user_data)->hFile = (HANDLE) _get_osfhandle(_fileno(file));
-    ((read_info *)*user_data)->hFile = NULL;
-    ((read_info *)*user_data)->lpBuffer = buffer;
-    ((read_info *)*user_data)->nNumberOfBytesToRead = size * count;
-    ((read_info *)*user_data)->lpNumberOfBytesRead = NULL;
-    ((read_info *)*user_data)->position = NULL;
+    // info->hFile = (HANDLE) _get_osfhandle(_fileno(file));
+    info->hFile = NULL;
+    info->lpBuffer = buffer;
+    info->nNumberOfBytesToRead = size * count;
+    info->lpNumberOfBytesRead = NULL;
+    info->position = NULL;
 }
 
 static void
@@ -716,16 +728,18 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
     FILE *file = (FILE *)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data = malloc(sizeof(read_info));
-    ((read_info *)*user_data)->function = Function::fread;
+    *user_data      = malloc(sizeof(read_info));
+    read_info *info = (read_info *) *user_data;
+
+    info->function = Function::fread;
     // TODO(ww): Figure out why _get_osfhandle breaks DR.
-    // ((read_info *)*user_data)->hFile = (HANDLE) _get_osfhandle(_fileno(file));
-    ((read_info *)*user_data)->hFile = NULL;
-    ((read_info *)*user_data)->lpBuffer = buffer;
-    ((read_info *)*user_data)->nNumberOfBytesToRead = size * count;
-    ((read_info *)*user_data)->lpNumberOfBytesRead = NULL;
-    ((read_info *)*user_data)->position = NULL;
-    ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    // info->hFile = (HANDLE) _get_osfhandle(_fileno(file));
+    info->hFile = NULL;
+    info->lpBuffer = buffer;
+    info->nNumberOfBytesToRead = size * count;
+    info->lpNumberOfBytesRead = NULL;
+    info->position = NULL;
+    info->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 }
 
 /* Mutates whatever data the hooked function wrote */
