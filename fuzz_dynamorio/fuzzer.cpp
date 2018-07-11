@@ -15,14 +15,9 @@
 #include "droption.h"
 
 #include <picosha2.h>
-#include <json.hpp>
-using json = nlohmann::json;
-
-extern "C" {
-    #include "common/uuid.h"
-}
 
 #include "server.hpp"
+
 #include "sl2_dr_client.hpp"
 
 #ifdef WINDOWS
@@ -57,25 +52,6 @@ static UUID runId;
 static BOOL crashed = false;
 static std::map<Function, UINT64> call_counts;
 static DWORD64 baseAddr;
-
-struct targetFunction {
-  bool selected;
-  UINT64 index;
-  UINT64 mode;
-  UINT64 retAddrOffset;
-  std::string functionName;
-  std::string argHash;
-};
-
-// TODO throw error messages if this doesn't work
-void from_json(const json& j, targetFunction& t) {
-    t.selected = j.at("selected").get<bool>();
-    t.index = j.at("callCount").get<int>();
-    t.mode = j.at("mode").get<int>();
-    t.retAddrOffset = j.at("retAddrOffset").get<int>();
-    t.functionName = j.at("func_name").get<std::string>();
-    t.argHash = j.at("argHash").get<std::string>();
-}
 
 //TODO: Fix logging
 /* Tries to get a new Run ID from the fuzz server */

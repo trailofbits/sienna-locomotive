@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.9)
 # don't get resolved correctly.
 # Background: https://github.com/DynamoRIO/dynamorio/issues/1883
 # Background: https://github.com/DynamoRIO/dynamorio/issues/1866
-add_library(slcommon STATIC uuid.c function_lookup.cpp)
+add_library(slcommon STATIC uuid.c sl2_dr_client.cpp)
 
 # NOTE(ww): The linkage and definition below are needed because
 # of some weirdness that happens with the version of VS that

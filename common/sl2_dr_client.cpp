@@ -1,6 +1,7 @@
 #include "common/sl2_dr_client.hpp"
 
-__declspec(dllexport) char *get_function_name(Function function) {
+__declspec(dllexport) char *get_function_name(Function function)
+{
     switch(function) {
         case Function::ReadFile:
             return "ReadFile";
@@ -23,4 +24,15 @@ __declspec(dllexport) char *get_function_name(Function function) {
     }
 
     return "unknown";
+}
+
+// TODO(ww): Throw an exception on parse/extraction errors.
+__declspec(dllexport) void from_json(const json& j, targetFunction& t)
+{
+    t.selected = j.at("selected").get<bool>();
+    t.index = j.at("callCount").get<int>();
+    t.mode = j.at("mode").get<int>();
+    t.retAddrOffset = j.at("retAddrOffset").get<int>();
+    t.functionName = j.at("func_name").get<std::string>();
+    t.argHash = j.at("argHash").get<std::string>();
 }

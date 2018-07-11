@@ -1,7 +1,13 @@
 #ifndef SL2_DR_CLIENT_H
 #define SL2_DR_CLIENT_H
 
-#include "uuid.h"
+#include <string>
+#include "json.hpp"
+using json = nlohmann::json;
+
+extern "C" {
+    #include "uuid.h"
+}
 
 // Macros for the function prototypes passed to pre- and post-function hooks.
 #define SL2_PRE_PROTO void(__cdecl *)(void *, void **)
@@ -40,7 +46,20 @@ struct fileArgHash {
   DWORD readSize;
 };
 
+// The struct filled with targetting information for a function.
+struct targetFunction {
+  bool selected;
+  UINT64 index;
+  UINT64 mode;
+  UINT64 retAddrOffset;
+  std::string functionName;
+  std::string argHash;
+};
+
 // Returns a C-string corresponding to the requested `function`.
 __declspec(dllexport) char *get_function_name(Function function);
+
+// Converts a JSON object into a `targetFunction`.
+__declspec(dllexport) void from_json(const json& j, targetFunction& t);
 
 #endif

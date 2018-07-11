@@ -23,15 +23,13 @@
 #include "droption.h"
 
 #include <picosha2.h>
-#include <json.hpp>
-using json = nlohmann::json;
 
 extern "C" {
     #include "tracer_utils.h"
-    #include "common/uuid.h"
 }
 
 #include "server.hpp"
+
 #include "common/sl2_dr_client.hpp"
 
 static void *mutatex;
@@ -61,25 +59,7 @@ static droption_t<std::string> op_target(
     "target",
     "Specific call to target.");
 
-struct targetFunction {
-  bool selected;
-  UINT64 index;
-  UINT64 mode;
-  UINT64 retAddrOffset;
-  std::string functionName;
-  std::string argHash;
-};
-
-void from_json(const json& j, targetFunction& t) {
-    t.selected = j.at("selected").get<bool>();
-    t.index = j.at("callCount").get<int>();
-    t.mode = j.at("mode").get<int>();
-    t.retAddrOffset = j.at("retAddrOffset").get<int>();
-    t.functionName = j.at("func_name").get<std::string>();
-    t.argHash = j.at("argHash").get<std::string>();
-}
-
-json parsedJson;
+static json parsedJson;
 
 /* Mostly used to debug if taint tracking is too slow */
 static droption_t<unsigned int> op_no_taint(

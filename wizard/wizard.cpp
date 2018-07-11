@@ -20,8 +20,6 @@
 #include <locale>
 
 #include <picosha2.h>
-#include <json.hpp>
-using json = nlohmann::json;
 using namespace std;
 
 #include "common/sl2_dr_client.hpp"
