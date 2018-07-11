@@ -93,14 +93,14 @@ struct read_info {
     LPVOID lpBuffer;
     size_t nNumberOfBytesToRead;
     Function function;
-    TCHAR *source;
+    WCHAR *source;
     DWORD position;
     DWORD64 retAddrOffset;
-    std::string argHash;
+    char *argHash;
 };
 
-struct fileArgHash{
-  WCHAR fileName[(MAX_PATH + 1) * sizeof(WCHAR)];
+struct fileArgHash {
+  WCHAR fileName[MAX_PATH + 1];
   DWORD64 position;
   DWORD readSize;
 };
@@ -131,6 +131,7 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->source               = NULL;
     ((read_info *)*user_data)->position             = NULL;
     ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    ((read_info *)*user_data)->argHash = NULL;
 }
 
 
@@ -155,6 +156,7 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
         ((read_info *)*user_data)->source               = NULL;
         ((read_info *)*user_data)->position             = NULL;
         ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+        ((read_info *)*user_data)->argHash = NULL;
     } else {
         *user_data = NULL;
     }
@@ -180,6 +182,7 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->source               = NULL;
     ((read_info *)*user_data)->position             = NULL;
     ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    ((read_info *)*user_data)->argHash = NULL;
 }
 
 static void
@@ -201,6 +204,7 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->source               = NULL;
     ((read_info *)*user_data)->position             = NULL;
     ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    ((read_info *)*user_data)->argHash = NULL;
 }
 
 static void
@@ -222,6 +226,7 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->source               = NULL;
     ((read_info *)*user_data)->position             = NULL;
     ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    ((read_info *)*user_data)->argHash = NULL;
 }
 
 static void
@@ -243,6 +248,7 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->source               = NULL;
     ((read_info *)*user_data)->position             = NULL;
     ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    ((read_info *)*user_data)->argHash = NULL;
 
     // get peer name doesn't work
     // https://github.com/DynamoRIO/dynamorio/issues/1883
@@ -272,15 +278,26 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
     ((read_info *)*user_data)->position = SetFilePointer(hFile, 0, NULL, FILE_CURRENT);
 
-    fileArgHash *fStruct = (fileArgHash *)malloc(sizeof(fileArgHash));
-    memset(fStruct, 0, sizeof(fileArgHash));
+    fileArgHash fStruct;
+    memset(&fStruct, 0, sizeof(fileArgHash));
 
-    DWORD pathSize = GetFinalPathNameByHandle(hFile, fStruct->fileName, MAX_PATH, FILE_NAME_NORMALIZED);
-        ((read_info *)*user_data)->source = fStruct->fileName;
-    fStruct->position = ((read_info *)*user_data)->position;
-    fStruct->readSize = nNumberOfBytesToRead;
+    DWORD pathSize = GetFinalPathNameByHandle(hFile, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
 
-    picosha2::hash256_hex_string((unsigned char *)fStruct, (unsigned char *)fStruct+sizeof(fileArgHash), ((read_info *)*user_data)->argHash);
+    ((read_info *)*user_data)->source = (WCHAR *)malloc(sizeof(fStruct.fileName));
+    memcpy(((read_info *)*user_data)->source, fStruct.fileName, sizeof(fStruct.fileName));
+
+    fStruct.position = ((read_info *)*user_data)->position;
+    fStruct.readSize = nNumberOfBytesToRead;
+
+    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct, ((unsigned char *) &fStruct) + sizeof(fileArgHash));
+    std::string hash_str;
+
+    picosha2::hash256_hex_string(blob_vec, hash_str);
+
+    // NOTE(ww): SHA2 digests are 64 characters, so we allocate that + room for a NULL
+    ((read_info *)*user_data)->argHash = (char *) malloc(65);
+    memset(((read_info *)*user_data)->argHash, 0, 65);
+    memcpy(((read_info *)*user_data)->argHash, hash_str.c_str(), 64);
 }
 
 static void
@@ -298,6 +315,7 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->source               = NULL;
     ((read_info *)*user_data)->position             = NULL;
     ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    ((read_info *)*user_data)->argHash = NULL;
 }
 
 static void
@@ -315,14 +333,17 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data) {
     ((read_info *)*user_data)->source               = NULL;
     ((read_info *)*user_data)->position             = NULL;
     ((read_info *)*user_data)->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    ((read_info *)*user_data)->argHash = NULL;
 }
 
 /* prints information about the function call to stderr so the harness can ingest it */
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data) {
-    if(user_data == NULL) {
+    if (user_data == NULL) {
         return;
     }
+
+    wstring_convert<std::codecvt_utf8<wchar_t>> utf8Convert;
 
     read_info *info    = ((read_info *)user_data);
     CHAR *functionName = get_function_name(info->function);
@@ -331,16 +352,13 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     j["type"]               = "id";
     j["callCount"]          = call_counts[info->function];
     j["retAddrOffset"]      = (UINT64) info->retAddrOffset;
-    j["argHash"]            = info->argHash;
-    // wizard prefixes functionName with a ,
     j["func_name"]          = functionName;
 
     call_counts[info->function]++;
 
     if(info->source != NULL) {
-        wstring_convert<std::codecvt_utf8<wchar_t>> utf8Convert;
-        wstring wstr =  wstring(info->source);
-        j["source"]  = utf8Convert.to_bytes(wstr);
+        wstring wsource =  wstring(info->source);
+        j["source"]  = utf8Convert.to_bytes(wsource);
 
         free(info->source);
 
@@ -349,8 +367,14 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
         j["end"]     = end;
     }
 
+    if (info->argHash != NULL) {
+        j["argHash"] = info->argHash;
+        free(info->argHash);
+    }
+
     char * lpBuffer = (char *) info->lpBuffer;
     DWORD nNumberOfBytesToRead = info->nNumberOfBytesToRead;
+
     free(user_data);
 
     vector<unsigned char> x(lpBuffer, lpBuffer + nNumberOfBytesToRead);
