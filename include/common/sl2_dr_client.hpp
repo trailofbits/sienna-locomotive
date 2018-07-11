@@ -1,6 +1,14 @@
 #ifndef SL2_DR_CLIENT_H
 #define SL2_DR_CLIENT_H
 
+// NOTE(ww): You might wonder why we don't include dr_api.h or other
+// DynamoRIO headers in this file. The short reason is that the DynamoRIO
+// headers rely on a bunch of macros that only get defined if you
+// declare your (CMake) target as a DynamoRIO client. Since slcommon
+// isn't a DynamoRIO client and defining all of those macros manually
+// would be fragile, we leave it up to the individual clients
+// to perform the includes.
+
 #include <string>
 #include "json.hpp"
 using json = nlohmann::json;
