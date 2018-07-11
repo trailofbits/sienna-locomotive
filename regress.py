@@ -19,7 +19,7 @@ class Test1(unittest.TestCase):
         p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,  stderr=subprocess.PIPE, close_fds=False)
         stdout, stderr = p.communicate()
         stderr = str(stderr)
-        self.assertRegexpMatches( stderr, r'.*aa8b10f2e5498367555fe6f09175f4d89f93cfe4d4af736cc5245cb8ac7ba1e9.*' )
+        self.assertRegex( stderr, r'.*aa8b10f2e5498367555fe6f09175f4d89f93cfe4d4af736cc5245cb8ac7ba1e9.*' )
 
 
 def main():

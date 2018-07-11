@@ -111,6 +111,17 @@ build\server\Debug\server.exe
 .\dynamorio\bin64\drrun.exe -c build\triage_dynamorio\Debug\tracer.dll -r [RUN_ID] -t 0,ReadFile -- build\corpus\test_application\Debug\test_application.exe 0 -f
 ```
 
+#### Regression Test
+```
+python.exe .\regress.py
+test_main (__main__.Test1) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.906s
+
+OK
+```
+
 ## File Formats
 
 ### FKT Format
