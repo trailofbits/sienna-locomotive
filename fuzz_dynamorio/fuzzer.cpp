@@ -23,8 +23,7 @@ extern "C" {
 }
 
 #include "server.hpp"
-#include "common/function_lookup.hpp"
-#include "common/hook_protos.h"
+#include "sl2_dr_client.hpp"
 
 #ifdef WINDOWS
 #define IF_WINDOWS_ELSE(x,y) x
@@ -66,12 +65,6 @@ struct targetFunction {
   UINT64 retAddrOffset;
   std::string functionName;
   std::string argHash;
-};
-
-struct fileArgHash{
-  WCHAR fileName[(MAX_PATH + 1) * sizeof(WCHAR)];
-  DWORD64 position;
-  DWORD readSize;
 };
 
 // TODO throw error messages if this doesn't work
@@ -813,8 +806,6 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     in that module. */
 static void
 module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
-
-
     if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))){
       baseAddr = (DWORD64) mod->start;
     }
@@ -853,15 +844,16 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
 
         // Look for function matching the target specified on the command line
         std::string strFunctionName(functionName);
+
         for (targetFunction t: parsedJson){
-          if (t.selected and t.functionName == strFunctionName){
-            hook = true;
-          }
-          else if(t.selected and (strFunctionName == "RegQueryValueExW" or strFunctionName == "RegQueryValueExA")) {
-            if(t.functionName != "RegQueryValueEx") {
-              hook = false;
+            if (t.selected && t.functionName == strFunctionName){
+                hook = true;
             }
-          }
+            else if (t.selected && (strFunctionName == "RegQueryValueExW" || strFunctionName == "RegQueryValueExA")) {
+                if (t.functionName != "RegQueryValueEx") {
+                  hook = false;
+                }
+            }
         }
 
         if (!hook)

@@ -32,9 +32,7 @@ extern "C" {
 }
 
 #include "server.hpp"
-#include "common/enums.h"
-#include "common/function_lookup.hpp"
-#include "common/hook_protos.h"
+#include "common/sl2_dr_client.hpp"
 
 void *mutatex;
 bool replay;
@@ -69,12 +67,6 @@ struct targetFunction {
   UINT64 retAddrOffset;
   std::string functionName;
   std::string argHash;
-};
-
-struct fileArgHash{
-  WCHAR fileName[(MAX_PATH + 1) * sizeof(WCHAR)];
-  DWORD64 position;
-  DWORD readSize;
 };
 
 void from_json(const json& j, targetFunction& t) {

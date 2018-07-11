@@ -1,4 +1,4 @@
-#include "common/function_lookup.hpp"
+#include "common/sl2_dr_client.hpp"
 
 __declspec(dllexport) char *get_function_name(Function function) {
     switch(function) {

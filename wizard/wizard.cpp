@@ -24,8 +24,7 @@
 using json = nlohmann::json;
 using namespace std;
 
-#include "common/function_lookup.hpp"
-#include "common/hook_protos.h"
+#include "common/sl2_dr_client.hpp"
 
 #define JSON_VAR (j##__COUNTER__)
 
@@ -47,13 +46,6 @@ struct read_info {
     UINT64 retAddrOffset;
     // TODO(ww): Make this a WCHAR * for consistency.
     char *argHash;
-};
-
-// the data used to construct an identifying hash for a function
-struct fileArgHash {
-  WCHAR fileName[MAX_PATH + 1];
-  UINT64 position;
-  DWORD readSize;
 };
 
 static UINT64 baseAddr;
