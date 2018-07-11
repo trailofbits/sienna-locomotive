@@ -58,13 +58,15 @@ Next, install the following dependencies
 Then, from the root of the Sienna Locomotive repository:
 In powershell, run make.ps1:
 
-`PS C:\proj\sl2\sienna-locomotive> \.make.ps1` 
+`PS C:\proj\sl2\sienna-locomotive> .\make.ps1` 
 
 This should download and install DynamoRIO in the sienna-locomotive directive if it does not already exist.  It will then compile the project.  
 
 If you're not familiar with cmake - the first invocation configures it, the second compiles the project. To recompile, just run the final command again.
 
 You might need to use the Visual Studio Developer Command Prompt in order for cmake to be able to see the VS compiler.
+
+Use `.\make.ps1 clean` for a clean build . 
 
 ### Configuring
 Open up powershell in the project root and run harness.py for the first time.
@@ -86,27 +88,27 @@ Using -h on the harness will print out the list of command line options it suppo
 From the root of the project -
 ```
 # General Pattern:
-C:\path\to\DynamoRIO\bin64\drrun.exe -c build\client_name\Debug\client.dll [client_args] -- C:\path\to\target_application [target_args]
+.\dynamorio\bin64\drrun.exe -c build\client_name\Debug\client.dll [client_args] -- C:\path\to\target_application [target_args]
 
 # triage
-C:\path\to\DynamoRIO\bin64\drrun.exe -c build\triage_dynamorio\Debug\tracer.dll -- corpus\win_asm\crashes.exe 7
+.\dynamorio\bin64\drrun.exe -c build\triage_dynamorio\Debug\tracer.dll -- corpus\win_asm\crashes.exe 7
 
 # wizard
-C:\path\to\DynamoRIO\bin64\drrun.exe -c build\wizard\Debug\wizard.dll -- build\corpus\test_application\Debug\test_application.exe 0
+.\dynamorio\bin64\drrun.exe -c build\wizard\Debug\wizard.dll -- build\corpus\test_application\Debug\test_application.exe 0
 
 # server
 build\server\Debug\server.exe
 
 # fuzzer
-C:\path\to\DynamoRIO\bin64\drrun.exe -c build\fuzz_dynamorio\Debug\fuzzer.dll -- build\corpus\test_application\Debug\test_application.exe 0 -f
+.\dynamorio\bin64\drrun.exe -c build\fuzz_dynamorio\Debug\fuzzer.dll -- build\corpus\test_application\Debug\test_application.exe 0 -f
 
 # triage crash
-C:\path\to\DynamoRIO\bin64\drrun.exe -c sienna-locomotive\build\triage_dynamorio\Debug\tracer.dll -r [RUN_ID] -- build\corpus\test_application\Debug\test_application.exe 0 -f
+.\dynamorio\bin64\drrun.exe -c sienna-locomotive\build\triage_dynamorio\Debug\tracer.dll -r [RUN_ID] -- build\corpus\test_application\Debug\test_application.exe 0 -f
 
 # targeting
-C:\path\to\DynamoRIO\bin64\drrun.exe -c build\fuzz_dynamorio\Debug\fuzzer.dll -t 0,ReadFile -- build\corpus\test_application\Debug\test_application.exe 0 -f
+.\dynamorio\bin64\drrun.exe -c build\fuzz_dynamorio\Debug\fuzzer.dll -t 0,ReadFile -- build\corpus\test_application\Debug\test_application.exe 0 -f
 
-C:\path\to\DynamoRIO\bin64\drrun.exe -c build\triage_dynamorio\Debug\tracer.dll -r [RUN_ID] -t 0,ReadFile -- build\corpus\test_application\Debug\test_application.exe 0 -f
+.\dynamorio\bin64\drrun.exe -c build\triage_dynamorio\Debug\tracer.dll -r [RUN_ID] -t 0,ReadFile -- build\corpus\test_application\Debug\test_application.exe 0 -f
 ```
 
 ## File Formats
