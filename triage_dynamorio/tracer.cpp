@@ -34,22 +34,23 @@ extern "C" {
 #include "server.hpp"
 #include "common/sl2_dr_client.hpp"
 
-void *mutatex;
-bool replay;
-bool mutate_count;
-UUID run_id;
+static void *mutatex;
+static bool replay;
+static bool mutate_count;
+static UUID run_id;
 
-std::set<reg_id_t> tainted_regs;
-std::set<app_pc> tainted_mems;
+static std::set<reg_id_t> tainted_regs;
+static std::set<app_pc> tainted_mems;
 
 #define LAST_COUNT 5
-int last_call_idx = 0;
-int last_insn_idx = 0;
-app_pc last_calls[LAST_COUNT] = { 0 };
-app_pc last_insns[LAST_COUNT] = { 0 };
 
-app_pc module_start = 0;
-app_pc module_end = 0;
+static int last_call_idx = 0;
+static int last_insn_idx = 0;
+static app_pc last_calls[LAST_COUNT] = { 0 };
+static app_pc last_insns[LAST_COUNT] = { 0 };
+
+static app_pc module_start = 0;
+static app_pc module_end = 0;
 static DWORD64 baseAddr;
 
 /* Required, which specific call to target */
@@ -96,7 +97,7 @@ static droption_t<std::string> op_replay(
     "replay",
     "The run id for a crash to replay.");
 
-std::map<Function, UINT64> call_counts;
+static std::map<Function, UINT64> call_counts;
 
 /* Currently unused as this runs on 64 bit applications */
 static reg_id_t reg_to_full_width32(reg_id_t reg) {
