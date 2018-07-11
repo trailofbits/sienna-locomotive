@@ -27,7 +27,7 @@
 using json = nlohmann::json;
 
 extern "C" {
-    #include "utils.h"
+    #include "tracer_utils.h"
     #include "common/uuid.h"
 }
 
