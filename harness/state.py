@@ -1,3 +1,7 @@
+"""
+Helper functions for reading and writing files to manage the fuzzing lifecycle
+Imports harness/config.py for argument and config file handling.
+"""
 import os
 import glob
 import re
@@ -67,6 +71,19 @@ def get_runs():
 def get_path_to_run_file(run_id, filename):
     """ Helper function for easily getting the full path to a file in the current run's directory """
     return os.path.join(config.sl2_dir, 'working', str(run_id), filename)
+
+
+def write_output_files(proc, run_id, stage_name):
+    """ Writes the stdout and stderr buffers for a run into the working directory """
+    try:
+        if proc.stdout is not None:
+            with open(get_path_to_run_file(run_id, '{}.stdout'.format(stage_name)), 'wb') as stdoutfile:
+                stdoutfile.write(proc.stdout)
+        if proc.stderr is not None:
+            with open(get_path_to_run_file(run_id, '{}.stderr'.format(stage_name)), 'wb') as stderrfile:
+                stderrfile.write(proc.stderr)
+    except FileNotFoundError:
+        print("Couldn't find an output directory for run %s" % run_id)
 
 
 def finalize(run_id, crashed):

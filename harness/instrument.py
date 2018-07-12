@@ -1,3 +1,10 @@
+"""
+Instrumentation functions for running DynamoRIO client & the fuzzing server
+Imports harness/config.py for argument and config file handling.
+Imports harness/state.py for fuzzing lifecycle management
+Imports harness/enums.py for the targeting mode enum
+"""
+
 import subprocess
 import time
 import signal
@@ -6,14 +13,21 @@ import uuid
 import os
 import json
 import traceback
+from enum import IntEnum
 
-from .state import get_path_to_run_file, finalize
-from .enums import Mode
+from .state import get_path_to_run_file, finalize, write_output_files
 from . import config
 
 
 print_lock = threading.Lock()
 can_fuzz = True
+
+
+class Mode(IntEnum):
+    """ Function selection modes. KEEP THIS UP-TO-DATE with common/enums.h """
+    MATCH_INDEX = 1 << 0
+    MATCH_RETN_ADDRESS = 1 << 1
+    MATCH_ARG_HASH = 1 << 2
 
 
 def print_l(*args):
@@ -23,7 +37,7 @@ def print_l(*args):
 
 
 def start_server():
-    # Start the server if it's not already running
+    """ Start the server if it's not already running """
     if not os.path.isfile(config.sl2_server_pipe_path):
         subprocess.Popen(["powershell", "start", "powershell",
                           "{-NoExit", "-Command", "\"{}\"}}".format(config.config['server_path'])])
@@ -31,11 +45,11 @@ def start_server():
         time.sleep(1)
 
 
-def run_dr(_config, save_stdout=False, save_stderr=False, verbose=False, timeout=None):
+def run_dr(config_dict, save_stdout=False, save_stderr=False, verbose=False, timeout=None):
     """ Runs dynamorio with the given config. Clobbers console output if save_stderr/stdout are true """
-    program_arr = [_config['drrun_path'], '-pidfile', 'pidfile'] + _config['drrun_args'] + \
-        ['-c', _config['client_path']] + _config['client_args'] + \
-        ['--', _config['target_application_path']] + _config['target_args']
+    program_arr = [config_dict['drrun_path'], '-pidfile', 'pidfile'] + config_dict['drrun_args'] + \
+        ['-c', config_dict['client_path']] + config_dict['client_args'] + \
+        ['--', config_dict['target_application_path']] + config_dict['target_args']
 
     if verbose:
         print_l("Executing drrun: %s" % ' '.join((k if " " not in k else "\"{}\"".format(k)) for k in program_arr))
@@ -92,37 +106,23 @@ def run_dr(_config, save_stdout=False, save_stderr=False, verbose=False, timeout
         return popen_obj
 
 
-def write_output_files(proc, run_id, stage_name):
-    """ Writes the stdout and stderr buffers for a run into the working directory """
-    try:
-        if proc.stdout is not None:
-            with open(get_path_to_run_file(run_id, '{}.stdout'.format(stage_name)), 'wb') as stdoutfile:
-                stdoutfile.write(proc.stdout)
-        if proc.stderr is not None:
-            with open(get_path_to_run_file(run_id, '{}.stderr'.format(stage_name)), 'wb') as stderrfile:
-                stderrfile.write(proc.stderr)
-    except FileNotFoundError:
-        print_l("Couldn't find an output directory for run %s" % run_id)
-
-
-def wizard_run(_config):
+def wizard_run(config_dict):
     """ Runs the wizard and lets the user select a target function """
-    completed_process = run_dr({'drrun_path': _config['drrun_path'],
-                                'drrun_args': _config['drrun_args'],
-                                'client_path': _config['wizard_path'],
+    completed_process = run_dr({'drrun_path': config_dict['drrun_path'],
+                                'drrun_args': config_dict['drrun_args'],
+                                'client_path': config_dict['wizard_path'],
                                 'client_args': [],
-                                'target_application_path': _config['target_application_path'],
-                                'target_args': _config['target_args']},
+                                'target_application_path': config_dict['target_application_path'],
+                                'target_args': config_dict['target_args']},
                                save_stdout=True,
                                save_stderr=True,
-                               verbose=_config['verbose'])
+                               verbose=config_dict['verbose'])
     wizard_output = completed_process.stderr.decode('utf-8')
     wizard_findings = []
 
     for line in wizard_output.splitlines():
         try:
             obj = json.loads(line)
-            print(obj)
             if "wrapped" == obj["type"]:
                 # TODO do something here later
                 pass
@@ -139,10 +139,10 @@ def wizard_run(_config):
     return wizard_findings
 
 
-def fuzzer_run(_config):
+def fuzzer_run(config_dict):
     """ Runs the fuzzer """
-    completed_process = run_dr(_config, True, True,
-                               verbose=_config['verbose'], timeout=_config.get('fuzz_timeout', None))
+    completed_process = run_dr(config_dict, True, True,
+                               verbose=config_dict['verbose'], timeout=config_dict.get('fuzz_timeout', None))
 
     # Parse run ID from fuzzer output
     run_id = 'ERR'
@@ -163,7 +163,7 @@ def fuzzer_run(_config):
         # Write stdout and stderr to files
         # TODO fix issue #40
         write_output_files(completed_process, run_id, 'fuzz')
-    elif _config['verbose']:
+    elif config_dict['verbose']:
         print_l("Run %s did not find a crash" % run_id)
 
     # Handle orphaned pipes after a timeout
@@ -176,18 +176,18 @@ def fuzzer_run(_config):
     return crashed, run_id
 
 
-def triage_run(_config, run_id):
+def triage_run(config_dict, run_id):
     """ Runs the triaging tool """
-    completed_process = run_dr({'drrun_path': _config['drrun_path'],
-                                'drrun_args': _config['drrun_args'],
-                                'client_path': _config['triage_path'],
-                                'client_args': _config['client_args'] + ['-r', str(run_id)],
-                                'target_application_path': _config['target_application_path'],
-                                'target_args': _config['target_args']},
+    completed_process = run_dr({'drrun_path': config_dict['drrun_path'],
+                                'drrun_args': config_dict['drrun_args'],
+                                'client_path': config_dict['triage_path'],
+                                'client_args': config_dict['client_args'] + ['-r', str(run_id)],
+                                'target_application_path': config_dict['target_application_path'],
+                                'target_args': config_dict['target_args']},
                                True,
                                True,
-                               _config['verbose'],
-                               _config.get('triage_timeout', None))
+                               config_dict['verbose'],
+                               config_dict.get('triage_timeout', None))
 
     # Write stdout and stderr to files
     write_output_files(completed_process, run_id, 'triage')
@@ -203,24 +203,25 @@ def triage_run(_config, run_id):
         print_l("Triage run %s returned %s (no crash file found)" % (run_id, completed_process.returncode))
 
 
-def fuzz_and_triage(_config):
+def fuzz_and_triage(config_dict):
     """ Runs the fuzzer (in a loop if continuous is true), then runs the triage tool if a crash is found """
     global can_fuzz
     # TODO: Move try/except so we can start new runs after an exception
     try:
         while can_fuzz:
-            crashed, run_id = fuzzer_run(_config)
+            crashed, run_id = fuzzer_run(config_dict)
             if crashed:
-                triage_run(_config, run_id)
+                triage_run(config_dict, run_id)
 
-                if _config['exit_early']:
+                if config_dict['exit_early']:
                     can_fuzz = False  # Prevent other threads from starting new fuzzing runs
 
-            if not _config['continuous']:
+            if not config_dict['continuous']:
                 return
 
     except Exception:
         traceback.print_exc()
+
 
 def kill():
     global can_fuzz
