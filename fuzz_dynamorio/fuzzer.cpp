@@ -53,6 +53,8 @@ static BOOL crashed = false;
 static std::map<Function, UINT64> call_counts;
 static DWORD64 baseAddr;
 
+static DWORD mutateCount = 0;
+
 // Metadata object for a target function call
 struct fuzzer_read_info {
     Function function;
@@ -68,7 +70,8 @@ struct fuzzer_read_info {
 
 //TODO: Fix logging
 /* Tries to get a new Run ID from the fuzz server */
-UUID getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs) {
+UUID getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs)
+{
     dr_log(NULL, DR_LOG_ALL, ERROR, "Requesting run id");
     DWORD bytesRead = 0;
     DWORD bytesWritten = 0;
@@ -112,7 +115,8 @@ UUID getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs) {
 }
 
 /* Get a handle to the pipe that lets us talk to the server */
-HANDLE getPipe() {
+HANDLE getPipe()
+{
     HANDLE hPipe;
     while (1) {
         hPipe = CreateFile(
@@ -155,7 +159,8 @@ HANDLE getPipe() {
 }
 
 /* Close out the fuzzing run with the server */
-DWORD finalize(HANDLE hPipe, UUID runId, BOOL crashed) {
+DWORD finalize(HANDLE hPipe, UUID runId, BOOL crashed)
+{
     WCHAR runId_s[SL2_UUID_SIZE];
     sl2_uuid_to_wstring(runId, runId_s);
 
@@ -197,7 +202,8 @@ DWORD finalize(HANDLE hPipe, UUID runId, BOOL crashed) {
 
 /* Read the PEB of the target application and get the full command line */
 static LPTSTR
-get_target_command_line() {
+get_target_command_line()
+{
     // see: https://github.com/DynamoRIO/dynamorio/issues/2662
     // alternatively: https://wj32.org/wp/2009/01/24/howto-get-the-command-line-of-processes/
     _PEB * clientPEB = (_PEB *) dr_get_app_PEB();
@@ -219,12 +225,13 @@ get_target_command_line() {
         dr_exit_process(1);
     }
 
-  return commandLineContents;
+    return commandLineContents;
 }
 
 /* Maps exception code to an exit status. Print it out, then exit. */
 static bool
-onexception(void *drcontext, dr_exception_t *excpt) {
+onexception(void *drcontext, dr_exception_t *excpt)
+{
     dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#onexception: Exception occurred!\n");
     crashed = true;
     DWORD exceptionCode = excpt->record->ExceptionCode;
@@ -300,7 +307,8 @@ onexception(void *drcontext, dr_exception_t *excpt) {
 
 /* Runs after the target application has exited */
 static void
-event_exit(void) {
+event_exit(void)
+{
     dr_fprintf(STDERR, "Dynamorio exiting (fuzzer)\n");
     HANDLE hPipe = getPipe();
     finalize(hPipe, runId, crashed); // Delete the fuzzing run if we didn't find a crash
@@ -313,9 +321,9 @@ event_exit(void) {
 }
 
 /* Hands bytes off to the mutation server, gets mutated bytes, and writes them into memory. */
-static DWORD mutateCount = 0;
 static BOOL
-mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size) {
+mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size)
+{
     WCHAR filePath[MAX_PATH + 1] = {0};
     WCHAR *new_buf = (WCHAR *)buf;
     DWORD pathSize = 0;
@@ -462,7 +470,8 @@ check_cache() {
     Return: If the function succeeds, the return value is nonzero.
 */
 static void
-wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
+wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
+{
     dr_fprintf(STDERR, "<in wrap_pre_ReadEventLog>\n");
     HANDLE hEventLog = (HANDLE)drwrap_get_arg(wrapcxt, 0);
     DWORD  dwReadFlags = (DWORD)drwrap_get_arg(wrapcxt, 1);
@@ -499,7 +508,8 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
     Return: If the function succeeds, the return value is ERROR_SUCCESS.
 */
 static void
-wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
+wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
+{
     dr_fprintf(STDERR, "<in wrap_pre_RegQueryValueEx>\n");
     HKEY    hKey = (HKEY)drwrap_get_arg(wrapcxt, 0);
     LPCTSTR lpValueName = (LPCTSTR)drwrap_get_arg(wrapcxt, 1);
@@ -538,7 +548,8 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
     Return: NO_ERROR on success. Otherwise an error code.
 */
 static void
-wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
+wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
+{
     dr_fprintf(STDERR, "<in wrap_pre_WinHttpWebSocketReceive>\n");
     HINTERNET hRequest = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     PVOID pvBuffer = drwrap_get_arg(wrapcxt, 1);
@@ -575,7 +586,8 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
     Return: Returns TRUE if successful
 */
 static void
-wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
+wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
+{
     dr_fprintf(STDERR, "<in wrap_pre_InternetReadFile>\n");
     HINTERNET hFile = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
@@ -610,7 +622,8 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
     Return: Returns TRUE if successful
 */
 static void
-wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
+wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
+{
     dr_fprintf(STDERR, "<in wrap_pre_WinHttpReadData>\n");
     HINTERNET hRequest = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
@@ -646,7 +659,8 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
     Return: recv returns the number of bytes received
 */
 static void
-wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
+wrap_pre_recv(void *wrapcxt, OUT void **user_data)
+{
     dr_fprintf(STDERR, "<in wrap_pre_recv>\n");
     SOCKET s  = (SOCKET)drwrap_get_arg(wrapcxt, 0);
     char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
@@ -678,7 +692,8 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
     Return: If the function succeeds, the return value is nonzero (TRUE).
 */
 static void
-wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
+wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
+{
     dr_fprintf(STDERR, "<in wrap_pre_ReadFile>\n");
     HANDLE hFile                = drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer             = drwrap_get_arg(wrapcxt, 1);
@@ -741,7 +756,8 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
 }
 
 static void
-wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
+wrap_pre_fread(void *wrapcxt, OUT void **user_data)
+{
     dr_fprintf(STDERR, "<in wrap_pre_fread>\n");
 
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
@@ -767,12 +783,13 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
 
 /* Mutates whatever data the hooked function wrote */
 static void
-wrap_post_Generic(void *wrapcxt, void *user_data) {
-    if(user_data == NULL) {
+wrap_post_Generic(void *wrapcxt, void *user_data)
+{
+    if (user_data == NULL) {
         return;
     }
 
-    fuzzer_read_info *info = ((fuzzer_read_info *)user_data);
+    fuzzer_read_info *info = ((fuzzer_read_info *) user_data);
 
     // Record the metadata about this function call
     Function function           = info->function;
@@ -798,6 +815,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
             }
         }
     }
+
     call_counts[function]++; // increment the call counter
 
     if (lpNumberOfBytesRead) {
@@ -822,7 +840,8 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
 /* Runs when a new module (typically an exe or dll) is loaded. Tells DynamoRIO to hook all the interesting functions
     in that module. */
 static void
-module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
+module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
+{
     if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))){
         baseAddr = (DWORD64) mod->start;
     }
@@ -935,7 +954,8 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
 */
 
 /* Runs after process initialization. Initializes DynamoRIO */
-DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[]) {
+DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
+{
     dr_set_client_name("Sienna-Locomotive Fuzzer",
                        "https://github.com/trailofbits/sienna-locomotive/issues");
 
