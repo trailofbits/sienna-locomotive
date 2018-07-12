@@ -17,6 +17,9 @@ extern "C" {
     #include "uuid.h"
 }
 
+// Used for debugging prints.
+#define SL2_DEBUG(...) (dr_fprintf(STDERR, __VA_ARGS__))
+
 // Macros for the function prototypes passed to pre- and post-function hooks.
 #define SL2_PRE_PROTO void(__cdecl *)(void *, void **)
 #define SL2_POST_PROTO void(__cdecl *)(void *, void *)
