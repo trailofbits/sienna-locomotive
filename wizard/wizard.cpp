@@ -367,8 +367,6 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
         wstring wsource =  wstring(info->source);
         j["source"]  = utf8Converter.to_bytes(wsource);
 
-        free(info->source);
-
         size_t end   = info->position + info->nNumberOfBytesToRead;
         j["start"]   = info->position;
         j["end"]     = end;
@@ -376,18 +374,24 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
 
     if (info->argHash != NULL) {
         j["argHash"] = info->argHash;
-        free(info->argHash);
     }
 
     char *lpBuffer = (char *) info->lpBuffer;
     DWORD nNumberOfBytesToRead = info->nNumberOfBytesToRead;
 
-    free(user_data);
-
     vector<unsigned char> x(lpBuffer, lpBuffer + nNumberOfBytesToRead);
     j["buffer"] = x;
 
     logObject(j);
+
+    if (info->source) {
+        free(info->source);
+    }
+    if (info->argHash) {
+        free(info->argHash);
+    }
+
+    free(info);
 }
 
 /* Runs every time we load a new module. Wraps functions we can target. See fuzzer.cpp for a more-detailed version */
