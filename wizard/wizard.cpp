@@ -408,28 +408,28 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     }
 
     std::map<char *, SL2_PRE_PROTO> toHookPre;
-    toHookPre["ReadEventLog"]            = wrap_pre_ReadEventLog;
-    toHookPre["RegQueryValueExW"]        = wrap_pre_RegQueryValueEx;
-    toHookPre["RegQueryValueExA"]        = wrap_pre_RegQueryValueEx;
-    toHookPre["WinHttpWebSocketReceive"] = wrap_pre_WinHttpWebSocketReceive;
-    toHookPre["InternetReadFile"]        = wrap_pre_InternetReadFile;
-    toHookPre["WinHttpReadData"]         = wrap_pre_WinHttpReadData;
-    toHookPre["recv"]                    = wrap_pre_recv;
-    toHookPre["ReadFile"]                = wrap_pre_ReadFile;
-    toHookPre["fread_s"]                 = wrap_pre_fread_s;
-    toHookPre["fread"]                   = wrap_pre_fread;
+    SL2_PRE_HOOK1(toHookPre, ReadFile);
+    SL2_PRE_HOOK1(toHookPre, InternetReadFile);
+    SL2_PRE_HOOK1(toHookPre, ReadEventLog);
+    SL2_PRE_HOOK2(toHookPre, RegQueryValueExW, RegQueryValueEx);
+    SL2_PRE_HOOK2(toHookPre, RegQueryValueExA, RegQueryValueEx);
+    SL2_PRE_HOOK1(toHookPre, WinHttpWebSocketReceive);
+    SL2_PRE_HOOK1(toHookPre, WinHttpReadData);
+    SL2_PRE_HOOK1(toHookPre, recv);
+    SL2_PRE_HOOK1(toHookPre, fread_s);
+    SL2_PRE_HOOK1(toHookPre, fread);
 
     std::map<char *, SL2_POST_PROTO> toHookPost;
-    toHookPost["ReadFile"]                = wrap_post_Generic;
-    toHookPost["InternetReadFile"]        = wrap_post_Generic;
-    toHookPost["ReadEventLog"]            = wrap_post_Generic;
-    toHookPost["RegQueryValueExW"]        = wrap_post_Generic;
-    toHookPost["RegQueryValueExA"]        = wrap_post_Generic;
-    toHookPost["WinHttpWebSocketReceive"] = wrap_post_Generic;
-    toHookPost["WinHttpReadData"]         = wrap_post_Generic;
-    toHookPost["recv"]                    = wrap_post_Generic;
-    toHookPost["fread_s"]                 = wrap_post_Generic;
-    toHookPost["fread"]                   = wrap_post_Generic;
+    SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
+    SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
+    SL2_POST_HOOK2(toHookPost, ReadEventLog, Generic);
+    SL2_POST_HOOK2(toHookPost, RegQueryValueExW, Generic);
+    SL2_POST_HOOK2(toHookPost, RegQueryValueExA, Generic);
+    SL2_POST_HOOK2(toHookPost, WinHttpWebSocketReceive, Generic);
+    SL2_POST_HOOK2(toHookPost, WinHttpReadData, Generic);
+    SL2_POST_HOOK2(toHookPost, recv, Generic);
+    SL2_POST_HOOK2(toHookPost, fread_s, Generic);
+    SL2_POST_HOOK2(toHookPost, fread, Generic);
 
     std::map<char *, SL2_PRE_PROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {

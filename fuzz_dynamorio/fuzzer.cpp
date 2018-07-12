@@ -839,35 +839,35 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 static void
 module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
 {
-    if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))){
+    if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))) {
         baseAddr = (DWORD64) mod->start;
     }
 
     // Build list of pre-function hooks
     std::map<char *, SL2_PRE_PROTO> toHookPre;
-    toHookPre["ReadFile"] = wrap_pre_ReadFile;
-    toHookPre["InternetReadFile"] = wrap_pre_InternetReadFile;
-    toHookPre["ReadEventLog"] = wrap_pre_ReadEventLog;
-    toHookPre["RegQueryValueExW"] = wrap_pre_RegQueryValueEx;
-    toHookPre["RegQueryValueExA"] = wrap_pre_RegQueryValueEx;
-    toHookPre["WinHttpWebSocketReceive"] = wrap_pre_WinHttpWebSocketReceive;
-    toHookPre["WinHttpReadData"] = wrap_pre_WinHttpReadData;
-    toHookPre["recv"] = wrap_pre_recv;
-    toHookPre["fread_s"] = wrap_pre_fread_s;
-    toHookPre["fread"] = wrap_pre_fread;
+    SL2_PRE_HOOK1(toHookPre, ReadFile);
+    SL2_PRE_HOOK1(toHookPre, InternetReadFile);
+    SL2_PRE_HOOK1(toHookPre, ReadEventLog);
+    SL2_PRE_HOOK2(toHookPre, RegQueryValueExW, RegQueryValueEx);
+    SL2_PRE_HOOK2(toHookPre, RegQueryValueExA, RegQueryValueEx);
+    SL2_PRE_HOOK1(toHookPre, WinHttpWebSocketReceive);
+    SL2_PRE_HOOK1(toHookPre, WinHttpReadData);
+    SL2_PRE_HOOK1(toHookPre, recv);
+    SL2_PRE_HOOK1(toHookPre, fread_s);
+    SL2_PRE_HOOK1(toHookPre, fread);
 
     // Build list of post-function hooks
     std::map<char *, SL2_POST_PROTO> toHookPost;
-    toHookPost["ReadFile"] = wrap_post_Generic;
-    toHookPost["InternetReadFile"] = wrap_post_Generic;
-    toHookPost["ReadEventLog"] = wrap_post_Generic;
-    toHookPost["RegQueryValueExW"] = wrap_post_Generic;
-    toHookPost["RegQueryValueExA"] = wrap_post_Generic;
-    toHookPost["WinHttpWebSocketReceive"] = wrap_post_Generic;
-    toHookPost["WinHttpReadData"] = wrap_post_Generic;
-    toHookPost["recv"] = wrap_post_Generic;
-    toHookPost["fread_s"] = wrap_post_Generic;
-    toHookPost["fread"] = wrap_post_Generic;
+    SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
+    SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
+    SL2_POST_HOOK2(toHookPost, ReadEventLog, Generic);
+    SL2_POST_HOOK2(toHookPost, RegQueryValueExW, Generic);
+    SL2_POST_HOOK2(toHookPost, RegQueryValueExA, Generic);
+    SL2_POST_HOOK2(toHookPost, WinHttpWebSocketReceive, Generic);
+    SL2_POST_HOOK2(toHookPost, WinHttpReadData, Generic);
+    SL2_POST_HOOK2(toHookPost, recv, Generic);
+    SL2_POST_HOOK2(toHookPost, fread_s, Generic);
+    SL2_POST_HOOK2(toHookPost, fread, Generic);
 
     // Iterate over list of hooks and register them with DynamoRIO
     std::map<char *, SL2_PRE_PROTO>::iterator it;
