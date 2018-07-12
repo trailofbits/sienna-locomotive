@@ -29,10 +29,10 @@ __declspec(dllexport) char *get_function_name(Function function)
 // TODO(ww): Throw an exception on parse/extraction errors.
 __declspec(dllexport) void from_json(const json& j, targetFunction& t)
 {
-    t.selected = j.at("selected").get<bool>();
-    t.index = j.at("callCount").get<int>();
-    t.mode = j.at("mode").get<int>();
-    t.retAddrOffset = j.at("retAddrOffset").get<int>();
-    t.functionName = j.at("func_name").get<std::string>();
-    t.argHash = j.at("argHash").get<std::string>();
+    t.selected = j.value("selected", false);
+    t.index = j.value("callCount", -1);
+    t.mode = j.value("mode", MATCH_INDEX);
+    t.retAddrOffset = j.value("retAddrOffset", -1);
+    t.functionName = j.value("func_name", "");
+    t.argHash = j.value("argHash", "");
 }
