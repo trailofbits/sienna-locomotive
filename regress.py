@@ -35,7 +35,6 @@ class TestWizard(unittest.TestCase):
             r'0' ]
         
         stdout, stderr = runAndCaptureOutput(cmd)
-        self.assertTrue( 'aa8b10f2e5498367555fe6f09175f4d89f93cfe4d4af736cc5245cb8ac7ba1e9'  in stderr )
         self.assertTrue(  r'buffer":[65,65,65,65,65,65,65,65]'  in stderr )
 
     def test_2(self):
