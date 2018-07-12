@@ -83,7 +83,8 @@ struct tracer_read_info {
     DWORD nNumberOfBytesToRead;
     Function function;
     DWORD64 retAddrOffset;
-    std::string argHash;
+    // TODO(ww) Use WCHAR * here for consistency.
+    char *argHash;
 };
 
 /* Currently unused as this runs on 64 bit applications */
@@ -1134,6 +1135,7 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
     info->function             = Function::ReadEventLog;
     info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->argHash              = NULL;
 }
 
 static void
@@ -1154,6 +1156,7 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
         info->nNumberOfBytesToRead = *lpcbData;
         info->function = Function::RegQueryValueEx;
         info->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+        info->argHash              = NULL;
     } else {
         *user_data = NULL;
     }
@@ -1175,6 +1178,7 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
     info->nNumberOfBytesToRead = dwBufferLength;
     info->function = Function::WinHttpWebSocketReceive;
     info->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->argHash              = NULL;
 }
 
 static void
@@ -1192,6 +1196,7 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
     info->function             = Function::InternetReadFile;
     info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->argHash              = NULL;
 }
 
 static void
@@ -1209,6 +1214,7 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
     info->function             = Function::WinHttpReadData;
     info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->argHash              = NULL;
 }
 
 static void
@@ -1226,6 +1232,7 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
     info->nNumberOfBytesToRead = len;
     info->function             = Function::recv;
     info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->argHash              = NULL;
 }
 
 static void
@@ -1254,7 +1261,14 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     fStruct.position = (positionHigh << 32) | positionLow;;
     fStruct.readSize = nNumberOfBytesToRead;
 
-    picosha2::hash256_hex_string((unsigned char *)&fStruct, (unsigned char *)&fStruct+sizeof(fileArgHash), ((tracer_read_info *)*user_data)->argHash);
+    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct, ((unsigned char *) &fStruct) + sizeof(fileArgHash));
+    std::string hash_str;
+    picosha2::hash256_hex_string(blob_vec, hash_str);
+
+    // NOTE(ww): SHA2 digests are 64 characters, so we allocate that + room for a NULL
+    info->argHash = (char *) malloc(65);
+    memset(info->argHash, 0, 65);
+    memcpy(info->argHash, hash_str.c_str(), 64);
 }
 
 static void
@@ -1271,6 +1285,7 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data) {
     info->lpBuffer             = buffer;
     info->nNumberOfBytesToRead = size * count;
     info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->argHash              = NULL;
 }
 
 static void
@@ -1287,6 +1302,7 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     info->lpBuffer = buffer;
     info->nNumberOfBytesToRead = size * count;
     info->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->argHash              = NULL;
 }
 
 /* Called after each targeted function to replay mutation and mark bytes as tainted */
@@ -1304,30 +1320,28 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
     DWORD nNumberOfBytesToRead = info->nNumberOfBytesToRead;
     Function function          = info->function;
     DWORD64 retAddrOffset      = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    std::string argHash        = info->argHash;
-    free(user_data);
 
     // Identify whether this is the function we want to target
     BOOL targeted = false;
     std::string strFunctionName(get_function_name(function));
-    for (targetFunction t: parsedJson){
-      if (t.selected and t.functionName == strFunctionName){
-        if (t.mode & MATCH_INDEX and call_counts[function] == t.index){
-          targeted = true;
+    for (targetFunction t : parsedJson){
+        if (t.selected && t.functionName == strFunctionName){
+            if (t.mode & MATCH_INDEX && call_counts[function] == t.index){
+              targeted = true;
+            }
+            else if (t.mode & MATCH_RETN_ADDRESS && t.retAddrOffset == retAddrOffset){
+              targeted = true;
+            }
+            else if (t.mode & MATCH_ARG_HASH && !strcmp(t.argHash.c_str(), info->argHash)){
+                targeted = true;
+            }
         }
-        else if (t.mode & MATCH_RETN_ADDRESS and t.retAddrOffset == retAddrOffset){
-          targeted = true;
-        }
-        else if (t.mode & MATCH_ARG_HASH and t.argHash == argHash){
-            targeted = true;
-        }
-      }
     }
 
     call_counts[function]++;
 
     // Mark the targeted memory as tainted
-    if(targeted) {
+    if (targeted) {
         taint_mem((app_pc)lpBuffer, nNumberOfBytesToRead);
     }
 
@@ -1368,6 +1382,12 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
             dr_mutex_unlock(mutatex);
         }
     }
+
+    if (info->argHash) {
+        free(info->argHash);
+    }
+
+    free(info);
 }
 
 /* Register function pre/post callbacks in each module */
@@ -1410,18 +1430,18 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
 
     // when a module is loaded, iterate its functions looking for matches in toHookPre
     std::map<char *, SL2_PRE_PROTO>::iterator it;
-    for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
+    for (it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
         bool hook = false;
 
         // Look for function matching the target specified on the command line
         std::string strFunctionName(functionName);
-        for (targetFunction t: parsedJson){
+        for (targetFunction t : parsedJson){
           if (t.selected and t.functionName == strFunctionName){
             hook = true;
           }
-          else if(t.selected and (strFunctionName == "RegQueryValueExW" or strFunctionName == "RegQueryValueExA")) {
-            if(t.functionName != "RegQueryValueEx") {
+          else if (t.selected and (strFunctionName == "RegQueryValueExW" or strFunctionName == "RegQueryValueExA")) {
+            if (t.functionName != "RegQueryValueEx") {
               hook = false;
             }
           }

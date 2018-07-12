@@ -62,7 +62,8 @@ struct fuzzer_read_info {
     LPDWORD lpNumberOfBytesRead;
     DWORD64 position;
     DWORD64 retAddrOffset;
-    std::string argHash;
+    // TODO(ww): Make this a WCHAR * for consistency.
+    char *argHash;
 };
 
 //TODO: Fix logging
@@ -481,6 +482,7 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
     info->lpNumberOfBytesRead  = pnBytesRead;
     info->position             = 0;
     info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->argHash              = NULL;
 }
 
 
@@ -517,6 +519,7 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
         info->lpNumberOfBytesRead  = lpcbData;
         info->position             = 0;
         info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+        info->argHash              = NULL;
     } else {
         *user_data = NULL;
     }
@@ -558,6 +561,7 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
     info->lpNumberOfBytesRead  = pdwBytesRead;
     info->position             = 0;
     info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->argHash              = NULL;
 }
 
 /*
@@ -592,6 +596,7 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
     info->lpNumberOfBytesRead  = lpNumberOfBytesRead;
     info->position             = 0;
     info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->argHash              = NULL;
 }
 
 /*
@@ -626,6 +631,7 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
     info->lpNumberOfBytesRead  = lpNumberOfBytesRead;
     info->position             = 0;
     info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->argHash              = NULL;
 }
 
 
@@ -657,6 +663,7 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
     info->lpNumberOfBytesRead  = NULL;
     info->position             = 0;
     info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->argHash              = NULL;
 }
 
 /*
@@ -700,7 +707,14 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     fStruct.position = ((fuzzer_read_info *)*user_data)->position;
     fStruct.readSize = nNumberOfBytesToRead;
 
-    picosha2::hash256_hex_string((unsigned char *)&fStruct, (unsigned char *)&fStruct+sizeof(fileArgHash), ((fuzzer_read_info *)*user_data)->argHash);
+    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct, ((unsigned char *) &fStruct) + sizeof(fileArgHash));
+    std::string hash_str;
+    picosha2::hash256_hex_string(blob_vec, hash_str);
+
+    // NOTE(ww): SHA2 digests are 64 characters, so we allocate that + room for a NULL
+    info->argHash = (char *) malloc(65);
+    memset(info->argHash, 0, 65);
+    memcpy(info->argHash, hash_str.c_str(), 64);
 }
 
 static void
@@ -723,11 +737,13 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
     info->nNumberOfBytesToRead = size * count;
     info->lpNumberOfBytesRead  = NULL;
     info->position             = NULL;
+    info->argHash              = NULL;
 }
 
 static void
 wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     dr_fprintf(STDERR, "<in wrap_pre_fread>\n");
+
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 1);
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
@@ -745,7 +761,9 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     info->lpNumberOfBytesRead  = NULL;
     info->position             = NULL;
     info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->argHash              = NULL;
 }
+
 
 /* Mutates whatever data the hooked function wrote */
 static void
@@ -764,24 +782,21 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     LPDWORD lpNumberOfBytesRead = info->lpNumberOfBytesRead;
     DWORD64 position            = info->position;
     DWORD64 retAddrOffset       = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    std::string argHash         = info->argHash;
-
-    free(user_data);
 
     BOOL targeted = false;
     std::string strFunctionName(get_function_name(function));
-    for (targetFunction t: parsedJson){
-      if (t.selected and t.functionName == strFunctionName){
-        if (t.mode & MATCH_INDEX and call_counts[function] == t.index){
-          targeted = true;
+    for (targetFunction t : parsedJson){
+        if (t.selected && t.functionName == strFunctionName) {
+            if (t.mode & MATCH_INDEX && call_counts[function] == t.index){
+              targeted = true;
+            }
+            else if (t.mode & MATCH_RETN_ADDRESS && t.retAddrOffset == retAddrOffset) {
+              targeted = true;
+            }
+            else if (t.mode & MATCH_ARG_HASH && !strcmp(t.argHash.c_str(), info->argHash)) {
+                targeted = true;
+            }
         }
-        else if (t.mode & MATCH_RETN_ADDRESS and t.retAddrOffset == retAddrOffset){
-          targeted = true;
-        }
-        else if (t.mode & MATCH_ARG_HASH and t.argHash == argHash){
-            targeted = true;
-        }
-      }
     }
     call_counts[function]++; // increment the call counter
 
@@ -790,12 +805,18 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     }
 
     // Talk to the server and mutate the bytes
-    if(targeted) {
+    if (targeted) {
         if (!mutate(function, hFile, position, lpBuffer, nNumberOfBytesToRead)) {
             // TODO: fallback mutations?
             exit(1);
         }
     }
+
+    if (info->argHash) {
+        free(info->argHash);
+    }
+
+    free(info);
 }
 
 /* Runs when a new module (typically an exe or dll) is loaded. Tells DynamoRIO to hook all the interesting functions
@@ -803,7 +824,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
 static void
 module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))){
-      baseAddr = (DWORD64) mod->start;
+        baseAddr = (DWORD64) mod->start;
     }
 
     // Build list of pre-function hooks
@@ -841,7 +862,9 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
         // Look for function matching the target specified on the command line
         std::string strFunctionName(functionName);
 
-        for (targetFunction t: parsedJson){
+        for (targetFunction t : parsedJson) {
+            dr_fprintf(STDERR, "selected: %d, functionName: %s\n", t.selected, t.functionName.c_str());
+
             if (t.selected && t.functionName == strFunctionName){
                 hook = true;
             }
@@ -851,6 +874,8 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
                 }
             }
         }
+
+        printf("%s: %d\n", functionName, hook);
 
         if (!hook)
           continue;
