@@ -57,7 +57,7 @@ struct fuzzer_read_info {
     Function function;
     HANDLE hFile;
     LPVOID lpBuffer;
-    DWORD nNumberOfBytesToRead;
+    size_t nNumberOfBytesToRead;
     LPDWORD lpNumberOfBytesRead;
     DWORD64 position;
     DWORD64 retAddrOffset;
@@ -792,7 +792,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     Function function           = info->function;
     HANDLE hFile                = info->hFile;
     LPVOID lpBuffer             = info->lpBuffer;
-    DWORD nNumberOfBytesToRead  = info->nNumberOfBytesToRead;
+    size_t nNumberOfBytesToRead  = info->nNumberOfBytesToRead;
     LPDWORD lpNumberOfBytesRead = info->lpNumberOfBytesRead;
     DWORD64 position            = info->position;
     DWORD64 retAddrOffset       = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
