@@ -68,6 +68,27 @@ You might need to use the Visual Studio Developer Command Prompt in order for cm
 
 Use `.\make.ps1 clean` for a clean build . 
 
+Usage `make.ps1 help` for more info.
+
+```
+PS C:\proj\sl2\sienna-locomotive> .\make.ps1 help
+Usage: make1.ps [clean|dep|reconfig|help]
+
+make1.ps without any options will build
+
+clean
+    Cleans build directory and configuration (reconfigs)
+
+dep
+    Rebuild dependencies
+
+reconfig
+    Deletes fuzzkit directory with run configuration
+
+help
+    This info
+```    
+
 ### Configuring
 Open up powershell in the project root and run harness.py for the first time.
 
