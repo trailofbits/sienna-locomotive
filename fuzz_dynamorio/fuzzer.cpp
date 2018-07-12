@@ -879,8 +879,6 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         std::string strFunctionName(functionName);
 
         for (targetFunction t : parsedJson) {
-            dr_fprintf(STDERR, "selected: %d, functionName: %s\n", t.selected, t.functionName.c_str());
-
             if (t.selected && t.functionName == strFunctionName){
                 hook = true;
             }
