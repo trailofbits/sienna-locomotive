@@ -9,14 +9,11 @@ import os
 import concurrent.futures
 import json
 import atexit
-import threading
 import harness.config
 import harness.statz
 from harness.state import get_target_dir, get_targets, get_runs, stringify_program_array
 from harness.instrument import print_l, wizard_run, fuzzer_run, triage_run, start_server, fuzz_and_triage, kill
 
-print_lock = threading.Lock()
-can_fuzz = True
 
 
 @atexit.register
@@ -25,108 +22,6 @@ def goodbye():
     # kill the harness, even when inside of the non-main thread.
     kill()
     os._exit(0)
-
-
-
-def print_l(*args):
-    """ Thread safe print """
-    with print_lock:
-        print(*args)
-
-
-def get_path_to_run_file(run_id, filename):
-    """ Helper function for easily getting the full path to a file in the current run's directory """
-    return os.path.join(harness.config.sl2_dir, 'working', str(run_id), filename)
-
-
-def run_dr(_config, save_stdout=False, save_stderr=False, verbose=False, timeout=None, stats=harness.statz.Statz()):
-    """ Runs dynamorio with the given config. Clobbers console output if save_stderr/stdout are true """
-    program_arr = [_config['drrun_path'], '-pidfile', 'pidfile'] + _config['drrun_args'] + \
-        ['-c', _config['client_path']] + _config['client_args'] + \
-        ['--', _config['target_application_path']] + _config['target_args']
-
-    if verbose:
-        print_l("Executing drrun: %s" % ' '.join((k if " " not in k else "\"{}\"".format(k)) for k in program_arr))
-
-    # Run client on target application
-    popen_obj = subprocess.Popen(program_arr,
-                                 stdout=(subprocess.PIPE if save_stdout else None),
-                                 stderr=(subprocess.PIPE if save_stderr else None))
-
-    stats.increment()
-    # Try to get the output from the process, time out if necessary
-    try:
-        stdout, stderr = popen_obj.communicate(timeout=timeout)
-
-        if verbose:
-            print_l("Process completed: ", stats)
-
-        # Overwrite fields on the object we return to make stdout/stderr the right type
-        popen_obj.stdout = stdout
-        popen_obj.stderr = stderr
-        popen_obj.timed_out = False
-
-        return popen_obj
-
-    # Handle cases where the program didn't exit in time
-    except subprocess.TimeoutExpired:
-        if verbose:
-            print_l("Process timed out: ", stats)
-
-        # Parse PID of target application and kill it, which causes drrun to exit
-        with open('pidfile', 'r') as pidfile:
-            pid = pidfile.read().strip()
-            if verbose:
-                print_l("Killing child process:", pid)
-            os.kill(int(pid), signal.SIGTERM)
-
-        # Try to get the output again
-        try:
-            stdout, stderr = popen_obj.communicate(timeout=5)  # Try to grab the existing console output
-            popen_obj.stdout = stdout
-            popen_obj.stderr = stderr
-
-        # If the timeout fires again, we probably caused the target program to hang
-        except subprocess.TimeoutExpired:
-            if verbose:
-                print_l("Caused the target application to hang")
-
-            # Fix types again (expects bytes)
-            popen_obj.stdout = "ERROR".encode('utf-8')
-            popen_obj.stderr = "EXCEPTION_SL2_TIMEOUT".encode('utf-8')
-
-        popen_obj.timed_out = True
-
-        return popen_obj
-
-
-def write_output_files(proc, run_id, stage_name):
-    """ Writes the stdout and stderr buffers for a run into the working directory """
-    try:
-        if proc.stdout is not None:
-            with open(get_path_to_run_file(run_id, '{}.stdout'.format(stage_name)), 'wb') as stdoutfile:
-                stdoutfile.write(proc.stdout)
-        if proc.stderr is not None:
-            with open(get_path_to_run_file(run_id, '{}.stderr'.format(stage_name)), 'wb') as stderrfile:
-                stderrfile.write(proc.stderr)
-    except FileNotFoundError:
-        print_l("Couldn't find an output directory for run %s" % run_id)
-
-
-def finalize(run_id, crashed):
-    """ Manually closes out a fuzzing run. Only necessary if we killed the target binary before DynamoRIO could
-    close out the run """
-    f = open(harness.config.sl2_server_path, 'w+b', buffering=0)
-    f.write(struct.pack('B', 0x4))  # Write the event ID (4)
-    f.seek(0)
-    f.write(run_id.bytes)  # Write the run ID
-    f.seek(0)
-    # Write a bool indicating a crash
-    f.write(struct.pack('?', 1 if crashed else 0))
-    # Write a bool indicating whether to preserve run files (without a crash)
-    f.write(struct.pack('?', 1 if True else 0))
-    f.close()
-
 
 
 def select_from_range(max_range, message):
@@ -173,7 +68,6 @@ def hexdump(buffer, lines=4, line_len=16):
         hexstr = " ".join("{:02X}".format(c) for c in buffer[address:address + line_len])
         asciistr = "".join((chr(c) if c in range(31, 127) else '.') for c in buffer[address:address + line_len])
         print_l("%08X:  %s  | %s" % (address, hexstr + " "*(line_len*3 - len(hexstr)), asciistr))
-
 
 
 def main():
