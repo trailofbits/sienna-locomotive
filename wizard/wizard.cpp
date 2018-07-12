@@ -377,7 +377,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     }
 
     char *lpBuffer = (char *) info->lpBuffer;
-    DWORD nNumberOfBytesToRead = info->nNumberOfBytesToRead;
+    size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
 
     vector<unsigned char> x(lpBuffer, lpBuffer + nNumberOfBytesToRead);
     j["buffer"] = x;

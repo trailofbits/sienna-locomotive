@@ -62,8 +62,8 @@ enum {
 // See `MATCH_ARG_HASH`.
 struct fileArgHash {
   WCHAR fileName[MAX_PATH + 1];
-  UINT64 position;
-  DWORD readSize;
+  size_t position;
+  size_t readSize;
 };
 
 // The struct filled with targetting information for a function.

@@ -194,41 +194,41 @@ DWORD getRand() {
     return random;
 }
 
-VOID strategyAAAA(BYTE *buf, DWORD size) {
-    for (DWORD i = 0; i < size; i++) {
+VOID strategyAAAA(BYTE *buf, size_t size) {
+    for (size_t i = 0; i < size; i++) {
         buf[i] = 'A';
     }
 }
 
-VOID strategyFlipBit(BYTE *buf, DWORD size) {
+VOID strategyFlipBit(BYTE *buf, size_t size) {
     std::random_device rd;
     srand(rd());
 
-    DWORD pos = getRand() % size;
+    size_t pos = getRand() % size;
     BYTE byte = buf[pos];
 
     BYTE mask = 1 << rand() % 8;
     buf[pos] = byte ^ mask;
 }
 
-VOID strategyRepeatBytes(BYTE *buf, DWORD size) {
+VOID strategyRepeatBytes(BYTE *buf, size_t size) {
     std::random_device rd;
     srand(rd());
 
     // pos -> zero to second to last byte
-    DWORD pos = getRand() % (size - 1);
+    size_t pos = getRand() % (size - 1);
 
     // repeat_length -> 1 to (remaining_size - 1)
-    DWORD size_m2 = size - 2;
-    DWORD repeat_length = 0;
+    size_t size_m2 = size - 2;
+    size_t repeat_length = 0;
     if(size_m2 > pos) {
         repeat_length = getRand() % (size_m2 - pos);
     }
     repeat_length++;
 
     // set start and end
-    DWORD curr_pos = pos + repeat_length;
-    DWORD end = getRand() % (size - curr_pos);
+    size_t curr_pos = pos + repeat_length;
+    size_t end = getRand() % (size - curr_pos);
     end += curr_pos + 1;
 
     while(curr_pos < end) {
@@ -238,23 +238,23 @@ VOID strategyRepeatBytes(BYTE *buf, DWORD size) {
     }
 }
 
-VOID strategyRepeatBytesBackward(BYTE *buf, DWORD size) {
+VOID strategyRepeatBytesBackward(BYTE *buf, size_t size) {
     std::random_device rd;
     srand(rd());
 
     // pos -> 1 to last byte
-    DWORD pos = getRand() % (size - 1);
+    size_t pos = getRand() % (size - 1);
     pos++;
 
     // repeat_length -> 1 to pos
-    DWORD repeat_length = getRand() % pos;
+    size_t repeat_length = getRand() % pos;
     repeat_length++;
 
     // set start
-    INT curr_pos = pos - repeat_length;
+    size_t curr_pos = pos - repeat_length;
 
     // set end between 0 to (curr_pos + 1)
-    INT end = getRand() % (curr_pos + 1);
+    size_t end = getRand() % (curr_pos + 1);
 
     // gte so we can go to 0
     while(curr_pos >= end) {
@@ -264,38 +264,38 @@ VOID strategyRepeatBytesBackward(BYTE *buf, DWORD size) {
     }
 }
 
-VOID strategyDeleteBytes(BYTE *buf, DWORD size) {
+VOID strategyDeleteBytes(BYTE *buf, size_t size) {
     std::random_device rd;
     srand(rd());
 
     // pos -> zero to second to last byte
-    DWORD pos = 0;
-    if(size > 1) {
+    size_t pos = 0;
+    if (size > 1) {
         pos = getRand() % (size - 1);
     }
 
     // delete_length -> 1 to (remaining_size - 1)
-    DWORD size_m2 = size - 2;
-    DWORD delete_length = 0;
-    if(size_m2 > pos) {
+    size_t size_m2 = size - 2;
+    size_t delete_length = 0;
+    if (size_m2 > pos) {
         delete_length = getRand() % (size_m2 - pos);
     }
     delete_length++;
 
-    for(DWORD i=0; i<delete_length; i++) {
+    for (size_t i=0; i<delete_length; i++) {
         buf[pos+i] = 0;
     }
 }
 
-VOID strategyRandValues(BYTE *buf, DWORD size) {
+VOID strategyRandValues(BYTE *buf, size_t size) {
     std::random_device rd;
     srand(rd());
 
-    DWORD rand_size = 0;
-    INT max = 0;
-    while(max < 1) {
+    size_t rand_size = 0;
+    size_t max = 0;
+    while (max < 1) {
         // rand_size -> 1, 2, 4, 8
-        rand_size = (DWORD) pow(2, getRand() % 4);
+        rand_size = (size_t) pow(2, getRand() % 4);
         max = (size + 1);
         max -= rand_size;
     }
@@ -304,9 +304,9 @@ VOID strategyRandValues(BYTE *buf, DWORD size) {
     // e.g. buf size is 16, rand_size is 8
     // max will be from 0 to 9 guanteeing a
     // pos that will fit into the buffer
-    DWORD pos = getRand() % max;
+    size_t pos = getRand() % max;
 
-    for(DWORD i=0; i<rand_size; i++) {
+    for (size_t i=0; i<rand_size; i++) {
         BYTE mut = rand() % 256;
         buf[pos + i] = mut;
     }
@@ -317,7 +317,7 @@ VOID strategyRandValues(BYTE *buf, DWORD size) {
 #define VALUES4 -2147483648, -100663046, -32769, 32768, 65536, 100663045, 2147483647, 4294967295
 #define VALUES8  -9151314442816848000, -2147483649, 2147483648, 4294967296, 432345564227567365, 18446744073709551615
 
-VOID strategyKnownValues(BYTE *buf, DWORD size) {
+VOID strategyKnownValues(BYTE *buf, size_t size) {
     INT8 values1[] = { VALUES1 };
     INT16 values2[] = { VALUES1, VALUES2 };
     INT32 values4[] = { VALUES1, VALUES2, VALUES4 };
@@ -326,11 +326,11 @@ VOID strategyKnownValues(BYTE *buf, DWORD size) {
     std::random_device rd;
     srand(rd());
 
-    DWORD rand_size = 0;
-    INT max = 0;
-    while(max < 1) {
+    size_t rand_size = 0;
+    size_t max = 0;
+    while (max < 1) {
         // size -> 1, 2, 4, 8
-        rand_size = (DWORD) pow(2, getRand() % 4);
+        rand_size = (size_t) pow(2, getRand() % 4);
         max = (size + 1);
         max -= rand_size;
     }
@@ -339,11 +339,11 @@ VOID strategyKnownValues(BYTE *buf, DWORD size) {
     // e.g. buf size is 16, rand_size is 8
     // max will be from 0 to 9 guaranteeing a
     // pos that will fit into the buffer
-    DWORD pos = getRand() % max;
+    size_t pos = getRand() % max;
     BOOL endian = rand() % 2;
 
-    DWORD selection = 0;
-    switch(rand_size) {
+    size_t selection = 0;
+    switch (rand_size) {
         case 1:
             selection = getRand() % (sizeof(values1) / sizeof(values1[0]));
             // nibble endianness, because sim cards
@@ -371,7 +371,7 @@ VOID strategyKnownValues(BYTE *buf, DWORD size) {
     }
 }
 
-VOID strategyAddSubKnownValues(BYTE *buf, DWORD size) {
+VOID strategyAddSubKnownValues(BYTE *buf, size_t size) {
     INT8 values1[] = { VALUES1 };
     INT16 values2[] = { VALUES1, VALUES2 };
     INT32 values4[] = { VALUES1, VALUES2, VALUES4 };
@@ -380,11 +380,11 @@ VOID strategyAddSubKnownValues(BYTE *buf, DWORD size) {
     std::random_device rd;
     srand(rd());
 
-    DWORD rand_size = 0;
-    DWORD max = 0;
-    while(max < 1) {
+    size_t rand_size = 0;
+    size_t max = 0;
+    while (max < 1) {
         // size -> 1, 2, 4, 8
-        rand_size = (DWORD) pow(2, getRand() % 4);
+        rand_size = (size_t) pow(2, getRand() % 4);
         max = (size + 1) - rand_size;
     }
 
@@ -392,16 +392,16 @@ VOID strategyAddSubKnownValues(BYTE *buf, DWORD size) {
     // e.g. buf size is 16, rand_size is 8
     // max will be from 0 to 9 guaranteeing a
     // pos that will fit into the buffer
-    DWORD pos = getRand() % max;
+    size_t pos = getRand() % max;
     BOOL endian = rand() % 2;
 
     BYTE sub = 1;
-    if(rand() % 2) {
+    if (rand() % 2) {
         sub = -1;
     }
 
-    DWORD selection = 0;
-    switch(rand_size) {
+    size_t selection = 0;
+    switch (rand_size) {
         case 1:
             selection = getRand() % (sizeof(values1) / sizeof(values1[0]));
             // nibble endianness, because sim cards
@@ -429,15 +429,15 @@ VOID strategyAddSubKnownValues(BYTE *buf, DWORD size) {
     }
 }
 
-VOID strategyEndianSwap(BYTE *buf, DWORD size) {
+VOID strategyEndianSwap(BYTE *buf, size_t size) {
     std::random_device rd;
     srand(rd());
 
-    DWORD rand_size = 0;
-    DWORD max = 0;
-    while(max < 1) {
+    size_t rand_size = 0;
+    size_t max = 0;
+    while (max < 1) {
         // size -> 1, 2, 4, 8
-        rand_size = (DWORD) pow(2, getRand() % 4);
+        rand_size = (size_t) pow(2, getRand() % 4);
         max = (size + 1) - rand_size;
     }
 
@@ -445,9 +445,9 @@ VOID strategyEndianSwap(BYTE *buf, DWORD size) {
     // e.g. buf size is 16, rand_size is 8
     // max will be from 0 to 9 guaranteeing a
     // pos that will fit into the buffer
-    DWORD pos = getRand() % max;
+    size_t pos = getRand() % max;
 
-    switch(rand_size) {
+    switch (rand_size) {
         case 1:
             // nibble endianness, because sim cards
             *(UINT8 *)(buf+pos) = *(UINT8 *)(buf+pos) >> 4 | *(UINT8 *)(buf+pos) << 4;
@@ -468,9 +468,9 @@ VOID strategyEndianSwap(BYTE *buf, DWORD size) {
 }
 
 /* Selects a mutations strategy at random */
-DWORD mutate(BYTE *buf, DWORD size) {
+DWORD mutate(BYTE *buf, size_t size) {
     // afl for inspiration
-    if(size == 0) {
+    if (size == 0) {
         return 0;
     }
 
@@ -478,7 +478,7 @@ DWORD mutate(BYTE *buf, DWORD size) {
     srand(rd());
 
     DWORD choice = getRand() % 8;
-    switch(choice) {
+    switch (choice) {
         case 0:
             LOG_F(INFO, "mutate: strategyFlipBit");
             strategyFlipBit(buf, size);
@@ -526,7 +526,7 @@ DWORD mutate(BYTE *buf, DWORD size) {
 }
 
 /* Writes the fkt file in the event we found a crash. Stores information about the mutation that caused it */
-DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, WCHAR *filePath, DWORD64 position, DWORD size, BYTE* buf) {
+DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, WCHAR *filePath, size_t position, size_t size, BYTE* buf) {
     DWORD dwBytesWritten = 0;
 
     if (!WriteFile(hFile, "FKT\0", 4, &dwBytesWritten, NULL)) {
@@ -550,17 +550,17 @@ DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, WCHAR *filePath, DWORD6
         exit(1);
     }
 
-    if (!WriteFile(hFile, &position, sizeof(DWORD64), &dwBytesWritten, NULL)) {
+    if (!WriteFile(hFile, &position, sizeof(size_t), &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "writeFKT: failed to write offset (0x%x)", GetLastError());
         exit(1);
     }
 
-    if (!WriteFile(hFile, &size, sizeof(DWORD), &dwBytesWritten, NULL)) {
+    if (!WriteFile(hFile, &size, sizeof(size_t), &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "writeFKT: failed to write buffer size (0x%x)", GetLastError());
         exit(1);
     }
 
-    if (!WriteFile(hFile, buf, size, &dwBytesWritten, NULL)) {
+    if (!WriteFile(hFile, buf, (DWORD)size, &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "writeFKT: failed to write buffer (0x%x)", GetLastError());
         exit(1);
     }
@@ -623,14 +623,14 @@ DWORD handleMutation(HANDLE hPipe) {
     filePath[pathSize] = 0;
     LOG_F(INFO, "handleMutation: mutation file path: %S\n", filePath);
 
-    DWORD64 position = 0;
-    if (!ReadFile(hPipe, &position, sizeof(DWORD64), &dwBytesRead, NULL)) {
+    size_t position = 0;
+    if (!ReadFile(hPipe, &position, sizeof(size_t), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleMutation: failed to read mutation offset (0x%x)", GetLastError());
         exit(1);
     }
 
-    DWORD size = 0;
-    if(!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
+    size_t size = 0;
+    if(!ReadFile(hPipe, &size, sizeof(size_t), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleMutation: failed to read size of mutation buffer (0x%x)", GetLastError());
         exit(1);
     }
@@ -648,7 +648,7 @@ DWORD handleMutation(HANDLE hPipe) {
         exit(1);
     }
 
-    if(!ReadFile(hPipe, buf, size, &dwBytesRead, NULL)) {
+    if(!ReadFile(hPipe, buf, (DWORD)size, &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleMutation: failed to read mutation buffer from pipe (0x%x)", GetLastError());
         exit(1);
     }
@@ -662,7 +662,7 @@ DWORD handleMutation(HANDLE hPipe) {
         mutate(buf, size);
     }
 
-    if (!WriteFile(hPipe, buf, size, &dwBytesWritten, NULL)) {
+    if (!WriteFile(hPipe, buf, (DWORD)size, &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "handleMutation: failed to write mutation buffer to pipe (0x%x)", GetLastError());
         exit(1);
     }
@@ -967,9 +967,9 @@ DWORD crashPath(HANDLE hPipe) {
     PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
     PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_CRASH_JSON);
 
-    DWORD size = (wcslen(targetFile) + 1) * sizeof(WCHAR);
+    size_t size = (wcslen(targetFile) + 1) * sizeof(WCHAR);
 
-    if(!WriteFile(hPipe, &targetFile, size, &dwBytesWritten, NULL)) {
+    if(!WriteFile(hPipe, &targetFile, (DWORD)size, &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "crashPath: failed to write crash.json path to pipe (0x%x)", GetLastError());
         exit(1);
     }
@@ -1065,7 +1065,8 @@ int main(int mArgc, char **mArgv)
     initLoggingFile();
     loguru::init(mArgc, mArgv);
     CHAR logLocalPathA[MAX_PATH]= {0};
-    wcstombs(logLocalPathA, FUZZ_LOG, MAX_PATH);
+    size_t converted;
+    wcstombs_s(&converted, logLocalPathA, MAX_PATH - 1, FUZZ_LOG, MAX_PATH - 1);
     loguru::add_file(logLocalPathA, loguru::Append, loguru::Verbosity_MAX);
 
     std::atexit(server_cleanup);
