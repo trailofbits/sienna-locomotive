@@ -21,6 +21,15 @@ extern "C" {
 #define SL2_PRE_PROTO void(__cdecl *)(void *, void **)
 #define SL2_POST_PROTO void(__cdecl *)(void *, void *)
 
+// Macros for quickly building a map of function names to function pre- and post-hooks.
+// TODO(ww): There should really only be one of each of these (pre and post), but
+// Microsoft's C preprocessor isn't C99 compliant and so makes things with __VA_ARGS__ hard.
+#define SL2_PRE_HOOK1(map, func) (map[#func] = wrap_pre_##func)
+#define SL2_PRE_HOOK2(map, func, hook_func) (map[#func] = wrap_pre_##hook_func)
+
+#define SL2_POST_HOOK1(map, func) (map[#func] = wrap_post_##func)
+#define SL2_POST_HOOK2(map, func, hook_func) (map[#func] = wrap_post_##hook_func)
+
 // The set of currently supported functions.
 enum class Function {
     ReadFile,
