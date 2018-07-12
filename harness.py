@@ -9,7 +9,7 @@ import os
 import concurrent.futures
 import json
 import atexit
-
+import threading
 import harness.config
 import harness.statz
 from harness.state import get_target_dir, get_targets, get_runs, stringify_program_array
