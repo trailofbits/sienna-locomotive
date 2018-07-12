@@ -66,12 +66,14 @@ Function SafeDelete {
     if ( Test-Path "$path" ) {
         "Deleting ${path}"
         Remove-Item $path -Force -Recurse
-    }
-
+    } 
 }
 
 Function Clean {
+    SafeDelete "$env:APPDATA\Trail of Bits\fuzzkit"
     SafeDelete "build"
+    "It's clean!"
+    
 }
 
 Function Dep {

@@ -20,6 +20,7 @@ import atexit
 
 import harness.config
 from harness.state import get_target_dir, get_targets, get_runs, stringify_program_array
+import harness.statz
 
 print_lock = threading.Lock()
 can_fuzz = True
@@ -44,7 +45,7 @@ def get_path_to_run_file(run_id, filename):
     return os.path.join(harness.config.sl2_dir, 'working', str(run_id), filename)
 
 
-def run_dr(_config, save_stdout=False, save_stderr=False, verbose=False, timeout=None):
+def run_dr(_config, save_stdout=False, save_stderr=False, verbose=False, timeout=None, stats=harness.statz.Statz()):
     """ Runs dynamorio with the given config. Clobbers console output if save_stderr/stdout are true """
     program_arr = [_config['drrun_path'], '-pidfile', 'pidfile'] + _config['drrun_args'] + \
         ['-c', _config['client_path']] + _config['client_args'] + \
@@ -54,17 +55,17 @@ def run_dr(_config, save_stdout=False, save_stderr=False, verbose=False, timeout
         print_l("Executing drrun: %s" % ' '.join((k if " " not in k else "\"{}\"".format(k)) for k in program_arr))
 
     # Run client on target application
-    started = time.time()
     popen_obj = subprocess.Popen(program_arr,
                                  stdout=(subprocess.PIPE if save_stdout else None),
                                  stderr=(subprocess.PIPE if save_stderr else None))
 
+    stats.increment()
     # Try to get the output from the process, time out if necessary
     try:
         stdout, stderr = popen_obj.communicate(timeout=timeout)
 
         if verbose:
-            print_l("Process completed after %s seconds" % (time.time() - started))
+            print_l("Process completed: ", stats)
 
         # Overwrite fields on the object we return to make stdout/stderr the right type
         popen_obj.stdout = stdout
@@ -76,7 +77,7 @@ def run_dr(_config, save_stdout=False, save_stderr=False, verbose=False, timeout
     # Handle cases where the program didn't exit in time
     except subprocess.TimeoutExpired:
         if verbose:
-            print_l("Process Timed Out after %s seconds" % (time.time() - started))
+            print_l("Process timed out: ", stats)
 
         # Parse PID of target application and kill it, which causes drrun to exit
         with open('pidfile', 'r') as pidfile:

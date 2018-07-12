@@ -16,13 +16,13 @@ def runAndCaptureOutput( cmd ):
 class TestWizard(unittest.TestCase):
     
     
-    def test_noargs(self):
-        cmd =  [ r'python.exe',
-            r'harness.py' ]
+    # def test_noargs(self):
+    #     cmd =  [ r'python.exe',
+    #         r'harness.py' ]
         
-        stdout, stderr = runAndCaptureOutput(cmd)
-        self.assertTrue( 'caused EXCEPTION_ACCESS_VIOLATION'  in stdout )
-        self.assertRegex(  stdout,  r"0x[a-f0-9]+: mov.*%rax.*-> %edx" )
+    #     stdout, stderr = runAndCaptureOutput(cmd)
+    #     self.assertTrue( 'caused EXCEPTION_ACCESS_VIOLATION'  in stdout )
+    #     self.assertRegex(  stdout,  r"0x[a-f0-9]+: mov.*%rax.*-> %edx" )
 
 
     def test_0(self):
