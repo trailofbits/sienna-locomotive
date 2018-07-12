@@ -20,4 +20,5 @@ dynamorio/
 build/
 config.ini
 .DS_Store
+.idea
 pidfile
