@@ -26,7 +26,7 @@ __declspec(dllexport) char *get_function_name(Function function)
     return "unknown";
 }
 
-// TODO(ww): Throw an exception on parse/extraction errors.
+// TODO(ww): Document the fallback values here.
 __declspec(dllexport) void from_json(const json& j, targetFunction& t)
 {
     t.selected = j.value("selected", false);
