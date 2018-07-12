@@ -32,7 +32,8 @@
  * DAMAGE.
  */
 
-#include "utils.h"
+#include "tracer_utils.h"
+
 #include "drx.h"
 #include <stdio.h>
 #ifdef WINDOWS
