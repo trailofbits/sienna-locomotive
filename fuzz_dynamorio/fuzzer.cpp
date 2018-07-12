@@ -34,9 +34,6 @@
 
 #define NULL_TERMINATE(buf) buf[(sizeof(buf)/sizeof(buf[0])) - 1] = '\0'
 
-static size_t max_ReadFile;
-static void *max_lock; /* sync writes to max_ReadFile */
-
 static BOOL mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size);
 
 // structure for getting command line client options in dynamorio
@@ -1005,8 +1002,6 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     dr_fprintf(STDERR, "Beginning fuzzing run %S\n\n", runId_s);
     drmgr_init();
     drwrap_init();
-
-    max_ReadFile = 0;
 
     drmgr_register_exception_event(onexception);
     dr_register_exit_event(event_exit);
