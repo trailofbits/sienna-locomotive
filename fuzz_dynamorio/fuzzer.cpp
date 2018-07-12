@@ -34,7 +34,7 @@
 
 #define NULL_TERMINATE(buf) buf[(sizeof(buf)/sizeof(buf[0])) - 1] = '\0'
 
-static BOOL mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size);
+static BOOL mutate(HANDLE hFile, size_t position, LPVOID buf, size_t size);
 
 // structure for getting command line client options in dynamorio
 static droption_t<std::string> op_target(
@@ -319,7 +319,7 @@ event_exit(void)
 
 /* Hands bytes off to the mutation server, gets mutated bytes, and writes them into memory. */
 static BOOL
-mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size)
+mutate(Function function, HANDLE hFile, size_t position, LPVOID buf, size_t size)
 {
     WCHAR filePath[MAX_PATH + 1] = {0};
     WCHAR *new_buf = (WCHAR *)buf;
@@ -359,8 +359,8 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
     WriteFile(hPipe, &pathSize, sizeof(DWORD), &bytesWritten, NULL);
     WriteFile(hPipe, &filePath, pathSize * sizeof(WCHAR), &bytesWritten, NULL);
 
-    WriteFile(hPipe, &position, sizeof(DWORD64), &bytesWritten, NULL);
-    WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL);
+    WriteFile(hPipe, &position, sizeof(size_t), &bytesWritten, NULL);
+    WriteFile(hPipe, &size, sizeof(size_t), &bytesWritten, NULL);
 
     // Send current contents of buf to the server, overwrite them with its reply
     TransactNamedPipe(hPipe, buf, size, buf, size, &bytesRead, NULL);

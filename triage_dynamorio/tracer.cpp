@@ -80,7 +80,7 @@ static std::map<Function, UINT64> call_counts;
 
 struct tracer_read_info {
     LPVOID lpBuffer;
-    DWORD nNumberOfBytesToRead;
+    size_t nNumberOfBytesToRead;
     Function function;
     DWORD64 retAddrOffset;
     // TODO(ww) Use WCHAR * here for consistency.
@@ -249,10 +249,10 @@ is_tainted(void *drcontext, opnd_t opnd)
 
 /* Mark a memory address as tainted */
 static void
-taint_mem(app_pc addr, uint size)
+taint_mem(app_pc addr, ssize_t size)
 {
-    for (uint i = 0; i < size; i++) {
-        tainted_mems.insert(addr+i);
+    for (ssize_t i = 0; i < size; i++) {
+        tainted_mems.insert(addr + i);
     }
 }
 
@@ -1362,7 +1362,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 
     // Grab stored metadata
     LPVOID lpBuffer            = info->lpBuffer;
-    DWORD nNumberOfBytesToRead = info->nNumberOfBytesToRead;
+    size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
     Function function          = info->function;
     DWORD64 retAddrOffset      = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
@@ -1421,7 +1421,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
             WriteFile(h_pipe, &run_id, sizeof(UUID), &bytes_written, NULL);
             WriteFile(h_pipe, &mutate_count, sizeof(DWORD), &bytes_written, NULL);
             // Overwrite bytes with old mutation
-            TransactNamedPipe(h_pipe, &nNumberOfBytesToRead, sizeof(DWORD), lpBuffer, nNumberOfBytesToRead, &bytes_read, NULL);
+            TransactNamedPipe(h_pipe, &nNumberOfBytesToRead, sizeof(size_t), lpBuffer, nNumberOfBytesToRead, &bytes_read, NULL);
             mutate_count++;
             CloseHandle(h_pipe);
             dr_mutex_unlock(mutatex);
