@@ -1,6 +1,6 @@
+// TODO(ww): Figure out if we still need these.
 #define EVENT_APP event_app_bb
 // #define EVENT_APP event_app_instruction
-
 #define EVENT_THREAD_EXIT event_thread_exit_cov
 // #define EVENT_THREAD_EXIT event_thread_exit
 
@@ -88,8 +88,9 @@ struct tracer_read_info {
 };
 
 /* Currently unused as this runs on 64 bit applications */
-static reg_id_t reg_to_full_width32(reg_id_t reg) {
-    switch(reg){
+static reg_id_t reg_to_full_width32(reg_id_t reg)
+{
+    switch(reg) {
         case DR_REG_AX:
         case DR_REG_AH:
         case DR_REG_AL:
@@ -120,8 +121,9 @@ static reg_id_t reg_to_full_width32(reg_id_t reg) {
 }
 
 /* Converts a register to full width for taint tracking */
-static reg_id_t reg_to_full_width64(reg_id_t reg) {
-    switch(reg){
+static reg_id_t reg_to_full_width64(reg_id_t reg)
+{
+    switch(reg) {
         case DR_REG_EAX:
         case DR_REG_AX:
         case DR_REG_AH:
@@ -195,39 +197,40 @@ static reg_id_t reg_to_full_width64(reg_id_t reg) {
 static bool
 is_tainted(void *drcontext, opnd_t opnd)
 {
-    if(opnd_is_reg(opnd)) {
+    if (opnd_is_reg(opnd)) {
         /* Check if a register is in tainted_regs */
         reg_id_t reg = opnd_get_reg(opnd);
         reg = reg_to_full_width64(reg);
 
-        if(tainted_regs.find(reg) != tainted_regs.end()) {
+        if (tainted_regs.find(reg) != tainted_regs.end()) {
             return true;
         }
-    } else if(opnd_is_memory_reference(opnd)) {
-        dr_mcontext_t mc = {sizeof(mc),DR_MC_ALL};
+    }
+    else if (opnd_is_memory_reference(opnd)) {
+        dr_mcontext_t mc = {sizeof(mc), DR_MC_ALL};
         dr_get_mcontext(drcontext, &mc);
         app_pc addr = opnd_compute_address(opnd, &mc);
 
         /* Check if a memory region overlaps a tainted address */
         opnd_size_t dr_size = opnd_get_size(opnd);
         uint size = opnd_size_in_bytes(dr_size);
-        for(uint i=0; i<size; i++) {
-            if(tainted_mems.find(addr+i) != tainted_mems.end()) {
+        for (uint i=0; i<size; i++) {
+            if (tainted_mems.find(addr+i) != tainted_mems.end()) {
                 return true;
             }
         }
 
         /* Check if a register used in calculating an address is tainted */
-        if(opnd_is_base_disp(opnd)) {
+        if (opnd_is_base_disp(opnd)) {
             reg_id_t reg_base = opnd_get_base(opnd);
             reg_id_t reg_disp = opnd_get_disp(opnd);
             reg_id_t reg_indx = opnd_get_index(opnd);
 
-            if(reg_base != NULL && tainted_regs.find(reg_to_full_width64(reg_base)) != tainted_regs.end()) {
+            if (reg_base != NULL && tainted_regs.find(reg_to_full_width64(reg_base)) != tainted_regs.end()) {
                 return true;
             }
 
-            if(reg_disp != NULL && tainted_regs.find(reg_to_full_width64(reg_disp)) != tainted_regs.end()) {
+            if (reg_disp != NULL && tainted_regs.find(reg_to_full_width64(reg_disp)) != tainted_regs.end()) {
                 return true;
             }
 
@@ -246,22 +249,25 @@ is_tainted(void *drcontext, opnd_t opnd)
 
 /* Mark a memory address as tainted */
 static void
-taint_mem(app_pc addr, uint size) {
-    for(uint i=0; i<size; i++) {
+taint_mem(app_pc addr, uint size)
+{
+    for (uint i = 0; i < size; i++) {
         tainted_mems.insert(addr+i);
     }
 }
 
 /* Unmark a memory address as tainted */
 static bool
-untaint_mem(app_pc addr, uint size) {
+untaint_mem(app_pc addr, uint size)
+{
     bool untainted = false;
-    for(uint i=0; i<size; i++) {
+    for (uint i = 0; i < size; i++) {
         size_t n = tainted_mems.erase(addr+i);
-        if(n) {
+        if (n) {
             untainted = true;
         }
-        if(untainted) {
+        if (untainted) {
+            // TODO(ww): Why is this branch here?
         }
     }
     return untainted;
@@ -271,7 +277,7 @@ untaint_mem(app_pc addr, uint size) {
 static void
 taint(void *drcontext, opnd_t opnd)
 {
-    if(opnd_is_reg(opnd)) {
+    if (opnd_is_reg(opnd)) {
         reg_id_t reg = opnd_get_reg(opnd);
         reg = reg_to_full_width64(reg);
 
@@ -279,8 +285,9 @@ taint(void *drcontext, opnd_t opnd)
 
         // char buf[100];
         // opnd_disassemble_to_buffer(drcontext, opnd, buf, 100);
-    } else if(opnd_is_memory_reference(opnd)) {
-        dr_mcontext_t mc = {sizeof(mc),DR_MC_ALL};
+    }
+    else if (opnd_is_memory_reference(opnd)) {
+        dr_mcontext_t mc = {sizeof(mc), DR_MC_ALL};
         dr_get_mcontext(drcontext, &mc);
         app_pc addr = opnd_compute_address(opnd, &mc);
 
@@ -305,17 +312,18 @@ static bool
 untaint(void *drcontext, opnd_t opnd)
 {
     bool untainted = false;
-    if(opnd_is_reg(opnd)) {
+    if (opnd_is_reg(opnd)) {
         reg_id_t reg = opnd_get_reg(opnd);
         reg = reg_to_full_width64(reg);
 
         size_t n = tainted_regs.erase(reg);
-        if(n) {
+        if (n) {
             // char buf[100];
             // opnd_disassemble_to_buffer(drcontext, opnd, buf, 100);
             untainted = true;
         }
-    } else if(opnd_is_memory_reference(opnd)) {
+    }
+    else if (opnd_is_memory_reference(opnd)) {
         dr_mcontext_t mc = {sizeof(mc),DR_MC_ALL};
         dr_get_mcontext(drcontext, &mc);
         app_pc addr = opnd_compute_address(opnd, &mc);
@@ -339,19 +347,20 @@ untaint(void *drcontext, opnd_t opnd)
 
 /* Handle special case of xor regA, regA - untaint the destination since it's inevitably 0 */
 static bool
-handle_xor(void *drcontext, instr_t *instr) {
+handle_xor(void *drcontext, instr_t *instr)
+{
     bool result = false;
     int src_count = instr_num_srcs(instr);
 
-    if(src_count == 2) {
+    if (src_count == 2) {
         opnd_t opnd_0 = instr_get_src(instr, 0);
         opnd_t opnd_1 = instr_get_src(instr, 1);
 
-        if(opnd_is_reg(opnd_0) && opnd_is_reg(opnd_1)) {
+        if (opnd_is_reg(opnd_0) && opnd_is_reg(opnd_1)) {
             reg_id_t reg_0 = reg_to_full_width64(opnd_get_reg(opnd_0));
             reg_id_t reg_1 = reg_to_full_width64(opnd_get_reg(opnd_1));
 
-            if(reg_0 == reg_1) {
+            if (reg_0 == reg_1) {
                 size_t n = tainted_regs.erase(reg_0);
                 // if(n) {
                 //     char buf[100];
@@ -367,12 +376,13 @@ handle_xor(void *drcontext, instr_t *instr) {
 
 /* Handle push and pop by not tainting RSP (included in operands) */
 static void
-handle_push_pop(void *drcontext, instr_t *instr) {
+handle_push_pop(void *drcontext, instr_t *instr)
+{
     int src_count = instr_num_srcs(instr);
     bool tainted = false;
 
     // check sources for taint
-    for(int i=0; i<src_count && !tainted; i++) {
+    for (int i = 0; i < src_count && !tainted; i++) {
         opnd_t opnd = instr_get_src(instr, i);
         tainted |= is_tainted(drcontext, opnd);
     }
@@ -380,13 +390,13 @@ handle_push_pop(void *drcontext, instr_t *instr) {
     // if tainted
     // taint destinations that aren't rsp
     int dst_count = instr_num_dsts(instr);
-    for(int i=0; i<dst_count && tainted; i++) {
+    for (int i = 0; i < dst_count && tainted; i++) {
         opnd_t opnd = instr_get_dst(instr, i);
 
-        if(opnd_is_reg(opnd)) {
+        if (opnd_is_reg(opnd)) {
             reg_id_t reg = opnd_get_reg(opnd);
             reg = reg_to_full_width64(reg);
-            if(reg == DR_REG_RSP) {
+            if (reg == DR_REG_RSP) {
                 continue;
             }
         }
@@ -397,13 +407,13 @@ handle_push_pop(void *drcontext, instr_t *instr) {
     // if not tainted
     // untaint destinations that aren't rsp
     bool untainted = false;
-    for(int i=0; i<dst_count && !tainted; i++) {
+    for (int i = 0; i < dst_count && !tainted; i++) {
         opnd_t opnd = instr_get_dst(instr, i);
 
-        if(opnd_is_reg(opnd)) {
+        if (opnd_is_reg(opnd)) {
             reg_id_t reg = opnd_get_reg(opnd);
             reg = reg_to_full_width64(reg);
-            if(reg == DR_REG_RSP) {
+            if (reg == DR_REG_RSP) {
                 continue;
             }
         }
@@ -420,15 +430,16 @@ handle_push_pop(void *drcontext, instr_t *instr) {
 
 /* Xchg of a tainted reg and non tainted reg should swap taint */
 static bool
-handle_xchg(void *drcontext, instr_t *instr) {
+handle_xchg(void *drcontext, instr_t *instr)
+{
     bool result = false;
     int src_count = instr_num_srcs(instr);
 
-    if(src_count == 2) {
+    if (src_count == 2) {
         opnd_t opnd_0 = instr_get_src(instr, 0);
         opnd_t opnd_1 = instr_get_src(instr, 1);
 
-        if(opnd_is_reg(opnd_0) && opnd_is_reg(opnd_1)) {
+        if (opnd_is_reg(opnd_0) && opnd_is_reg(opnd_1)) {
             reg_id_t reg_0 = reg_to_full_width64(opnd_get_reg(opnd_0));
             reg_id_t reg_1 = reg_to_full_width64(opnd_get_reg(opnd_1));
 
@@ -436,11 +447,12 @@ handle_xchg(void *drcontext, instr_t *instr) {
             bool reg_0_tainted = tainted_regs.find(reg_0) != tainted_regs.end();
             bool reg_1_tainted = tainted_regs.find(reg_1) != tainted_regs.end();
 
-            if(reg_0_tainted && !reg_1_tainted) {
+            if (reg_0_tainted && !reg_1_tainted) {
                 tainted_regs.erase(reg_0);
                 tainted_regs.insert(reg_1);
                 result = true;
-            } else if(reg_1_tainted && !reg_0_tainted) {
+            }
+            else if (reg_1_tainted && !reg_0_tainted) {
                 tainted_regs.erase(reg_1);
                 tainted_regs.insert(reg_0);
                 result = true;
@@ -453,14 +465,15 @@ handle_xchg(void *drcontext, instr_t *instr) {
 
 /* Special cases for tainting / untainting PC */
 static bool
-handle_branches(void *drcontext, instr_t *instr) {
+handle_branches(void *drcontext, instr_t *instr)
+{
 
     bool is_ret = instr_is_return(instr);
     bool is_direct = instr_is_ubr(instr) || instr_is_cbr(instr) || instr_is_call_direct(instr);
     bool is_indirect = instr_is_mbr(instr);
     bool is_call = instr_is_call(instr);
 
-    if(!is_ret && !is_direct && !is_indirect && !is_call) {
+    if (!is_ret && !is_direct && !is_indirect && !is_call) {
         return false;
     }
 
@@ -473,12 +486,12 @@ handle_branches(void *drcontext, instr_t *instr) {
     int dst_count = instr_num_dsts(instr);
 
     // call
-    if(is_call) {
-        if(pc_tainted) {
+    if (is_call) {
+        if (pc_tainted) {
             // make saved return address tainted
-            for(int i=0; i<dst_count; i++) {
+            for (int i = 0; i < dst_count; i++) {
                 opnd_t opnd = instr_get_dst(instr, i);
-                if(opnd_is_memory_reference(opnd)) {
+                if (opnd_is_memory_reference(opnd)) {
                     taint(drcontext, opnd);
                     break;
                 }
@@ -487,21 +500,21 @@ handle_branches(void *drcontext, instr_t *instr) {
     }
 
     // direct branch or call
-    if(is_direct) {
-        if(pc_tainted) {
+    if (is_direct) {
+        if (pc_tainted) {
             // untaint pc
             tainted_regs.erase(reg_pc);
         }
     }
 
     // indirect branch or call
-    if(is_indirect) {
-        for(int i=0; i<src_count; i++) {
+    if (is_indirect) {
+        for (int i = 0; i < src_count; i++) {
             opnd_t opnd = instr_get_src(instr, i);
 
-            if(opnd_is_reg(opnd)) {
+            if (opnd_is_reg(opnd)) {
                 reg_id_t reg = reg_to_full_width64(opnd_get_reg(opnd));
-                if(reg != reg_stack && tainted_regs.find(reg) != tainted_regs.end()) {
+                if (reg != reg_stack && tainted_regs.find(reg) != tainted_regs.end()) {
                     // taint pc
                     tainted_regs.insert(reg_pc);
                 }
@@ -511,20 +524,21 @@ handle_branches(void *drcontext, instr_t *instr) {
 
     /* TODO: check that this taints PC if the tainted address is saved (by the if(is_call)) and restored */
     // ret
-    if(is_ret) {
+    if (is_ret) {
         bool tainted = false;
-        for(int i=0; i<src_count; i++) {
+        for (int i = 0; i < src_count; i++) {
             opnd_t opnd = instr_get_src(instr, i);
-            if(is_tainted(drcontext, opnd)) {
+            if (is_tainted(drcontext, opnd)) {
                 tainted = true;
                 break;
             }
         }
 
-        if(tainted){
+        if (tainted) {
             // taint pc
             tainted_regs.insert(reg_pc);
-        } else {
+        }
+        else {
             // untaint pc
             tainted_regs.erase(reg_pc);
         }
@@ -536,16 +550,17 @@ handle_branches(void *drcontext, instr_t *instr) {
 /* Dispatch to instruction-specific taint handling for things that don't fit the general
     model of tainted operand -> tainted result */
 static bool
-handle_specific(void *drcontext, instr_t *instr) {
+handle_specific(void *drcontext, instr_t *instr)
+{
     int opcode = instr_get_opcode(instr);
     bool result = false;
 
     // indirect call
-    if(handle_branches(drcontext, instr)) {
+    if (handle_branches(drcontext, instr)) {
         return true;
     }
 
-    switch(opcode) {
+    switch (opcode) {
         // push
         case 18:
         // pop
@@ -572,13 +587,13 @@ static void
 propagate_taint(app_pc pc)
 {
     // Store instruction trace
-    if(pc > module_start && pc < module_end) {
+    if (pc > module_start && pc < module_end) {
         last_insns[last_insn_idx] = pc;
         last_insn_idx++;
         last_insn_idx %= LAST_COUNT;
     }
 
-    if(tainted_mems.size() == 0 && tainted_regs.size() == 0) {
+    if (tainted_mems.size() == 0 && tainted_regs.size() == 0) {
         return;
     }
 
@@ -588,14 +603,14 @@ propagate_taint(app_pc pc)
     decode(drcontext, pc, &instr);
 
     // Save the count of times we've called this function (if it's a call)
-    if(instr_is_call(&instr)) {
+    if (instr_is_call(&instr)) {
         opnd_t target = instr_get_target(&instr);
-        if(opnd_is_memory_reference(target)) {
-            dr_mcontext_t mc = {sizeof(mc),DR_MC_ALL};
+        if (opnd_is_memory_reference(target)) {
+            dr_mcontext_t mc = {sizeof(mc), DR_MC_ALL};
             dr_get_mcontext(drcontext, &mc);
             app_pc addr = opnd_compute_address(target, &mc);
 
-            if(pc > module_start && pc < module_end) {
+            if (pc > module_start && pc < module_end) {
                 last_calls[last_call_idx] = addr;
                 last_call_idx++;
                 last_call_idx %= LAST_COUNT;
@@ -610,7 +625,7 @@ propagate_taint(app_pc pc)
     // }
 
     /* Handle specific instructions */
-    if(handle_specific(drcontext, &instr)) {
+    if (handle_specific(drcontext, &instr)) {
         instr_free(drcontext, &instr);
         return;
     }
@@ -619,21 +634,21 @@ propagate_taint(app_pc pc)
     int src_count = instr_num_srcs(&instr);
     bool tainted = false;
 
-    for(int i=0; i<src_count && !tainted; i++) {
+    for (int i=0; i<src_count && !tainted; i++) {
         opnd_t opnd = instr_get_src(&instr, i);
         tainted |= is_tainted(drcontext, opnd);
     }
 
     /* If tainted sources, taint destinations */
     int dst_count = instr_num_dsts(&instr);
-    for(int i=0; i<dst_count && tainted; i++) {
+    for (int i=0; i<dst_count && tainted; i++) {
         opnd_t opnd = instr_get_dst(&instr, i);
         taint(drcontext, opnd);
     }
 
     /* If not tainted sources, untaint destinations*/
     bool untainted = false;
-    for(int i=0; i<dst_count && !tainted; i++) {
+    for (int i=0; i<dst_count && !tainted; i++) {
         opnd_t opnd = instr_get_dst(&instr, i);
         untainted |= untaint(drcontext, opnd);
     }
@@ -684,8 +699,8 @@ event_thread_exit(void *drcontext)
 static void
 event_exit_trace(void)
 {
-    if(!op_no_taint.get_value()) {
-        if(!drmgr_unregister_bb_insertion_event(event_app_instruction)) {
+    if (!op_no_taint.get_value()) {
+        if (!drmgr_unregister_bb_insertion_event(event_app_instruction)) {
             DR_ASSERT(false);
         }
     }
@@ -723,30 +738,39 @@ dump_regs(void *drcontext, app_pc exception_address) {
     };
 
     std::set<reg_id_t>::iterator reg_it;
-    for(reg_it = tainted_regs.begin(); reg_it != tainted_regs.end(); reg_it++) {
+    for (reg_it = tainted_regs.begin(); reg_it != tainted_regs.end(); reg_it++) {
+        // TODO(ww): Implement.
     }
 
     std::set<app_pc>::iterator mem_it;
-    for(mem_it = tainted_mems.begin(); mem_it != tainted_mems.end(); mem_it++) {
+    for (mem_it = tainted_mems.begin(); mem_it != tainted_mems.end(); mem_it++) {
+        // TODO(ww): Implement.
     }
 
-    for(int i=0; i<16; i++) {
+    for (int i = 0; i < 16; i++) {
         bool tainted = tainted_regs.find(regs[i]) != tainted_regs.end();
         dr_mcontext_t mc = {sizeof(mc),DR_MC_ALL};
         dr_get_mcontext(drcontext, &mc);
-        if(tainted) {
-        } else {
+        if (tainted) {
+            // TODO(ww): Implement.
+        }
+        else {
+            // TODO(ww): Implement.
         }
     }
 
     bool tainted = tainted_regs.find(DR_REG_NULL) != tainted_regs.end();
-    if(tainted) {
-    } else {
+    if (tainted) {
+        // TODO(ww): Implement.
+    }
+    else {
+        // TODO(ww): Implement.
     }
 }
 
 std::string
-exception_to_string(DWORD exception_code) {
+exception_to_string(DWORD exception_code)
+{
     std::string exception_str = "UNKNOWN";
     switch (exception_code) {
         case EXCEPTION_ACCESS_VIOLATION:
@@ -818,7 +842,8 @@ exception_to_string(DWORD exception_code) {
 
 /* Get crash info as JSON for dumping to stderr */
 std::string
-dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *excpt, std::string disassembly) {
+dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *excpt, std::string disassembly)
+{
     DWORD exception_code = excpt->record->ExceptionCode;
     app_pc exception_address = (app_pc)excpt->record->ExceptionAddress;
 
@@ -850,7 +875,7 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
         DR_REG_R15,
     };
 
-    for(int i=0; i<16; i++) {
+    for (int i = 0; i < 16; i++) {
         bool tainted = tainted_regs.find(regs[i]) != tainted_regs.end();
         json reg = {{"reg", get_register_name(regs[i])},
                     {"value", reg_get_value(regs[i], excpt->mcontext)},
@@ -865,14 +890,14 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
     j["regs"].push_back(rip);
 
     j["last_calls"] = json::array();
-    for(int i = 0; i < LAST_COUNT; i++) {
+    for (int i = 0; i < LAST_COUNT; i++) {
         int idx = last_call_idx + i;
         idx %= LAST_COUNT;
         j["last_calls"].push_back((uint64)last_calls[idx]);
     }
 
     j["last_insns"] = json::array();
-    for(int i = 0; i < LAST_COUNT; i++) {
+    for (int i = 0; i < LAST_COUNT; i++) {
         int idx = last_insn_idx + i;
         idx %= LAST_COUNT;
         j["last_insns"].push_back((uint64)last_insns[idx]);
@@ -906,13 +931,14 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
 
 /* Get Run ID and dump crash info into JSON file in the run folder. */
 static void
-dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t score, std::string disassembly) {
+dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t score, std::string disassembly)
+{
     std::string crash_json = dump_json(drcontext, score, reason, excpt, disassembly);
 
     WCHAR targetFile[MAX_PATH + 1] = { 0 };
     ZeroMemory(targetFile, sizeof(WCHAR) * (MAX_PATH + 1));
 
-    if(replay) {
+    if (replay) {
         HANDLE h_pipe = CreateFile(
             FUZZ_SERVER_PATH,
             GENERIC_READ | GENERIC_WRITE,
@@ -962,7 +988,8 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
 
 /* Scoring function. Checks exception code, then checks taint state in order to calculate the severity score */
 static bool
-onexception(void *drcontext, dr_exception_t *excpt) {
+onexception(void *drcontext, dr_exception_t *excpt)
+{
     DWORD exception_code = excpt->record->ExceptionCode;
 
     reg_id_t reg_pc = reg_to_full_width64(DR_REG_NULL);
@@ -978,11 +1005,13 @@ onexception(void *drcontext, dr_exception_t *excpt) {
 
     // TODO - remove use of IsBadReadPtr
     // https://msdn.microsoft.com/en-us/library/windows/desktop/aa366713(v=vs.85).aspx
-    if(IsBadReadPtr(exception_address, 1)) {
-        if(pc_tainted) {
+    if (IsBadReadPtr(exception_address, 1))
+    {
+        if (pc_tainted) {
             reason = "oob execution tainted pc";
             score = 100;
-        } else {
+        }
+        else {
             reason = "oob execution";
             score = 50;
         }
@@ -1001,10 +1030,11 @@ onexception(void *drcontext, dr_exception_t *excpt) {
 
     // check exception code - illegal instructions are bad
     if (exception_code == EXCEPTION_ILLEGAL_INSTRUCTION) {
-        if(pc_tainted) {
+        if (pc_tainted) {
             reason = "illegal instruction tainted pc";
             score = 100;
-        } else {
+        }
+        else {
             reason = "illegal instruction";
             score = 50;
         }
@@ -1068,41 +1098,45 @@ onexception(void *drcontext, dr_exception_t *excpt) {
     int dst_count = instr_num_dsts(&instr);
 
 
-    for(int i=0; i<src_count; i++) {
+    for (int i = 0; i < src_count; i++) {
         opnd_t opnd = instr_get_src(&instr, i);
         tainted_src |= is_tainted(drcontext, opnd);
     }
 
-    for(int i=0; i<dst_count; i++) {
+    for (int i = 0; i < dst_count; i++) {
         opnd_t opnd = instr_get_dst(&instr, i);
         tainted_dst |= is_tainted(drcontext, opnd);
     }
 
     // Check if the crash resulted from an invalid memory write
     // usually EXCEPTION_ACCESS_VIOLATION
-    if(mem_write) {
-      // If what we're writing or where we're writing it to are potentially attacker controlled, that's worse than if
-      // it's just a normal invalid write
-        if(tainted_src || tainted_dst) {
+    if (mem_write) {
+        // If what we're writing or where we're writing it to are potentially attacker controlled, that's worse than if
+        // it's just a normal invalid write
+        if (tainted_src || tainted_dst) {
             reason = "tainted write";
             score = 75;
-        } else {
+        }
+        else {
             reason = "write";
             score = 50;
         }
+
         dump_crash(drcontext, excpt, reason, score, disassembly);
     }
 
     // ditto, but for invalid reads
-    if(mem_read) {
+    if (mem_read) {
         // TODO - do we need to think about tainted destination addresses?
-        if(tainted_src) {
+        if (tainted_src) {
             reason = "tainted read";
             score = 75;
-        } else {
+        }
+        else {
             reason = "read";
             score = 25;
         }
+
         dump_crash(drcontext, excpt, reason, score, disassembly);
     }
 
@@ -1118,7 +1152,8 @@ onexception(void *drcontext, dr_exception_t *excpt) {
 */
 
 static void
-wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
+wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
+{
     dr_fprintf(STDERR, "<in wrap_pre_ReadEventLog>\n");
     HANDLE hEventLog                 = (HANDLE)drwrap_get_arg(wrapcxt, 0);
     DWORD  dwReadFlags               = (DWORD)drwrap_get_arg(wrapcxt, 1);
@@ -1139,7 +1174,8 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
 }
 
 static void
-wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
+wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
+{
     dr_fprintf(STDERR, "<in wrap_pre_RegQueryValueEx>\n");
     HKEY    hKey        = (HKEY)drwrap_get_arg(wrapcxt, 0);
     LPCTSTR lpValueName = (LPCTSTR)drwrap_get_arg(wrapcxt, 1);
@@ -1148,7 +1184,7 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
     LPBYTE  lpData      = (LPBYTE)drwrap_get_arg(wrapcxt, 4);
     LPDWORD lpcbData    = (LPDWORD)drwrap_get_arg(wrapcxt, 5);
 
-    if(lpData != NULL && lpcbData != NULL) {
+    if (lpData != NULL && lpcbData != NULL) {
         *user_data             = malloc(sizeof(tracer_read_info));
         tracer_read_info *info = (tracer_read_info *) *user_data;
 
@@ -1157,13 +1193,15 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
         info->function = Function::RegQueryValueEx;
         info->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
         info->argHash              = NULL;
-    } else {
+    }
+    else {
         *user_data = NULL;
     }
 }
 
 static void
-wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
+wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
+{
     dr_fprintf(STDERR, "<in wrap_pre_WinHttpWebSocketReceive>\n");
     HINTERNET hRequest                          = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     PVOID pvBuffer                              = drwrap_get_arg(wrapcxt, 1);
@@ -1182,7 +1220,8 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
 }
 
 static void
-wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
+wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
+{
     dr_fprintf(STDERR, "<in wrap_pre_InternetReadFile>\n");
     HINTERNET hFile             = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer             = drwrap_get_arg(wrapcxt, 1);
@@ -1200,7 +1239,8 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
 }
 
 static void
-wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
+wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
+{
     dr_fprintf(STDERR, "<in wrap_pre_WinHttpReadData>\n");
     HINTERNET hRequest          = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer             = drwrap_get_arg(wrapcxt, 1);
@@ -1218,7 +1258,8 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
 }
 
 static void
-wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
+wrap_pre_recv(void *wrapcxt, OUT void **user_data)
+{
     dr_fprintf(STDERR, "<in wrap_pre_recv>\n");
     SOCKET s  = (SOCKET)drwrap_get_arg(wrapcxt, 0);
     char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
@@ -1236,7 +1277,8 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
 }
 
 static void
-wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
+wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
+{
     dr_fprintf(STDERR, "<in wrap_pre_ReadFile>\n");
     HANDLE hFile                = drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer             = drwrap_get_arg(wrapcxt, 1);
@@ -1272,7 +1314,8 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
 }
 
 static void
-wrap_pre_fread_s(void *wrapcxt, OUT void **user_data) {
+wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
+{
     dr_fprintf(STDERR, "<in wrap_pre_fread_s>\n");
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 2);
@@ -1289,7 +1332,8 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data) {
 }
 
 static void
-wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
+wrap_pre_fread(void *wrapcxt, OUT void **user_data)
+{
     dr_fprintf(STDERR, "<in wrap_pre_fread>\n");
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 1);
@@ -1307,9 +1351,10 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
 
 /* Called after each targeted function to replay mutation and mark bytes as tainted */
 static void
-wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
+wrap_post_GenericTaint(void *wrapcxt, void *user_data)
+{
     dr_fprintf(STDERR, "<in wrap_post_GenericTaint>\n");
-    if(user_data == NULL) {
+    if (user_data == NULL) {
         return;
     }
 
@@ -1325,14 +1370,14 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
     BOOL targeted = false;
     std::string strFunctionName(get_function_name(function));
     for (targetFunction t : parsedJson){
-        if (t.selected && t.functionName == strFunctionName){
-            if (t.mode & MATCH_INDEX && call_counts[function] == t.index){
+        if (t.selected && t.functionName == strFunctionName) {
+            if (t.mode & MATCH_INDEX && call_counts[function] == t.index) {
               targeted = true;
             }
-            else if (t.mode & MATCH_RETN_ADDRESS && t.retAddrOffset == retAddrOffset){
+            else if (t.mode & MATCH_RETN_ADDRESS && t.retAddrOffset == retAddrOffset) {
               targeted = true;
             }
-            else if (t.mode & MATCH_ARG_HASH && !strcmp(t.argHash.c_str(), info->argHash)){
+            else if (t.mode & MATCH_ARG_HASH && !strcmp(t.argHash.c_str(), info->argHash)) {
                 targeted = true;
             }
         }
@@ -1346,7 +1391,7 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
     }
 
     // Talk to the server, get the stored mutation from the fuzzing run, and write it into memory.
-    if(replay && targeted) {
+    if (replay && targeted) {
         dr_mutex_lock(mutatex);
         // Open handle to server
         HANDLE h_pipe = CreateFile(
@@ -1392,8 +1437,9 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data) {
 
 /* Register function pre/post callbacks in each module */
 static void
-module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
-    if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))){
+module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
+{
+    if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))) {
       baseAddr = (DWORD64) mod->start;
     }
 
@@ -1411,19 +1457,20 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     toHookPre["fread"] = wrap_pre_fread;
 
     std::map<char *, SL2_POST_PROTO> toHookPost;
-    toHookPost["fread"] = wrap_post_GenericTaint;
-    toHookPost["ReadFile"] = wrap_post_GenericTaint;
-    toHookPost["InternetReadFile"] = wrap_post_GenericTaint;
     toHookPost["ReadEventLog"] = wrap_post_GenericTaint;
     toHookPost["RegQueryValueExW"] = wrap_post_GenericTaint;
     toHookPost["RegQueryValueExA"] = wrap_post_GenericTaint;
     toHookPost["WinHttpWebSocketReceive"] = wrap_post_GenericTaint;
+    toHookPost["InternetReadFile"] = wrap_post_GenericTaint;
     toHookPost["WinHttpReadData"] = wrap_post_GenericTaint;
     toHookPost["recv"] = wrap_post_GenericTaint;
+    toHookPost["ReadFile"] = wrap_post_GenericTaint;
+    toHookPost["fread"] = wrap_post_GenericTaint;
+    toHookPost["fread_s"] = wrap_post_GenericTaint;
 
     const char *mod_name = dr_module_preferred_name(mod);
     /* assume our target executable is an exe */
-    if(strstr(mod_name, ".exe") != NULL) {
+    if (strstr(mod_name, ".exe") != NULL) {
         module_start = mod->start; // TODO evaluate us of dr_get_application_name above
         module_end = module_start + mod->module_internal_size;
     }
@@ -1436,11 +1483,11 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
 
         // Look for function matching the target specified on the command line
         std::string strFunctionName(functionName);
-        for (targetFunction t : parsedJson){
-          if (t.selected and t.functionName == strFunctionName){
+        for (targetFunction t : parsedJson) {
+          if (t.selected && t.functionName == strFunctionName) {
             hook = true;
           }
-          else if (t.selected and (strFunctionName == "RegQueryValueExW" or strFunctionName == "RegQueryValueExA")) {
+          else if (t.selected && (strFunctionName == "RegQueryValueExW" || strFunctionName == "RegQueryValueExA")) {
             if (t.functionName != "RegQueryValueEx") {
               hook = false;
             }
@@ -1456,7 +1503,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
         hookFunctionPost = NULL;
 
         // if we have a post hook function, use it
-        if(toHookPost.find(functionName) != toHookPost.end()) {
+        if (toHookPost.find(functionName) != toHookPost.end()) {
             hookFunctionPost = toHookPost[functionName];
         }
 
@@ -1467,14 +1514,14 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
         // ReadFile and RegQueryValueEx* are in multiple DLLs
         // only use the ones in KERNELBASE.dll
 
-        if(strcmp(functionName, "ReadFile") == 0) {
-            if(strcmp(mod_name, "KERNELBASE.dll") != 0) {
+        if (strcmp(functionName, "ReadFile") == 0) {
+            if (strcmp(mod_name, "KERNELBASE.dll") != 0) {
                 continue;
             }
         }
 
-        if(strcmp(functionName, "RegQueryValueExA") == 0 || strcmp(functionName, "RegQueryValueExW") == 0) {
-            if(strcmp(mod_name, "KERNELBASE.dll") != 0) {
+        if (strcmp(functionName, "RegQueryValueExA") == 0 || strcmp(functionName, "RegQueryValueExW") == 0) {
+            if (strcmp(mod_name, "KERNELBASE.dll") != 0) {
                 continue;
             }
         }
@@ -1486,7 +1533,8 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
             // bool ok = false;
             if (ok) {
                 dr_fprintf(STDERR, "<wrapped %s @ 0x%p>\n", functionName, towrap);
-            } else {
+            }
+            else {
                 dr_fprintf(STDERR, "<FAILED to wrap %s @ 0x%p: already wrapped?>\n", functionName, towrap);
             }
         }
@@ -1494,7 +1542,8 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
 }
 
 // register callbacks
-void tracer(client_id_t id, int argc, const char *argv[]) {
+void tracer(client_id_t id, int argc, const char *argv[])
+{
     drreg_options_t ops = {sizeof(ops), 3, false};
     dr_set_client_name("Tracer",
                        "https://github.com/trailofbits/sienna-locomotive");
@@ -1507,7 +1556,7 @@ void tracer(client_id_t id, int argc, const char *argv[]) {
 
     std::string run_id_s = op_replay.get_value();
 
-    if(run_id_s.length() > 0) {
+    if (run_id_s.length() > 0) {
         replay = true;
     }
 
@@ -1517,9 +1566,9 @@ void tracer(client_id_t id, int argc, const char *argv[]) {
     dr_register_exit_event(event_exit_trace);
 
     // If taint tracing is enabled, register the propagate_taint callback
-    if(!op_no_taint.get_value()) {
+    if (!op_no_taint.get_value()) {
         // http://dynamorio.org/docs/group__drmgr.html#ga83a5fc96944e10bd7356e0c492c93966
-        if(!drmgr_register_bb_instrumentation_event(
+        if (!drmgr_register_bb_instrumentation_event(
                                                 NULL,
                                                 event_app_instruction,
                                                 NULL))
@@ -1552,15 +1601,18 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
 
     // target is mandatory
     std::string target = op_target.get_value();
-    if(target == "") {
+    if (target == "") {
         dr_fprintf(STDERR, "ERROR: arg -t (target) required");
         dr_abort();
     }
 
     std::ifstream jsonStream(target); // TODO ifstream can sometimes cause performance issues
     jsonStream >> parsedJson;
-    if (!parsedJson.is_array())
-      dr_fprintf(STDERR, "Document root is not an array\n");
+
+    if (!parsedJson.is_array()){
+        dr_fprintf(STDERR, "ERROR: Document root is not an array\n");
+        dr_abort();
+    }
 
     tracer(id, argc, argv);
 }
