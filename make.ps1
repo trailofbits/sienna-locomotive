@@ -69,8 +69,12 @@ Function SafeDelete {
     } 
 }
 
-Function Clean {
+Function Reconfig {
     SafeDelete "$env:APPDATA\Trail of Bits\fuzzkit"
+}
+
+Function Clean {
+    Reconfig
     SafeDelete "build"
     "It's clean!"
     
@@ -81,12 +85,38 @@ Function Dep {
     SafeDelete "dynamorio"
 }
 
+Function Help {
+    @'
+Usage: make1.ps [clean|dep|reconfig|help]
+
+make1.ps without any options will build
+
+
+clean
+    Cleans build directory and configuration (reconfigs)
+
+dep
+    Rebuild dependencies
+
+reconfig
+    Deletes fuzzkit directory with run configuration
+
+help
+    This info    
+'@
+}
+
+
 $cmd = $args[0]
 
 if(         $cmd -eq "clean" ) {
     Clean
 } ElseIf(   $cmd -eq "dep" ) {
     Dep
+} ElseIf(   $cmd -eq "reconfig" ) {
+    Reconfig
+} ElseIf(   $cmd -eq "help" ) {
+    Help
 } else {
     Build
 }

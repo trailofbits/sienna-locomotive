@@ -7,11 +7,15 @@ import shlex
 
 
 def runAndCaptureOutput( cmd ):
-    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,  stderr=subprocess.PIPE, close_fds=True)
-    stdout, stderr = p.communicate()
-    stdout = str(stdout)
-    stderr = str(stderr)
-    return stdout, stderr
+    if type(cmd) == type([]):
+        cmd = " ".join(cmd)
+
+    return subprocess.getoutput(cmd)
+    # p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,  stderr=subprocess.PIPE, close_fds=True)
+    # stdout, stderr = p.communicate()
+    # stdout = str(stdout)
+    # stderr = str(stderr)
+    # return stdout, stderr
 
 class TestWizard(unittest.TestCase):
     
@@ -34,8 +38,8 @@ class TestWizard(unittest.TestCase):
             r'build\corpus\test_application\Debug\test_application.exe',
             r'0' ]
         
-        stdout, stderr = runAndCaptureOutput(cmd)
-        self.assertTrue(  r'buffer":[65,65,65,65,65,65,65,65]'  in stderr )
+        output = runAndCaptureOutput(cmd)
+        self.assertTrue(  r'buffer":[65,65,65,65,65,65,65,65]'  in output )
 
     def test_2(self):
         
@@ -46,8 +50,13 @@ class TestWizard(unittest.TestCase):
             r'build\corpus\test_application\Debug\test_application.exe',
             r'2' ]
         
-        stdout, stderr = runAndCaptureOutput(cmd)
-        self.assertTrue(  r'[60,104,116,109,108,62,10,32]' in stderr )
+        output = runAndCaptureOutput(cmd)
+        self.assertTrue(  r'[60,104,116,109,108,62,10,32]' in output )
+
+    def test_RegQueryValueEx(self):
+        cmd = r'echo 0 | python .\harness.py -r3 -v -t build\\corpus\\test_application\\Debug\\test_application.exe -a 4 -f'
+        output = runAndCaptureOutput(cmd)
+        self.assertTrue( 'Process completed after' in output )
 
 
 def main():
