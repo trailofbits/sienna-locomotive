@@ -1,6 +1,7 @@
-#include "common/function_lookup.hpp"
+#include "common/sl2_dr_client.hpp"
 
-__declspec(dllexport) char *get_function_name(Function function) {
+__declspec(dllexport) char *get_function_name(Function function)
+{
     switch(function) {
         case Function::ReadFile:
             return "ReadFile";
@@ -23,4 +24,15 @@ __declspec(dllexport) char *get_function_name(Function function) {
     }
 
     return "unknown";
+}
+
+// TODO(ww): Document the fallback values here.
+__declspec(dllexport) void from_json(const json& j, targetFunction& t)
+{
+    t.selected = j.value("selected", false);
+    t.index = j.value("callCount", -1);
+    t.mode = j.value("mode", MATCH_INDEX);
+    t.retAddrOffset = j.value("retAddrOffset", -1);
+    t.functionName = j.value("func_name", "");
+    t.argHash = j.value("argHash", "");
 }

@@ -20,12 +20,9 @@
 #include <locale>
 
 #include <picosha2.h>
-#include <json.hpp>
-using json = nlohmann::json;
 using namespace std;
 
-#include "common/function_lookup.hpp"
-#include "common/hook_protos.h"
+#include "common/sl2_dr_client.hpp"
 
 #define JSON_VAR (j##__COUNTER__)
 
@@ -38,7 +35,7 @@ using namespace std;
 
 
 // function metadata structure
-struct read_info {
+struct wizard_read_info {
     LPVOID lpBuffer;
     size_t nNumberOfBytesToRead;
     Function function;
@@ -47,13 +44,6 @@ struct read_info {
     UINT64 retAddrOffset;
     // TODO(ww): Make this a WCHAR * for consistency.
     char *argHash;
-};
-
-// the data used to construct an identifying hash for a function
-struct fileArgHash {
-  WCHAR fileName[MAX_PATH + 1];
-  UINT64 position;
-  DWORD readSize;
 };
 
 static UINT64 baseAddr;
@@ -118,8 +108,8 @@ static void
 wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
     JSON_WRAP_PRE_LOG();
 
-    *user_data      = malloc(sizeof(read_info));
-    read_info *info = (read_info *) *user_data;
+    *user_data             = malloc(sizeof(wizard_read_info));
+    wizard_read_info *info = (wizard_read_info *) *user_data;
 
     HANDLE hEventLog                 = (HANDLE)drwrap_get_arg(wrapcxt, 0);
     DWORD  dwReadFlags               = (DWORD)drwrap_get_arg(wrapcxt, 1);
@@ -153,8 +143,8 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
     // get registry key path (maybe hook open key?)
 
     if (lpData != NULL && lpcbData != NULL) {
-        *user_data      = malloc(sizeof(read_info));
-        read_info *info = (read_info *) *user_data;
+        *user_data             = malloc(sizeof(wizard_read_info));
+        wizard_read_info *info = (wizard_read_info *) *user_data;
 
         info->lpBuffer             = lpData;
         info->nNumberOfBytesToRead = *lpcbData;
@@ -173,8 +163,8 @@ static void
 wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
     JSON_WRAP_PRE_LOG();
 
-    *user_data      = malloc(sizeof(read_info));
-    read_info *info = (read_info *) *user_data;
+    *user_data             = malloc(sizeof(wizard_read_info));
+    wizard_read_info *info = (wizard_read_info *) *user_data;
 
     HINTERNET hRequest                          = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     PVOID pvBuffer                              = drwrap_get_arg(wrapcxt, 1);
@@ -198,8 +188,8 @@ static void
 wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
     JSON_WRAP_PRE_LOG();
 
-    *user_data      = malloc(sizeof(read_info));
-    read_info *info = (read_info *) *user_data;
+    *user_data             = malloc(sizeof(wizard_read_info));
+    wizard_read_info *info = (wizard_read_info *) *user_data;
 
     HINTERNET hFile             = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer             = drwrap_get_arg(wrapcxt, 1);
@@ -222,8 +212,8 @@ static void
 wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
     JSON_WRAP_PRE_LOG();
 
-    *user_data      = malloc(sizeof(read_info));
-    read_info *info = (read_info *) *user_data;
+    *user_data             = malloc(sizeof(wizard_read_info));
+    wizard_read_info *info = (wizard_read_info *) *user_data;
 
     HINTERNET hRequest          = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer             = drwrap_get_arg(wrapcxt, 1);
@@ -246,8 +236,8 @@ static void
 wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
     JSON_WRAP_PRE_LOG();
 
-    *user_data      = malloc(sizeof(read_info));
-    read_info *info = (read_info *) *user_data;
+    *user_data             = malloc(sizeof(wizard_read_info));
+    wizard_read_info *info = (wizard_read_info *) *user_data;
 
     SOCKET s  = (SOCKET)drwrap_get_arg(wrapcxt, 0);
     char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
@@ -279,8 +269,8 @@ static void
 wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     JSON_WRAP_PRE_LOG();
 
-    *user_data                  = malloc(sizeof(read_info));
-    read_info *info             = (read_info *) *user_data;
+    *user_data             = malloc(sizeof(wizard_read_info));
+    wizard_read_info *info = (wizard_read_info *) *user_data;
 
     HANDLE hFile                = drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer             = drwrap_get_arg(wrapcxt, 1);
@@ -317,8 +307,8 @@ static void
 wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     JSON_WRAP_PRE_LOG();
 
-    *user_data      = malloc(sizeof(read_info));
-    read_info *info = (read_info *) *user_data;
+    *user_data             = malloc(sizeof(wizard_read_info));
+    wizard_read_info *info = (wizard_read_info *) *user_data;
 
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 1);
@@ -337,8 +327,8 @@ static void
 wrap_pre_fread_s(void *wrapcxt, OUT void **user_data) {
     JSON_WRAP_PRE_LOG();
 
-    *user_data      = malloc(sizeof(read_info));
-    read_info *info = (read_info *) *user_data;
+    *user_data             = malloc(sizeof(wizard_read_info));
+    wizard_read_info *info = (wizard_read_info *) *user_data;
 
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 2);
@@ -362,8 +352,8 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
 
     wstring_convert<std::codecvt_utf8<wchar_t>> utf8Converter;
 
-    read_info *info    = ((read_info *)user_data);
-    CHAR *functionName = get_function_name(info->function);
+    wizard_read_info *info = ((wizard_read_info *)user_data);
+    CHAR *functionName     = get_function_name(info->function);
 
     json j;
     j["type"]               = "id";
@@ -377,8 +367,6 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
         wstring wsource =  wstring(info->source);
         j["source"]  = utf8Converter.to_bytes(wsource);
 
-        free(info->source);
-
         size_t end   = info->position + info->nNumberOfBytesToRead;
         j["start"]   = info->position;
         j["end"]     = end;
@@ -386,18 +374,24 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
 
     if (info->argHash != NULL) {
         j["argHash"] = info->argHash;
-        free(info->argHash);
     }
 
     char *lpBuffer = (char *) info->lpBuffer;
     DWORD nNumberOfBytesToRead = info->nNumberOfBytesToRead;
 
-    free(user_data);
-
     vector<unsigned char> x(lpBuffer, lpBuffer + nNumberOfBytesToRead);
     j["buffer"] = x;
 
     logObject(j);
+
+    if (info->source) {
+        free(info->source);
+    }
+    if (info->argHash) {
+        free(info->argHash);
+    }
+
+    free(info);
 }
 
 /* Runs every time we load a new module. Wraps functions we can target. See fuzzer.cpp for a more-detailed version */
