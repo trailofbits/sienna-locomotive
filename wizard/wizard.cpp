@@ -269,34 +269,34 @@ static void
 wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     JSON_WRAP_PRE_LOG();
 
-    *user_data             = malloc(sizeof(wizard_read_info));
-    wizard_read_info *info = (wizard_read_info *) *user_data;
-
     HANDLE hFile                = drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer             = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
 
+    LARGE_INTEGER offset = {0};
+    LARGE_INTEGER position = {0};
+    SetFilePointerEx(hFile, offset, &position, FILE_CURRENT);
+
+    fileArgHash fStruct = {0};
+
+    GetFinalPathNameByHandle(hFile, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
+    fStruct.position = position.QuadPart;
+    fStruct.readSize = nNumberOfBytesToRead;
+
+    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct,
+        ((unsigned char *) &fStruct) + sizeof(fileArgHash));
+    std::string hash_str;
+    picosha2::hash256_hex_string(blob_vec, hash_str);
+
+    *user_data             = malloc(sizeof(wizard_read_info));
+    wizard_read_info *info = (wizard_read_info *) *user_data;
+
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
     info->function             = Function::ReadFile;
     info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-
-    LARGE_INTEGER offset = {0};
-    LARGE_INTEGER position = {0};
-    SetFilePointerEx(hFile, offset, &position, FILE_CURRENT);
-    info->position = position.QuadPart;
-
-    fileArgHash fStruct;
-    memset(&fStruct, 0, sizeof(fileArgHash));
-
-    DWORD pathSize = GetFinalPathNameByHandle(hFile, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
-    fStruct.position = info->position;
-    fStruct.readSize = nNumberOfBytesToRead;
-
-    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct, ((unsigned char *) &fStruct) + sizeof(fileArgHash));
-    std::string hash_str;
-    picosha2::hash256_hex_string(blob_vec, hash_str);
+    info->position             = fStruct.position;
 
     info->source = (WCHAR *)malloc(sizeof(fStruct.fileName));
     memcpy(info->source, fStruct.fileName, sizeof(fStruct.fileName));
@@ -436,7 +436,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     SL2_POST_HOOK2(toHookPost, fread, Generic);
 
     std::map<char *, SL2_PRE_PROTO>::iterator it;
-    for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
+    for (it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
         std::string strFunctionName(functionName);
 
@@ -445,20 +445,20 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
         void(__cdecl *hookFunctionPost)(void *, void *);
         hookFunctionPost = NULL;
 
-        if(toHookPost.find(functionName) != toHookPost.end()) {
+        if (toHookPost.find(functionName) != toHookPost.end()) {
             hookFunctionPost = toHookPost[functionName];
         }
 
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
         const char *mod_name = dr_module_preferred_name(mod);
-        if(strcmp(functionName, "ReadFile") == 0) {
-            if(strcmp(mod_name, "KERNELBASE.dll") != 0) {
+        if (strcmp(functionName, "ReadFile") == 0) {
+            if (strcmp(mod_name, "KERNELBASE.dll") != 0) {
                 continue;
             }
         }
 
-        if(strcmp(functionName, "RegQueryValueExA") == 0 || strcmp(functionName, "RegQueryValueExW") == 0) {
-            if(strcmp(mod_name, "KERNELBASE.dll") != 0) {
+        if (strcmp(functionName, "RegQueryValueExA") == 0 || strcmp(functionName, "RegQueryValueExW") == 0) {
+            if (strcmp(mod_name, "KERNELBASE.dll") != 0) {
                 continue;
             }
         }
