@@ -19,7 +19,7 @@ extern "C" {
 }
 
 // Used for debugging prints.
-#define SL2_DEBUG(...) (dr_fprintf(STDERR, __VA_ARGS__))
+#define SL2_DR_DEBUG(...) (dr_fprintf(STDERR, __VA_ARGS__))
 
 // NOTE(ww): This loop is here because dr_fprintf has an internal buffer
 // of 2048, and our JSON objects frequently exceed that. When that happens,
