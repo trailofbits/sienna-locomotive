@@ -53,19 +53,21 @@ static std::map<Function, UINT64> call_counts;
 static void
 event_thread_init(void *drcontext)
 {
-    SL2_DR_DEBUG("wizard: event_thread_init\n");
+    SL2_DR_DEBUG("wizard#event_thread_init\n");
 }
 
 static void
 event_thread_exit(void *drcontext)
 {
-    SL2_DR_DEBUG("wizard: event_thread_exit\n");
+    SL2_DR_DEBUG("wizard#event_thread_exit\n");
 }
 
 /* Clean up after the target binary exits */
 static void
 event_exit_trace(void)
 {
+    SL2_DR_DEBUG("wizard#event_exit_trace\n");
+
     if (!drmgr_unregister_thread_init_event(event_thread_init) ||
         !drmgr_unregister_thread_exit_event(event_thread_exit) ||
         drreg_exit() != DRREG_SUCCESS)
@@ -505,7 +507,7 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
     std::string parse_err;
     int last_idx = 0;
     if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
-        SL2_DR_DEBUG("Usage error: %s", parse_err.c_str());
+        SL2_DR_DEBUG("wizard#main: usage error: %s", parse_err.c_str());
         dr_abort();
     }
 
