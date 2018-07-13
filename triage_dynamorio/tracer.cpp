@@ -48,7 +48,7 @@ static app_pc last_insns[LAST_COUNT] = { 0 };
 
 static app_pc module_start = 0;
 static app_pc module_end = 0;
-static DWORD64 baseAddr;
+static size_t baseAddr;
 
 /* Required, which specific call to target */
 static droption_t<std::string> op_target(
@@ -82,7 +82,7 @@ struct tracer_read_info {
     LPVOID lpBuffer;
     size_t nNumberOfBytesToRead;
     Function function;
-    DWORD64 retAddrOffset;
+    size_t retAddrOffset;
     // TODO(ww) Use WCHAR * here for consistency.
     char *argHash;
 };
@@ -249,9 +249,9 @@ is_tainted(void *drcontext, opnd_t opnd)
 
 /* Mark a memory address as tainted */
 static void
-taint_mem(app_pc addr, ssize_t size)
+taint_mem(app_pc addr, size_t size)
 {
-    for (ssize_t i = 0; i < size; i++) {
+    for (size_t i = 0; i < size; i++) {
         tainted_mems.insert(addr + i);
     }
 }
@@ -1169,7 +1169,7 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
     info->function             = Function::ReadEventLog;
-    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
@@ -1191,7 +1191,7 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
         info->lpBuffer = lpData;
         info->nNumberOfBytesToRead = *lpcbData;
         info->function = Function::RegQueryValueEx;
-        info->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+        info->retAddrOffset = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
         info->argHash              = NULL;
     }
     else {
@@ -1215,7 +1215,7 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
     info->lpBuffer = pvBuffer;
     info->nNumberOfBytesToRead = dwBufferLength;
     info->function = Function::WinHttpWebSocketReceive;
-    info->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
@@ -1234,7 +1234,7 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
     info->function             = Function::InternetReadFile;
-    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
@@ -1253,7 +1253,7 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
     info->function             = Function::WinHttpReadData;
-    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
@@ -1272,7 +1272,7 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data)
     info->lpBuffer             = buf;
     info->nNumberOfBytesToRead = len;
     info->function             = Function::recv;
-    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
@@ -1291,16 +1291,18 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
     info->function             = Function::ReadFile;
-    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
-    LONG positionHigh = 0;
-    DWORD positionLow = SetFilePointer(hFile, 0, &positionHigh, FILE_CURRENT);
+    LARGE_INTEGER offset = {0};
+    offset.QuadPart = 0;
+    LARGE_INTEGER position = {0};
+    SetFilePointerEx(hFile, offset, &position, FILE_CURRENT);
 
     fileArgHash fStruct;
     memset(&fStruct, 0, sizeof(fileArgHash));
 
     DWORD pathSize   = GetFinalPathNameByHandle(hFile, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
-    fStruct.position = (positionHigh << 32) | positionLow;;
+    fStruct.position = position.QuadPart;
     fStruct.readSize = nNumberOfBytesToRead;
 
     std::vector<unsigned char> blob_vec((unsigned char *) &fStruct, ((unsigned char *) &fStruct) + sizeof(fileArgHash));
@@ -1327,7 +1329,7 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
     info->function             = Function::fread;
     info->lpBuffer             = buffer;
     info->nNumberOfBytesToRead = size * count;
-    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
@@ -1345,7 +1347,7 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data)
     info->function = Function::fread;
     info->lpBuffer = buffer;
     info->nNumberOfBytesToRead = size * count;
-    info->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
@@ -1361,10 +1363,10 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     tracer_read_info *info = (tracer_read_info *) user_data;
 
     // Grab stored metadata
-    LPVOID lpBuffer            = info->lpBuffer;
+    LPVOID lpBuffer             = info->lpBuffer;
     size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
-    Function function          = info->function;
-    DWORD64 retAddrOffset      = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    Function function           = info->function;
+    size_t retAddrOffset       = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
     // Identify whether this is the function we want to target
     BOOL targeted = false;
@@ -1421,7 +1423,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
             WriteFile(h_pipe, &run_id, sizeof(UUID), &bytes_written, NULL);
             WriteFile(h_pipe, &mutate_count, sizeof(DWORD), &bytes_written, NULL);
             // Overwrite bytes with old mutation
-            TransactNamedPipe(h_pipe, &nNumberOfBytesToRead, sizeof(size_t), lpBuffer, nNumberOfBytesToRead, &bytes_read, NULL);
+            TransactNamedPipe(h_pipe, &nNumberOfBytesToRead, sizeof(size_t), lpBuffer, (DWORD)nNumberOfBytesToRead, &bytes_read, NULL);
             mutate_count++;
             CloseHandle(h_pipe);
             dr_mutex_unlock(mutatex);
@@ -1440,7 +1442,7 @@ static void
 module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
 {
     if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))) {
-      baseAddr = (DWORD64) mod->start;
+      baseAddr = (size_t) mod->start;
     }
 
     std::map<char *, SL2_PRE_PROTO> toHookPre;
