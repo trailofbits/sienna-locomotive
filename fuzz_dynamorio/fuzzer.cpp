@@ -16,8 +16,7 @@
 
 #include <picosha2.h>
 
-#include "server.hpp"
-
+#include "sl2_server_api.hpp"
 #include "sl2_dr_client.hpp"
 
 #ifdef WINDOWS
@@ -45,102 +44,24 @@ static droption_t<std::string> op_target(
     "JSON file in which to look for targets");
 
 static SL2Client   client;
-
-static UUID runId;
+static sl2_client server_client;
+static json parsedJson;
 static BOOL crashed = false;
 static DWORD64 baseAddr;
-
 static DWORD mutateCount = 0;
 
-//TODO: Fix logging
-/* Tries to get a new Run ID from the fuzz server */
-UUID getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs)
-{
-    dr_log(NULL, DR_LOG_ALL, ERROR, "Requesting run id");
-    DWORD bytesRead = 0;
-    DWORD bytesWritten = 0;
-
-    BYTE eventId = EVT_RUN_ID;
-    UUID runId;
-    if (!TransactNamedPipe(hPipe, &eventId, sizeof(BYTE), &runId, sizeof(UUID), &bytesRead, NULL)) {
-        dr_log(NULL, DR_LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
-        dr_exit_process(1);
-    }
-
-    WCHAR runId_s[SL2_UUID_SIZE];
-    sl2_uuid_to_wstring(runId, runId_s);
-
-    dr_log(NULL, DR_LOG_ALL, ERROR, "Run id %S", runId_s);
-
-    DWORD size = lstrlenW(targetName) * sizeof(WCHAR);
-
-    if (!WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL)) {
-        dr_log(NULL, DR_LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
-        dr_exit_process(1);
-    }
-
-    if (!WriteFile(hPipe, targetName, size, &bytesWritten, NULL)) {
-        dr_log(NULL, DR_LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
-        dr_exit_process(1);
-    }
-
-    size = lstrlen(targetArgs) * sizeof(WCHAR);
-    if (!WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL)) {
-        dr_log(NULL, DR_LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
-        dr_exit_process(1);
-    }
-
-    if (!WriteFile(hPipe, targetArgs, size, &bytesWritten, NULL)) {
-        dr_log(NULL, DR_LOG_ALL, ERROR, "Error getting run id (%x)", GetLastError());
-        dr_exit_process(1);
-    }
-
-    return runId;
-}
-
-/* Get a handle to the pipe that lets us talk to the server */
-HANDLE getPipe()
-{
-    HANDLE hPipe;
-    while (1) {
-        hPipe = CreateFile(
-            FUZZ_SERVER_PATH,
-            GENERIC_READ | GENERIC_WRITE,
-            0,
-            NULL,
-            OPEN_EXISTING,
-            0,
-            NULL);
-
-        if (hPipe != INVALID_HANDLE_VALUE) {
-            break;
-        }
-
-        // This is basically just a check that the server is running
-        DWORD err = GetLastError();
-        if (err != ERROR_PIPE_BUSY) {
-            dr_log(NULL, DR_LOG_ALL, ERROR, "Could not open pipe (%x)", err);
-            SL2_DR_DEBUG("Could not open pipe (0x%x)\n", err);
-            SL2_DR_DEBUG("Is the server running?\n");
-            dr_exit_process(1);
-        }
-
-        if (!WaitNamedPipe(FUZZ_SERVER_PATH, 5000)) {
-            dr_log(NULL, DR_LOG_ALL, ERROR, "Could not connect, timeout");
-            SL2_DR_DEBUG("Could not connect, timeout\n", err);
-            dr_exit_process(1);
-        }
-    }
-
-    DWORD readMode = PIPE_READMODE_MESSAGE;
-    SetNamedPipeHandleState(
-        hPipe,
-        &readMode,
-        NULL,
-        NULL);
-
-    return hPipe;
-}
+// Metadata object for a target function call
+struct fuzzer_read_info {
+    Function function;
+    HANDLE hFile;
+    LPVOID lpBuffer;
+    size_t nNumberOfBytesToRead;
+    LPDWORD lpNumberOfBytesRead;
+    DWORD64 position;
+    DWORD64 retAddrOffset;
+    // TODO(ww): Make this a WCHAR * for consistency.
+    char *argHash;
+};
 
 /* Close out the fuzzing run with the server */
 DWORD finalize(HANDLE hPipe, UUID runId, BOOL crashed)
@@ -295,9 +216,10 @@ static void
 event_exit(void)
 {
     SL2_DR_DEBUG("Dynamorio exiting (fuzzer)\n");
-    HANDLE hPipe = getPipe();
-    finalize(hPipe, runId, crashed); // Delete the fuzzing run if we didn't find a crash
-    CloseHandle(hPipe); // Close out connection to server
+    // TODO(ww): Uncomment when implemented.
+    // sl2_client_finalize_run(&client, true, crashed);
+    finalize(client.pipe, client.run_id, crashed); // Delete the fuzzing run if we didn't find a crash
+    sl2_client_close(&client);
 
     // Clean up DynamoRIO
     dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#event_exit: Dynamorio Exiting\n");
@@ -310,8 +232,6 @@ static BOOL
 mutate(Function function, HANDLE hFile, size_t position, LPVOID buf, size_t size)
 {
     WCHAR filePath[MAX_PATH + 1] = {0};
-    WCHAR *new_buf = (WCHAR *)buf;
-    DWORD pathSize = 0;
 
     // Check that ReadFile calls are to something actually valid
     // TODO(ww): Add fread and fread_s here once the _getosfhandle problem is fixed.
@@ -321,16 +241,9 @@ mutate(Function function, HANDLE hFile, size_t position, LPVOID buf, size_t size
             return false;
         }
 
-        pathSize = GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, 0);
+        GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, 0);
         SL2_DR_DEBUG("mutate: filePath: %S", filePath);
-
-        if (pathSize > MAX_PATH || pathSize == 0) {
-            dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#mutate: Pathsize %d is out of bounds\n", pathSize);
-            return false;
-        }
     }
-
-    HANDLE hPipe = getPipe();
 
     DWORD bytesRead = 0;
     DWORD bytesWritten = 0;
@@ -338,26 +251,11 @@ mutate(Function function, HANDLE hFile, size_t position, LPVOID buf, size_t size
     BYTE eventId = EVT_MUTATION;
     DWORD type = static_cast<DWORD>(function);
 
-    // Send state information to the fuzz server
-    WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL);
-    WriteFile(hPipe, &runId, sizeof(UUID), &bytesWritten, NULL);
-    WriteFile(hPipe, &type, sizeof(DWORD), &bytesWritten, NULL);
-    WriteFile(hPipe, &mutateCount, sizeof(DWORD), &bytesWritten, NULL);
-
-    WriteFile(hPipe, &pathSize, sizeof(DWORD), &bytesWritten, NULL);
-    WriteFile(hPipe, &filePath, pathSize * sizeof(WCHAR), &bytesWritten, NULL);
-
-    WriteFile(hPipe, &position, sizeof(size_t), &bytesWritten, NULL);
-    WriteFile(hPipe, &size, sizeof(size_t), &bytesWritten, NULL);
-
-    // Send current contents of buf to the server, overwrite them with its reply
-    TransactNamedPipe(hPipe, buf, size, buf, size, &bytesRead, NULL);
-
-    CloseHandle(hPipe);
+    sl2_client_request_mutation(&client, type, mutateCount, filePath, position, size, buf);
 
     mutateCount++;
 
-  return true;
+    return true;
 }
 
 /*
@@ -960,17 +858,15 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     //TODO: support multiple passes over one binary without re-running drrun
 
     // Get application name
-    HANDLE hPipe = getPipe();
     const char* mbsAppName = dr_get_application_name();
     WCHAR wcsAppName[MAX_PATH];
     mbstowcs(wcsAppName, mbsAppName, MAX_PATH);
 
-    // Send application name and invokation to fuzz server, get back the run ID
-    runId = getRunID(hPipe, wcsAppName, get_target_command_line());
-    CloseHandle(hPipe);
+    sl2_client_open(&client);
+    sl2_client_request_run_id(&client, wcsAppName, get_target_command_line());
 
     WCHAR runId_s[SL2_UUID_SIZE];
-    sl2_uuid_to_wstring(runId, runId_s);
+    sl2_uuid_to_wstring(client.run_id, runId_s);
     // Initialize DynamoRIO and register callbacks
     SL2_DR_DEBUG("Beginning fuzzing run %S\n\n", runId_s);
     drmgr_init();
