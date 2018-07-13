@@ -515,6 +515,7 @@ DWORD mutate(BYTE *buf, size_t size)
     // insert bytes
     // move bytes
     // add random bytes to space
+    // inject random NULL(s)
 
     return 0;
 }
