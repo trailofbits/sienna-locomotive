@@ -698,9 +698,20 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
 
+    fileArgHash fStruct = {0};
+
     LARGE_INTEGER offset = {0};
     LARGE_INTEGER position = {0};
     SetFilePointerEx(hFile, offset, &position, FILE_CURRENT);
+
+    GetFinalPathNameByHandle(hFile, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
+    fStruct.position = position.QuadPart;
+    fStruct.readSize = nNumberOfBytesToRead;
+
+    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct,
+        ((unsigned char *) &fStruct) + sizeof(fileArgHash));
+    std::string hash_str;
+    picosha2::hash256_hex_string(blob_vec, hash_str);
 
     *user_data             = malloc(sizeof(fuzzer_read_info));
     fuzzer_read_info *info = (fuzzer_read_info *) *user_data;
@@ -710,19 +721,8 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
     info->lpNumberOfBytesRead  = lpNumberOfBytesRead;
-    info->position             = position.QuadPart;
+    info->position             = fStruct.position;
     info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
-
-    fileArgHash fStruct;
-    memset(&fStruct, 0, sizeof(fileArgHash));
-
-    DWORD pathSize   = GetFinalPathNameByHandle(hFile, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
-    fStruct.position = ((fuzzer_read_info *)*user_data)->position;
-    fStruct.readSize = nNumberOfBytesToRead;
-
-    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct, ((unsigned char *) &fStruct) + sizeof(fileArgHash));
-    std::string hash_str;
-    picosha2::hash256_hex_string(blob_vec, hash_str);
 
     // NOTE(ww): SHA2 digests are 64 characters, so we allocate that + room for a NULL
     info->argHash = (char *) malloc(65);
