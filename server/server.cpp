@@ -930,15 +930,15 @@ DWORD finalizeRun(HANDLE hPipe)
         exit(1);
     }
 
-    BOOL remove = true;
-    if (!ReadFile(hPipe, &remove, sizeof(BOOL), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "finalizeRun: failed to read remove flag (0x%x)", GetLastError());
+    BOOL preserve = false;
+    if (!ReadFile(hPipe, &preserve, sizeof(BOOL), &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "finalizeRun: failed to read preserve flag (0x%x)", GetLastError());
         exit(1);
     }
 
     LOG_F(INFO, "finalizeRun: finalizing %S", runId_s);
 
-    if (!crash && remove) {
+    if (!crash && !preserve) {
         LOG_F(INFO, "finalizeRun: no crash, removing run %S", runId_s);
         EnterCriticalSection(&critId);
 

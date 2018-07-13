@@ -63,49 +63,6 @@ struct fuzzer_read_info {
     char *argHash;
 };
 
-/* Close out the fuzzing run with the server */
-DWORD finalize(HANDLE hPipe, UUID runId, BOOL crashed)
-{
-    WCHAR runId_s[SL2_UUID_SIZE];
-    sl2_uuid_to_wstring(runId, runId_s);
-
-    if (crashed) {
-        SL2_DR_DEBUG("<crash found for run id %S>\n", runId_s);
-        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#finalize: Crash found for run id %S!", runId_s);
-    }
-
-    DWORD bytesWritten;
-    BYTE eventId = EVT_RUN_COMPLETE;
-
-    // write the event ID (4 for finalize)
-    if (!WriteFile(hPipe, &eventId, sizeof(BYTE), &bytesWritten, NULL)) {
-        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write event ID (0x%x)", GetLastError());
-        dr_exit_process(1);
-    }
-
-    // Write the run ID
-    if (!WriteFile(hPipe, &runId, sizeof(UUID), &bytesWritten, NULL)) {
-        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write run ID (0x%x)", GetLastError());
-        dr_exit_process(1);
-    }
-
-    // write whether the run found a crash
-    if (!WriteFile(hPipe, &crashed, sizeof(BOOL), &bytesWritten, NULL)) {
-        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write crash status (%x)", GetLastError());
-        dr_exit_process(1);
-    }
-
-    // Write whether to preserve the files, even without a crash.
-    // For now we don't, but this can be flipped to help with debugging.
-    BOOL remove = 1;
-    if (!WriteFile(hPipe, &remove, sizeof(BOOL), &bytesWritten, NULL)) {
-        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write remove code (%x)", GetLastError());
-        dr_exit_process(1);
-    }
-
-    return 0;
-}
-
 /* Read the PEB of the target application and get the full command line */
 static LPTSTR
 get_target_command_line()
@@ -216,9 +173,16 @@ static void
 event_exit(void)
 {
     SL2_DR_DEBUG("Dynamorio exiting (fuzzer)\n");
-    // TODO(ww): Uncomment when implemented.
-    // sl2_client_finalize_run(&client, true, crashed);
-    finalize(client.pipe, client.run_id, crashed); // Delete the fuzzing run if we didn't find a crash
+
+    WCHAR run_id_s[SL2_UUID_SIZE];
+    sl2_uuid_to_wstring(client.run_id, run_id_s);
+
+    if (crashed) {
+        SL2_DR_DEBUG("<crash found for run id %S>\n", run_id_s);
+        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#event_exit: Crash found for run id %S!", run_id_s);
+    }
+
+    sl2_client_finalize_run(&client, crashed, false);
     sl2_client_close(&client);
 
     // Clean up DynamoRIO
@@ -865,10 +829,10 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     sl2_client_open(&client);
     sl2_client_request_run_id(&client, wcsAppName, get_target_command_line());
 
-    WCHAR runId_s[SL2_UUID_SIZE];
-    sl2_uuid_to_wstring(client.run_id, runId_s);
+    WCHAR run_id_s[SL2_UUID_SIZE];
+    sl2_uuid_to_wstring(client.run_id, run_id_s);
     // Initialize DynamoRIO and register callbacks
-    SL2_DR_DEBUG("Beginning fuzzing run %S\n\n", runId_s);
+    SL2_DR_DEBUG("Beginning fuzzing run %S\n\n", run_id_s);
     drmgr_init();
     drwrap_init();
 

@@ -15,19 +15,6 @@ __declspec(dllexport) SL2Response sl2_client_open(sl2_client *client)
         return SL2Response::BadPipe;
     }
 
-    // // This is basically just a check that the server is running
-    // DWORD err = GetLastError();
-    // if (err != ERROR_PIPE_BUSY) {
-    //     dr_log(NULL, DR_LOG_ALL, ERROR, "Could not open pipe (%x)", err);
-    //     dr_exit_process(1);
-    // }
-
-    // if (!WaitNamedPipe(FUZZ_SERVER_PATH, 5000)) {
-    //     dr_log(NULL, DR_LOG_ALL, ERROR, "Could not connect, timeout");
-    //     SL2_DR_DEBUG("Could not connect, timeout\n", err);
-    //     dr_exit_process(1);
-    // }
-
     DWORD readMode = PIPE_READMODE_MESSAGE;
     SetNamedPipeHandleState(pipe, &readMode, NULL, NULL);
 
@@ -47,7 +34,7 @@ __declspec(dllexport) SL2Response sl2_client_close(sl2_client *client)
     DWORD txsize;
 
     // Tell the server that we want to end our session.
-    WriteFile(client->pipe, &event, sizeof(BYTE), &txsize, NULL);
+    WriteFile(client->pipe, &event, sizeof(event), &txsize, NULL);
 
     CloseHandle(client->pipe);
 
@@ -109,6 +96,8 @@ __declspec(dllexport) SL2Response sl2_client_request_mutation(
     BYTE event = EVT_MUTATION;
     DWORD txsize;
 
+    // If the client doesn't have a run ID, then we don't have any state
+    // to request a mutation against.
     if (!client->has_run_id) {
         return SL2Response::MissingRunID;
     }
@@ -151,6 +140,63 @@ __declspec(dllexport) SL2Response sl2_client_request_mutation(
     ReadFile(client->pipe, buffer, bufsize, &txsize, NULL);
 
     // TODO(ww): error returns
+    return SL2Response::OK;
+}
+
+__declspec(dllexport) SL2Response sl2_client_request_replay(
+    sl2_client *client,
+    DWORD mutation_count,
+    void *buf,
+    size_t size)
+{
+    return SL2Response::OK;
+}
+
+__declspec(dllexport) SL2Response sl2_client_request_run_info(
+    sl2_client *client,
+    sl2_run_info *info)
+{
+    return SL2Response::OK;
+}
+
+__declspec(dllexport) SL2Response sl2_client_destroy_run_info(sl2_run_info *info)
+{
+    return SL2Response::OK;
+}
+
+__declspec(dllexport) SL2Response sl2_client_finalize_run(
+    sl2_client *client,
+    bool crash,
+    bool preserve)
+{
+    BYTE event = EVT_RUN_COMPLETE;
+    DWORD txsize;
+
+    // If the client doesn't a run ID, then we don't have a run to finalize.
+    if (!client->has_run_id) {
+        return SL2Response::MissingRunID;
+    }
+
+    // First, tell the server that we're finalizing a run.
+    WriteFile(client->pipe, &event, sizeof(event), &txsize, NULL);
+
+    // Then, tell the server which run we're finalizing.
+    WriteFile(client->pipe, &(client->run_id), sizeof(client->run_id), &txsize, NULL);
+
+    // Then, tell the server whether we've found a crash.
+    WriteFile(client->pipe, &crash, sizeof(crash), &txsize, NULL);
+
+    // Finally, tell the server if we'd like to preserve the run's on-disk state,
+    // even without a crash. This is only checked if by the server if crash is false.
+    WriteFile(client->pipe, &preserve, sizeof(preserve), &txsize, NULL);
+
+    return SL2Response::OK;
+}
+
+__declspec(dllexport) SL2Response sl2_client_request_crash_path(
+    sl2_client *client,
+    wchar_t **crash_path)
+{
     return SL2Response::OK;
 }
 
