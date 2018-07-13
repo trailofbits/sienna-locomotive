@@ -967,13 +967,13 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
 
             HANDLE hCrashFile = CreateFile(targetFile, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
             if (hCrashFile == INVALID_HANDLE_VALUE) {
-                SL2_DR_DEBUG("Could not open crash file json (%x)", GetLastError());
+                SL2_DR_DEBUG("tracer#dump_crash: could not open the crash file (%x)", GetLastError());
                 exit(1);
             }
 
             DWORD bytesWritten;
             if (!WriteFile(hCrashFile, crash_json.c_str(), crash_json.length(), &bytesWritten, NULL)) {
-                SL2_DR_DEBUG("Could not write crash file json (%x)", GetLastError());
+                SL2_DR_DEBUG("tracer#dump_crash: could not write to the crash file (%x)", GetLastError());
                 exit(1);
             }
         }
@@ -1591,14 +1591,14 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
     std::string parse_err;
     int last_idx = 0;
     if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
-        SL2_DR_DEBUG("Usage error: %s", parse_err.c_str());
+        SL2_DR_DEBUG("tracer#main: usage error: %s", parse_err.c_str());
         dr_abort();
     }
 
     // target is mandatory
     std::string target = op_target.get_value();
     if (target == "") {
-        SL2_DR_DEBUG("ERROR: arg -t (target) required");
+        SL2_DR_DEBUG("tracer#main: ERROR: arg -t (target) required");
         dr_abort();
     }
 
@@ -1606,7 +1606,7 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
     jsonStream >> parsedJson;
 
     if (!parsedJson.is_array()){
-        SL2_DR_DEBUG("ERROR: Document root is not an array\n");
+        SL2_DR_DEBUG("tracer#main: ERROR: Document root is not an array\n");
         dr_abort();
     }
 
