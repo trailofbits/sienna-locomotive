@@ -103,7 +103,7 @@ DWORD generateRunId(HANDLE hPipe) {
     // we should try to find a macro in the WINAPI for it here.
     WCHAR commandLine[8192] = {0};
     DWORD size = 0;
-    if(!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "generateRunId: failed to read size of program name (0x%x)", GetLastError());
         exit(1);
     }
@@ -113,7 +113,7 @@ DWORD generateRunId(HANDLE hPipe) {
         exit(1);
     }
 
-    if(!ReadFile(hPipe, commandLine, size, &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, commandLine, size, &dwBytesRead, NULL)) {
         LOG_F(ERROR, "generateRunId: failed to read size of argument list (0x%x)", GetLastError());
         exit(1);
     }
@@ -122,17 +122,17 @@ DWORD generateRunId(HANDLE hPipe) {
     PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_PROGRAM_TXT);
     HANDLE hFile = CreateFileW(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
-    if(hFile == INVALID_HANDLE_VALUE) {
+    if (hFile == INVALID_HANDLE_VALUE) {
         LOG_F(ERROR, "generateRunId: failed to open program.txt: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
-    if(!WriteFile(hFile, commandLine, size, &dwBytesWritten, NULL)) {
+    if (!WriteFile(hFile, commandLine, size, &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "generateRunId: failed to write program name to program.txt (0x%x)", GetLastError());
         exit(1);
     }
 
-    if(!CloseHandle(hFile)) {
+    if (!CloseHandle(hFile)) {
         LOG_F(ERROR, "generateRunId: failed to close program.txt (0x%x)", GetLastError());
         exit(1);
     }
@@ -141,7 +141,7 @@ DWORD generateRunId(HANDLE hPipe) {
 
     // get program arguments
     size = 0;
-    if(!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "generateRunId: failed to read program argument list length (0x%x)", GetLastError());
         exit(1);
     }
@@ -151,7 +151,7 @@ DWORD generateRunId(HANDLE hPipe) {
         exit(1);
     }
 
-    if(!ReadFile(hPipe, commandLine, size, &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, commandLine, size, &dwBytesRead, NULL)) {
         LOG_F(ERROR, "generateRunId: failed to read program argument list (0x%x)", GetLastError());
         exit(1);
     }
@@ -160,17 +160,17 @@ DWORD generateRunId(HANDLE hPipe) {
     PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_ARGUMENTS_TXT);
     hFile = CreateFile(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
-    if(hFile == INVALID_HANDLE_VALUE) {
+    if (hFile == INVALID_HANDLE_VALUE) {
         LOG_F(ERROR, "generateRunId: failed to open arguments.txt: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
-    if(!WriteFile(hFile, commandLine, size, &dwBytesWritten, NULL)) {
+    if (!WriteFile(hFile, commandLine, size, &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "generateRunId: failed to write argument list to arguments.txt (0x%x)", GetLastError());
         exit(1);
     }
 
-    if(!CloseHandle(hFile)) {
+    if (!CloseHandle(hFile)) {
         LOG_F(ERROR, "generateRunId: failed to close arguments.txt (0x%x)", GetLastError());
         exit(1);
     }
@@ -187,7 +187,8 @@ DWORD generateRunId(HANDLE hPipe) {
 */
 
 // TODO(ww): Why are we doing this?
-DWORD getRand() {
+DWORD getRand()
+{
     DWORD random = rand();
     random <<= 15;
     random |= rand();
@@ -195,13 +196,13 @@ DWORD getRand() {
     return random;
 }
 
-VOID strategyAAAA(BYTE *buf, size_t size) {
-    for (size_t i = 0; i < size; i++) {
-        buf[i] = 'A';
-    }
+VOID strategyAAAA(BYTE *buf, size_t size)
+{
+    memset(buf, 'A', size);
 }
 
-VOID strategyFlipBit(BYTE *buf, size_t size) {
+VOID strategyFlipBit(BYTE *buf, size_t size)
+{
     std::random_device rd;
     srand(rd());
 
@@ -212,7 +213,8 @@ VOID strategyFlipBit(BYTE *buf, size_t size) {
     buf[pos] = byte ^ mask;
 }
 
-VOID strategyRepeatBytes(BYTE *buf, size_t size) {
+VOID strategyRepeatBytes(BYTE *buf, size_t size)
+{
     std::random_device rd;
     srand(rd());
 
@@ -222,7 +224,7 @@ VOID strategyRepeatBytes(BYTE *buf, size_t size) {
     // repeat_length -> 1 to (remaining_size - 1)
     size_t size_m2 = size - 2;
     size_t repeat_length = 0;
-    if(size_m2 > pos) {
+    if (size_m2 > pos) {
         repeat_length = getRand() % (size_m2 - pos);
     }
     repeat_length++;
@@ -232,14 +234,15 @@ VOID strategyRepeatBytes(BYTE *buf, size_t size) {
     size_t end = getRand() % (size - curr_pos);
     end += curr_pos + 1;
 
-    while(curr_pos < end) {
+    while (curr_pos < end) {
         buf[curr_pos] = buf[pos];
         curr_pos++;
         pos++;
     }
 }
 
-VOID strategyRepeatBytesBackward(BYTE *buf, size_t size) {
+VOID strategyRepeatBytesBackward(BYTE *buf, size_t size)
+{
     std::random_device rd;
     srand(rd());
 
@@ -249,7 +252,8 @@ VOID strategyRepeatBytesBackward(BYTE *buf, size_t size) {
     std::reverse(buf + start, buf + end);
 }
 
-VOID strategyDeleteBytes(BYTE *buf, size_t size) {
+VOID strategyDeleteBytes(BYTE *buf, size_t size)
+{
     std::random_device rd;
     srand(rd());
 
@@ -272,7 +276,8 @@ VOID strategyDeleteBytes(BYTE *buf, size_t size) {
     }
 }
 
-VOID strategyRandValues(BYTE *buf, size_t size) {
+VOID strategyRandValues(BYTE *buf, size_t size)
+{
     std::random_device rd;
     srand(rd());
 
@@ -302,7 +307,8 @@ VOID strategyRandValues(BYTE *buf, size_t size) {
 #define VALUES4 -2147483648, -100663046, -32769, 32768, 65536, 100663045, 2147483647, 4294967295
 #define VALUES8  -9151314442816848000, -2147483649, 2147483648, 4294967296, 432345564227567365, 18446744073709551615
 
-VOID strategyKnownValues(BYTE *buf, size_t size) {
+VOID strategyKnownValues(BYTE *buf, size_t size)
+{
     INT8 values1[] = { VALUES1 };
     INT16 values2[] = { VALUES1, VALUES2 };
     INT32 values4[] = { VALUES1, VALUES2, VALUES4 };
@@ -356,7 +362,8 @@ VOID strategyKnownValues(BYTE *buf, size_t size) {
     }
 }
 
-VOID strategyAddSubKnownValues(BYTE *buf, size_t size) {
+VOID strategyAddSubKnownValues(BYTE *buf, size_t size)
+{
     INT8 values1[] = { VALUES1 };
     INT16 values2[] = { VALUES1, VALUES2 };
     INT32 values4[] = { VALUES1, VALUES2, VALUES4 };
@@ -414,7 +421,8 @@ VOID strategyAddSubKnownValues(BYTE *buf, size_t size) {
     }
 }
 
-VOID strategyEndianSwap(BYTE *buf, size_t size) {
+VOID strategyEndianSwap(BYTE *buf, size_t size)
+{
     std::random_device rd;
     srand(rd());
 
@@ -453,7 +461,8 @@ VOID strategyEndianSwap(BYTE *buf, size_t size) {
 }
 
 /* Selects a mutations strategy at random */
-DWORD mutate(BYTE *buf, size_t size) {
+DWORD mutate(BYTE *buf, size_t size)
+{
     // afl for inspiration
     if (size == 0) {
         return 0;
@@ -511,7 +520,8 @@ DWORD mutate(BYTE *buf, size_t size) {
 }
 
 /* Writes the fkt file in the event we found a crash. Stores information about the mutation that caused it */
-DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, WCHAR *filePath, size_t position, size_t size, BYTE* buf) {
+DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, WCHAR *filePath, size_t position, size_t size, BYTE* buf)
+{
     DWORD dwBytesWritten = 0;
 
     if (!WriteFile(hFile, "FKT\0", 4, &dwBytesWritten, NULL)) {
@@ -559,7 +569,8 @@ DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, WCHAR *filePath, size_t
 }
 
 /* handles mutation requests over the named pipe from the fuzzing harness */
-DWORD handleMutation(HANDLE hPipe) {
+DWORD handleMutation(HANDLE hPipe)
+{
     LOG_F(INFO, "handleMutation: starting mutation request");
 
     DWORD dwBytesRead = 0;
@@ -567,7 +578,7 @@ DWORD handleMutation(HANDLE hPipe) {
     UUID runId;
     WCHAR *runId_s;
 
-    if(!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleMutation: failed to read run ID (0x%x)", GetLastError());
         exit(1);
     }
@@ -575,14 +586,14 @@ DWORD handleMutation(HANDLE hPipe) {
     UuidToString(&runId, (RPC_WSTR *)&runId_s);
 
     DWORD type = 0;
-    if(!ReadFile(hPipe, &type, sizeof(DWORD), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &type, sizeof(DWORD), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleMutation: failed to read mutation type (0x%x)", GetLastError());
         exit(1);
     }
 
     DWORD mutate_count = 0;
     WCHAR mutate_fname[MAX_PATH + 1] = {0};
-    if(!ReadFile(hPipe, &mutate_count, sizeof(DWORD), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &mutate_count, sizeof(DWORD), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleMutation: failed to read mutation count (0x%x)", GetLastError());
         exit(1);
     }
@@ -615,25 +626,25 @@ DWORD handleMutation(HANDLE hPipe) {
     }
 
     size_t size = 0;
-    if(!ReadFile(hPipe, &size, sizeof(size_t), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &size, sizeof(size_t), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleMutation: failed to read size of mutation buffer (0x%x)", GetLastError());
         exit(1);
     }
 
     HANDLE hHeap = GetProcessHeap();
-    if(hHeap == NULL) {
+    if (hHeap == NULL) {
         LOG_F(ERROR, "handleMutation: failed to get proces heap (0x%x)", GetLastError());
         exit(1);
     }
 
     BYTE* buf = (BYTE*)HeapAlloc(hHeap, 0, size * sizeof(BYTE));
 
-    if(buf == NULL) {
+    if (buf == NULL) {
         LOG_F(ERROR, "handleMutation: failed to allocate mutation buffer (0x%x)", GetLastError());
         exit(1);
     }
 
-    if(!ReadFile(hPipe, buf, (DWORD)size, &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, buf, (DWORD)size, &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleMutation: failed to read mutation buffer from pipe (0x%x)", GetLastError());
         exit(1);
     }
@@ -660,14 +671,14 @@ DWORD handleMutation(HANDLE hPipe) {
 
     HANDLE hFile = CreateFile(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
-    if(hFile == INVALID_HANDLE_VALUE) {
+    if (hFile == INVALID_HANDLE_VALUE) {
         LOG_F(ERROR, "handleMutation: failed to create FTK: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
     writeFKT(hFile, type, pathSize, filePath, position, size, buf);
 
-    if(!HeapFree(hHeap, NULL, buf)) {
+    if (!HeapFree(hHeap, NULL, buf)) {
         LOG_F(ERROR, "handleMutation: failed to deallocate mutation buffer (0x%x)", GetLastError());
         exit(1);
     }
@@ -678,7 +689,8 @@ DWORD handleMutation(HANDLE hPipe) {
 }
 
 /* Gets the mutated bytes stored in the FKT file for mutation replay */
-DWORD getBytesFKT(HANDLE hFile, BYTE *buf, size_t size) {
+DWORD getBytesFKT(HANDLE hFile, BYTE *buf, size_t size)
+{
     DWORD dwBytesRead = 0;
     size_t buf_size = 0;
 
@@ -705,7 +717,8 @@ DWORD getBytesFKT(HANDLE hFile, BYTE *buf, size_t size) {
 }
 
 /* Handles requests over the named pipe from the triage client for replays of mutated bytes */
-DWORD handleReplay(HANDLE hPipe) {
+DWORD handleReplay(HANDLE hPipe)
+{
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
     UUID runId;
@@ -737,14 +750,14 @@ DWORD handleReplay(HANDLE hPipe) {
 
     HANDLE hHeap = GetProcessHeap();
 
-    if(hHeap == NULL) {
+    if (hHeap == NULL) {
         LOG_F(ERROR, "handleReplay: failed to get process heap (0x%x)", GetLastError());
         exit(1);
     }
 
     BYTE* buf = (BYTE*)HeapAlloc(hHeap, 0, size * sizeof(BYTE));
 
-    if(buf == NULL) {
+    if (buf == NULL) {
         LOG_F(ERROR, "handleReplay: failed to allocate replay buffer (0x%x)", GetLastError());
         exit(1);
     }
@@ -791,7 +804,8 @@ DWORD handleReplay(HANDLE hPipe) {
 }
 
 /* Dump information about a given run into the named pipe */
-DWORD serveRunInfo(HANDLE hPipe) {
+DWORD serveRunInfo(HANDLE hPipe)
+{
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
     UUID runId;
@@ -874,7 +888,8 @@ DWORD serveRunInfo(HANDLE hPipe) {
 }
 
 /* Deletes the run files to free up a Run ID if the last run didn't find a crash */
-DWORD finalizeRun(HANDLE hPipe) {
+DWORD finalizeRun(HANDLE hPipe)
+{
     DWORD dwBytesRead = 0;
     UUID runId;
     WCHAR *runId_s;
@@ -934,7 +949,8 @@ DWORD finalizeRun(HANDLE hPipe) {
 }
 
 /* Return the location of the crash.json file for a given run ID */
-DWORD crashPath(HANDLE hPipe) {
+DWORD crashPath(HANDLE hPipe)
+{
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
     UUID runId;
@@ -966,7 +982,8 @@ DWORD crashPath(HANDLE hPipe) {
 }
 
 /* Handles incoming connections from clients */
-DWORD WINAPI threadHandler(LPVOID lpvPipe) {
+DWORD WINAPI threadHandler(LPVOID lpvPipe)
+{
     HANDLE hPipe = (HANDLE)lpvPipe;
 
     DWORD dwBytesRead = 0;
@@ -1012,17 +1029,17 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe) {
             break;
     }
 
-    if(!FlushFileBuffers(hPipe)) {
+    if (!FlushFileBuffers(hPipe)) {
         LOG_F(ERROR, "threadHandler: failed to flush pipe (0x%x)", GetLastError());
         exit(1);
     }
 
-    if(!DisconnectNamedPipe(hPipe)) {
+    if (!DisconnectNamedPipe(hPipe)) {
         LOG_F(ERROR, "threadHandler: failed to disconnect pipe (0x%x)", GetLastError());
         exit(1);
     }
 
-    if(!CloseHandle(hPipe)) {
+    if (!CloseHandle(hPipe)) {
         LOG_F(ERROR, "threadHandler: failed to close pipe (0x%x)", GetLastError());
         exit(1);
     }
@@ -1031,15 +1048,16 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe) {
 }
 
 /* concurrency protection */
-void lockProcess() {
+void lockProcess()
+{
     hProcessMutex = CreateMutex(NULL, FALSE, L"fuzz_server_mutex");
-    if(!hProcessMutex || hProcessMutex == INVALID_HANDLE_VALUE) {
+    if (!hProcessMutex || hProcessMutex == INVALID_HANDLE_VALUE) {
         LOG_F(ERROR, "lockProcess: could not get process lock (handle)");
         exit(1);
     }
 
     DWORD result = WaitForSingleObject(hProcessMutex, 0);
-    if(result != WAIT_OBJECT_0) {
+    if (result != WAIT_OBJECT_0) {
         LOG_F(ERROR, "lockProcess: could not get process lock (lock)");
         exit(1);
     }
