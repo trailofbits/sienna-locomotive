@@ -62,7 +62,7 @@ def select_and_dump_wizard_findings(wizard_findings, target_file):
 def hexdump(buffer, lines=4, line_len=16):
     """ Dump buffer byte array to stdout """
     for address in range(0, len(buffer), line_len):
-        if address > lines * 16:
+        if address > lines * line_len:
             print_l('...')
             break
         hexstr = " ".join("{:02X}".format(c) for c in buffer[address:address + line_len])

@@ -3,6 +3,7 @@ import json
 
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtGui import QFontDatabase
 
 from harness import config
 from harness.state import get_target
@@ -14,7 +15,7 @@ class MainWindow(QtWidgets.QMainWindow):
         QtWidgets.QMainWindow.__init__(self)
 
         self.setWindowTitle("Sienna Locomotive 2")
-        self.setMinimumSize(QSize(800, 600))
+        self.setMinimumSize(QSize(1300, 800))
 
         self.get_config()
 
@@ -30,9 +31,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self._layout.addWidget(self._func_tree)
 
         for option in target_data:
-            widget = QtWidgets.QTreeWidgetItem()
+            widget = QtWidgets.QTreeWidgetItem(self._func_tree)
             widget.setCheckState(0, Qt.Checked if option["selected"] else Qt.Unchecked)
-            widget.setText(0, option["func_name"])
+            widget.setText(0, ("{func_name} from {source}:{start}-{end}" if 'source' in option
+                               else "{func_name}").format(**option))
+
+            for address in range(0, min(len(option["buffer"]), 16*5), 16):
+                hexstr = " ".join("{:02X}".format(c) for c in option["buffer"][address:address + 16])
+                asciistr = "".join((chr(c) if c in range(31, 127) else '.') for c in option["buffer"][address:address + 16])
+                formatted = "0x%04X:  %s  | %s" % (address, hexstr + " " * (16 * 3 - len(hexstr)), asciistr)
+                data_disp = QtWidgets.QTreeWidgetItem(widget, [formatted])
+                data_disp.setFont(0, QFontDatabase.systemFont(QFontDatabase.FixedFont))
+
             self._func_tree.insertTopLevelItem(0, widget)
 
     def get_config(self):
