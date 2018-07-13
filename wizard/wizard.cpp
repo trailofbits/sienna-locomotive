@@ -30,7 +30,7 @@ using namespace std;
     json JSON_VAR; \
     JSON_VAR["type"] = "in"; \
     JSON_VAR["function"] = __FUNCTION__; \
-    logObject(JSON_VAR); \
+    SL2_LOG_JSONL(JSON_VAR); \
 } while (0)
 
 
@@ -48,27 +48,6 @@ struct wizard_read_info {
 
 static size_t baseAddr;
 static std::map<Function, UINT64> call_counts;
-
-////////////////////////////////////////////////////////////////////////////
-// logObject()
-//
-// Takes a json object and prints it to stderr for consumption by the harness
-////////////////////////////////////////////////////////////////////////////
-void logObject(json obj)
-{
-    auto str = obj.dump();
-
-    // TODO(ww): Replace this with a separate channel for JSON.
-    // NOTE(ww): This loop is here because dr_fprintf has an internal buffer
-    // of 2048, and our JSON objects frequently exceed that. When that happens,
-    // dr_fprintf silently truncates them and confuses the harness with invalid JSON.
-    // We circumvent this by chunking the output.
-    for (int i = 0; i < str.length(); i += 1024) {
-        dr_fprintf(STDERR, "%s", str.substr(i, 1024).c_str());
-    }
-
-    dr_fprintf(STDERR, "\n");
-}
 
 /* Run whenever a thread inits/exits */
 static void
@@ -386,7 +365,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     vector<unsigned char> x(lpBuffer, lpBuffer + nNumberOfBytesToRead);
     j["buffer"] = x;
 
-    logObject(j);
+    SL2_LOG_JSONL(j);
 
     if (info->source) {
         free(info->source);
@@ -481,7 +460,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
                 j["msg"] = s.str();
             }
 
-            logObject(j);
+            SL2_LOG_JSONL(j);
         }
     }
 }
