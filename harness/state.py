@@ -51,10 +51,28 @@ def get_target_dir(_config):
     return dir_name
 
 
+class TargetAdapter(object):
+
+    def __init__(self, target_list, filename):
+        super().__init__()
+        self.target_list = target_list
+        self.filename = filename
+
+    def __iter__(self):
+        return self.target_list.__iter__()
+
+    def update(self, index, **kwargs):
+        for key in kwargs:
+            self.target_list[index][key] = kwargs[key]
+
+        with open(self.filename, 'w') as jsonfile:
+            json.dump(self.target_list, jsonfile)
+
+
 def get_target(_config):
     target_file = os.path.join(get_target_dir(_config), 'targets.json')
     with open(target_file) as target_json:
-        return json.loads(target_json.read())
+        return TargetAdapter(json.load(target_json), target_file)
 
 
 def get_all_targets():

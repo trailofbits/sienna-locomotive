@@ -26,15 +26,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self._layout = QtWidgets.QGridLayout(_central_widget)
         _central_widget.setLayout(self._layout)
 
-        target_data = get_target(config.config)
+        self.target_data = get_target(config.config)
 
         self._func_tree = CheckboxTreeWidget()
         self._layout.addWidget(self._func_tree)
 
         self._func_tree.itemCheckedStateChanged.connect(self.changed)
 
-        for option in target_data:
-            widget = CheckboxTreeWidgetItem(self._func_tree)
+        for index, option in enumerate(self.target_data):
+            widget = CheckboxTreeWidgetItem(self._func_tree, index)
             widget.setText(0, ("{func_name} from {source}:{start}-{end}" if 'source' in option
                                else "{func_name}").format(**option))
             widget.setCheckState(0, Qt.Checked if option["selected"] else Qt.Unchecked)
@@ -49,6 +49,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._func_tree.insertTopLevelItem(0, widget)
 
     def changed(self, widget, column, is_checked):
+        self.target_data.update(widget.index, selected=is_checked)
         print(widget.text(column), "Checked" if is_checked else "Unchecked")
 
     def get_config(self):

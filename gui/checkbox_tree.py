@@ -4,8 +4,9 @@ from PyQt5.QtCore import pyqtSignal, Qt
 
 class CheckboxTreeWidgetItem(QTreeWidgetItem):
 
-    def __init__(self, parent, *args):
+    def __init__(self, parent, index, *args):
         super().__init__(parent, *args)
+        self.index = index
         self._parent = parent
         self.setCheckState(0, Qt.Unchecked)
 
