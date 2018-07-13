@@ -967,13 +967,13 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
 
             HANDLE hCrashFile = CreateFile(targetFile, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
             if (hCrashFile == INVALID_HANDLE_VALUE) {
-                dr_fprintf(STDERR, "Could not open crash file json (%x)", GetLastError());
+                SL2_DR_DEBUG("Could not open crash file json (%x)", GetLastError());
                 exit(1);
             }
 
             DWORD bytesWritten;
             if (!WriteFile(hCrashFile, crash_json.c_str(), crash_json.length(), &bytesWritten, NULL)) {
-                dr_fprintf(STDERR, "Could not write crash file json (%x)", GetLastError());
+                SL2_DR_DEBUG("Could not write crash file json (%x)", GetLastError());
                 exit(1);
             }
         }
@@ -1150,7 +1150,7 @@ onexception(void *drcontext, dr_exception_t *excpt)
 static void
 wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_ReadEventLog>\n");
+    SL2_DR_DEBUG("<in wrap_pre_ReadEventLog>\n");
     HANDLE hEventLog                 = (HANDLE)drwrap_get_arg(wrapcxt, 0);
     DWORD  dwReadFlags               = (DWORD)drwrap_get_arg(wrapcxt, 1);
     DWORD  dwRecordOffset            = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -1172,7 +1172,7 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_RegQueryValueEx>\n");
+    SL2_DR_DEBUG("<in wrap_pre_RegQueryValueEx>\n");
     HKEY    hKey        = (HKEY)drwrap_get_arg(wrapcxt, 0);
     LPCTSTR lpValueName = (LPCTSTR)drwrap_get_arg(wrapcxt, 1);
     LPDWORD lpReserved  = (LPDWORD)drwrap_get_arg(wrapcxt, 2);
@@ -1198,7 +1198,7 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_WinHttpWebSocketReceive>\n");
+    SL2_DR_DEBUG("<in wrap_pre_WinHttpWebSocketReceive>\n");
     HINTERNET hRequest                          = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     PVOID pvBuffer                              = drwrap_get_arg(wrapcxt, 1);
     DWORD dwBufferLength                        = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -1218,7 +1218,7 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_InternetReadFile>\n");
+    SL2_DR_DEBUG("<in wrap_pre_InternetReadFile>\n");
     HINTERNET hFile             = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer             = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -1237,7 +1237,7 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_WinHttpReadData>\n");
+    SL2_DR_DEBUG("<in wrap_pre_WinHttpReadData>\n");
     HINTERNET hRequest          = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer             = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -1256,7 +1256,7 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_recv(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_recv>\n");
+    SL2_DR_DEBUG("<in wrap_pre_recv>\n");
     SOCKET s  = (SOCKET)drwrap_get_arg(wrapcxt, 0);
     char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
     int len   = (int)drwrap_get_arg(wrapcxt, 2);
@@ -1275,7 +1275,7 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_ReadFile>\n");
+    SL2_DR_DEBUG("<in wrap_pre_ReadFile>\n");
     HANDLE hFile                = drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer             = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -1313,7 +1313,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_fread_s>\n");
+    SL2_DR_DEBUG("<in wrap_pre_fread_s>\n");
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 2);
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 3);
@@ -1331,7 +1331,7 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_fread(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_fread>\n");
+    SL2_DR_DEBUG("<in wrap_pre_fread>\n");
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 1);
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
@@ -1350,7 +1350,7 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data)
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_post_Generic>\n");
+    SL2_DR_DEBUG("<in wrap_post_Generic>\n");
     if (user_data == NULL) {
         return;
     }
@@ -1528,10 +1528,10 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
             bool ok = drwrap_wrap(towrap, hookFunctionPre, hookFunctionPost);
             // bool ok = false;
             if (ok) {
-                dr_fprintf(STDERR, "<wrapped %s @ 0x%p>\n", functionName, towrap);
+                SL2_DR_DEBUG("<wrapped %s @ 0x%p>\n", functionName, towrap);
             }
             else {
-                dr_fprintf(STDERR, "<FAILED to wrap %s @ 0x%p: already wrapped?>\n", functionName, towrap);
+                SL2_DR_DEBUG("<FAILED to wrap %s @ 0x%p: already wrapped?>\n", functionName, towrap);
             }
         }
     }
@@ -1591,14 +1591,14 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
     std::string parse_err;
     int last_idx = 0;
     if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
-        dr_fprintf(STDERR, "Usage error: %s", parse_err.c_str());
+        SL2_DR_DEBUG("Usage error: %s", parse_err.c_str());
         dr_abort();
     }
 
     // target is mandatory
     std::string target = op_target.get_value();
     if (target == "") {
-        dr_fprintf(STDERR, "ERROR: arg -t (target) required");
+        SL2_DR_DEBUG("ERROR: arg -t (target) required");
         dr_abort();
     }
 
@@ -1606,7 +1606,7 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
     jsonStream >> parsedJson;
 
     if (!parsedJson.is_array()){
-        dr_fprintf(STDERR, "ERROR: Document root is not an array\n");
+        SL2_DR_DEBUG("ERROR: Document root is not an array\n");
         dr_abort();
     }
 
