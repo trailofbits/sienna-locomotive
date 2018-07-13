@@ -34,7 +34,7 @@
 
 #define NULL_TERMINATE(buf) buf[(sizeof(buf)/sizeof(buf[0])) - 1] = '\0'
 
-static BOOL mutate(HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size);
+static BOOL mutate(HANDLE hFile, size_t position, LPVOID buf, size_t size);
 
 // structure for getting command line client options in dynamorio
 static droption_t<std::string> op_target(
@@ -57,7 +57,7 @@ struct fuzzer_read_info {
     Function function;
     HANDLE hFile;
     LPVOID lpBuffer;
-    DWORD nNumberOfBytesToRead;
+    size_t nNumberOfBytesToRead;
     LPDWORD lpNumberOfBytesRead;
     DWORD64 position;
     DWORD64 retAddrOffset;
@@ -133,14 +133,14 @@ HANDLE getPipe()
         DWORD err = GetLastError();
         if (err != ERROR_PIPE_BUSY) {
             dr_log(NULL, DR_LOG_ALL, ERROR, "Could not open pipe (%x)", err);
-            dr_fprintf(STDERR, "Could not open pipe (0x%x)\n", err);
-            dr_fprintf(STDERR, "Is the server running?\n");
+            SL2_DR_DEBUG("Could not open pipe (0x%x)\n", err);
+            SL2_DR_DEBUG("Is the server running?\n");
             dr_exit_process(1);
         }
 
         if (!WaitNamedPipe(FUZZ_SERVER_PATH, 5000)) {
             dr_log(NULL, DR_LOG_ALL, ERROR, "Could not connect, timeout");
-            dr_fprintf(STDERR, "Could not connect, timeout\n", err);
+            SL2_DR_DEBUG("Could not connect, timeout\n", err);
             dr_exit_process(1);
         }
     }
@@ -162,7 +162,7 @@ DWORD finalize(HANDLE hPipe, UUID runId, BOOL crashed)
     sl2_uuid_to_wstring(runId, runId_s);
 
     if (crashed) {
-        dr_fprintf(STDERR, "<crash found for run id %S>\n", runId_s);
+        SL2_DR_DEBUG("<crash found for run id %S>\n", runId_s);
         dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#finalize: Crash found for run id %S!", runId_s);
     }
 
@@ -174,6 +174,7 @@ DWORD finalize(HANDLE hPipe, UUID runId, BOOL crashed)
         dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write event ID (0x%x)", GetLastError());
         dr_exit_process(1);
     }
+
     // Write the run ID
     if (!WriteFile(hPipe, &runId, sizeof(UUID), &bytesWritten, NULL)) {
         dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write run ID (0x%x)", GetLastError());
@@ -235,64 +236,64 @@ onexception(void *drcontext, dr_exception_t *excpt)
 
     switch (exceptionCode){
         case EXCEPTION_ACCESS_VIOLATION:
-            dr_fprintf(STDERR, "EXCEPTION_ACCESS_VIOLATION\n");
+            SL2_DR_DEBUG("EXCEPTION_ACCESS_VIOLATION\n");
             break;
         case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
-            dr_fprintf(STDERR, "EXCEPTION_ARRAY_BOUNDS_EXCEEDED\n");
+            SL2_DR_DEBUG("EXCEPTION_ARRAY_BOUNDS_EXCEEDED\n");
             break;
         case EXCEPTION_BREAKPOINT:
-            dr_fprintf(STDERR, "EXCEPTION_BREAKPOINT\n");
+            SL2_DR_DEBUG("EXCEPTION_BREAKPOINT\n");
             break;
         case EXCEPTION_DATATYPE_MISALIGNMENT:
-            dr_fprintf(STDERR, "EXCEPTION_DATATYPE_MISALIGNMENT\n");
+            SL2_DR_DEBUG("EXCEPTION_DATATYPE_MISALIGNMENT\n");
             break;
         case EXCEPTION_FLT_DENORMAL_OPERAND:
-            dr_fprintf(STDERR, "EXCEPTION_FLT_DENORMAL_OPERAND\n");
+            SL2_DR_DEBUG("EXCEPTION_FLT_DENORMAL_OPERAND\n");
             break;
         case EXCEPTION_FLT_DIVIDE_BY_ZERO:
-            dr_fprintf(STDERR, "EXCEPTION_FLT_DIVIDE_BY_ZERO\n");
+            SL2_DR_DEBUG("EXCEPTION_FLT_DIVIDE_BY_ZERO\n");
             break;
         case EXCEPTION_FLT_INEXACT_RESULT:
-            dr_fprintf(STDERR, "EXCEPTION_FLT_INEXACT_RESULT\n");
+            SL2_DR_DEBUG("EXCEPTION_FLT_INEXACT_RESULT\n");
             break;
         case EXCEPTION_FLT_INVALID_OPERATION:
-            dr_fprintf(STDERR, "EXCEPTION_FLT_INVALID_OPERATION\n");
+            SL2_DR_DEBUG("EXCEPTION_FLT_INVALID_OPERATION\n");
             break;
         case EXCEPTION_FLT_OVERFLOW:
-            dr_fprintf(STDERR, "EXCEPTION_FLT_OVERFLOW\n");
+            SL2_DR_DEBUG("EXCEPTION_FLT_OVERFLOW\n");
             break;
         case EXCEPTION_FLT_STACK_CHECK:
-            dr_fprintf(STDERR, "EXCEPTION_FLT_STACK_CHECK\n");
+            SL2_DR_DEBUG("EXCEPTION_FLT_STACK_CHECK\n");
             break;
         case EXCEPTION_FLT_UNDERFLOW:
-            dr_fprintf(STDERR, "EXCEPTION_FLT_UNDERFLOW\n");
+            SL2_DR_DEBUG("EXCEPTION_FLT_UNDERFLOW\n");
             break;
         case EXCEPTION_ILLEGAL_INSTRUCTION:
-            dr_fprintf(STDERR, "EXCEPTION_ILLEGAL_INSTRUCTION\n");
+            SL2_DR_DEBUG("EXCEPTION_ILLEGAL_INSTRUCTION\n");
             break;
         case EXCEPTION_IN_PAGE_ERROR:
-            dr_fprintf(STDERR, "EXCEPTION_IN_PAGE_ERROR\n");
+            SL2_DR_DEBUG("EXCEPTION_IN_PAGE_ERROR\n");
             break;
         case EXCEPTION_INT_DIVIDE_BY_ZERO:
-            dr_fprintf(STDERR, "EXCEPTION_INT_DIVIDE_BY_ZERO\n");
+            SL2_DR_DEBUG("EXCEPTION_INT_DIVIDE_BY_ZERO\n");
             break;
         case EXCEPTION_INT_OVERFLOW:
-            dr_fprintf(STDERR, "EXCEPTION_INT_OVERFLOW\n");
+            SL2_DR_DEBUG("EXCEPTION_INT_OVERFLOW\n");
             break;
         case EXCEPTION_INVALID_DISPOSITION:
-            dr_fprintf(STDERR, "EXCEPTION_INVALID_DISPOSITION\n");
+            SL2_DR_DEBUG("EXCEPTION_INVALID_DISPOSITION\n");
             break;
         case EXCEPTION_NONCONTINUABLE_EXCEPTION:
-            dr_fprintf(STDERR, "EXCEPTION_NONCONTINUABLE_EXCEPTION\n");
+            SL2_DR_DEBUG("EXCEPTION_NONCONTINUABLE_EXCEPTION\n");
             break;
         case EXCEPTION_PRIV_INSTRUCTION:
-            dr_fprintf(STDERR, "EXCEPTION_PRIV_INSTRUCTION\n");
+            SL2_DR_DEBUG("EXCEPTION_PRIV_INSTRUCTION\n");
             break;
         case EXCEPTION_SINGLE_STEP:
-            dr_fprintf(STDERR, "EXCEPTION_SINGLE_STEP\n");
+            SL2_DR_DEBUG("EXCEPTION_SINGLE_STEP\n");
             break;
         case EXCEPTION_STACK_OVERFLOW:
-            dr_fprintf(STDERR, "EXCEPTION_STACK_OVERFLOW\n");
+            SL2_DR_DEBUG("EXCEPTION_STACK_OVERFLOW\n");
             break;
         default:
             break;
@@ -306,7 +307,7 @@ onexception(void *drcontext, dr_exception_t *excpt)
 static void
 event_exit(void)
 {
-    dr_fprintf(STDERR, "Dynamorio exiting (fuzzer)\n");
+    SL2_DR_DEBUG("Dynamorio exiting (fuzzer)\n");
     HANDLE hPipe = getPipe();
     finalize(hPipe, runId, crashed); // Delete the fuzzing run if we didn't find a crash
     CloseHandle(hPipe); // Close out connection to server
@@ -319,7 +320,7 @@ event_exit(void)
 
 /* Hands bytes off to the mutation server, gets mutated bytes, and writes them into memory. */
 static BOOL
-mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size)
+mutate(Function function, HANDLE hFile, size_t position, LPVOID buf, size_t size)
 {
     WCHAR filePath[MAX_PATH + 1] = {0};
     WCHAR *new_buf = (WCHAR *)buf;
@@ -334,7 +335,7 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
         }
 
         pathSize = GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, 0);
-        dr_fprintf(STDERR, "mutate: filePath: %S", filePath);
+        SL2_DR_DEBUG("mutate: filePath: %S", filePath);
 
         if (pathSize > MAX_PATH || pathSize == 0) {
             dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#mutate: Pathsize %d is out of bounds\n", pathSize);
@@ -359,8 +360,8 @@ mutate(Function function, HANDLE hFile, DWORD64 position, LPVOID buf, DWORD size
     WriteFile(hPipe, &pathSize, sizeof(DWORD), &bytesWritten, NULL);
     WriteFile(hPipe, &filePath, pathSize * sizeof(WCHAR), &bytesWritten, NULL);
 
-    WriteFile(hPipe, &position, sizeof(DWORD64), &bytesWritten, NULL);
-    WriteFile(hPipe, &size, sizeof(DWORD), &bytesWritten, NULL);
+    WriteFile(hPipe, &position, sizeof(size_t), &bytesWritten, NULL);
+    WriteFile(hPipe, &size, sizeof(size_t), &bytesWritten, NULL);
 
     // Send current contents of buf to the server, overwrite them with its reply
     TransactNamedPipe(hPipe, buf, size, buf, size, &bytesRead, NULL);
@@ -469,7 +470,7 @@ check_cache() {
 static void
 wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_ReadEventLog>\n");
+    SL2_DR_DEBUG("<in wrap_pre_ReadEventLog>\n");
     HANDLE hEventLog = (HANDLE)drwrap_get_arg(wrapcxt, 0);
     DWORD  dwReadFlags = (DWORD)drwrap_get_arg(wrapcxt, 1);
     DWORD  dwRecordOffset = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -507,7 +508,7 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_RegQueryValueEx>\n");
+    SL2_DR_DEBUG("<in wrap_pre_RegQueryValueEx>\n");
     HKEY    hKey = (HKEY)drwrap_get_arg(wrapcxt, 0);
     LPCTSTR lpValueName = (LPCTSTR)drwrap_get_arg(wrapcxt, 1);
     LPDWORD lpReserved = (LPDWORD)drwrap_get_arg(wrapcxt, 2);
@@ -515,7 +516,7 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
     LPBYTE  lpData = (LPBYTE)drwrap_get_arg(wrapcxt, 4);
     LPDWORD lpcbData = (LPDWORD)drwrap_get_arg(wrapcxt, 5);
 
-    if(lpData != NULL && lpcbData != NULL) {
+    if (lpData != NULL && lpcbData != NULL) {
         *user_data             = malloc(sizeof(fuzzer_read_info));
         fuzzer_read_info *info = (fuzzer_read_info *) *user_data;
 
@@ -547,7 +548,7 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_WinHttpWebSocketReceive>\n");
+    SL2_DR_DEBUG("<in wrap_pre_WinHttpWebSocketReceive>\n");
     HINTERNET hRequest = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     PVOID pvBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD dwBufferLength = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -585,7 +586,7 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_InternetReadFile>\n");
+    SL2_DR_DEBUG("<in wrap_pre_InternetReadFile>\n");
     HINTERNET hFile = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -621,7 +622,7 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_WinHttpReadData>\n");
+    SL2_DR_DEBUG("<in wrap_pre_WinHttpReadData>\n");
     HINTERNET hRequest = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -658,7 +659,7 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_recv(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_recv>\n");
+    SL2_DR_DEBUG("<in wrap_pre_recv>\n");
     SOCKET s  = (SOCKET)drwrap_get_arg(wrapcxt, 0);
     char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
     int len   = (int)drwrap_get_arg(wrapcxt, 2);
@@ -691,15 +692,26 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_ReadFile>\n");
+    SL2_DR_DEBUG("<in wrap_pre_ReadFile>\n");
     HANDLE hFile                = drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer             = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
 
-    LONG positionHigh = 0;
-    DWORD positionLow = SetFilePointer(hFile, 0, &positionHigh, FILE_CURRENT);
-    DWORD64 position = positionHigh;
+    fileArgHash fStruct = {0};
+
+    LARGE_INTEGER offset = {0};
+    LARGE_INTEGER position = {0};
+    SetFilePointerEx(hFile, offset, &position, FILE_CURRENT);
+
+    GetFinalPathNameByHandle(hFile, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
+    fStruct.position = position.QuadPart;
+    fStruct.readSize = nNumberOfBytesToRead;
+
+    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct,
+        ((unsigned char *) &fStruct) + sizeof(fileArgHash));
+    std::string hash_str;
+    picosha2::hash256_hex_string(blob_vec, hash_str);
 
     *user_data             = malloc(sizeof(fuzzer_read_info));
     fuzzer_read_info *info = (fuzzer_read_info *) *user_data;
@@ -709,19 +721,8 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
     info->lpNumberOfBytesRead  = lpNumberOfBytesRead;
-    info->position             = (position << 32) | positionLow;
+    info->position             = fStruct.position;
     info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
-
-    fileArgHash fStruct;
-    memset(&fStruct, 0, sizeof(fileArgHash));
-
-    DWORD pathSize   = GetFinalPathNameByHandle(hFile, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
-    fStruct.position = ((fuzzer_read_info *)*user_data)->position;
-    fStruct.readSize = nNumberOfBytesToRead;
-
-    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct, ((unsigned char *) &fStruct) + sizeof(fileArgHash));
-    std::string hash_str;
-    picosha2::hash256_hex_string(blob_vec, hash_str);
 
     // NOTE(ww): SHA2 digests are 64 characters, so we allocate that + room for a NULL
     info->argHash = (char *) malloc(65);
@@ -732,7 +733,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_fread_s>\n");
+    SL2_DR_DEBUG("<in wrap_pre_fread_s>\n");
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 2);
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 3);
@@ -755,7 +756,7 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_fread(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_fread>\n");
+    SL2_DR_DEBUG("<in wrap_pre_fread>\n");
 
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 1);
@@ -792,7 +793,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     Function function           = info->function;
     HANDLE hFile                = info->hFile;
     LPVOID lpBuffer             = info->lpBuffer;
-    DWORD nNumberOfBytesToRead  = info->nNumberOfBytesToRead;
+    size_t nNumberOfBytesToRead  = info->nNumberOfBytesToRead;
     LPDWORD lpNumberOfBytesRead = info->lpNumberOfBytesRead;
     DWORD64 position            = info->position;
     DWORD64 retAddrOffset       = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
@@ -839,35 +840,35 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 static void
 module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
 {
-    if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))){
+    if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))) {
         baseAddr = (DWORD64) mod->start;
     }
 
     // Build list of pre-function hooks
     std::map<char *, SL2_PRE_PROTO> toHookPre;
-    toHookPre["ReadFile"] = wrap_pre_ReadFile;
-    toHookPre["InternetReadFile"] = wrap_pre_InternetReadFile;
-    toHookPre["ReadEventLog"] = wrap_pre_ReadEventLog;
-    toHookPre["RegQueryValueExW"] = wrap_pre_RegQueryValueEx;
-    toHookPre["RegQueryValueExA"] = wrap_pre_RegQueryValueEx;
-    toHookPre["WinHttpWebSocketReceive"] = wrap_pre_WinHttpWebSocketReceive;
-    toHookPre["WinHttpReadData"] = wrap_pre_WinHttpReadData;
-    toHookPre["recv"] = wrap_pre_recv;
-    toHookPre["fread_s"] = wrap_pre_fread_s;
-    toHookPre["fread"] = wrap_pre_fread;
+    SL2_PRE_HOOK1(toHookPre, ReadFile);
+    SL2_PRE_HOOK1(toHookPre, InternetReadFile);
+    SL2_PRE_HOOK1(toHookPre, ReadEventLog);
+    SL2_PRE_HOOK2(toHookPre, RegQueryValueExW, RegQueryValueEx);
+    SL2_PRE_HOOK2(toHookPre, RegQueryValueExA, RegQueryValueEx);
+    SL2_PRE_HOOK1(toHookPre, WinHttpWebSocketReceive);
+    SL2_PRE_HOOK1(toHookPre, WinHttpReadData);
+    SL2_PRE_HOOK1(toHookPre, recv);
+    SL2_PRE_HOOK1(toHookPre, fread_s);
+    SL2_PRE_HOOK1(toHookPre, fread);
 
     // Build list of post-function hooks
     std::map<char *, SL2_POST_PROTO> toHookPost;
-    toHookPost["ReadFile"] = wrap_post_Generic;
-    toHookPost["InternetReadFile"] = wrap_post_Generic;
-    toHookPost["ReadEventLog"] = wrap_post_Generic;
-    toHookPost["RegQueryValueExW"] = wrap_post_Generic;
-    toHookPost["RegQueryValueExA"] = wrap_post_Generic;
-    toHookPost["WinHttpWebSocketReceive"] = wrap_post_Generic;
-    toHookPost["WinHttpReadData"] = wrap_post_Generic;
-    toHookPost["recv"] = wrap_post_Generic;
-    toHookPost["fread_s"] = wrap_post_Generic;
-    toHookPost["fread"] = wrap_post_Generic;
+    SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
+    SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
+    SL2_POST_HOOK2(toHookPost, ReadEventLog, Generic);
+    SL2_POST_HOOK2(toHookPost, RegQueryValueExW, Generic);
+    SL2_POST_HOOK2(toHookPost, RegQueryValueExA, Generic);
+    SL2_POST_HOOK2(toHookPost, WinHttpWebSocketReceive, Generic);
+    SL2_POST_HOOK2(toHookPost, WinHttpReadData, Generic);
+    SL2_POST_HOOK2(toHookPost, recv, Generic);
+    SL2_POST_HOOK2(toHookPost, fread_s, Generic);
+    SL2_POST_HOOK2(toHookPost, fread, Generic);
 
     // Iterate over list of hooks and register them with DynamoRIO
     std::map<char *, SL2_PRE_PROTO>::iterator it;
@@ -879,8 +880,6 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         std::string strFunctionName(functionName);
 
         for (targetFunction t : parsedJson) {
-            dr_fprintf(STDERR, "selected: %d, functionName: %s\n", t.selected, t.functionName.c_str());
-
             if (t.selected && t.functionName == strFunctionName){
                 hook = true;
             }
@@ -901,7 +900,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         void(__cdecl *hookFunctionPost)(void *, void *);
         hookFunctionPost = NULL;
 
-        if(toHookPost.find(functionName) != toHookPost.end()) {
+        if (toHookPost.find(functionName) != toHookPost.end()) {
             hookFunctionPost = toHookPost[functionName];
         }
 
@@ -909,15 +908,15 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
         const char *mod_name = dr_module_preferred_name(mod);
 
-        if(strFunctionName == "ReadFile") {
-            if(_stricmp(mod_name, "KERNELBASE.dll") != 0) {
+        if (strFunctionName == "ReadFile") {
+            if (_stricmp(mod_name, "KERNELBASE.dll") != 0) {
                 continue;
             }
         }
 
         // Only hook registry queries in the kernel
-        if(strFunctionName == "RegQueryValueExA" or strFunctionName == "RegQueryValueExW") {
-            if(_stricmp(mod_name, "KERNELBASE.dll") != 0) {
+        if (strFunctionName == "RegQueryValueExA" or strFunctionName == "RegQueryValueExW") {
+            if (_stricmp(mod_name, "KERNELBASE.dll") != 0) {
                 continue;
             }
         }
@@ -934,9 +933,9 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
             dr_flush_region(towrap, 0x1000);
             bool ok = drwrap_wrap(towrap, hookFunctionPre, hookFunctionPost);
             if (ok) {
-                dr_fprintf(STDERR, "<wrapped %s @ 0x%p in %s\n", functionName, towrap, mod_name);
+                SL2_DR_DEBUG("<wrapped %s @ 0x%p in %s\n", functionName, towrap, mod_name);
             } else {
-                dr_fprintf(STDERR, "<FAILED to wrap %s @ 0x%p: already wrapped?\n", functionName, towrap);
+                SL2_DR_DEBUG("<FAILED to wrap %s @ 0x%p: already wrapped?\n", functionName, towrap);
             }
         }
     }
@@ -960,20 +959,20 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     std::string parse_err;
     int last_idx = 0;
     if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
-        dr_fprintf(STDERR, "Usage error: %s", parse_err.c_str());
+        SL2_DR_DEBUG("Usage error: %s", parse_err.c_str());
         dr_abort();
     }
 
     std::string target = op_target.get_value();
-    if(target == "") {
-        dr_fprintf(STDERR, "ERROR: arg -t (target file) required");
+    if (target == "") {
+        SL2_DR_DEBUG("ERROR: arg -t (target file) required");
         dr_abort();
     }
 
     std::ifstream jsonStream(target); // TODO ifstream can sometimes cause performance issues
     jsonStream >> parsedJson;
     if (!parsedJson.is_array())
-      dr_fprintf(STDERR, "Document root is not an array\n");
+      SL2_DR_DEBUG("Document root is not an array\n");
 
     // Set up console printing
     dr_log(NULL, DR_LOG_ALL, 1, "DR client 'SL Fuzzer' initializing\n");
@@ -999,7 +998,7 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     WCHAR runId_s[SL2_UUID_SIZE];
     sl2_uuid_to_wstring(runId, runId_s);
     // Initialize DynamoRIO and register callbacks
-    dr_fprintf(STDERR, "Beginning fuzzing run %S\n\n", runId_s);
+    SL2_DR_DEBUG("Beginning fuzzing run %S\n\n", runId_s);
     drmgr_init();
     drwrap_init();
 

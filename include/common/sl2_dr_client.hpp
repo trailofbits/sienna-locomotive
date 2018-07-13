@@ -17,9 +17,33 @@ extern "C" {
     #include "uuid.h"
 }
 
+// Used for debugging prints.
+#define SL2_DR_DEBUG(...) (dr_fprintf(STDERR, __VA_ARGS__))
+
+// NOTE(ww): This loop is here because dr_fprintf has an internal buffer
+// of 2048, and our JSON objects frequently exceed that. When that happens,
+// dr_fprintf silently truncates them and confuses the harness with invalid JSON.
+// We circumvent this by chunking the output.
+#define SL2_LOG_JSONL(json) do { \
+    auto jsonl_str = json.dump(); \
+    for (int i = 0; i < jsonl_str.length(); i += 1024) { \
+        dr_fprintf(STDERR, "%s", jsonl_str.substr(i, 1024).c_str()); \
+    } \
+    dr_fprintf(STDERR, "\n"); \
+} while(0)
+
 // Macros for the function prototypes passed to pre- and post-function hooks.
 #define SL2_PRE_PROTO void(__cdecl *)(void *, void **)
 #define SL2_POST_PROTO void(__cdecl *)(void *, void *)
+
+// Macros for quickly building a map of function names to function pre- and post-hooks.
+// TODO(ww): There should really only be one of each of these (pre and post), but
+// Microsoft's C preprocessor isn't C99 compliant and so makes things with __VA_ARGS__ hard.
+#define SL2_PRE_HOOK1(map, func) (map[#func] = wrap_pre_##func)
+#define SL2_PRE_HOOK2(map, func, hook_func) (map[#func] = wrap_pre_##hook_func)
+
+#define SL2_POST_HOOK1(map, func) (map[#func] = wrap_post_##func)
+#define SL2_POST_HOOK2(map, func, hook_func) (map[#func] = wrap_post_##hook_func)
 
 // The set of currently supported functions.
 enum class Function {
@@ -50,8 +74,8 @@ enum {
 // See `MATCH_ARG_HASH`.
 struct fileArgHash {
   WCHAR fileName[MAX_PATH + 1];
-  UINT64 position;
-  DWORD readSize;
+  size_t position;
+  size_t readSize;
 };
 
 // The struct filled with targetting information for a function.

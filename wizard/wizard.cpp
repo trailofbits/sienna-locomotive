@@ -30,7 +30,7 @@ using namespace std;
     json JSON_VAR; \
     JSON_VAR["type"] = "in"; \
     JSON_VAR["function"] = __FUNCTION__; \
-    logObject(JSON_VAR); \
+    SL2_LOG_JSONL(JSON_VAR); \
 } while (0)
 
 
@@ -40,53 +40,34 @@ struct wizard_read_info {
     size_t nNumberOfBytesToRead;
     Function function;
     WCHAR *source;
-    DWORD position;
-    UINT64 retAddrOffset;
+    size_t position;
+    size_t retAddrOffset;
     // TODO(ww): Make this a WCHAR * for consistency.
     char *argHash;
 };
 
-static UINT64 baseAddr;
+static size_t baseAddr;
 static std::map<Function, UINT64> call_counts;
-
-////////////////////////////////////////////////////////////////////////////
-// logObject()
-//
-// Takes a json object and prints it to stderr for consumption by the harness
-////////////////////////////////////////////////////////////////////////////
-void logObject(json obj)
-{
-    auto str = obj.dump();
-
-    // TODO(ww): Replace this with a separate channel for JSON.
-    // NOTE(ww): This loop is here because dr_fprintf has an internal buffer
-    // of 2048, and our JSON objects frequently exceed that. When that happens,
-    // dr_fprintf silently truncates them and confuses the harness with invalid JSON.
-    // We circumvent this by chunking the output.
-    for (int i = 0; i < str.length(); i += 1024) {
-        dr_fprintf(STDERR, "%s", str.substr(i, 1024).c_str());
-    }
-
-    dr_fprintf(STDERR, "\n");
-}
 
 /* Run whenever a thread inits/exits */
 static void
 event_thread_init(void *drcontext)
 {
-    dr_fprintf(STDERR, "wizard: event_thread_init\n");
+    SL2_DR_DEBUG("wizard#event_thread_init\n");
 }
 
 static void
 event_thread_exit(void *drcontext)
 {
-    dr_fprintf(STDERR, "wizard: event_thread_exit\n");
+    SL2_DR_DEBUG("wizard#event_thread_exit\n");
 }
 
 /* Clean up after the target binary exits */
 static void
 event_exit_trace(void)
 {
+    SL2_DR_DEBUG("wizard#event_exit_trace\n");
+
     if (!drmgr_unregister_thread_init_event(event_thread_init) ||
         !drmgr_unregister_thread_exit_event(event_thread_exit) ||
         drreg_exit() != DRREG_SUCCESS)
@@ -105,7 +86,8 @@ Below we have a number of functions that instrument metadata retreival for the i
 //       so we can track the names of the resources geing read
 
 static void
-wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
+wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
+{
     JSON_WRAP_PRE_LOG();
 
     *user_data             = malloc(sizeof(wizard_read_info));
@@ -124,13 +106,14 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
     info->function             = Function::ReadEventLog;
     info->source               = NULL;
     info->position             = NULL;
-    info->retAddrOffset        = (UINT64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
 
 static void
-wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
+wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
+{
     JSON_WRAP_PRE_LOG();
 
     HKEY    hKey        = (HKEY)drwrap_get_arg(wrapcxt, 0);
@@ -151,7 +134,7 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
         info->function             = Function::RegQueryValueEx;
         info->source               = NULL;
         info->position             = NULL;
-        info->retAddrOffset        = (UINT64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+        info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
         info->argHash              = NULL;
     }
     else {
@@ -160,7 +143,8 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
 }
 
 static void
-wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
+wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
+{
     JSON_WRAP_PRE_LOG();
 
     *user_data             = malloc(sizeof(wizard_read_info));
@@ -180,12 +164,13 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
     info->function             = Function::WinHttpWebSocketReceive;
     info->source               = NULL;
     info->position             = NULL;
-    info->retAddrOffset        = (UINT64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
 static void
-wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
+wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
+{
     JSON_WRAP_PRE_LOG();
 
     *user_data             = malloc(sizeof(wizard_read_info));
@@ -204,12 +189,13 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
     info->function             = Function::InternetReadFile;
     info->source               = NULL;
     info->position             = NULL;
-    info->retAddrOffset        = (UINT64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
 static void
-wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
+wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
+{
     JSON_WRAP_PRE_LOG();
 
     *user_data             = malloc(sizeof(wizard_read_info));
@@ -228,12 +214,13 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
     info->function             = Function::WinHttpReadData;
     info->source               = NULL;
     info->position             = NULL;
-    info->retAddrOffset        = (UINT64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
 static void
-wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
+wrap_pre_recv(void *wrapcxt, OUT void **user_data)
+{
     JSON_WRAP_PRE_LOG();
 
     *user_data             = malloc(sizeof(wizard_read_info));
@@ -252,7 +239,7 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
     info->function             = Function::recv;
     info->source               = NULL;
     info->position             = NULL;
-    info->retAddrOffset        = (UINT64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 
     // get peer name doesn't work
@@ -266,33 +253,38 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
 }
 
 static void
-wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
+wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
+{
     JSON_WRAP_PRE_LOG();
-
-    *user_data             = malloc(sizeof(wizard_read_info));
-    wizard_read_info *info = (wizard_read_info *) *user_data;
 
     HANDLE hFile                = drwrap_get_arg(wrapcxt, 0);
     LPVOID lpBuffer             = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
 
+    LARGE_INTEGER offset = {0};
+    LARGE_INTEGER position = {0};
+    SetFilePointerEx(hFile, offset, &position, FILE_CURRENT);
+
+    fileArgHash fStruct = {0};
+
+    GetFinalPathNameByHandle(hFile, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
+    fStruct.position = position.QuadPart;
+    fStruct.readSize = nNumberOfBytesToRead;
+
+    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct,
+        ((unsigned char *) &fStruct) + sizeof(fileArgHash));
+    std::string hash_str;
+    picosha2::hash256_hex_string(blob_vec, hash_str);
+
+    *user_data             = malloc(sizeof(wizard_read_info));
+    wizard_read_info *info = (wizard_read_info *) *user_data;
+
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
     info->function             = Function::ReadFile;
-    info->retAddrOffset        = (UINT64) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->position             = SetFilePointer(hFile, 0, NULL, FILE_CURRENT);
-
-    fileArgHash fStruct;
-    memset(&fStruct, 0, sizeof(fileArgHash));
-
-    DWORD pathSize = GetFinalPathNameByHandle(hFile, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
-    fStruct.position = info->position;
-    fStruct.readSize = nNumberOfBytesToRead;
-
-    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct, ((unsigned char *) &fStruct) + sizeof(fileArgHash));
-    std::string hash_str;
-    picosha2::hash256_hex_string(blob_vec, hash_str);
+    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->position             = fStruct.position;
 
     info->source = (WCHAR *)malloc(sizeof(fStruct.fileName));
     memcpy(info->source, fStruct.fileName, sizeof(fStruct.fileName));
@@ -304,7 +296,8 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
 }
 
 static void
-wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
+wrap_pre_fread(void *wrapcxt, OUT void **user_data)
+{
     JSON_WRAP_PRE_LOG();
 
     *user_data             = malloc(sizeof(wizard_read_info));
@@ -319,12 +312,13 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
     info->function             = Function::fread;
     info->source               = NULL;
     info->position             = NULL;
-    info->retAddrOffset        = (UINT64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
 static void
-wrap_pre_fread_s(void *wrapcxt, OUT void **user_data) {
+wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
+{
     JSON_WRAP_PRE_LOG();
 
     *user_data             = malloc(sizeof(wizard_read_info));
@@ -339,13 +333,14 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data) {
     info->function             = Function::fread_s;
     info->source               = NULL;
     info->position             = NULL;
-    info->retAddrOffset        = (UINT64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
 /* prints information about the function call to stderr so the harness can ingest it */
 static void
-wrap_post_Generic(void *wrapcxt, void *user_data) {
+wrap_post_Generic(void *wrapcxt, void *user_data)
+{
     if (user_data == NULL) {
         return;
     }
@@ -377,12 +372,12 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
     }
 
     char *lpBuffer = (char *) info->lpBuffer;
-    DWORD nNumberOfBytesToRead = info->nNumberOfBytesToRead;
+    size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
 
     vector<unsigned char> x(lpBuffer, lpBuffer + nNumberOfBytesToRead);
     j["buffer"] = x;
 
-    logObject(j);
+    SL2_LOG_JSONL(j);
 
     if (info->source) {
         free(info->source);
@@ -396,7 +391,8 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
 
 /* Runs every time we load a new module. Wraps functions we can target. See fuzzer.cpp for a more-detailed version */
 static void
-module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
+module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
+{
     /*
         ReadFile is hooked twice, in kernel32 and kernelbase.
         kernelbase is forwarded to kernel32, so if we want to filter
@@ -404,35 +400,35 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
     */
 
     if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))){
-      baseAddr = (UINT64) mod->start;
+      baseAddr = (size_t) mod->start;
     }
 
     std::map<char *, SL2_PRE_PROTO> toHookPre;
-    toHookPre["ReadEventLog"]            = wrap_pre_ReadEventLog;
-    toHookPre["RegQueryValueExW"]        = wrap_pre_RegQueryValueEx;
-    toHookPre["RegQueryValueExA"]        = wrap_pre_RegQueryValueEx;
-    toHookPre["WinHttpWebSocketReceive"] = wrap_pre_WinHttpWebSocketReceive;
-    toHookPre["InternetReadFile"]        = wrap_pre_InternetReadFile;
-    toHookPre["WinHttpReadData"]         = wrap_pre_WinHttpReadData;
-    toHookPre["recv"]                    = wrap_pre_recv;
-    toHookPre["ReadFile"]                = wrap_pre_ReadFile;
-    toHookPre["fread_s"]                 = wrap_pre_fread_s;
-    toHookPre["fread"]                   = wrap_pre_fread;
+    SL2_PRE_HOOK1(toHookPre, ReadFile);
+    SL2_PRE_HOOK1(toHookPre, InternetReadFile);
+    SL2_PRE_HOOK1(toHookPre, ReadEventLog);
+    SL2_PRE_HOOK2(toHookPre, RegQueryValueExW, RegQueryValueEx);
+    SL2_PRE_HOOK2(toHookPre, RegQueryValueExA, RegQueryValueEx);
+    SL2_PRE_HOOK1(toHookPre, WinHttpWebSocketReceive);
+    SL2_PRE_HOOK1(toHookPre, WinHttpReadData);
+    SL2_PRE_HOOK1(toHookPre, recv);
+    SL2_PRE_HOOK1(toHookPre, fread_s);
+    SL2_PRE_HOOK1(toHookPre, fread);
 
     std::map<char *, SL2_POST_PROTO> toHookPost;
-    toHookPost["ReadFile"]                = wrap_post_Generic;
-    toHookPost["InternetReadFile"]        = wrap_post_Generic;
-    toHookPost["ReadEventLog"]            = wrap_post_Generic;
-    toHookPost["RegQueryValueExW"]        = wrap_post_Generic;
-    toHookPost["RegQueryValueExA"]        = wrap_post_Generic;
-    toHookPost["WinHttpWebSocketReceive"] = wrap_post_Generic;
-    toHookPost["WinHttpReadData"]         = wrap_post_Generic;
-    toHookPost["recv"]                    = wrap_post_Generic;
-    toHookPost["fread_s"]                 = wrap_post_Generic;
-    toHookPost["fread"]                   = wrap_post_Generic;
+    SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
+    SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
+    SL2_POST_HOOK2(toHookPost, ReadEventLog, Generic);
+    SL2_POST_HOOK2(toHookPost, RegQueryValueExW, Generic);
+    SL2_POST_HOOK2(toHookPost, RegQueryValueExA, Generic);
+    SL2_POST_HOOK2(toHookPost, WinHttpWebSocketReceive, Generic);
+    SL2_POST_HOOK2(toHookPost, WinHttpReadData, Generic);
+    SL2_POST_HOOK2(toHookPost, recv, Generic);
+    SL2_POST_HOOK2(toHookPost, fread_s, Generic);
+    SL2_POST_HOOK2(toHookPost, fread, Generic);
 
     std::map<char *, SL2_PRE_PROTO>::iterator it;
-    for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
+    for (it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
         std::string strFunctionName(functionName);
 
@@ -441,20 +437,20 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
         void(__cdecl *hookFunctionPost)(void *, void *);
         hookFunctionPost = NULL;
 
-        if(toHookPost.find(functionName) != toHookPost.end()) {
+        if (toHookPost.find(functionName) != toHookPost.end()) {
             hookFunctionPost = toHookPost[functionName];
         }
 
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
         const char *mod_name = dr_module_preferred_name(mod);
-        if(strcmp(functionName, "ReadFile") == 0) {
-            if(strcmp(mod_name, "KERNELBASE.dll") != 0) {
+        if (strcmp(functionName, "ReadFile") == 0) {
+            if (strcmp(mod_name, "KERNELBASE.dll") != 0) {
                 continue;
             }
         }
 
-        if(strcmp(functionName, "RegQueryValueExA") == 0 || strcmp(functionName, "RegQueryValueExW") == 0) {
-            if(strcmp(mod_name, "KERNELBASE.dll") != 0) {
+        if (strcmp(functionName, "RegQueryValueExA") == 0 || strcmp(functionName, "RegQueryValueExW") == 0) {
+            if (strcmp(mod_name, "KERNELBASE.dll") != 0) {
                 continue;
             }
         }
@@ -477,13 +473,14 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
                 j["msg"] = s.str();
             }
 
-            logObject(j);
+            SL2_LOG_JSONL(j);
         }
     }
 }
 
 /* registers event callbacks and initializes DynamoRIO */
-void wizard(client_id_t id, int argc, const char *argv[]) {
+void wizard(client_id_t id, int argc, const char *argv[])
+{
     drreg_options_t ops = {sizeof(ops), 3, false};
     dr_set_client_name("Wizard",
                        "https://github.com/trailofbits/sienna-locomotive");
@@ -510,7 +507,7 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
     std::string parse_err;
     int last_idx = 0;
     if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
-        dr_fprintf(STDERR, "Usage error: %s", parse_err.c_str());
+        SL2_DR_DEBUG("wizard#main: usage error: %s", parse_err.c_str());
         dr_abort();
     }
 
