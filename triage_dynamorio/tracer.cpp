@@ -33,7 +33,7 @@ extern "C" {
 
 static void *mutatex;
 static bool replay;
-static bool mutate_count;
+static DWORD mutate_count;
 static UUID run_id;
 
 static std::set<reg_id_t> tainted_regs;
