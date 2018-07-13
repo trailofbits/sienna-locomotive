@@ -6,6 +6,7 @@ import os
 import glob
 import re
 import struct
+import json
 from hashlib import sha1
 
 from . import config
@@ -50,7 +51,13 @@ def get_target_dir(_config):
     return dir_name
 
 
-def get_targets():
+def get_target(_config):
+    target_file = os.path.join(get_target_dir(_config), 'targets.json')
+    with open(target_file) as target_json:
+        return json.loads(target_json.read())
+
+
+def get_all_targets():
     """ Returns a dict mapping target directories to the contents of the argument file """
     targets = {}
     for _dir in glob.glob(os.path.join(config.sl2_targets_dir, '*')):

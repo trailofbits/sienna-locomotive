@@ -11,7 +11,7 @@ import json
 import atexit
 import harness.config
 import harness.statz
-from harness.state import get_target_dir, get_targets, get_runs, stringify_program_array
+from harness.state import get_target_dir, get_all_targets, get_runs, stringify_program_array
 from harness.instrument import print_l, wizard_run, fuzzer_run, triage_run, start_server, fuzz_and_triage, kill
 
 
@@ -85,7 +85,7 @@ def main():
 
         # Parse the list of targets and select one to fuzz
         if config['stage'] == 'FUZZER':
-            targets = get_targets()
+            targets = get_all_targets()
             mapping = []
             for target in targets:
                 print("{}) [{}]  {}".format(len(mapping),
