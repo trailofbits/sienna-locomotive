@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <random>
 #include <set>
 #include <map>
@@ -242,26 +243,10 @@ VOID strategyRepeatBytesBackward(BYTE *buf, size_t size) {
     std::random_device rd;
     srand(rd());
 
-    // pos -> 1 to last byte
-    size_t pos = getRand() % (size - 1);
-    pos++;
+    size_t start = getRand() % (size - 1);
+    size_t end = start + getRand() % ((size + 1) - start);
 
-    // repeat_length -> 1 to pos
-    size_t repeat_length = getRand() % pos;
-    repeat_length++;
-
-    // set start
-    size_t curr_pos = pos - repeat_length;
-
-    // set end between 0 to (curr_pos + 1)
-    size_t end = getRand() % (curr_pos + 1);
-
-    // gte so we can go to 0
-    while(curr_pos >= end) {
-        buf[curr_pos] = buf[pos];
-        curr_pos--;
-        pos--;
-    }
+    std::reverse(buf + start, buf + end);
 }
 
 VOID strategyDeleteBytes(BYTE *buf, size_t size) {
@@ -693,17 +678,17 @@ DWORD handleMutation(HANDLE hPipe) {
 }
 
 /* Gets the mutated bytes stored in the FKT file for mutation replay */
-DWORD getBytesFKT(HANDLE hFile, BYTE *buf, DWORD size) {
+DWORD getBytesFKT(HANDLE hFile, BYTE *buf, size_t size) {
     DWORD dwBytesRead = 0;
+    size_t buf_size = 0;
 
-    DWORD buf_size = 0;
     SetFilePointer(hFile, 0x14, NULL, FILE_BEGIN);
     if (!ReadFile(hFile, &buf_size, 4, &dwBytesRead, NULL)) {
         LOG_F(ERROR, "getBytesFKT: failed to read replay buffer size from FKT (0x%x)", GetLastError());
         exit(1);
     }
 
-    if(buf_size < size) {
+    if (buf_size < size) {
         size = buf_size;
     }
 
@@ -726,7 +711,7 @@ DWORD handleReplay(HANDLE hPipe) {
     UUID runId;
     WCHAR *runId_s;
 
-    if(!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleReplay: failed to read run ID (0x%x)", GetLastError());
         exit(1);
     }
@@ -737,14 +722,15 @@ DWORD handleReplay(HANDLE hPipe) {
 
     DWORD mutate_count = 0;
     WCHAR mutate_fname[MAX_PATH + 1] = {0};
-    if(!ReadFile(hPipe, &mutate_count, sizeof(DWORD), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &mutate_count, sizeof(DWORD), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleReplay: failed to read mutate count (0x%x)", GetLastError());
         exit(1);
     }
+
     StringCchPrintfW(mutate_fname, MAX_PATH, FUZZ_RUN_FKT_FMT, mutate_count);
 
-    DWORD size = 0;
-    if(!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
+    size_t size = 0;
+    if (!ReadFile(hPipe, &size, sizeof(size_t), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleReplay: failed to read size of replay buffer (0x%x)", GetLastError());
         exit(1);
     }
@@ -777,24 +763,24 @@ DWORD handleReplay(HANDLE hPipe) {
 
     HANDLE hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 
-    if(hFile == INVALID_HANDLE_VALUE) {
+    if (hFile == INVALID_HANDLE_VALUE) {
         LOG_F(ERROR, "handleReplay: failed to open FKT: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
     getBytesFKT(hFile, buf, size);
 
-    if(!WriteFile(hPipe, buf, size, &dwBytesWritten, NULL)) {
+    if (!WriteFile(hPipe, buf, size, &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "handleReplay: failed to write replay buffer (0x%x)", GetLastError());
         exit(1);
     }
 
-    if(!CloseHandle(hFile)) {
+    if (!CloseHandle(hFile)) {
         LOG_F(ERROR, "handleReplay: failed to close FKT (0x%x)", GetLastError());
         exit(1);
     }
 
-    if(!HeapFree(hHeap, NULL, buf)) {
+    if (!HeapFree(hHeap, NULL, buf)) {
         LOG_F(ERROR, "handleReplay: failed to deallocate replay buffer (0x%x)", GetLastError());
         exit(1);
     }
@@ -811,7 +797,7 @@ DWORD serveRunInfo(HANDLE hPipe) {
     UUID runId;
     WCHAR *runId_s;
 
-    if(!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "serveRunInfo: failed to read run ID (0x%x)", GetLastError());
         exit(1);
     }
@@ -826,27 +812,27 @@ DWORD serveRunInfo(HANDLE hPipe) {
     PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_PROGRAM_TXT);
     HANDLE hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 
-    if(hFile == INVALID_HANDLE_VALUE) {
+    if (hFile == INVALID_HANDLE_VALUE) {
         LOG_F(ERROR, "serveRunInfo: failed to open program.txt: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
-    if(!ReadFile(hFile, commandLine, 8191 * sizeof(WCHAR), &dwBytesRead, NULL)) {
+    if (!ReadFile(hFile, commandLine, 8191 * sizeof(WCHAR), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "serveRunInfo: failed to read program name (0x%x)", GetLastError());
         exit(1);
     }
 
-    if(!CloseHandle(hFile)) {
+    if (!CloseHandle(hFile)) {
         LOG_F(ERROR, "serveRunInfo: failed to close program.txt (0x%x)", GetLastError());
         exit(1);
     }
 
-    if(!WriteFile(hPipe, &dwBytesRead, sizeof(DWORD), &dwBytesWritten, NULL)) {
+    if (!WriteFile(hPipe, &dwBytesRead, sizeof(DWORD), &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "serveRunInfo: failed to write program name size (0x%x)", GetLastError());
         exit(1);
     }
 
-    if(!WriteFile(hPipe, commandLine, dwBytesRead, &dwBytesWritten, NULL)) {
+    if (!WriteFile(hPipe, commandLine, dwBytesRead, &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "serveRunInfo: failed to write program name (0x%x)", GetLastError());
         exit(1);
     }
@@ -857,27 +843,27 @@ DWORD serveRunInfo(HANDLE hPipe) {
 
     hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 
-    if(hFile == INVALID_HANDLE_VALUE) {
+    if (hFile == INVALID_HANDLE_VALUE) {
         LOG_F(ERROR, "serveRunInfo: failed to open arguments.txt: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
-    if(!ReadFile(hFile, commandLine, 8191 * sizeof(WCHAR), &dwBytesRead, NULL)) {
+    if (!ReadFile(hFile, commandLine, 8191 * sizeof(WCHAR), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "serveRunInfo: failed to read command line argument list (0x%x)", GetLastError());
         exit(1);
     }
 
-    if(!CloseHandle(hFile)) {
+    if (!CloseHandle(hFile)) {
         LOG_F(ERROR, "serveRunInfo: failed to close arguments.txt (0x%x)", GetLastError());
         exit(1);
     }
 
-    if(!WriteFile(hPipe, &dwBytesRead, sizeof(DWORD), &dwBytesWritten, NULL)) {
+    if (!WriteFile(hPipe, &dwBytesRead, sizeof(DWORD), &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "serveRunInfo: failed to write argument list size (0x%x)", GetLastError());
         exit(1);
     }
 
-    if(!WriteFile(hPipe, commandLine, dwBytesRead, &dwBytesWritten, NULL)) {
+    if (!WriteFile(hPipe, commandLine, dwBytesRead, &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "serveRunInfo: faield to write argument list (0x%x)", GetLastError());
         exit(1);
     }
@@ -893,7 +879,7 @@ DWORD finalizeRun(HANDLE hPipe) {
     UUID runId;
     WCHAR *runId_s;
 
-    if(!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "finalizeRun: failed to read run ID (0x%x)", GetLastError());
         exit(1);
     }
@@ -901,7 +887,7 @@ DWORD finalizeRun(HANDLE hPipe) {
     UuidToString(&runId, (RPC_WSTR *)&runId_s);
 
     BOOL crash = false;
-    if(!ReadFile(hPipe, &crash, sizeof(BOOL), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &crash, sizeof(BOOL), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "finalizeRun: failed to read crash status (0x%x)", GetLastError());
         exit(1);
     }
@@ -954,7 +940,7 @@ DWORD crashPath(HANDLE hPipe) {
     UUID runId;
     WCHAR *runId_s;
 
-    if(!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "crashPath: failed to read UUID (0x%x)", GetLastError());
         exit(1);
     }
@@ -969,7 +955,7 @@ DWORD crashPath(HANDLE hPipe) {
 
     size_t size = (wcslen(targetFile) + 1) * sizeof(WCHAR);
 
-    if(!WriteFile(hPipe, &targetFile, (DWORD)size, &dwBytesWritten, NULL)) {
+    if (!WriteFile(hPipe, &targetFile, (DWORD)size, &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "crashPath: failed to write crash.json path to pipe (0x%x)", GetLastError());
         exit(1);
     }
@@ -987,7 +973,7 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe) {
     DWORD dwBytesWritten = 0;
 
     BYTE eventId = 255;
-    if(!ReadFile(hPipe, &eventId, sizeof(BYTE), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &eventId, sizeof(BYTE), &dwBytesRead, NULL)) {
         if (GetLastError() != ERROR_BROKEN_PIPE){
             LOG_F(ERROR, "threadHandler: failed to read eventId (0x%x)", GetLastError());
             exit(1);
