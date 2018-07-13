@@ -84,7 +84,8 @@ Below we have a number of functions that instrument metadata retreival for the i
 //       so we can track the names of the resources geing read
 
 static void
-wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
+wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
+{
     JSON_WRAP_PRE_LOG();
 
     *user_data             = malloc(sizeof(wizard_read_info));
@@ -109,7 +110,8 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data) {
 
 
 static void
-wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
+wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
+{
     JSON_WRAP_PRE_LOG();
 
     HKEY    hKey        = (HKEY)drwrap_get_arg(wrapcxt, 0);
@@ -139,7 +141,8 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data) {
 }
 
 static void
-wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
+wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
+{
     JSON_WRAP_PRE_LOG();
 
     *user_data             = malloc(sizeof(wizard_read_info));
@@ -164,7 +167,8 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data) {
 }
 
 static void
-wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
+wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
+{
     JSON_WRAP_PRE_LOG();
 
     *user_data             = malloc(sizeof(wizard_read_info));
@@ -188,7 +192,8 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data) {
 }
 
 static void
-wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
+wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
+{
     JSON_WRAP_PRE_LOG();
 
     *user_data             = malloc(sizeof(wizard_read_info));
@@ -212,7 +217,8 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data) {
 }
 
 static void
-wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
+wrap_pre_recv(void *wrapcxt, OUT void **user_data)
+{
     JSON_WRAP_PRE_LOG();
 
     *user_data             = malloc(sizeof(wizard_read_info));
@@ -245,7 +251,8 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data) {
 }
 
 static void
-wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
+wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
+{
     JSON_WRAP_PRE_LOG();
 
     HANDLE hFile                = drwrap_get_arg(wrapcxt, 0);
@@ -287,7 +294,8 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
 }
 
 static void
-wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
+wrap_pre_fread(void *wrapcxt, OUT void **user_data)
+{
     JSON_WRAP_PRE_LOG();
 
     *user_data             = malloc(sizeof(wizard_read_info));
@@ -307,7 +315,8 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data) {
 }
 
 static void
-wrap_pre_fread_s(void *wrapcxt, OUT void **user_data) {
+wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
+{
     JSON_WRAP_PRE_LOG();
 
     *user_data             = malloc(sizeof(wizard_read_info));
@@ -328,7 +337,8 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data) {
 
 /* prints information about the function call to stderr so the harness can ingest it */
 static void
-wrap_post_Generic(void *wrapcxt, void *user_data) {
+wrap_post_Generic(void *wrapcxt, void *user_data)
+{
     if (user_data == NULL) {
         return;
     }
@@ -379,7 +389,8 @@ wrap_post_Generic(void *wrapcxt, void *user_data) {
 
 /* Runs every time we load a new module. Wraps functions we can target. See fuzzer.cpp for a more-detailed version */
 static void
-module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
+module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
+{
     /*
         ReadFile is hooked twice, in kernel32 and kernelbase.
         kernelbase is forwarded to kernel32, so if we want to filter
@@ -466,7 +477,8 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded) {
 }
 
 /* registers event callbacks and initializes DynamoRIO */
-void wizard(client_id_t id, int argc, const char *argv[]) {
+void wizard(client_id_t id, int argc, const char *argv[])
+{
     drreg_options_t ops = {sizeof(ops), 3, false};
     dr_set_client_name("Wizard",
                        "https://github.com/trailofbits/sienna-locomotive");
