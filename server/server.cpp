@@ -28,6 +28,13 @@ static HANDLE hLog = INVALID_HANDLE_VALUE;
 static WCHAR FUZZ_WORKING_PATH[MAX_PATH] = L"";
 static WCHAR FUZZ_LOG[MAX_PATH] = L"";
 
+/*
+    TODO(ww): Create a formal server API. Doing so will help with:
+        1. all of the `exit`s scattered through the current code
+        2. iterating on the server protocol without breaking clients
+*/
+
+
 // Called on process termination (by atexit).
 static VOID server_cleanup()
 {
@@ -588,7 +595,7 @@ DWORD handleMutation(HANDLE hPipe)
 
     DWORD type = 0;
     if (!ReadFile(hPipe, &type, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "handleMutation: failed to read mutation type (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleMutation: failed to read function type (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -650,13 +657,16 @@ DWORD handleMutation(HANDLE hPipe)
         exit(1);
     }
 
-    // TODO(ww): Shouldn't this be dwBytesRead < size?
-    if (dwBytesRead != size) {
+    if (dwBytesRead < size) {
+        LOG_F(WARNING, "handleMutation: read fewer bytes than expected (%d < %lu)", dwBytesRead, size);
         size = dwBytesRead;
     }
 
     if (size > 0) {
         mutate(buf, size);
+    }
+    else {
+        LOG_F(WARNING, "handleMutation: got an unexpectedly small buffer (%lu < 0), skipping mutation");
     }
 
     if (!WriteFile(hPipe, buf, (DWORD)size, &dwBytesWritten, NULL)) {
