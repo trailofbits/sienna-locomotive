@@ -618,14 +618,24 @@ DWORD handleMutation(HANDLE hPipe)
         exit(1);
     }
 
-    WCHAR filePath[MAX_PATH + 1];
-    if (!ReadFile(hPipe, &filePath, pathSize * sizeof(WCHAR), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "handleMutation: failed to read mutation filepath (0x%x)", GetLastError());
-        exit(1);
-    }
+    WCHAR filePath[MAX_PATH + 1] = {0};
 
-    filePath[pathSize] = 0;
-    LOG_F(INFO, "handleMutation: mutation file path: %S\n", filePath);
+    // NOTE(ww): Interestingly, Windows distinguishes between a read of 0 bytes
+    // and no read at all -- both the client and the server have to do either one or the
+    // other, and failing to do either on one side causes a truncated read or write.
+    if (pathSize > 0) {
+        if (!ReadFile(hPipe, &filePath, pathSize * sizeof(WCHAR), &dwBytesRead, NULL)) {
+            LOG_F(ERROR, "handleMutation: failed to read mutation filepath (0x%x)", GetLastError());
+            exit(1);
+        }
+
+        filePath[pathSize] = 0;
+
+        LOG_F(INFO, "handleMutation: mutation file path: %S", filePath);
+    }
+    else {
+        LOG_F(WARNING, "handleMutation: the fuzzer didn't send us a file path!");
+    }
 
     size_t position = 0;
     if (!ReadFile(hPipe, &position, sizeof(size_t), &dwBytesRead, NULL)) {
@@ -686,6 +696,8 @@ DWORD handleMutation(HANDLE hPipe)
         LOG_F(ERROR, "handleMutation: failed to create FTK: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
+
+    LOG_F(INFO, "calling writeFKT with targetFile: %s", targetFile);
 
     writeFKT(hFile, type, pathSize, filePath, position, size, buf);
 
@@ -1001,44 +1013,58 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe)
     DWORD dwBytesWritten = 0;
 
     BYTE eventId = 255;
-    if (!ReadFile(hPipe, &eventId, sizeof(BYTE), &dwBytesRead, NULL)) {
-        if (GetLastError() != ERROR_BROKEN_PIPE){
-            LOG_F(ERROR, "threadHandler: failed to read eventId (0x%x)", GetLastError());
-            exit(1);
-        }
-        else{
-             // Pipe was broken when we tried to read it. Happens when the python client
-             // checks if it exists.
-            return 0;
-        }
-    }
 
-    LOG_F(INFO, "threadHandler: got event ID: %d", eventId);
+    // NOTE(ww): This is a second event loop, inside of the infinite event loop that
+    // creates each thread and calls threadHandler. We do this so that clients can
+    // re-use their pipe instances to send multiple events -- with only the top-level
+    // loop, each connection would be discarded after a single event.
+    //
+    // To end a "session", a client sends the EVT_SESSION_TEARDOWN event. "Session"
+    // is in scare quotes because each session is essentially anonymous -- the server
+    // only sees when they end, not which runs or events they correspond to.
+    do {
+        if (!ReadFile(hPipe, &eventId, sizeof(BYTE), &dwBytesRead, NULL)) {
+            if (GetLastError() != ERROR_BROKEN_PIPE){
+                LOG_F(ERROR, "threadHandler: failed to read eventId (0x%x)", GetLastError());
+                exit(1);
+            }
+            else{
+                 // Pipe was broken when we tried to read it. Happens when the python client
+                 // checks if it exists.
+                return 0;
+            }
+        }
 
-    // Dispatch individual requests based on which event the client requested
-    switch (eventId) {
-        case EVT_RUN_ID:
-            generateRunId(hPipe);
-            break;
-        case EVT_MUTATION:
-            handleMutation(hPipe);
-            break;
-        case EVT_REPLAY:
-            handleReplay(hPipe);
-            break;
-        case EVT_RUN_INFO:
-            serveRunInfo(hPipe);
-            break;
-        case EVT_RUN_COMPLETE:
-            finalizeRun(hPipe);
-            break;
-        case EVT_CRASH_PATH:
-            crashPath(hPipe);
-            break;
-        default:
-            LOG_F(ERROR, "Unknown or invalid event id 0x%x", eventId);
-            break;
-    }
+        LOG_F(INFO, "threadHandler: got event ID: %d", eventId);
+
+        // Dispatch individual requests based on which event the client requested
+        switch (eventId) {
+            case EVT_RUN_ID:
+                generateRunId(hPipe);
+                break;
+            case EVT_MUTATION:
+                handleMutation(hPipe);
+                break;
+            case EVT_REPLAY:
+                handleReplay(hPipe);
+                break;
+            case EVT_RUN_INFO:
+                serveRunInfo(hPipe);
+                break;
+            case EVT_RUN_COMPLETE:
+                finalizeRun(hPipe);
+                break;
+            case EVT_CRASH_PATH:
+                crashPath(hPipe);
+                break;
+            case EVT_SESSION_TEARDOWN:
+                LOG_F(INFO, "Ending a client's session with the server.");
+                break;
+            default:
+                LOG_F(ERROR, "Unknown or invalid event id 0x%x", eventId);
+                break;
+        }
+    } while (eventId != EVT_SESSION_TEARDOWN);
 
     if (!FlushFileBuffers(hPipe)) {
         LOG_F(ERROR, "threadHandler: failed to flush pipe (0x%x)", GetLastError());

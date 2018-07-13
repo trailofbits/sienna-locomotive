@@ -33,8 +33,9 @@ enum Event {
     EVT_RUN_INFO,           // 3
     EVT_RUN_COMPLETE,       // 4
     EVT_CRASH_PATH,         // 5
+    EVT_SESSION_TEARDOWN,   // 6
     // TODO(ww): Allow the user to shut the server down via an event.
-    // EVT_SHUTDOWN,           // 6
+    // EVT_SHUTDOWN,           // 7
 };
 
 #endif
