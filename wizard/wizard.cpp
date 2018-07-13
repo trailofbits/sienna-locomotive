@@ -283,7 +283,6 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data) {
     info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
     LARGE_INTEGER offset = {0};
-    offset.QuadPart = 0;
     LARGE_INTEGER position = {0};
     SetFilePointerEx(hFile, offset, &position, FILE_CURRENT);
     info->position = position.QuadPart;
