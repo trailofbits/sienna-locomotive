@@ -516,7 +516,7 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
     LPBYTE  lpData = (LPBYTE)drwrap_get_arg(wrapcxt, 4);
     LPDWORD lpcbData = (LPDWORD)drwrap_get_arg(wrapcxt, 5);
 
-    if(lpData != NULL && lpcbData != NULL) {
+    if (lpData != NULL && lpcbData != NULL) {
         *user_data             = malloc(sizeof(fuzzer_read_info));
         fuzzer_read_info *info = (fuzzer_read_info *) *user_data;
 
@@ -900,7 +900,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         void(__cdecl *hookFunctionPost)(void *, void *);
         hookFunctionPost = NULL;
 
-        if(toHookPost.find(functionName) != toHookPost.end()) {
+        if (toHookPost.find(functionName) != toHookPost.end()) {
             hookFunctionPost = toHookPost[functionName];
         }
 
@@ -908,15 +908,15 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
         const char *mod_name = dr_module_preferred_name(mod);
 
-        if(strFunctionName == "ReadFile") {
-            if(_stricmp(mod_name, "KERNELBASE.dll") != 0) {
+        if (strFunctionName == "ReadFile") {
+            if (_stricmp(mod_name, "KERNELBASE.dll") != 0) {
                 continue;
             }
         }
 
         // Only hook registry queries in the kernel
-        if(strFunctionName == "RegQueryValueExA" or strFunctionName == "RegQueryValueExW") {
-            if(_stricmp(mod_name, "KERNELBASE.dll") != 0) {
+        if (strFunctionName == "RegQueryValueExA" or strFunctionName == "RegQueryValueExW") {
+            if (_stricmp(mod_name, "KERNELBASE.dll") != 0) {
                 continue;
             }
         }
@@ -964,7 +964,7 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     }
 
     std::string target = op_target.get_value();
-    if(target == "") {
+    if (target == "") {
         SL2_DR_DEBUG("ERROR: arg -t (target file) required");
         dr_abort();
     }
