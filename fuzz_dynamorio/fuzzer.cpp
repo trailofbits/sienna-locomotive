@@ -174,6 +174,7 @@ DWORD finalize(HANDLE hPipe, UUID runId, BOOL crashed)
         dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write event ID (0x%x)", GetLastError());
         dr_exit_process(1);
     }
+
     // Write the run ID
     if (!WriteFile(hPipe, &runId, sizeof(UUID), &bytesWritten, NULL)) {
         dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#finalize: Couldn't write run ID (0x%x)", GetLastError());
@@ -697,9 +698,9 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
 
-    LONG positionHigh = 0;
-    DWORD positionLow = SetFilePointer(hFile, 0, &positionHigh, FILE_CURRENT);
-    DWORD64 position = positionHigh;
+    LARGE_INTEGER offset = {0};
+    LARGE_INTEGER position = {0};
+    SetFilePointerEx(hFile, offset, &position, FILE_CURRENT);
 
     *user_data             = malloc(sizeof(fuzzer_read_info));
     fuzzer_read_info *info = (fuzzer_read_info *) *user_data;
@@ -709,7 +710,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
     info->lpNumberOfBytesRead  = lpNumberOfBytesRead;
-    info->position             = (position << 32) | positionLow;
+    info->position             = position.QuadPart;
     info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
     fileArgHash fStruct;
