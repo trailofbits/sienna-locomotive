@@ -73,6 +73,11 @@ Function Reconfig {
     SafeDelete "$env:APPDATA\Trail of Bits\fuzzkit"
 }
 
+Function Test {
+    python harness.py  -v
+}
+
+
 Function Clean {
     Reconfig
     SafeDelete "build"
@@ -109,14 +114,22 @@ help
 
 $cmd = $args[0]
 
-if(         $cmd -eq "clean" ) {
-    Clean
-} ElseIf(   $cmd -eq "dep" ) {
-    Dep
-} ElseIf(   $cmd -eq "reconfig" ) {
-    Reconfig
-} ElseIf(   $cmd -eq "help" ) {
-    Help
-} else {
-    Build
+switch( $cmd ) {
+    "clean"             { Clean }
+    "dep"               { Dep }
+    "reconfig"          { Reconfig }
+    "help"              { Help }
+    "test"              { Test }
+    default             { Build }   
 }
+# if(         $cmd -eq "clean" ) {
+#     Clean
+# } ElseIf(   $cmd -eq "dep" ) {
+#     Dep
+# } ElseIf(   $cmd -eq "reconfig" ) {
+#     Reconfig
+# } ElseIf(   $cmd -eq "help" ) {
+#     Help
+# } else {
+#     Build
+# }

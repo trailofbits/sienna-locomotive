@@ -12,6 +12,7 @@
 #include <string>
 #include "json.hpp"
 using json = nlohmann::json;
+using namespace std;
 
 extern "C" {
     #include "uuid.h"
@@ -55,13 +56,29 @@ struct fileArgHash {
 };
 
 // The struct filled with targetting information for a function.
-struct targetFunction {
+typedef struct targetFunction {
   bool selected;
   UINT64 index;
   UINT64 mode;
   UINT64 retAddrOffset;
   std::string functionName;
   std::string argHash;
+} TargetFunction;
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// SL2Client
+///////////////////////////////////////////////////////////////////////////////////////////////////
+class SL2Client {
+
+private:
+
+
+public:
+    SL2Client();
+
+    bool isFunctionTargeted();
+    
 };
 
 // Returns a C-string corresponding to the requested `function`.

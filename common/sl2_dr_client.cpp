@@ -1,4 +1,33 @@
 #include "common/sl2_dr_client.hpp"
+#include <string>
+using namespace std;
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// SL2Client
+///////////////////////////////////////////////////////////////////////////////////////////////////
+SL2Client::SL2Client() {
+    
+}
+
+bool SL2Client::isFunctionTargeted() {
+    return true;
+    //    std::string strFunctionName(get_function_name(function));
+    // for (targetFunction t : parsedJson){
+    //     if (t.selected && t.functionName == strFunctionName) {
+    //         if (t.mode & MATCH_INDEX && call_counts[function] == t.index) {
+    //           targeted = true;
+    //         }
+    //         else if (t.mode & MATCH_RETN_ADDRESS && t.retAddrOffset == retAddrOffset) {
+    //           targeted = true;
+    //         }
+    //         else if (t.mode & MATCH_ARG_HASH && !strcmp(t.argHash.c_str(), info->argHash)) {
+    //             targeted = true;
+    //         }
+    //     }
+    // }    
+}
+
 
 __declspec(dllexport) char *get_function_name(Function function)
 {
