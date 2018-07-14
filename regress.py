@@ -59,6 +59,12 @@ class TestWizard(unittest.TestCase):
         self.assertTrue( 'Process completed after' in output )
 
 
+    def test_TheWiz(self):
+        cmd = r'echo 0 | python .\harness.py -v'
+        output = runAndCaptureOutput(cmd)
+        self.assertTrue( 'Process completed after' in output )
+
+
 def main():
     support.run_unittest(TestWizard)
 

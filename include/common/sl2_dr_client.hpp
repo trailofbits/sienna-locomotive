@@ -14,6 +14,7 @@
 using json = nlohmann::json;
 using namespace std;
 
+
 extern "C" {
     #include "uuid.h"
 }
@@ -69,6 +70,10 @@ enum {
 
     // Target a function by a hash calculated from its arguments
     MATCH_ARG_HASH = 1 << 2,
+
+    // Target a function by contents of argument buffer
+    MATCH_ARG_COMPARE = 1 << 3,
+
 };
 
 // The struct filled with function information for hashing.
@@ -81,13 +86,27 @@ struct fileArgHash {
 
 // The struct filled with targetting information for a function.
 typedef struct targetFunction {
-  bool selected;
-  UINT64 index;
-  UINT64 mode;
-  UINT64 retAddrOffset;
-  std::string functionName;
-  std::string argHash;
+    bool                    selected;
+    uint64_t                index;
+    uint64_t                mode;
+    uint64_t                retAddrOffset;
+    string                  functionName;
+    string                  argHash;
+    vector<uint8_t>         buffer;
 } TargetFunction;
+
+// Information for read in fuzzer and tracer clients
+struct client_read_info {
+    uint64_t    position;
+    uint64_t    retAddrOffset;
+    Function    function;
+    HANDLE      hFile;
+    LPDWORD     lpNumberOfBytesRead;
+    LPVOID      lpBuffer;
+    char*       argHash;
+    size_t      nNumberOfBytesToRead;
+};
+
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -96,12 +115,21 @@ typedef struct targetFunction {
 class SL2Client {
 
 private:
-
+    
 
 public:
     SL2Client();
 
-    bool isFunctionTargeted();
+    ////////////////////////////////////////////////////////////////////////////////////////////
+    // Variables
+    map<Function, uint64_t>     call_counts;
+    json                        parsedJson;
+
+    ////////////////////////////////////////////////////////////////////////////////////////////
+    // Methods
+    bool        isFunctionTargeted(Function function,  client_read_info* info);
+    void        loadJson(string json);
+    uint64_t    incrementCallCountForFunction(Function function);
     
 };
 
