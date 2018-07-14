@@ -788,16 +788,6 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     BOOL targeted = client.isFunctionTargeted( function, info );
     client.incrementCallCountForFunction(function);
 
-    vector<uint8_t> v;
-    targetFunction targetFunc;
-    for (targetFunction t : client.parsedJson) {
-        if(t.selected) {
-            targetFunc = t;
-        }
-    }
-    SL2_DR_DEBUG( "\t %c %c %c %c \n", targetFunc.buffer[0], targetFunc.buffer[1], targetFunc.buffer[2], targetFunc.buffer[3] );
-
-
     if (info->lpNumberOfBytesRead) {
         nNumberOfBytesToRead = *info->lpNumberOfBytesRead;
     }
