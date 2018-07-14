@@ -35,7 +35,7 @@ static SL2Client   client;
 
 static void *mutatex;
 static bool replay;
-static bool mutate_count;
+static DWORD mutate_count;
 static UUID run_id;
 
 static std::set<reg_id_t> tainted_regs;
@@ -77,8 +77,6 @@ static droption_t<std::string> op_replay(
     "",
     "replay",
     "The run id for a crash to replay.");
-
-
 
 
 /* Currently unused as this runs on 64 bit applications */
@@ -1355,7 +1353,8 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     LPVOID lpBuffer             = info->lpBuffer;
     size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
     Function function           = info->function;
-    info->retAddrOffset       = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset         = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+
 
     // Identify whether this is the function we want to target
     BOOL targeted = client.isFunctionTargeted( function, info );

@@ -52,19 +52,6 @@ static DWORD64 baseAddr;
 
 static DWORD mutateCount = 0;
 
-// // Metadata object for a target function call
-// struct client_read_info {
-//     Function function;
-//     HANDLE hFile;
-//     LPVOID lpBuffer;
-//     size_t nNumberOfBytesToRead;
-//     LPDWORD lpNumberOfBytesRead;
-//     DWORD64 position;
-//     DWORD64 retAddrOffset;
-//     // TODO(ww): Make this a WCHAR * for consistency.
-//     char *argHash;
-// };
-
 //TODO: Fix logging
 /* Tries to get a new Run ID from the fuzz server */
 UUID getRunID(HANDLE hPipe, LPCTSTR targetName, LPTSTR targetArgs)
@@ -520,6 +507,7 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
         *user_data             = malloc(sizeof(client_read_info));
         client_read_info *info = (client_read_info *) *user_data;
 
+
         info->function             = Function::RegQueryValueEx;
         info->hFile                = hKey;
         info->lpBuffer             = lpData;
@@ -969,7 +957,6 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         SL2_DR_DEBUG(msg);
         dr_abort();
     }
-
 
     // Set up console printing
     dr_log(NULL, DR_LOG_ALL, 1, "DR client 'SL Fuzzer' initializing\n");
