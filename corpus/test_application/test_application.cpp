@@ -70,6 +70,8 @@ int prep_read_file_test(LPWSTR name) {
     return 0;
 }
 
+
+
 int test_ReadFile(bool fuzzing) {
     LPWSTR name = L"test_ReadFile.txt";
     prep_read_file_test(name);
@@ -141,6 +143,25 @@ int test_ReadFile_inf_loop(bool fuzzing) {
     CloseHandle(file);
     return 0;
 }
+int readfile(LPWSTR path ) {
+    printf("Reading file %S.\n", path);
+    HANDLE file = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (file == INVALID_HANDLE_VALUE) {
+        printf("ERROR: CreateFile (%x)\n", GetLastError());
+        return 1;
+    }
+
+    BYTE buf[0x1000] = {};
+    DWORD bytes_to_read = 8;
+    DWORD bytes_read;
+    if (!ReadFile(file, buf, bytes_to_read, &bytes_read, NULL) || bytes_read != bytes_to_read) {
+        printf("ERROR: ReadFile (ms_buf) (%x)\n", GetLastError());
+        return 1;
+    }
+
+    CloseHandle(file);
+    return 0;
+}
 
 int test_fread(bool fuzzing) {
     LPWSTR name = L"test_ReadFile.txt";
@@ -169,6 +190,17 @@ int test_fread(bool fuzzing) {
     return 0;
 }
 
+int test_argCompare(bool fuzzing) {
+
+    readfile(L"test_argCompare_fail.txt");
+    readfile(L"test_argCompare_fail.txt");
+    readfile(L"test_argCompare_fail.txt");
+    readfile(L"test_argCompare_win.txt");
+    readfile(L"test_argCompare_fail.txt");
+
+    return 0;
+}
+
 int show_help(LPWSTR *argv) {
     printf("\nUSAGE: %S [TEST NUMBER] [-f]\n", argv[0]);
     printf("\nTEST NUMBERS:\n");
@@ -179,6 +211,8 @@ int show_help(LPWSTR *argv) {
     printf("\t4: test_RegQueryValueEx\n");
     printf("\t5: test_WinHttpWebSocketReceive\n");
     printf("\t6: test_fread\n");
+    printf("\t7: test_ReadFile_inf_loop\n");
+    printf("\t8: test_argCompare\n");
     printf("\nf:\n"); 
     printf("\tenable fuzzing mode\n");
     printf("\the crashing condition will be guarded by a conditional\n");
@@ -237,6 +271,11 @@ int main()
             printf("Running: test_ReadFile_inf_loop\n");
             test_ReadFile_inf_loop(fuzzing);
             break;
+        case 8:
+            printf("Running: test_argCompare\n");
+            test_argCompare(fuzzing);
+            break;
+
         default:
             show_help(argv);
             break;

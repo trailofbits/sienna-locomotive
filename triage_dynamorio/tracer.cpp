@@ -31,6 +31,8 @@ extern "C" {
 
 #include "common/sl2_dr_client.hpp"
 
+static SL2Client   client;
+
 static void *mutatex;
 static bool replay;
 static DWORD mutate_count;
@@ -58,7 +60,7 @@ static droption_t<std::string> op_target(
     "target",
     "Specific call to target.");
 
-static json parsedJson;
+
 
 /* Mostly used to debug if taint tracking is too slow */
 static droption_t<unsigned int> op_no_taint(
@@ -76,16 +78,6 @@ static droption_t<std::string> op_replay(
     "replay",
     "The run id for a crash to replay.");
 
-static std::map<Function, UINT64> call_counts;
-
-struct tracer_read_info {
-    LPVOID lpBuffer;
-    size_t nNumberOfBytesToRead;
-    Function function;
-    size_t retAddrOffset;
-    // TODO(ww) Use WCHAR * here for consistency.
-    char *argHash;
-};
 
 /* Currently unused as this runs on 64 bit applications */
 static reg_id_t reg_to_full_width32(reg_id_t reg)
@@ -1159,8 +1151,8 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
     DWORD  *pnBytesRead              = (DWORD *)drwrap_get_arg(wrapcxt, 5);
     DWORD  *pnMinNumberOfBytesNeeded = (DWORD *)drwrap_get_arg(wrapcxt, 6);
 
-    *user_data             = malloc(sizeof(tracer_read_info));
-    tracer_read_info *info = (tracer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
@@ -1181,8 +1173,8 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
     LPDWORD lpcbData    = (LPDWORD)drwrap_get_arg(wrapcxt, 5);
 
     if (lpData != NULL && lpcbData != NULL) {
-        *user_data             = malloc(sizeof(tracer_read_info));
-        tracer_read_info *info = (tracer_read_info *) *user_data;
+        *user_data             = malloc(sizeof(client_read_info));
+        client_read_info *info = (client_read_info *) *user_data;
 
         info->lpBuffer             = lpData;
         info->nNumberOfBytesToRead = *lpcbData;
@@ -1205,8 +1197,8 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
     PDWORD pdwBytesRead                         = (PDWORD)drwrap_get_arg(wrapcxt, 3);
     WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE)(int)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data             = malloc(sizeof(tracer_read_info));
-    tracer_read_info *info = (tracer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->lpBuffer = pvBuffer;
     info->nNumberOfBytesToRead = dwBufferLength;
@@ -1224,8 +1216,8 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data             = malloc(sizeof(tracer_read_info));
-    tracer_read_info *info = (tracer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
@@ -1243,8 +1235,8 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data             = malloc(sizeof(tracer_read_info));
-    tracer_read_info *info = (tracer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
@@ -1262,8 +1254,8 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data)
     int len   = (int)drwrap_get_arg(wrapcxt, 2);
     int flags = (int)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data             = malloc(sizeof(tracer_read_info));
-    tracer_read_info *info = (tracer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->lpBuffer             = buf;
     info->nNumberOfBytesToRead = len;
@@ -1296,8 +1288,8 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     std::string hash_str;
     picosha2::hash256_hex_string(blob_vec, hash_str);
 
-    *user_data             = malloc(sizeof(tracer_read_info));
-    tracer_read_info *info = (tracer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
@@ -1318,8 +1310,8 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 2);
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data             = malloc(sizeof(tracer_read_info));
-    tracer_read_info *info = (tracer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->function             = Function::fread;
     info->lpBuffer             = buffer;
@@ -1336,8 +1328,8 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data)
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 1);
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
 
-    *user_data             = malloc(sizeof(tracer_read_info));
-    tracer_read_info *info = (tracer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->function             = Function::fread;
     info->lpBuffer             = buffer;
@@ -1355,32 +1347,18 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
         return;
     }
 
-    tracer_read_info *info = (tracer_read_info *) user_data;
+    client_read_info *info = (client_read_info *) user_data;
 
     // Grab stored metadata
     LPVOID lpBuffer             = info->lpBuffer;
     size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
     Function function           = info->function;
-    size_t retAddrOffset       = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset         = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+
 
     // Identify whether this is the function we want to target
-    BOOL targeted = false;
-    std::string strFunctionName(get_function_name(function));
-    for (targetFunction t : parsedJson){
-        if (t.selected && t.functionName == strFunctionName) {
-            if (t.mode & MATCH_INDEX && call_counts[function] == t.index) {
-              targeted = true;
-            }
-            else if (t.mode & MATCH_RETN_ADDRESS && t.retAddrOffset == retAddrOffset) {
-              targeted = true;
-            }
-            else if (t.mode & MATCH_ARG_HASH && !strcmp(t.argHash.c_str(), info->argHash)) {
-                targeted = true;
-            }
-        }
-    }
-
-    call_counts[function]++;
+    BOOL targeted = client.isFunctionTargeted( function, info );
+    client.incrementCallCountForFunction(function);
 
     // Mark the targeted memory as tainted
     if (targeted) {
@@ -1479,7 +1457,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
 
         // Look for function matching the target specified on the command line
         std::string strFunctionName(functionName);
-        for (targetFunction t : parsedJson) {
+        for (targetFunction t : client.parsedJson) {
           if (t.selected && t.functionName == strFunctionName) {
             hook = true;
           }
@@ -1587,6 +1565,8 @@ void tracer(client_id_t id, int argc, const char *argv[])
 DR_EXPORT void
 dr_client_main(client_id_t id, int argc, const char *argv[])
 {
+
+    
     // parse client options
     std::string parse_err;
     int last_idx = 0;
@@ -1602,11 +1582,10 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_abort();
     }
 
-    std::ifstream jsonStream(target); // TODO ifstream can sometimes cause performance issues
-    jsonStream >> parsedJson;
-
-    if (!parsedJson.is_array()){
-        SL2_DR_DEBUG("tracer#main: ERROR: Document root is not an array\n");
+    try {
+        client.loadJson(target);
+    } catch (const char* msg) {
+        SL2_DR_DEBUG(msg);
         dr_abort();
     }
 

@@ -44,26 +44,13 @@ static droption_t<std::string> op_target(
     "targetfile",
     "JSON file in which to look for targets");
 
-static json parsedJson;
+static SL2Client   client;
+
 static UUID runId;
 static BOOL crashed = false;
-static std::map<Function, UINT64> call_counts;
 static DWORD64 baseAddr;
 
 static DWORD mutateCount = 0;
-
-// Metadata object for a target function call
-struct fuzzer_read_info {
-    Function function;
-    HANDLE hFile;
-    LPVOID lpBuffer;
-    size_t nNumberOfBytesToRead;
-    LPDWORD lpNumberOfBytesRead;
-    DWORD64 position;
-    DWORD64 retAddrOffset;
-    // TODO(ww): Make this a WCHAR * for consistency.
-    char *argHash;
-};
 
 //TODO: Fix logging
 /* Tries to get a new Run ID from the fuzz server */
@@ -479,8 +466,8 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
     DWORD  *pnBytesRead = (DWORD *)drwrap_get_arg(wrapcxt, 5);
     DWORD  *pnMinNumberOfBytesNeeded = (DWORD *)drwrap_get_arg(wrapcxt, 6);
 
-    *user_data             = malloc(sizeof(fuzzer_read_info));
-    fuzzer_read_info *info = (fuzzer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->function             = Function::ReadEventLog;
     info->hFile                = hEventLog;
@@ -517,8 +504,9 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
     LPDWORD lpcbData = (LPDWORD)drwrap_get_arg(wrapcxt, 5);
 
     if (lpData != NULL && lpcbData != NULL) {
-        *user_data             = malloc(sizeof(fuzzer_read_info));
-        fuzzer_read_info *info = (fuzzer_read_info *) *user_data;
+        *user_data             = malloc(sizeof(client_read_info));
+        client_read_info *info = (client_read_info *) *user_data;
+
 
         info->function             = Function::RegQueryValueEx;
         info->hFile                = hKey;
@@ -560,8 +548,8 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
     // DWORD positionLow = InternetSetFilePointer(hRequest, 0, &positionHigh, FILE_CURRENT);
     // DWORD64 position = positionHigh;
 
-    *user_data             = malloc(sizeof(fuzzer_read_info));
-    fuzzer_read_info *info = (fuzzer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->function             = Function::WinHttpWebSocketReceive;
     info->hFile                = hRequest;
@@ -596,8 +584,8 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
     // DWORD positionLow = InternetSetFilePointer(hFile, 0, &positionHigh, FILE_CURRENT);
     // DWORD64 position = positionHigh;
 
-    *user_data             = malloc(sizeof(fuzzer_read_info));
-    fuzzer_read_info *info = (fuzzer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->function             = Function::InternetReadFile;
     info->hFile                = hFile;
@@ -632,8 +620,8 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
     // DWORD positionLow = InternetSetFilePointer(hRequest, 0, &positionHigh, FILE_CURRENT);
     // DWORD64 position = positionHigh;
 
-    *user_data             = malloc(sizeof(fuzzer_read_info));
-    fuzzer_read_info *info = (fuzzer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->function             = Function::WinHttpReadData;
     info->hFile                = hRequest;
@@ -665,8 +653,8 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data)
     int len   = (int)drwrap_get_arg(wrapcxt, 2);
     int flags = (int)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data             = malloc(sizeof(fuzzer_read_info));
-    fuzzer_read_info *info = (fuzzer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->function             = Function::recv;
     info->hFile                = NULL;
@@ -713,8 +701,8 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     std::string hash_str;
     picosha2::hash256_hex_string(blob_vec, hash_str);
 
-    *user_data             = malloc(sizeof(fuzzer_read_info));
-    fuzzer_read_info *info = (fuzzer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->function             = Function::ReadFile;
     info->hFile                = hFile;
@@ -739,8 +727,8 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 3);
     FILE *file   = (FILE *)drwrap_get_arg(wrapcxt, 4);
 
-    *user_data             = malloc(sizeof(fuzzer_read_info));
-    fuzzer_read_info *info = (fuzzer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->function             = Function::fread_s;
     // TODO(ww): Figure out why _get_osfhandle breaks DR.
@@ -763,8 +751,8 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data)
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
     FILE *file   = (FILE *)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data             = malloc(sizeof(fuzzer_read_info));
-    fuzzer_read_info *info = (fuzzer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->function             = Function::fread;
     // TODO(ww): Figure out why _get_osfhandle breaks DR.
@@ -783,46 +771,40 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data)
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data)
 {
+
+    SL2_DR_DEBUG("<in wrap_post_Generic>\n");
     if (user_data == NULL) {
         return;
     }
 
-    fuzzer_read_info *info = ((fuzzer_read_info *) user_data);
+    client_read_info *info = (client_read_info *) user_data;
 
-    // Record the metadata about this function call
+    // Grab stored metadata
+    size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
     Function function           = info->function;
-    HANDLE hFile                = info->hFile;
-    LPVOID lpBuffer             = info->lpBuffer;
-    size_t nNumberOfBytesToRead  = info->nNumberOfBytesToRead;
-    LPDWORD lpNumberOfBytesRead = info->lpNumberOfBytesRead;
-    DWORD64 position            = info->position;
-    DWORD64 retAddrOffset       = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset       = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
-    BOOL targeted = false;
-    std::string strFunctionName(get_function_name(function));
-    for (targetFunction t : parsedJson){
-        if (t.selected && t.functionName == strFunctionName) {
-            if (t.mode & MATCH_INDEX && call_counts[function] == t.index){
-              targeted = true;
-            }
-            else if (t.mode & MATCH_RETN_ADDRESS && t.retAddrOffset == retAddrOffset) {
-              targeted = true;
-            }
-            else if (t.mode & MATCH_ARG_HASH && !strcmp(t.argHash.c_str(), info->argHash)) {
-                targeted = true;
-            }
+    // Identify whether this is the function we want to target
+    BOOL targeted = client.isFunctionTargeted( function, info );
+    client.incrementCallCountForFunction(function);
+
+    vector<uint8_t> v;
+    targetFunction targetFunc;
+    for (targetFunction t : client.parsedJson) {
+        if(t.selected) {
+            targetFunc = t;
         }
     }
+    SL2_DR_DEBUG( "\t %c %c %c %c \n", targetFunc.buffer[0], targetFunc.buffer[1], targetFunc.buffer[2], targetFunc.buffer[3] );
 
-    call_counts[function]++; // increment the call counter
 
-    if (lpNumberOfBytesRead) {
-        nNumberOfBytesToRead = *lpNumberOfBytesRead;
+    if (info->lpNumberOfBytesRead) {
+        nNumberOfBytesToRead = *info->lpNumberOfBytesRead;
     }
 
     // Talk to the server and mutate the bytes
     if (targeted) {
-        if (!mutate(function, hFile, position, lpBuffer, nNumberOfBytesToRead)) {
+        if (!mutate(function, info->hFile, info->position, info->lpBuffer, nNumberOfBytesToRead)) {
             // TODO: fallback mutations?
             exit(1);
         }
@@ -879,7 +861,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         // Look for function matching the target specified on the command line
         std::string strFunctionName(functionName);
 
-        for (targetFunction t : parsedJson) {
+        for (targetFunction t : client.parsedJson) {
             if (t.selected && t.functionName == strFunctionName){
                 hook = true;
             }
@@ -969,10 +951,12 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_abort();
     }
 
-    std::ifstream jsonStream(target); // TODO ifstream can sometimes cause performance issues
-    jsonStream >> parsedJson;
-    if (!parsedJson.is_array())
-      SL2_DR_DEBUG("Document root is not an array\n");
+    try {
+        client.loadJson(target);
+    } catch (const char* msg) {
+        SL2_DR_DEBUG(msg);
+        dr_abort();
+    }
 
     // Set up console printing
     dr_log(NULL, DR_LOG_ALL, 1, "DR client 'SL Fuzzer' initializing\n");

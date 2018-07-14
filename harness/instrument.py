@@ -28,6 +28,7 @@ class Mode(IntEnum):
     MATCH_INDEX = 1 << 0
     MATCH_RETN_ADDRESS = 1 << 1
     MATCH_ARG_HASH = 1 << 2
+    MATCH_ARG_COMPARE = 1 << 3
 
 
 def print_l(*args):
