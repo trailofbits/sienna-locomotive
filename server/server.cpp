@@ -36,7 +36,7 @@ static wchar_t FUZZ_LOG[MAX_PATH] = L"";
 
 
 // Called on process termination (by atexit).
-static VOID server_cleanup()
+static void server_cleanup()
 {
     LOG_F(INFO, "server_cleanup: Called, cleaning things up");
 
@@ -50,7 +50,7 @@ static VOID server_cleanup()
 // Initialize the global variable (FUZZ_LOG) containing the path to the logging file.
 // NOTE(ww): We separate this from initWorkingDir so that we can log any errors that
 // happen to occur in initWorkingDir.
-VOID initLoggingFile() {
+void initLoggingFile() {
     wchar_t *roamingPath;
     SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roamingPath);
 
@@ -65,7 +65,7 @@ VOID initLoggingFile() {
 // Initialize the global variables containins the paths to the working directory,
 // as well as the subdirectories and files we expect individual runs to produce.
 // NOTE(ww): This should be kept up-to-date with fuzzer_config.py.
-VOID initWorkingDir() {
+void initWorkingDir() {
     wchar_t *roamingPath;
     SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roamingPath);
     wchar_t workingLocalPath[MAX_PATH] = L"Trail of Bits\\fuzzkit\\working";
@@ -203,12 +203,12 @@ DWORD getRand()
     return random;
 }
 
-VOID strategyAAAA(BYTE *buf, size_t size)
+void strategyAAAA(BYTE *buf, size_t size)
 {
     memset(buf, 'A', size);
 }
 
-VOID strategyFlipBit(BYTE *buf, size_t size)
+void strategyFlipBit(BYTE *buf, size_t size)
 {
     std::random_device rd;
     srand(rd());
@@ -220,7 +220,7 @@ VOID strategyFlipBit(BYTE *buf, size_t size)
     buf[pos] = byte ^ mask;
 }
 
-VOID strategyRepeatBytes(BYTE *buf, size_t size)
+void strategyRepeatBytes(BYTE *buf, size_t size)
 {
     std::random_device rd;
     srand(rd());
@@ -248,7 +248,7 @@ VOID strategyRepeatBytes(BYTE *buf, size_t size)
     }
 }
 
-VOID strategyRepeatBytesBackward(BYTE *buf, size_t size)
+void strategyRepeatBytesBackward(BYTE *buf, size_t size)
 {
     std::random_device rd;
     srand(rd());
@@ -259,7 +259,7 @@ VOID strategyRepeatBytesBackward(BYTE *buf, size_t size)
     std::reverse(buf + start, buf + end);
 }
 
-VOID strategyDeleteBytes(BYTE *buf, size_t size)
+void strategyDeleteBytes(BYTE *buf, size_t size)
 {
     std::random_device rd;
     srand(rd());
@@ -283,7 +283,7 @@ VOID strategyDeleteBytes(BYTE *buf, size_t size)
     }
 }
 
-VOID strategyRandValues(BYTE *buf, size_t size)
+void strategyRandValues(BYTE *buf, size_t size)
 {
     std::random_device rd;
     srand(rd());
@@ -314,7 +314,7 @@ VOID strategyRandValues(BYTE *buf, size_t size)
 #define VALUES4 -2147483648, -100663046, -32769, 32768, 65536, 100663045, 2147483647, 4294967295
 #define VALUES8  -9151314442816848000, -2147483649, 2147483648, 4294967296, 432345564227567365, 18446744073709551615
 
-VOID strategyKnownValues(BYTE *buf, size_t size)
+void strategyKnownValues(BYTE *buf, size_t size)
 {
     INT8 values1[] = { VALUES1 };
     INT16 values2[] = { VALUES1, VALUES2 };
@@ -346,22 +346,22 @@ VOID strategyKnownValues(BYTE *buf, size_t size)
             selection = getRand() % (sizeof(values1) / sizeof(values1[0]));
             // nibble endianness, because sim cards
             values1[selection] = endian ? values1[selection] >> 4 | values1[selection] << 4 : values1[selection];
-            *(UINT8 *)(buf+pos) = values1[selection];
+            *(uint8_t *)(buf+pos) = values1[selection];
             break;
         case 2:
             selection = getRand() % (sizeof(values2) / sizeof(values2[0]));
             values2[selection] = endian ? _byteswap_ushort(values2[selection]) : values2[selection];
-            *(UINT16 *)(buf+pos) = values2[selection];
+            *(uint16_t *)(buf+pos) = values2[selection];
             break;
         case 4:
             selection = getRand() % (sizeof(values4) / sizeof(values4[0]));
             values4[selection] = endian ? _byteswap_ulong(values4[selection]) : values4[selection];
-            *(UINT32 *)(buf+pos) = values4[selection];
+            *(uint32_t *)(buf+pos) = values4[selection];
             break;
         case 8:
             selection = getRand() % (sizeof(values8) / sizeof(values8[0]));
             values8[selection] = endian ? _byteswap_uint64(values8[selection]) : values8[selection];
-            *(UINT64 *)(buf+pos) = values8[selection];
+            *(uint64_t *)(buf+pos) = values8[selection];
             break;
         default:
             strategyAAAA(buf, size);
@@ -369,7 +369,7 @@ VOID strategyKnownValues(BYTE *buf, size_t size)
     }
 }
 
-VOID strategyAddSubKnownValues(BYTE *buf, size_t size)
+void strategyAddSubKnownValues(BYTE *buf, size_t size)
 {
     INT8 values1[] = { VALUES1 };
     INT16 values2[] = { VALUES1, VALUES2 };
@@ -405,22 +405,22 @@ VOID strategyAddSubKnownValues(BYTE *buf, size_t size)
             selection = getRand() % (sizeof(values1) / sizeof(values1[0]));
             // nibble endianness, because sim cards
             values1[selection] = endian ? values1[selection] >> 4 | values1[selection] << 4 : values1[selection];
-            *(UINT8 *)(buf+pos) += sub * values1[selection];
+            *(uint8_t *)(buf+pos) += sub * values1[selection];
             break;
         case 2:
             selection = getRand() % (sizeof(values2) / sizeof(values2[0]));
             values2[selection] = endian ? _byteswap_ushort(values2[selection]) : values2[selection];
-            *(UINT16 *)(buf+pos) += sub * values2[selection];
+            *(uint16_t *)(buf+pos) += sub * values2[selection];
             break;
         case 4:
             selection = getRand() % (sizeof(values4) / sizeof(values4[0]));
             values4[selection] = endian ? _byteswap_ulong(values4[selection]) : values4[selection];
-            *(UINT32 *)(buf+pos) += sub * values4[selection];
+            *(uint32_t *)(buf+pos) += sub * values4[selection];
             break;
         case 8:
             selection = getRand() % (sizeof(values8) / sizeof(values8[0]));
             values8[selection] = endian ? _byteswap_uint64(values8[selection]) : values8[selection];
-            *(UINT64 *)(buf+pos) += sub * values8[selection];
+            *(uint64_t *)(buf+pos) += sub * values8[selection];
             break;
         default:
             strategyAAAA(buf, size);
@@ -428,7 +428,7 @@ VOID strategyAddSubKnownValues(BYTE *buf, size_t size)
     }
 }
 
-VOID strategyEndianSwap(BYTE *buf, size_t size)
+void strategyEndianSwap(BYTE *buf, size_t size)
 {
     std::random_device rd;
     srand(rd());
@@ -450,16 +450,16 @@ VOID strategyEndianSwap(BYTE *buf, size_t size)
     switch (rand_size) {
         case 1:
             // nibble endianness, because sim cards
-            *(UINT8 *)(buf+pos) = *(UINT8 *)(buf+pos) >> 4 | *(UINT8 *)(buf+pos) << 4;
+            *(uint8_t *)(buf+pos) = *(uint8_t *)(buf+pos) >> 4 | *(uint8_t *)(buf+pos) << 4;
             break;
         case 2:
-            *(UINT16 *)(buf+pos) = _byteswap_ushort(*(UINT16 *)(buf+pos));
+            *(uint16_t *)(buf+pos) = _byteswap_ushort(*(uint16_t *)(buf+pos));
             break;
         case 4:
-            *(UINT32 *)(buf+pos) = _byteswap_ulong(*(UINT32 *)(buf+pos));
+            *(uint32_t *)(buf+pos) = _byteswap_ulong(*(uint32_t *)(buf+pos));
             break;
         case 8:
-            *(UINT64 *)(buf+pos) = _byteswap_uint64(*(UINT64 *)(buf+pos));
+            *(uint64_t *)(buf+pos) = _byteswap_uint64(*(uint64_t *)(buf+pos));
             break;
         default:
             strategyAAAA(buf, size);
@@ -1009,7 +1009,7 @@ DWORD handleCrashPath(HANDLE hPipe)
 }
 
 /* Handles incoming connections from clients */
-DWORD WINAPI threadHandler(LPVOID lpvPipe)
+DWORD WINAPI threadHandler(void *lpvPipe)
 {
     HANDLE hPipe = (HANDLE)lpvPipe;
 
@@ -1150,7 +1150,7 @@ int main(int mArgc, char **mArgv)
                 NULL,
                 0,
                 threadHandler,
-                (LPVOID)hPipe,
+                (void*)hPipe,
                 0,
                 &threadID);
 
