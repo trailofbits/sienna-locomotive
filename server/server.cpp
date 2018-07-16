@@ -655,7 +655,7 @@ DWORD handleMutation(HANDLE hPipe)
         exit(1);
     }
 
-    BYTE* buf = (BYTE*)HeapAlloc(hHeap, 0, size * sizeof(BYTE));
+    BYTE *buf = (BYTE*)HeapAlloc(hHeap, 0, size * sizeof(BYTE));
 
     if (buf == NULL) {
         LOG_F(ERROR, "handleMutation: failed to allocate mutation buffer (0x%x)", GetLastError());
@@ -1016,7 +1016,7 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe)
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
 
-    BYTE eventId = 255;
+    BYTE eventId = EVT_INVALID;
 
     // NOTE(ww): This is a second event loop, inside of the infinite event loop that
     // creates each thread and calls threadHandler. We do this so that clients can

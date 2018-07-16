@@ -36,6 +36,7 @@ enum Event {
     EVT_SESSION_TEARDOWN,   // 6
     // TODO(ww): Allow the user to shut the server down via an event.
     // EVT_SHUTDOWN,           // 7
+    EVT_INVALID = 255,
 };
 
 #endif
