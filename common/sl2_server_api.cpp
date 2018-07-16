@@ -146,9 +146,32 @@ __declspec(dllexport) SL2Response sl2_client_request_mutation(
 __declspec(dllexport) SL2Response sl2_client_request_replay(
     sl2_client *client,
     DWORD mutation_count,
-    void *buf,
-    size_t size)
+    size_t bufsize,
+    void *buffer)
 {
+    BYTE event = EVT_REPLAY;
+    DWORD txsize;
+
+    // If the client doesn't have a run ID, then we don't know which
+    // replay to request.
+    if (!client->has_run_id) {
+        return SL2Response::MissingRunID;
+    }
+
+    // First, tell the server that we're requesting a replay.
+    WriteFile(client->pipe, &event, sizeof(event), &txsize, NULL);
+
+    // Then, tell the server which run we're requesting the replay for.
+    WriteFile(client->pipe, &(client->run_id), sizeof(client->run_id), &txsize, NULL);
+
+    // Then, tell the server which mutation we're expecting from that run.
+    WriteFile(client->pipe, &mutation_count, sizeof(mutation_count), &txsize, NULL);
+
+    // Finally, tell the server how many bytes we expect to receive and
+    // receive those bytes into the buffer.
+    WriteFile(client->pipe, &bufsize, sizeof(bufsize), &txsize, NULL);
+    ReadFile(client->pipe, &buffer, bufsize, &txsize, NULL);
+
     return SL2Response::OK;
 }
 
@@ -156,11 +179,49 @@ __declspec(dllexport) SL2Response sl2_client_request_run_info(
     sl2_client *client,
     sl2_run_info *info)
 {
+    BYTE event = EVT_RUN_INFO;
+    DWORD txsize;
+
+    if (!client->has_run_id) {
+        return SL2Response::MissingRunID;
+    }
+
+    // First, tell the server that we're requesting information about a run.
+    WriteFile(client->pipe, &event, sizeof(event), &txsize, NULL);
+
+    // Then, tell the server which run we want information for.
+    WriteFile(client->pipe, &(client->run_id), sizeof(client->run_id), &txsize, NULL);
+
+    // Then, read the length-prefixed program pathname and argument list.
+    // NOTE(ww): The server sends us the length of the buffer, not the length of
+    // the widechar string (which would be half of the buffer's size).
+    DWORD len;
+
+    ReadFile(client->pipe, &len, sizeof(len), &txsize, NULL);
+    info->program = (wchar_t *) malloc(len + 1);
+    memset(info->program, 0, len + 1);
+
+    ReadFile(client->pipe, info->program, len, &txsize, NULL);
+
+    ReadFile(client->pipe, &len, sizeof(len), &txsize, NULL);
+    info->arguments = (wchar_t *) malloc(len + 1);
+    memset(info->arguments, 0, len + 1);
+
+    ReadFile(client->pipe, info->arguments, len, &txsize, NULL);
+
     return SL2Response::OK;
 }
 
 __declspec(dllexport) SL2Response sl2_client_destroy_run_info(sl2_run_info *info)
 {
+    if (info->program) {
+        free(info->program);
+    }
+
+    if (info->arguments) {
+        free(info->arguments);
+    }
+
     return SL2Response::OK;
 }
 
@@ -197,6 +258,32 @@ __declspec(dllexport) SL2Response sl2_client_request_crash_path(
     sl2_client *client,
     wchar_t **crash_path)
 {
+    BYTE event = EVT_CRASH_PATH;
+    DWORD txsize;
+
+    // If the client doesn't have a run ID, then we don't know which crash path to
+    // request.
+    if (!client->has_run_id) {
+        return SL2Response::MissingRunID;
+    }
+
+    // First, tell the server that we're requesting a crash path.
+    WriteFile(client->pipe, &event, sizeof(event), &txsize, NULL);
+
+    // Then, tell the server which run we want the crash path for.
+    WriteFile(client->pipe, &(client->run_id), sizeof(client->run_id), &txsize, NULL);
+
+    // Finally, read the length-prefixed crash path from the server.
+    // NOTE(ww): Like EVT_RUN_INFO, the lengths here are buffer lengths,
+    // not string lengths.
+    DWORD len;
+
+    ReadFile(client->pipe, &len, sizeof(len), &txsize, NULL);
+    *crash_path = (wchar_t *) malloc(len + 1);
+    memset(*crash_path, 0, len + 1);
+
+    ReadFile(client->pipe, *crash_path, len, &txsize, NULL);
+
     return SL2Response::OK;
 }
 
