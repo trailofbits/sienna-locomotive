@@ -1,7 +1,7 @@
 import sys
 
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtCore import Qt, QSize, QThread, pyqtSignal
 from PyQt5.QtGui import QFontDatabase
 
 from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem
@@ -9,6 +9,19 @@ from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem
 from harness import config
 from harness.state import get_target
 from harness.instrument import wizard_run
+
+
+class WizardThread(QThread):
+    resultReady = pyqtSignal(list)
+
+    def __init__(self):
+        QThread.__init__(self)
+
+    def __del__(self):
+        self.wait()
+
+    def run(self):
+        self.resultReady.emit(wizard_run(config.config))
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -28,7 +41,9 @@ class MainWindow(QtWidgets.QMainWindow):
         _central_widget.setLayout(self._layout)
 
         self.wizard_run = QtWidgets.QPushButton("Run Wizard")
-        self.wizard_run.clicked.connect(self.run_wizard)
+        self.wizard_thread = WizardThread()
+        self.wizard_thread.resultReady.connect(self.wizard_finished)
+        self.wizard_run.clicked.connect(self.wizard_thread.start)
         self._layout.addWidget(self.wizard_run)
 
         self.target_data = get_target(config.config)
@@ -39,6 +54,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.build_func_tree()
 
         self.fuzzer_run = QtWidgets.QPushButton("Fuzz selected targets")
+        # self.fuzzer_run.clicked.connect(self.run_fuzzer_and_triage)
         self._layout.addWidget(self.fuzzer_run)
 
         self._stateDisplay = QtWidgets.QTextBrowser()
@@ -68,9 +84,8 @@ class MainWindow(QtWidgets.QMainWindow):
     def changed(self, widget, _column, is_checked):
         self.target_data.update(widget.index, selected=is_checked)
 
-    def run_wizard(self):
-        self.target_data.set_target_list(wizard_run(config.config))
-
+    def wizard_finished(self, wizard_output):
+        self.target_data.set_target_list(wizard_output)
         self.build_func_tree()
 
     def get_config(self):
