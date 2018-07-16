@@ -209,10 +209,6 @@ mutate(Function function, HANDLE hFile, size_t position, LPVOID buf, size_t size
         SL2_DR_DEBUG("mutate: filePath: %S", filePath);
     }
 
-    DWORD bytesRead = 0;
-    DWORD bytesWritten = 0;
-
-    BYTE eventId = EVT_MUTATION;
     DWORD type = static_cast<DWORD>(function);
 
     sl2_client_request_mutation(&client, type, mutateCount, filePath, position, size, buf);
