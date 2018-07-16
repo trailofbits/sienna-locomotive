@@ -1,27 +1,15 @@
 import sys
 
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt, QSize, QThread, pyqtSignal
+from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QFontDatabase
 
 from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem
 
 from harness import config
 from harness.state import get_target
-from harness.instrument import wizard_run
+from harness.threads import WizardThread
 
-
-class WizardThread(QThread):
-    resultReady = pyqtSignal(list)
-
-    def __init__(self):
-        QThread.__init__(self)
-
-    def __del__(self):
-        self.wait()
-
-    def run(self):
-        self.resultReady.emit(wizard_run(config.config))
 
 
 class MainWindow(QtWidgets.QMainWindow):
