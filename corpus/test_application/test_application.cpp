@@ -201,6 +201,14 @@ int test_argCompare(bool fuzzing) {
     return 0;
 }
 
+int test_captureStdout(bool fuzzing) {
+    readfile(L"test_argCompare_fail.txt");
+
+    printf("XXXWWWXXX\n");
+    return 0;
+
+}
+
 int show_help(LPWSTR *argv) {
     printf("\nUSAGE: %S [TEST NUMBER] [-f]\n", argv[0]);
     printf("\nTEST NUMBERS:\n");
@@ -213,6 +221,7 @@ int show_help(LPWSTR *argv) {
     printf("\t6: test_fread\n");
     printf("\t7: test_ReadFile_inf_loop\n");
     printf("\t8: test_argCompare\n");
+    printf("\t9: test_captureStdout\n");
     printf("\nf:\n"); 
     printf("\tenable fuzzing mode\n");
     printf("\the crashing condition will be guarded by a conditional\n");
@@ -275,6 +284,11 @@ int main()
             printf("Running: test_argCompare\n");
             test_argCompare(fuzzing);
             break;
+        case 9:
+            printf("Running: test_captureStdout\n");
+            test_captureStdout(fuzzing);
+            break;
+
 
         default:
             show_help(argv);
