@@ -145,7 +145,7 @@ __declspec(dllexport) SL2Response sl2_client_request_mutation(
 
 __declspec(dllexport) SL2Response sl2_client_request_replay(
     sl2_client *client,
-    DWORD mutation_count,
+    DWORD mut_count,
     size_t bufsize,
     void *buffer)
 {
@@ -165,7 +165,7 @@ __declspec(dllexport) SL2Response sl2_client_request_replay(
     WriteFile(client->pipe, &(client->run_id), sizeof(client->run_id), &txsize, NULL);
 
     // Then, tell the server which mutation we're expecting from that run.
-    WriteFile(client->pipe, &mutation_count, sizeof(mutation_count), &txsize, NULL);
+    WriteFile(client->pipe, &mut_count, sizeof(mut_count), &txsize, NULL);
 
     // Finally, tell the server how many bytes we expect to receive and
     // receive those bytes into the buffer.
