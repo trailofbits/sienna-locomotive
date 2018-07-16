@@ -16,8 +16,8 @@
 
 #include <picosha2.h>
 
-#include "sl2_server_api.hpp"
-#include "sl2_dr_client.hpp"
+#include "common/sl2_server_api.hpp"
+#include "common/sl2_dr_client.hpp"
 
 #ifdef WINDOWS
 #define IF_WINDOWS_ELSE(x,y) x
