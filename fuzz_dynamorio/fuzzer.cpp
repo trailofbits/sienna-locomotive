@@ -45,7 +45,6 @@ static droption_t<std::string> op_target(
 
 static SL2Client   client;
 static sl2_client server_client;
-static json parsedJson;
 static BOOL crashed = false;
 static DWORD64 baseAddr;
 static DWORD mutateCount = 0;
@@ -175,15 +174,15 @@ event_exit(void)
     SL2_DR_DEBUG("Dynamorio exiting (fuzzer)\n");
 
     WCHAR run_id_s[SL2_UUID_SIZE];
-    sl2_uuid_to_wstring(client.run_id, run_id_s);
+    sl2_uuid_to_wstring(server_client.run_id, run_id_s);
 
     if (crashed) {
         SL2_DR_DEBUG("<crash found for run id %S>\n", run_id_s);
         dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#event_exit: Crash found for run id %S!", run_id_s);
     }
 
-    sl2_client_finalize_run(&client, crashed, false);
-    sl2_client_close(&client);
+    sl2_client_finalize_run(&server_client, crashed, false);
+    sl2_client_close(&server_client);
 
     // Clean up DynamoRIO
     dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#event_exit: Dynamorio Exiting\n");
@@ -211,7 +210,7 @@ mutate(Function function, HANDLE hFile, size_t position, LPVOID buf, size_t size
 
     DWORD type = static_cast<DWORD>(function);
 
-    sl2_client_request_mutation(&client, type, mutateCount, filePath, position, size, buf);
+    sl2_client_request_mutation(&server_client, type, mutateCount, filePath, position, size, buf);
 
     mutateCount++;
 
@@ -822,11 +821,11 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     WCHAR wcsAppName[MAX_PATH];
     mbstowcs(wcsAppName, mbsAppName, MAX_PATH);
 
-    sl2_client_open(&client);
-    sl2_client_request_run_id(&client, wcsAppName, get_target_command_line());
+    sl2_client_open(&server_client);
+    sl2_client_request_run_id(&server_client, wcsAppName, get_target_command_line());
 
     WCHAR run_id_s[SL2_UUID_SIZE];
-    sl2_uuid_to_wstring(client.run_id, run_id_s);
+    sl2_uuid_to_wstring(server_client.run_id, run_id_s);
     // Initialize DynamoRIO and register callbacks
     SL2_DR_DEBUG("Beginning fuzzing run %S\n\n", run_id_s);
     drmgr_init();
