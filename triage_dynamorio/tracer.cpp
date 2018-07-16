@@ -29,14 +29,14 @@ extern "C" {
 
 #include "server.hpp"
 
+#include "common/sl2_server_api.hpp"
 #include "common/sl2_dr_client.hpp"
 
 static SL2Client   client;
-
+static sl2_client server_client;
 static void *mutatex;
 static bool replay;
 static DWORD mutate_count;
-static UUID run_id;
 
 static std::set<reg_id_t> tainted_regs;
 static std::set<app_pc> tainted_mems;
@@ -689,7 +689,7 @@ event_thread_exit(void *drcontext)
 
 /* Clean up registered callbacks before exiting */
 static void
-event_exit_trace(void)
+event_exit(void)
 {
     if (!op_no_taint.get_value()) {
         if (!drmgr_unregister_bb_insertion_event(event_app_instruction)) {
@@ -703,6 +703,8 @@ event_exit_trace(void)
     {
         DR_ASSERT(false);
     }
+
+    sl2_client_close(&server_client);
 
     drmgr_exit();
 }
@@ -927,48 +929,23 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
 {
     std::string crash_json = dump_json(drcontext, score, reason, excpt, disassembly);
 
-    WCHAR targetFile[MAX_PATH + 1] = { 0 };
-    ZeroMemory(targetFile, sizeof(WCHAR) * (MAX_PATH + 1));
-
     if (replay) {
-        HANDLE h_pipe = CreateFile(
-            FUZZ_SERVER_PATH,
-            GENERIC_READ | GENERIC_WRITE,
-            0,
-            NULL,
-            OPEN_EXISTING,
-            0,
-            NULL);
+        wchar_t *crash_path;
+        sl2_client_request_crash_path(&server_client, &crash_path);
 
-        if (h_pipe != INVALID_HANDLE_VALUE) {
-            DWORD read_mode = PIPE_READMODE_MESSAGE;
-            SetNamedPipeHandleState(
-                h_pipe,
-                &read_mode,
-                NULL,
-                NULL);
-
-            DWORD bytes_read = 0;
-            DWORD bytes_written = 0;
-
-            BYTE event_id = EVT_CRASH_PATH;
-
-            WriteFile(h_pipe, &event_id, sizeof(BYTE), &bytes_written, NULL);
-            TransactNamedPipe(h_pipe, &run_id, sizeof(UUID), targetFile, MAX_PATH + 1, &bytes_read, NULL);
-            CloseHandle(h_pipe);
-
-            HANDLE hCrashFile = CreateFile(targetFile, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-            if (hCrashFile == INVALID_HANDLE_VALUE) {
-                SL2_DR_DEBUG("tracer#dump_crash: could not open the crash file (%x)", GetLastError());
-                exit(1);
-            }
-
-            DWORD bytesWritten;
-            if (!WriteFile(hCrashFile, crash_json.c_str(), crash_json.length(), &bytesWritten, NULL)) {
-                SL2_DR_DEBUG("tracer#dump_crash: could not write to the crash file (%x)", GetLastError());
-                exit(1);
-            }
+        HANDLE hCrashFile = CreateFile(crash_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hCrashFile == INVALID_HANDLE_VALUE) {
+            SL2_DR_DEBUG("tracer#dump_crash: could not open the crash file (%x)", GetLastError());
+            exit(1);
         }
+
+        DWORD bytesWritten;
+        if (!WriteFile(hCrashFile, crash_json.c_str(), crash_json.length(), &bytesWritten, NULL)) {
+            SL2_DR_DEBUG("tracer#dump_crash: could not write to the crash file (%x)", GetLastError());
+            exit(1);
+        }
+
+        free(crash_path);
     }
 
     dr_exit_process(1);
@@ -1368,39 +1345,11 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     // Talk to the server, get the stored mutation from the fuzzing run, and write it into memory.
     if (replay && targeted) {
         dr_mutex_lock(mutatex);
-        // Open handle to server
-        HANDLE h_pipe = CreateFile(
-            FUZZ_SERVER_PATH,
-            GENERIC_READ | GENERIC_WRITE,
-            0,
-            NULL,
-            OPEN_EXISTING,
-            0,
-            NULL);
 
-        if (h_pipe != INVALID_HANDLE_VALUE) {
-            DWORD read_mode = PIPE_READMODE_MESSAGE;
-            SetNamedPipeHandleState(
-                h_pipe,
-                &read_mode,
-                NULL,
-                NULL);
+        sl2_client_request_replay(&server_client, mutate_count, nNumberOfBytesToRead, lpBuffer);
+        mutate_count++;
 
-            DWORD bytes_read = 0;
-            DWORD bytes_written = 0;
-
-            BYTE event_id = EVT_REPLAY;
-
-            // Send the run ID and request the mutation
-            WriteFile(h_pipe, &event_id, sizeof(BYTE), &bytes_written, NULL);
-            WriteFile(h_pipe, &run_id, sizeof(UUID), &bytes_written, NULL);
-            WriteFile(h_pipe, &mutate_count, sizeof(DWORD), &bytes_written, NULL);
-            // Overwrite bytes with old mutation
-            TransactNamedPipe(h_pipe, &nNumberOfBytesToRead, sizeof(size_t), lpBuffer, (DWORD)nNumberOfBytesToRead, &bytes_read, NULL);
-            mutate_count++;
-            CloseHandle(h_pipe);
-            dr_mutex_unlock(mutatex);
-        }
+        dr_mutex_unlock(mutatex);
     }
 
     if (info->argHash) {
@@ -1529,15 +1478,17 @@ void tracer(client_id_t id, int argc, const char *argv[])
     mutate_count = 0;
 
     std::string run_id_s = op_replay.get_value();
+    UUID run_id;
 
     if (run_id_s.length() > 0) {
         replay = true;
     }
 
     sl2_wstring_to_uuid(run_id_s.c_str(), &run_id);
+    sl2_client_assign_run_id(&server_client, run_id);
 
     mutatex = dr_mutex_create();
-    dr_register_exit_event(event_exit_trace);
+    dr_register_exit_event(event_exit);
 
     // If taint tracing is enabled, register the propagate_taint callback
     if (!op_no_taint.get_value()) {
@@ -1565,8 +1516,6 @@ void tracer(client_id_t id, int argc, const char *argv[])
 DR_EXPORT void
 dr_client_main(client_id_t id, int argc, const char *argv[])
 {
-
-    
     // parse client options
     std::string parse_err;
     int last_idx = 0;
@@ -1588,6 +1537,11 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
         SL2_DR_DEBUG(msg);
         dr_abort();
     }
+
+    // NOTE(ww): We open the client's connection to the server here,
+    // but the client isn't ready to use until it's been given a run ID.
+    // See inside of `tracer` for that.
+    sl2_client_open(&server_client);
 
     tracer(id, argc, argv);
 }
