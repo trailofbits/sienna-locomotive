@@ -54,9 +54,25 @@ class TestWizard(unittest.TestCase):
         self.assertTrue(  r'[60,104,116,109,108,62,10,32]' in output )
 
     def test_RegQueryValueEx(self):
-        cmd = r'echo 0 | python .\harness.py -r3 -v -t build\\corpus\\test_application\\Debug\\test_application.exe -a 4 -f'
+        cmd = r'echo 0 | python .\harness.py -r3 -l -v -t build\\corpus\\test_application\\Debug\\test_application.exe -a 4 -f'
         output = runAndCaptureOutput(cmd)
         self.assertTrue( 'Process completed after' in output )
+
+
+    def test_captureStdout(self):
+
+        targetString = 'XXXWWWXXX'
+        # First version have -l, inlining stdout for us to capture.   String "XXXWWWXXX" should appear
+        cmd = r'echo 0 | python .\harness.py -r3 -l -v -t build\\corpus\\test_application\\Debug\\test_application.exe -a 9 -f'
+        output = runAndCaptureOutput(cmd)
+        self.assertTrue( targetString in output )
+
+
+        # This version does not have have -l, so we aren't capturing stdout and String "XXXWWWXXX" should NOT appear
+        cmd = r'echo 0 | python .\harness.py -r3 -v -t build\\corpus\\test_application\\Debug\\test_application.exe -a 9 -f'
+        output = runAndCaptureOutput(cmd)
+        self.assertFalse( targetString in output )
+
 
 
     def test_TheWiz(self):
