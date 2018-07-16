@@ -102,7 +102,7 @@ DWORD handleGenerateRunId(HANDLE hPipe) {
         exit(1);
     }
 
-    WriteFile(hPipe, &runId, sizeof(UUID), &dwBytesWritten, NULL);
+    WriteFile(hPipe, &runId, sizeof(runId), &dwBytesWritten, NULL);
     LOG_F(INFO, "handleGenerateRunId: generated ID %S", runId_s);
 
     // get program name
@@ -110,7 +110,7 @@ DWORD handleGenerateRunId(HANDLE hPipe) {
     // we should try to find a macro in the WINAPI for it here.
     wchar_t commandLine[8192] = {0};
     DWORD size = 0;
-    if (!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &size, sizeof(size), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleGenerateRunId: failed to read size of program name (0x%x)", GetLastError());
         exit(1);
     }
@@ -148,7 +148,7 @@ DWORD handleGenerateRunId(HANDLE hPipe) {
 
     // get program arguments
     size = 0;
-    if (!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &size, sizeof(size), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleGenerateRunId: failed to read program argument list length (0x%x)", GetLastError());
         exit(1);
     }
@@ -338,7 +338,7 @@ void strategyKnownValues(BYTE *buf, size_t size)
     // max will be from 0 to 9 guaranteeing a
     // pos that will fit into the buffer
     size_t pos = getRand() % max;
-    BOOL endian = rand() % 2;
+    bool endian = rand() % 2;
 
     size_t selection = 0;
     switch (rand_size) {
@@ -392,7 +392,7 @@ void strategyAddSubKnownValues(BYTE *buf, size_t size)
     // max will be from 0 to 9 guaranteeing a
     // pos that will fit into the buffer
     size_t pos = getRand() % max;
-    BOOL endian = rand() % 2;
+    bool endian = rand() % 2;
 
     BYTE sub = 1;
     if (rand() % 2) {
@@ -538,12 +538,12 @@ DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, wchar_t *filePath, size
     }
 
     // only one type for right now, files
-    if (!WriteFile(hFile, &type, sizeof(DWORD), &dwBytesWritten, NULL)) {
+    if (!WriteFile(hFile, &type, sizeof(type), &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "writeFKT: failed to write type (0x%x)", GetLastError());
         exit(1);
     }
 
-    if (!WriteFile(hFile, &pathSize, sizeof(DWORD), &dwBytesWritten, NULL)) {
+    if (!WriteFile(hFile, &pathSize, sizeof(pathSize), &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "writeFKT: failed to write path size (0x%x)", GetLastError());
         exit(1);
     }
@@ -553,7 +553,7 @@ DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, wchar_t *filePath, size
         exit(1);
     }
 
-    if (!WriteFile(hFile, &position, sizeof(size_t), &dwBytesWritten, NULL)) {
+    if (!WriteFile(hFile, &position, sizeof(position), &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "writeFKT: failed to write offset (0x%x)", GetLastError());
         exit(1);
     }
@@ -586,7 +586,7 @@ DWORD handleMutation(HANDLE hPipe)
     UUID runId;
     wchar_t *runId_s;
 
-    if (!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &runId, sizeof(runId), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleMutation: failed to read run ID (0x%x)", GetLastError());
         exit(1);
     }
@@ -594,21 +594,21 @@ DWORD handleMutation(HANDLE hPipe)
     UuidToString(&runId, (RPC_WSTR *)&runId_s);
 
     DWORD type = 0;
-    if (!ReadFile(hPipe, &type, sizeof(DWORD), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &type, sizeof(type), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleMutation: failed to read function type (0x%x)", GetLastError());
         exit(1);
     }
 
     DWORD mutate_count = 0;
     wchar_t mutate_fname[MAX_PATH + 1] = {0};
-    if (!ReadFile(hPipe, &mutate_count, sizeof(DWORD), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &mutate_count, sizeof(mutate_count), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleMutation: failed to read mutation count (0x%x)", GetLastError());
         exit(1);
     }
     StringCchPrintfW(mutate_fname, MAX_PATH, FUZZ_RUN_FKT_FMT, mutate_count);
 
     DWORD pathSize = 0;
-    if (!ReadFile(hPipe, &pathSize, sizeof(DWORD), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &pathSize, sizeof(pathSize), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleMutation: failed to read size of mutation filepath (0x%x)", GetLastError());
         exit(1);
     }
@@ -638,24 +638,18 @@ DWORD handleMutation(HANDLE hPipe)
     }
 
     size_t position = 0;
-    if (!ReadFile(hPipe, &position, sizeof(size_t), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &position, sizeof(position), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleMutation: failed to read mutation offset (0x%x)", GetLastError());
         exit(1);
     }
 
     size_t size = 0;
-    if (!ReadFile(hPipe, &size, sizeof(size_t), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &size, sizeof(size), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleMutation: failed to read size of mutation buffer (0x%x)", GetLastError());
         exit(1);
     }
 
-    HANDLE hHeap = GetProcessHeap();
-    if (hHeap == NULL) {
-        LOG_F(ERROR, "handleMutation: failed to get proces heap (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    BYTE *buf = (BYTE*)HeapAlloc(hHeap, 0, size * sizeof(BYTE));
+    BYTE *buf = (BYTE *) malloc(size);
 
     if (buf == NULL) {
         LOG_F(ERROR, "handleMutation: failed to allocate mutation buffer (0x%x)", GetLastError());
@@ -700,11 +694,6 @@ DWORD handleMutation(HANDLE hPipe)
     LOG_F(INFO, "calling writeFKT with targetFile: %S", targetFile);
 
     writeFKT(hFile, type, pathSize, filePath, position, size, buf);
-
-    if (!HeapFree(hHeap, NULL, buf)) {
-        LOG_F(ERROR, "handleMutation: failed to deallocate mutation buffer (0x%x)", GetLastError());
-        exit(1);
-    }
 
     RpcStringFree((RPC_WSTR *)&runId_s);
 
@@ -771,14 +760,7 @@ DWORD handleReplay(HANDLE hPipe)
         exit(1);
     }
 
-    HANDLE hHeap = GetProcessHeap();
-
-    if (hHeap == NULL) {
-        LOG_F(ERROR, "handleReplay: failed to get process heap (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    BYTE* buf = (BYTE*)HeapAlloc(hHeap, 0, size * sizeof(BYTE));
+    BYTE *buf = (BYTE *) malloc(size);
 
     if (buf == NULL) {
         LOG_F(ERROR, "handleReplay: failed to allocate replay buffer (0x%x)", GetLastError());
@@ -813,11 +795,6 @@ DWORD handleReplay(HANDLE hPipe)
 
     if (!CloseHandle(hFile)) {
         LOG_F(ERROR, "handleReplay: failed to close FKT (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    if (!HeapFree(hHeap, NULL, buf)) {
-        LOG_F(ERROR, "handleReplay: failed to deallocate replay buffer (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -924,14 +901,14 @@ DWORD handleFinalizeRun(HANDLE hPipe)
 
     UuidToString(&runId, (RPC_WSTR *)&runId_s);
 
-    BOOL crash = false;
-    if (!ReadFile(hPipe, &crash, sizeof(BOOL), &dwBytesRead, NULL)) {
+    bool crash = false;
+    if (!ReadFile(hPipe, &crash, sizeof(bool), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleFinalizeRun: failed to read crash status (0x%x)", GetLastError());
         exit(1);
     }
 
-    BOOL preserve = false;
-    if (!ReadFile(hPipe, &preserve, sizeof(BOOL), &dwBytesRead, NULL)) {
+    bool preserve = false;
+    if (!ReadFile(hPipe, &preserve, sizeof(bool), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleFinalizeRun: failed to read preserve flag (0x%x)", GetLastError());
         exit(1);
     }
@@ -1109,7 +1086,7 @@ int main(int mArgc, char **mArgv)
 {
     initLoggingFile();
     loguru::init(mArgc, mArgv);
-    CHAR logLocalPathA[MAX_PATH]= {0};
+    char logLocalPathA[MAX_PATH]= {0};
     size_t converted;
     wcstombs_s(&converted, logLocalPathA, MAX_PATH - 1, FUZZ_LOG, MAX_PATH - 1);
     loguru::add_file(logLocalPathA, loguru::Append, loguru::Verbosity_MAX);
@@ -1141,7 +1118,7 @@ int main(int mArgc, char **mArgv)
             return 1;
         }
 
-        BOOL connected = ConnectNamedPipe(hPipe, NULL) ?
+        bool connected = ConnectNamedPipe(hPipe, NULL) ?
             TRUE : (GetLastError() == ERROR_PIPE_CONNECTED);
 
         if (connected) {
