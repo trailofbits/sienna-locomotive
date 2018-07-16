@@ -33,7 +33,7 @@ extern "C" {
 #include "common/sl2_dr_client.hpp"
 
 static SL2Client   client;
-static sl2_client server_client;
+static sl2_conn sl2_conn;
 static void *mutatex;
 static bool replay;
 static DWORD mutate_count;
@@ -704,7 +704,7 @@ event_exit(void)
         DR_ASSERT(false);
     }
 
-    sl2_client_close(&server_client);
+    sl2_conn_close(&sl2_conn);
 
     drmgr_exit();
 }
@@ -931,7 +931,7 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
 
     if (replay) {
         wchar_t *crash_path;
-        sl2_client_request_crash_path(&server_client, &crash_path);
+        sl2_conn_request_crash_path(&sl2_conn, &crash_path);
 
         HANDLE hCrashFile = CreateFile(crash_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         if (hCrashFile == INVALID_HANDLE_VALUE) {
@@ -1346,7 +1346,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     if (replay && targeted) {
         dr_mutex_lock(mutatex);
 
-        sl2_client_request_replay(&server_client, mutate_count, nNumberOfBytesToRead, lpBuffer);
+        sl2_conn_request_replay(&sl2_conn, mutate_count, nNumberOfBytesToRead, lpBuffer);
         mutate_count++;
 
         dr_mutex_unlock(mutatex);
@@ -1485,7 +1485,7 @@ void tracer(client_id_t id, int argc, const char *argv[])
     }
 
     sl2_wstring_to_uuid(run_id_s.c_str(), &run_id);
-    sl2_client_assign_run_id(&server_client, run_id);
+    sl2_conn_assign_run_id(&sl2_conn, run_id);
 
     mutatex = dr_mutex_create();
     dr_register_exit_event(event_exit);
@@ -1541,7 +1541,7 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
     // NOTE(ww): We open the client's connection to the server here,
     // but the client isn't ready to use until it's been given a run ID.
     // See inside of `tracer` for that.
-    sl2_client_open(&server_client);
+    sl2_conn_open(&sl2_conn);
 
     tracer(id, argc, argv);
 }
