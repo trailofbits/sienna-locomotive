@@ -29,12 +29,14 @@ extern "C" {
 
 #include "server.hpp"
 
+#include "common/sl2_server_api.hpp"
 #include "common/sl2_dr_client.hpp"
 
+static SL2Client   client;
+static sl2_conn sl2_conn;
 static void *mutatex;
 static bool replay;
-static bool mutate_count;
-static UUID run_id;
+static DWORD mutate_count;
 
 static std::set<reg_id_t> tainted_regs;
 static std::set<app_pc> tainted_mems;
@@ -48,7 +50,7 @@ static app_pc last_insns[LAST_COUNT] = { 0 };
 
 static app_pc module_start = 0;
 static app_pc module_end = 0;
-static DWORD64 baseAddr;
+static size_t baseAddr;
 
 /* Required, which specific call to target */
 static droption_t<std::string> op_target(
@@ -58,7 +60,7 @@ static droption_t<std::string> op_target(
     "target",
     "Specific call to target.");
 
-static json parsedJson;
+
 
 /* Mostly used to debug if taint tracking is too slow */
 static droption_t<unsigned int> op_no_taint(
@@ -76,16 +78,6 @@ static droption_t<std::string> op_replay(
     "replay",
     "The run id for a crash to replay.");
 
-static std::map<Function, UINT64> call_counts;
-
-struct tracer_read_info {
-    LPVOID lpBuffer;
-    DWORD nNumberOfBytesToRead;
-    Function function;
-    DWORD64 retAddrOffset;
-    // TODO(ww) Use WCHAR * here for consistency.
-    char *argHash;
-};
 
 /* Currently unused as this runs on 64 bit applications */
 static reg_id_t reg_to_full_width32(reg_id_t reg)
@@ -249,10 +241,10 @@ is_tainted(void *drcontext, opnd_t opnd)
 
 /* Mark a memory address as tainted */
 static void
-taint_mem(app_pc addr, uint size)
+taint_mem(app_pc addr, size_t size)
 {
-    for (uint i = 0; i < size; i++) {
-        tainted_mems.insert(addr+i);
+    for (size_t i = 0; i < size; i++) {
+        tainted_mems.insert(addr + i);
     }
 }
 
@@ -697,7 +689,7 @@ event_thread_exit(void *drcontext)
 
 /* Clean up registered callbacks before exiting */
 static void
-event_exit_trace(void)
+event_exit(void)
 {
     if (!op_no_taint.get_value()) {
         if (!drmgr_unregister_bb_insertion_event(event_app_instruction)) {
@@ -711,6 +703,8 @@ event_exit_trace(void)
     {
         DR_ASSERT(false);
     }
+
+    sl2_conn_close(&sl2_conn);
 
     drmgr_exit();
 }
@@ -935,53 +929,24 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
 {
     std::string crash_json = dump_json(drcontext, score, reason, excpt, disassembly);
 
-    WCHAR targetFile[MAX_PATH + 1] = { 0 };
-    ZeroMemory(targetFile, sizeof(WCHAR) * (MAX_PATH + 1));
-
     if (replay) {
-        HANDLE h_pipe = CreateFile(
-            FUZZ_SERVER_PATH,
-            GENERIC_READ | GENERIC_WRITE,
-            0,
-            NULL,
-            OPEN_EXISTING,
-            0,
-            NULL);
+        wchar_t *crash_path;
+        sl2_conn_request_crash_path(&sl2_conn, &crash_path);
 
-        if (h_pipe != INVALID_HANDLE_VALUE) {
-            DWORD read_mode = PIPE_READMODE_MESSAGE;
-            SetNamedPipeHandleState(
-                h_pipe,
-                &read_mode,
-                NULL,
-                NULL);
-
-            DWORD bytes_read = 0;
-            DWORD bytes_written = 0;
-
-            BYTE event_id = EVT_CRASH_PATH;
-
-            WriteFile(h_pipe, &event_id, sizeof(BYTE), &bytes_written, NULL);
-            TransactNamedPipe(h_pipe, &run_id, sizeof(UUID), targetFile, MAX_PATH + 1, &bytes_read, NULL);
-            CloseHandle(h_pipe);
-
-            HANDLE hCrashFile = CreateFile(targetFile, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-            if (hCrashFile == INVALID_HANDLE_VALUE) {
-                dr_fprintf(STDERR, "Could not open crash file json (%x)", GetLastError());
-                exit(1);
-            }
-
-            DWORD bytesWritten;
-            if (!WriteFile(hCrashFile, crash_json.c_str(), crash_json.length(), &bytesWritten, NULL)) {
-                dr_fprintf(STDERR, "Could not write crash file json (%x)", GetLastError());
-                exit(1);
-            }
+        HANDLE hCrashFile = CreateFile(crash_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hCrashFile == INVALID_HANDLE_VALUE) {
+            SL2_DR_DEBUG("tracer#dump_crash: could not open the crash file (%x)", GetLastError());
+            exit(1);
         }
-    }
 
-    dr_printf("#### BEGIN CRASH DATA JSON\n");
-    dr_printf("%s\n", crash_json.c_str());
-    dr_printf("#### END CRASH DATA JSON\n");
+        DWORD bytesWritten;
+        if (!WriteFile(hCrashFile, crash_json.c_str(), crash_json.length(), &bytesWritten, NULL)) {
+            SL2_DR_DEBUG("tracer#dump_crash: could not write to the crash file (%x)", GetLastError());
+            exit(1);
+        }
+
+        free(crash_path);
+    }
 
     dr_exit_process(1);
 }
@@ -1154,44 +1119,44 @@ onexception(void *drcontext, dr_exception_t *excpt)
 static void
 wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_ReadEventLog>\n");
+    SL2_DR_DEBUG("<in wrap_pre_ReadEventLog>\n");
     HANDLE hEventLog                 = (HANDLE)drwrap_get_arg(wrapcxt, 0);
     DWORD  dwReadFlags               = (DWORD)drwrap_get_arg(wrapcxt, 1);
     DWORD  dwRecordOffset            = (DWORD)drwrap_get_arg(wrapcxt, 2);
-    LPVOID lpBuffer                  = (LPVOID)drwrap_get_arg(wrapcxt, 3);
+    void   *lpBuffer                 = (void *)drwrap_get_arg(wrapcxt, 3);
     DWORD  nNumberOfBytesToRead      = (DWORD)drwrap_get_arg(wrapcxt, 4);
     DWORD  *pnBytesRead              = (DWORD *)drwrap_get_arg(wrapcxt, 5);
     DWORD  *pnMinNumberOfBytesNeeded = (DWORD *)drwrap_get_arg(wrapcxt, 6);
 
-    *user_data             = malloc(sizeof(tracer_read_info));
-    tracer_read_info *info = (tracer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
     info->function             = Function::ReadEventLog;
-    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
 static void
 wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_RegQueryValueEx>\n");
-    HKEY    hKey        = (HKEY)drwrap_get_arg(wrapcxt, 0);
-    LPCTSTR lpValueName = (LPCTSTR)drwrap_get_arg(wrapcxt, 1);
-    LPDWORD lpReserved  = (LPDWORD)drwrap_get_arg(wrapcxt, 2);
-    LPDWORD lpType      = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
-    LPBYTE  lpData      = (LPBYTE)drwrap_get_arg(wrapcxt, 4);
-    LPDWORD lpcbData    = (LPDWORD)drwrap_get_arg(wrapcxt, 5);
+    SL2_DR_DEBUG("<in wrap_pre_RegQueryValueEx>\n");
+    HKEY hKey         = (HKEY)drwrap_get_arg(wrapcxt, 0);
+    char *lpValueName = (char *)drwrap_get_arg(wrapcxt, 1);
+    DWORD *lpReserved = (DWORD *)drwrap_get_arg(wrapcxt, 2);
+    DWORD *lpType     = (DWORD *)drwrap_get_arg(wrapcxt, 3);
+    BYTE *lpData      = (BYTE *)drwrap_get_arg(wrapcxt, 4);
+    DWORD *lpcbData   = (DWORD *)drwrap_get_arg(wrapcxt, 5);
 
     if (lpData != NULL && lpcbData != NULL) {
-        *user_data             = malloc(sizeof(tracer_read_info));
-        tracer_read_info *info = (tracer_read_info *) *user_data;
+        *user_data             = malloc(sizeof(client_read_info));
+        client_read_info *info = (client_read_info *) *user_data;
 
-        info->lpBuffer = lpData;
+        info->lpBuffer             = lpData;
         info->nNumberOfBytesToRead = *lpcbData;
-        info->function = Function::RegQueryValueEx;
-        info->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+        info->function             = Function::RegQueryValueEx;
+        info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
         info->argHash              = NULL;
     }
     else {
@@ -1202,110 +1167,111 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_WinHttpWebSocketReceive>\n");
+    SL2_DR_DEBUG("<in wrap_pre_WinHttpWebSocketReceive>\n");
     HINTERNET hRequest                          = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
-    PVOID pvBuffer                              = drwrap_get_arg(wrapcxt, 1);
+    void *pvBuffer                              = drwrap_get_arg(wrapcxt, 1);
     DWORD dwBufferLength                        = (DWORD)drwrap_get_arg(wrapcxt, 2);
-    PDWORD pdwBytesRead                         = (PDWORD)drwrap_get_arg(wrapcxt, 3);
+    DWORD *pdwBytesRead                         = (DWORD *)drwrap_get_arg(wrapcxt, 3);
     WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE)(int)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data             = malloc(sizeof(tracer_read_info));
-    tracer_read_info *info = (tracer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->lpBuffer = pvBuffer;
     info->nNumberOfBytesToRead = dwBufferLength;
     info->function = Function::WinHttpWebSocketReceive;
-    info->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
 static void
 wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_InternetReadFile>\n");
+    SL2_DR_DEBUG("<in wrap_pre_InternetReadFile>\n");
     HINTERNET hFile             = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
-    LPVOID lpBuffer             = drwrap_get_arg(wrapcxt, 1);
+    void *lpBuffer              = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
-    LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
+    DWORD *lpNumberOfBytesRead  = (DWORD*)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data             = malloc(sizeof(tracer_read_info));
-    tracer_read_info *info = (tracer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
     info->function             = Function::InternetReadFile;
-    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
 static void
 wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_WinHttpReadData>\n");
+    SL2_DR_DEBUG("<in wrap_pre_WinHttpReadData>\n");
     HINTERNET hRequest          = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
-    LPVOID lpBuffer             = drwrap_get_arg(wrapcxt, 1);
+    void *lpBuffer              = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
-    LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
+    DWORD *lpNumberOfBytesRead  = (DWORD*)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data             = malloc(sizeof(tracer_read_info));
-    tracer_read_info *info = (tracer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
     info->function             = Function::WinHttpReadData;
-    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
 static void
 wrap_pre_recv(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_recv>\n");
+    SL2_DR_DEBUG("<in wrap_pre_recv>\n");
     SOCKET s  = (SOCKET)drwrap_get_arg(wrapcxt, 0);
     char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
     int len   = (int)drwrap_get_arg(wrapcxt, 2);
     int flags = (int)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data             = malloc(sizeof(tracer_read_info));
-    tracer_read_info *info = (tracer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->lpBuffer             = buf;
     info->nNumberOfBytesToRead = len;
     info->function             = Function::recv;
-    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
 static void
 wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_ReadFile>\n");
+    SL2_DR_DEBUG("<in wrap_pre_ReadFile>\n");
     HANDLE hFile                = drwrap_get_arg(wrapcxt, 0);
-    LPVOID lpBuffer             = drwrap_get_arg(wrapcxt, 1);
+    void *lpBuffer              = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
-    LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
+    DWORD *lpNumberOfBytesRead  = (DWORD*)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data             = malloc(sizeof(tracer_read_info));
-    tracer_read_info *info = (tracer_read_info *) *user_data;
+    fileArgHash fStruct = {0};
+
+    LARGE_INTEGER offset = {0};
+    LARGE_INTEGER position = {0};
+    SetFilePointerEx(hFile, offset, &position, FILE_CURRENT);
+
+    GetFinalPathNameByHandle(hFile, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
+    fStruct.position = position.QuadPart;
+    fStruct.readSize = nNumberOfBytesToRead;
+
+    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct,
+        ((unsigned char *) &fStruct) + sizeof(fileArgHash));
+    std::string hash_str;
+    picosha2::hash256_hex_string(blob_vec, hash_str);
+
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
     info->function             = Function::ReadFile;
-    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
-
-    LONG positionHigh = 0;
-    DWORD positionLow = SetFilePointer(hFile, 0, &positionHigh, FILE_CURRENT);
-
-    fileArgHash fStruct;
-    memset(&fStruct, 0, sizeof(fileArgHash));
-
-    DWORD pathSize   = GetFinalPathNameByHandle(hFile, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
-    fStruct.position = (positionHigh << 32) | positionLow;;
-    fStruct.readSize = nNumberOfBytesToRead;
-
-    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct, ((unsigned char *) &fStruct) + sizeof(fileArgHash));
-    std::string hash_str;
-    picosha2::hash256_hex_string(blob_vec, hash_str);
+    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
     // NOTE(ww): SHA2 digests are 64 characters, so we allocate that + room for a NULL
     info->argHash = (char *) malloc(65);
@@ -1316,74 +1282,60 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_fread_s>\n");
+    SL2_DR_DEBUG("<in wrap_pre_fread_s>\n");
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 2);
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data             = malloc(sizeof(tracer_read_info));
-    tracer_read_info *info = (tracer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->function             = Function::fread;
     info->lpBuffer             = buffer;
     info->nNumberOfBytesToRead = size * count;
-    info->retAddrOffset        = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
 static void
 wrap_pre_fread(void *wrapcxt, OUT void **user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_pre_fread>\n");
+    SL2_DR_DEBUG("<in wrap_pre_fread>\n");
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 1);
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
 
-    *user_data             = malloc(sizeof(tracer_read_info));
-    tracer_read_info *info = (tracer_read_info *) *user_data;
+    *user_data             = malloc(sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
-    info->function = Function::fread;
-    info->lpBuffer = buffer;
+    info->function             = Function::fread;
+    info->lpBuffer             = buffer;
     info->nNumberOfBytesToRead = size * count;
-    info->retAddrOffset = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->argHash              = NULL;
 }
 
 /* Called after each targeted function to replay mutation and mark bytes as tainted */
 static void
-wrap_post_GenericTaint(void *wrapcxt, void *user_data)
+wrap_post_Generic(void *wrapcxt, void *user_data)
 {
-    dr_fprintf(STDERR, "<in wrap_post_GenericTaint>\n");
+    SL2_DR_DEBUG("<in wrap_post_Generic>\n");
     if (user_data == NULL) {
         return;
     }
 
-    tracer_read_info *info = (tracer_read_info *) user_data;
+    client_read_info *info = (client_read_info *) user_data;
 
     // Grab stored metadata
-    LPVOID lpBuffer            = info->lpBuffer;
-    DWORD nNumberOfBytesToRead = info->nNumberOfBytesToRead;
-    Function function          = info->function;
-    DWORD64 retAddrOffset      = (DWORD64) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    void *lpBuffer              = info->lpBuffer;
+    size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
+    Function function           = info->function;
+    info->retAddrOffset         = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+
 
     // Identify whether this is the function we want to target
-    BOOL targeted = false;
-    std::string strFunctionName(get_function_name(function));
-    for (targetFunction t : parsedJson){
-        if (t.selected && t.functionName == strFunctionName) {
-            if (t.mode & MATCH_INDEX && call_counts[function] == t.index) {
-              targeted = true;
-            }
-            else if (t.mode & MATCH_RETN_ADDRESS && t.retAddrOffset == retAddrOffset) {
-              targeted = true;
-            }
-            else if (t.mode & MATCH_ARG_HASH && !strcmp(t.argHash.c_str(), info->argHash)) {
-                targeted = true;
-            }
-        }
-    }
-
-    call_counts[function]++;
+    bool targeted = client.isFunctionTargeted( function, info );
+    client.incrementCallCountForFunction(function);
 
     // Mark the targeted memory as tainted
     if (targeted) {
@@ -1393,39 +1345,11 @@ wrap_post_GenericTaint(void *wrapcxt, void *user_data)
     // Talk to the server, get the stored mutation from the fuzzing run, and write it into memory.
     if (replay && targeted) {
         dr_mutex_lock(mutatex);
-        // Open handle to server
-        HANDLE h_pipe = CreateFile(
-            FUZZ_SERVER_PATH,
-            GENERIC_READ | GENERIC_WRITE,
-            0,
-            NULL,
-            OPEN_EXISTING,
-            0,
-            NULL);
 
-        if (h_pipe != INVALID_HANDLE_VALUE) {
-            DWORD read_mode = PIPE_READMODE_MESSAGE;
-            SetNamedPipeHandleState(
-                h_pipe,
-                &read_mode,
-                NULL,
-                NULL);
+        sl2_conn_request_replay(&sl2_conn, mutate_count, nNumberOfBytesToRead, lpBuffer);
+        mutate_count++;
 
-            DWORD bytes_read = 0;
-            DWORD bytes_written = 0;
-
-            BYTE event_id = EVT_REPLAY;
-
-            // Send the run ID and request the mutation
-            WriteFile(h_pipe, &event_id, sizeof(BYTE), &bytes_written, NULL);
-            WriteFile(h_pipe, &run_id, sizeof(UUID), &bytes_written, NULL);
-            WriteFile(h_pipe, &mutate_count, sizeof(DWORD), &bytes_written, NULL);
-            // Overwrite bytes with old mutation
-            TransactNamedPipe(h_pipe, &nNumberOfBytesToRead, sizeof(DWORD), lpBuffer, nNumberOfBytesToRead, &bytes_read, NULL);
-            mutate_count++;
-            CloseHandle(h_pipe);
-            dr_mutex_unlock(mutatex);
-        }
+        dr_mutex_unlock(mutatex);
     }
 
     if (info->argHash) {
@@ -1440,33 +1364,32 @@ static void
 module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
 {
     if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))) {
-      baseAddr = (DWORD64) mod->start;
+      baseAddr = (size_t) mod->start;
     }
 
-    // set up pre and post hooks for each target function
     std::map<char *, SL2_PRE_PROTO> toHookPre;
-    toHookPre["ReadEventLog"] = wrap_pre_ReadEventLog;
-    toHookPre["RegQueryValueExW"] = wrap_pre_RegQueryValueEx;
-    toHookPre["RegQueryValueExA"] = wrap_pre_RegQueryValueEx;
-    toHookPre["WinHttpWebSocketReceive"] = wrap_pre_WinHttpWebSocketReceive;
-    toHookPre["InternetReadFile"] = wrap_pre_InternetReadFile;
-    toHookPre["WinHttpReadData"] = wrap_pre_WinHttpReadData;
-    toHookPre["recv"] = wrap_pre_recv;
-    toHookPre["ReadFile"] = wrap_pre_ReadFile;
-    toHookPre["fread_s"] = wrap_pre_fread_s;
-    toHookPre["fread"] = wrap_pre_fread;
+    SL2_PRE_HOOK1(toHookPre, ReadFile);
+    SL2_PRE_HOOK1(toHookPre, InternetReadFile);
+    SL2_PRE_HOOK1(toHookPre, ReadEventLog);
+    SL2_PRE_HOOK2(toHookPre, RegQueryValueExW, RegQueryValueEx);
+    SL2_PRE_HOOK2(toHookPre, RegQueryValueExA, RegQueryValueEx);
+    SL2_PRE_HOOK1(toHookPre, WinHttpWebSocketReceive);
+    SL2_PRE_HOOK1(toHookPre, WinHttpReadData);
+    SL2_PRE_HOOK1(toHookPre, recv);
+    SL2_PRE_HOOK1(toHookPre, fread_s);
+    SL2_PRE_HOOK1(toHookPre, fread);
 
     std::map<char *, SL2_POST_PROTO> toHookPost;
-    toHookPost["ReadEventLog"] = wrap_post_GenericTaint;
-    toHookPost["RegQueryValueExW"] = wrap_post_GenericTaint;
-    toHookPost["RegQueryValueExA"] = wrap_post_GenericTaint;
-    toHookPost["WinHttpWebSocketReceive"] = wrap_post_GenericTaint;
-    toHookPost["InternetReadFile"] = wrap_post_GenericTaint;
-    toHookPost["WinHttpReadData"] = wrap_post_GenericTaint;
-    toHookPost["recv"] = wrap_post_GenericTaint;
-    toHookPost["ReadFile"] = wrap_post_GenericTaint;
-    toHookPost["fread"] = wrap_post_GenericTaint;
-    toHookPost["fread_s"] = wrap_post_GenericTaint;
+    SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
+    SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
+    SL2_POST_HOOK2(toHookPost, ReadEventLog, Generic);
+    SL2_POST_HOOK2(toHookPost, RegQueryValueExW, Generic);
+    SL2_POST_HOOK2(toHookPost, RegQueryValueExA, Generic);
+    SL2_POST_HOOK2(toHookPost, WinHttpWebSocketReceive, Generic);
+    SL2_POST_HOOK2(toHookPost, WinHttpReadData, Generic);
+    SL2_POST_HOOK2(toHookPost, recv, Generic);
+    SL2_POST_HOOK2(toHookPost, fread_s, Generic);
+    SL2_POST_HOOK2(toHookPost, fread, Generic);
 
     const char *mod_name = dr_module_preferred_name(mod);
     /* assume our target executable is an exe */
@@ -1483,7 +1406,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
 
         // Look for function matching the target specified on the command line
         std::string strFunctionName(functionName);
-        for (targetFunction t : parsedJson) {
+        for (targetFunction t : client.parsedJson) {
           if (t.selected && t.functionName == strFunctionName) {
             hook = true;
           }
@@ -1532,10 +1455,10 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
             bool ok = drwrap_wrap(towrap, hookFunctionPre, hookFunctionPost);
             // bool ok = false;
             if (ok) {
-                dr_fprintf(STDERR, "<wrapped %s @ 0x%p>\n", functionName, towrap);
+                SL2_DR_DEBUG("<wrapped %s @ 0x%p>\n", functionName, towrap);
             }
             else {
-                dr_fprintf(STDERR, "<FAILED to wrap %s @ 0x%p: already wrapped?>\n", functionName, towrap);
+                SL2_DR_DEBUG("<FAILED to wrap %s @ 0x%p: already wrapped?>\n", functionName, towrap);
             }
         }
     }
@@ -1555,15 +1478,17 @@ void tracer(client_id_t id, int argc, const char *argv[])
     mutate_count = 0;
 
     std::string run_id_s = op_replay.get_value();
+    UUID run_id;
 
     if (run_id_s.length() > 0) {
         replay = true;
     }
 
     sl2_wstring_to_uuid(run_id_s.c_str(), &run_id);
+    sl2_conn_assign_run_id(&sl2_conn, run_id);
 
     mutatex = dr_mutex_create();
-    dr_register_exit_event(event_exit_trace);
+    dr_register_exit_event(event_exit);
 
     // If taint tracing is enabled, register the propagate_taint callback
     if (!op_no_taint.get_value()) {
@@ -1595,24 +1520,28 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
     std::string parse_err;
     int last_idx = 0;
     if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
-        dr_fprintf(STDERR, "Usage error: %s", parse_err.c_str());
+        SL2_DR_DEBUG("tracer#main: usage error: %s", parse_err.c_str());
         dr_abort();
     }
 
     // target is mandatory
     std::string target = op_target.get_value();
     if (target == "") {
-        dr_fprintf(STDERR, "ERROR: arg -t (target) required");
+        SL2_DR_DEBUG("tracer#main: ERROR: arg -t (target) required");
         dr_abort();
     }
 
-    std::ifstream jsonStream(target); // TODO ifstream can sometimes cause performance issues
-    jsonStream >> parsedJson;
-
-    if (!parsedJson.is_array()){
-        dr_fprintf(STDERR, "ERROR: Document root is not an array\n");
+    try {
+        client.loadJson(target);
+    } catch (const char* msg) {
+        SL2_DR_DEBUG(msg);
         dr_abort();
     }
+
+    // NOTE(ww): We open the client's connection to the server here,
+    // but the client isn't ready to use until it's been given a run ID.
+    // See inside of `tracer` for that.
+    sl2_conn_open(&sl2_conn);
 
     tracer(id, argc, argv);
 }
