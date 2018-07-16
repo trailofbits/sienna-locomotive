@@ -744,7 +744,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         }
 
         // Only hook registry queries in the kernel
-        if (strFunctionName == "RegQueryValueExA" or strFunctionName == "RegQueryValueExW") {
+        if (strFunctionName == "RegQueryValueExA" || strFunctionName == "RegQueryValueExW") {
             if (_stricmp(mod_name, "KERNELBASE.dll") != 0) {
                 continue;
             }
