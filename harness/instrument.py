@@ -15,7 +15,7 @@ import json
 import traceback
 from enum import IntEnum
 
-from .state import get_path_to_run_file, finalize, write_output_files
+from .state import parse_triage_output, finalize, write_output_files
 from . import config
 
 
@@ -192,15 +192,8 @@ def triage_run(config_dict, run_id):
     # Write stdout and stderr to files
     write_output_files(completed_process, run_id, 'triage')
 
-    # Parse triage results and print them
-    try:
-        with open(get_path_to_run_file(run_id, 'crash.json'), 'r') as crash_json:
-            results = json.loads(crash_json.read())
-            results['run_id'] = run_id
-            print_l("Triage ({score}): {reason} in run {run_id} caused {exception}".format(**results))
-            print_l("\t0x{location:02x}: {instruction}".format(**results))
-    except FileNotFoundError:
-        print_l("Triage run %s returned %s (no crash file found)" % (run_id, completed_process.returncode))
+    formatted, _ = parse_triage_output(run_id)
+    return formatted
 
 
 def fuzz_and_triage(config_dict):
@@ -211,7 +204,8 @@ def fuzz_and_triage(config_dict):
         while can_fuzz:
             crashed, run_id = fuzzer_run(config_dict)
             if crashed:
-                triage_run(config_dict, run_id)
+                formatted = triage_run(config_dict, run_id)
+                print_l(formatted)
 
                 if config_dict['exit_early']:
                     can_fuzz = False  # Prevent other threads from starting new fuzzing runs

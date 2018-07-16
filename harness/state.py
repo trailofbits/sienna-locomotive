@@ -78,9 +78,11 @@ class TargetAdapter(object):
 
 def get_target(_config):
     target_file = os.path.join(get_target_dir(_config), 'targets.json')
-    with open(target_file) as target_json:
-        return TargetAdapter(json.load(target_json), target_file)
-
+    try:
+        with open(target_file) as target_json:
+            return TargetAdapter(json.load(target_json), target_file)
+    except FileNotFoundError:
+        return TargetAdapter([], target_file)
 
 def get_all_targets():
     """ Returns a dict mapping target directories to the contents of the argument file """
@@ -116,6 +118,19 @@ def write_output_files(proc, run_id, stage_name):
                 stderrfile.write(proc.stderr)
     except FileNotFoundError:
         print("Couldn't find an output directory for run %s" % run_id)
+
+
+def parse_triage_output(run_id):
+    # Parse triage results and print them
+    try:
+        with open(get_path_to_run_file(run_id, 'crash.json'), 'r') as crash_json:
+            results = json.loads(crash_json.read())
+            results['run_id'] = run_id
+            formatted = "Triage ({score}): {reason} in run {run_id} caused {exception}".format(**results)
+            formatted += ("\n\t0x{location:02x}: {instruction}".format(**results))
+            return formatted, results
+    except FileNotFoundError:
+        return "Triage run %s exited improperly, but no crash file could be found)" % run_id, None
 
 
 def finalize(run_id, crashed):

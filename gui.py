@@ -8,8 +8,7 @@ from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem
 
 from harness import config
 from harness.state import get_target
-from harness.threads import WizardThread
-
+from harness.threads import WizardThread, FuzzerThread
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -29,7 +28,7 @@ class MainWindow(QtWidgets.QMainWindow):
         _central_widget.setLayout(self._layout)
 
         self.wizard_run = QtWidgets.QPushButton("Run Wizard")
-        self.wizard_thread = WizardThread()
+        self.wizard_thread = WizardThread(config.config)
         self.wizard_thread.resultReady.connect(self.wizard_finished)
         self.wizard_run.clicked.connect(self.wizard_thread.start)
         self._layout.addWidget(self.wizard_run)
@@ -42,13 +41,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.build_func_tree()
 
         self.fuzzer_run = QtWidgets.QPushButton("Fuzz selected targets")
-        # self.fuzzer_run.clicked.connect(self.run_fuzzer_and_triage)
         self._layout.addWidget(self.fuzzer_run)
 
         self._stateDisplay = QtWidgets.QTextBrowser()
         self._stateDisplay.setOpenLinks(False)
         self._stateDisplay.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self._layout.addWidget(self._stateDisplay)
+
+        self.fuzzer_thread = FuzzerThread(config.config, self.target_data.filename)
+        self.fuzzer_thread.foundCrash.connect(self._stateDisplay.append)
+        self.fuzzer_run.clicked.connect(self.fuzzer_thread.start)
 
     def build_func_tree(self):
         self._func_tree.clear()

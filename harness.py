@@ -111,7 +111,7 @@ def main():
             config['target_application_path'], config['target_args'] = runs[run_id]
             config['client_args'].append('-t')
             config['client_args'].append(target_file)
-            triage_run(config, run_id[-36:])
+            print(triage_run(config, run_id[-36:]))
 
     else:
         # Run the wizard to select a target function if we don't have one saved
