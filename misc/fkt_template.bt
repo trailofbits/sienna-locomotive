@@ -5,10 +5,10 @@
 //   Authors: TACIXAT
 //   Version: 0.01
 //   Purpose: Parse the fuzzkit data files.
-//  Category: 
-// File Mask: 
-//  ID Bytes: 
-//   History: 
+//  Category:
+// File Mask:
+//  ID Bytes:
+//   History:
 //------------------------------------------------
 
 struct FKT {
@@ -16,7 +16,7 @@ struct FKT {
     uint type;
     uint file_size;
     wchar_t path[file_size];
-    uint64 position;
-    uint size;
+    size_t position;
+    size_t size;
     uchar data[size];
 } fkt;
