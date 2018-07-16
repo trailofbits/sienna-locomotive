@@ -170,7 +170,7 @@ __declspec(dllexport) SL2Response sl2_client_request_replay(
     // Finally, tell the server how many bytes we expect to receive and
     // receive those bytes into the buffer.
     WriteFile(client->pipe, &bufsize, sizeof(bufsize), &txsize, NULL);
-    ReadFile(client->pipe, &buffer, bufsize, &txsize, NULL);
+    ReadFile(client->pipe, buffer, bufsize, &txsize, NULL);
 
     return SL2Response::OK;
 }
@@ -276,7 +276,7 @@ __declspec(dllexport) SL2Response sl2_client_request_crash_path(
     // Finally, read the length-prefixed crash path from the server.
     // NOTE(ww): Like EVT_RUN_INFO, the lengths here are buffer lengths,
     // not string lengths.
-    DWORD len;
+    size_t len;
 
     ReadFile(client->pipe, &len, sizeof(len), &txsize, NULL);
     *crash_path = (wchar_t *) malloc(len + 1);
