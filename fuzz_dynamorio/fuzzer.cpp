@@ -719,8 +719,6 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
             }
         }
 
-        printf("%s: %d\n", functionName, hook);
-
         if (!hook)
           continue;
 
