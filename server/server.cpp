@@ -81,13 +81,13 @@ VOID initWorkingDir() {
 /* Generates a new run UUID, writes relevant run metadata files into the corresponding run metadata dir
     This, like many things in the server, is pretty overzealous about exiting after any errors, often without an
     explanation of what happened. TODO - fix this */
-DWORD generateRunId(HANDLE hPipe) {
+DWORD handleGenerateRunId(HANDLE hPipe) {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
     UUID runId;
     WCHAR *runId_s;
 
-    LOG_F(INFO, "generateRunId: received request");
+    LOG_F(INFO, "handleGenerateRunId: received request");
 
     // NOTE(ww): On recent versions of Windows, UuidCreate generates a v4 UUID that
     // is sufficiently diffuse for our purposes (avoiding conflicts between runs).
@@ -98,12 +98,12 @@ DWORD generateRunId(HANDLE hPipe) {
     WCHAR targetDir[MAX_PATH + 1] = {0};
     PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
     if (!CreateDirectory(targetDir, NULL)) {
-        LOG_F(ERROR, "generateRunId: couldn't create working directory (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleGenerateRunId: couldn't create working directory (0x%x)", GetLastError());
         exit(1);
     }
 
     WriteFile(hPipe, &runId, sizeof(UUID), &dwBytesWritten, NULL);
-    LOG_F(INFO, "generateRunId: generated ID %S", runId_s);
+    LOG_F(INFO, "handleGenerateRunId: generated ID %S", runId_s);
 
     // get program name
     // TODO(ww): 8192 is the correct buffer size for the Windows command line, but
@@ -111,17 +111,17 @@ DWORD generateRunId(HANDLE hPipe) {
     WCHAR commandLine[8192] = {0};
     DWORD size = 0;
     if (!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "generateRunId: failed to read size of program name (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleGenerateRunId: failed to read size of program name (0x%x)", GetLastError());
         exit(1);
     }
 
     if (size > 8191) {
-        LOG_F(ERROR, "generateRunId: program name length > 8191");
+        LOG_F(ERROR, "handleGenerateRunId: program name length > 8191");
         exit(1);
     }
 
     if (!ReadFile(hPipe, commandLine, size, &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "generateRunId: failed to read size of argument list (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleGenerateRunId: failed to read size of argument list (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -130,17 +130,17 @@ DWORD generateRunId(HANDLE hPipe) {
     HANDLE hFile = CreateFileW(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
     if (hFile == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "generateRunId: failed to open program.txt: %S (0x%x)", targetFile, GetLastError());
+        LOG_F(ERROR, "handleGenerateRunId: failed to open program.txt: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
     if (!WriteFile(hFile, commandLine, size, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "generateRunId: failed to write program name to program.txt (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleGenerateRunId: failed to write program name to program.txt (0x%x)", GetLastError());
         exit(1);
     }
 
     if (!CloseHandle(hFile)) {
-        LOG_F(ERROR, "generateRunId: failed to close program.txt (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleGenerateRunId: failed to close program.txt (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -149,17 +149,17 @@ DWORD generateRunId(HANDLE hPipe) {
     // get program arguments
     size = 0;
     if (!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "generateRunId: failed to read program argument list length (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleGenerateRunId: failed to read program argument list length (0x%x)", GetLastError());
         exit(1);
     }
 
     if (size > 8191) {
-        LOG_F(ERROR, "generateRunId: program argument list length > 8191");
+        LOG_F(ERROR, "handleGenerateRunId: program argument list length > 8191");
         exit(1);
     }
 
     if (!ReadFile(hPipe, commandLine, size, &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "generateRunId: failed to read program argument list (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleGenerateRunId: failed to read program argument list (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -168,23 +168,23 @@ DWORD generateRunId(HANDLE hPipe) {
     hFile = CreateFile(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
     if (hFile == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "generateRunId: failed to open arguments.txt: %S (0x%x)", targetFile, GetLastError());
+        LOG_F(ERROR, "handleGenerateRunId: failed to open arguments.txt: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
     if (!WriteFile(hFile, commandLine, size, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "generateRunId: failed to write argument list to arguments.txt (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleGenerateRunId: failed to write argument list to arguments.txt (0x%x)", GetLastError());
         exit(1);
     }
 
     if (!CloseHandle(hFile)) {
-        LOG_F(ERROR, "generateRunId: failed to close arguments.txt (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleGenerateRunId: failed to close arguments.txt (0x%x)", GetLastError());
         exit(1);
     }
 
     RpcStringFree((RPC_WSTR *)&runId_s);
 
-    LOG_F(INFO, "generateRunId: finished");
+    LOG_F(INFO, "handleGenerateRunId: finished");
 
     return 0;
 }
@@ -697,7 +697,7 @@ DWORD handleMutation(HANDLE hPipe)
         exit(1);
     }
 
-    LOG_F(INFO, "calling writeFKT with targetFile: %s", targetFile);
+    LOG_F(INFO, "calling writeFKT with targetFile: %S", targetFile);
 
     writeFKT(hFile, type, pathSize, filePath, position, size, buf);
 
@@ -827,7 +827,7 @@ DWORD handleReplay(HANDLE hPipe)
 }
 
 /* Dump information about a given run into the named pipe */
-DWORD serveRunInfo(HANDLE hPipe)
+DWORD handleRunInfo(HANDLE hPipe)
 {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
@@ -835,7 +835,7 @@ DWORD serveRunInfo(HANDLE hPipe)
     WCHAR *runId_s;
 
     if (!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "serveRunInfo: failed to read run ID (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleRunInfo: failed to read run ID (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -850,27 +850,27 @@ DWORD serveRunInfo(HANDLE hPipe)
     HANDLE hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 
     if (hFile == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "serveRunInfo: failed to open program.txt: %S (0x%x)", targetFile, GetLastError());
+        LOG_F(ERROR, "handleRunInfo: failed to open program.txt: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
     if (!ReadFile(hFile, commandLine, 8191 * sizeof(WCHAR), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "serveRunInfo: failed to read program name (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleRunInfo: failed to read program name (0x%x)", GetLastError());
         exit(1);
     }
 
     if (!CloseHandle(hFile)) {
-        LOG_F(ERROR, "serveRunInfo: failed to close program.txt (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleRunInfo: failed to close program.txt (0x%x)", GetLastError());
         exit(1);
     }
 
     if (!WriteFile(hPipe, &dwBytesRead, sizeof(DWORD), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "serveRunInfo: failed to write program name size (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleRunInfo: failed to write program name size (0x%x)", GetLastError());
         exit(1);
     }
 
     if (!WriteFile(hPipe, commandLine, dwBytesRead, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "serveRunInfo: failed to write program name (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleRunInfo: failed to write program name (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -881,27 +881,27 @@ DWORD serveRunInfo(HANDLE hPipe)
     hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 
     if (hFile == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "serveRunInfo: failed to open arguments.txt: %S (0x%x)", targetFile, GetLastError());
+        LOG_F(ERROR, "handleRunInfo: failed to open arguments.txt: %S (0x%x)", targetFile, GetLastError());
         exit(1);
     }
 
     if (!ReadFile(hFile, commandLine, 8191 * sizeof(WCHAR), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "serveRunInfo: failed to read command line argument list (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleRunInfo: failed to read command line argument list (0x%x)", GetLastError());
         exit(1);
     }
 
     if (!CloseHandle(hFile)) {
-        LOG_F(ERROR, "serveRunInfo: failed to close arguments.txt (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleRunInfo: failed to close arguments.txt (0x%x)", GetLastError());
         exit(1);
     }
 
     if (!WriteFile(hPipe, &dwBytesRead, sizeof(DWORD), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "serveRunInfo: failed to write argument list size (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleRunInfo: failed to write argument list size (0x%x)", GetLastError());
         exit(1);
     }
 
     if (!WriteFile(hPipe, commandLine, dwBytesRead, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "serveRunInfo: faield to write argument list (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleRunInfo: faield to write argument list (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -911,14 +911,14 @@ DWORD serveRunInfo(HANDLE hPipe)
 }
 
 /* Deletes the run files to free up a Run ID if the last run didn't find a crash */
-DWORD finalizeRun(HANDLE hPipe)
+DWORD handleFinalizeRun(HANDLE hPipe)
 {
     DWORD dwBytesRead = 0;
     UUID runId;
     WCHAR *runId_s;
 
     if (!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "finalizeRun: failed to read run ID (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleFinalizeRun: failed to read run ID (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -926,20 +926,20 @@ DWORD finalizeRun(HANDLE hPipe)
 
     BOOL crash = false;
     if (!ReadFile(hPipe, &crash, sizeof(BOOL), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "finalizeRun: failed to read crash status (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleFinalizeRun: failed to read crash status (0x%x)", GetLastError());
         exit(1);
     }
 
     BOOL preserve = false;
     if (!ReadFile(hPipe, &preserve, sizeof(BOOL), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "finalizeRun: failed to read preserve flag (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleFinalizeRun: failed to read preserve flag (0x%x)", GetLastError());
         exit(1);
     }
 
-    LOG_F(INFO, "finalizeRun: finalizing %S", runId_s);
+    LOG_F(INFO, "handleFinalizeRun: finalizing %S", runId_s);
 
     if (!crash && !preserve) {
-        LOG_F(INFO, "finalizeRun: no crash, removing run %S", runId_s);
+        LOG_F(INFO, "handleFinalizeRun: no crash, removing run %S", runId_s);
         EnterCriticalSection(&critId);
 
         WCHAR targetDir[MAX_PATH + 1] = {0};
@@ -960,10 +960,10 @@ DWORD finalizeRun(HANDLE hPipe)
         LeaveCriticalSection(&critId);
     }
     else if (!crash && !remove) {
-        LOG_F(INFO, "finalizeRun: no crash, but not removing files (requested)");
+        LOG_F(INFO, "handleFinalizeRun: no crash, but not removing files (requested)");
     }
     else {
-        LOG_F(INFO, "finalizeRun: crash found for run %S", runId_s);
+        LOG_F(INFO, "handleFinalizeRun: crash found for run %S", runId_s);
     }
 
     RpcStringFree((RPC_WSTR *)&runId_s);
@@ -972,7 +972,7 @@ DWORD finalizeRun(HANDLE hPipe)
 }
 
 /* Return the location of the crash.json file for a given run ID */
-DWORD crashPath(HANDLE hPipe)
+DWORD handleCrashPath(HANDLE hPipe)
 {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
@@ -980,7 +980,7 @@ DWORD crashPath(HANDLE hPipe)
     WCHAR *runId_s;
 
     if (!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "crashPath: failed to read UUID (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleCrashPath: failed to read UUID (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -995,11 +995,11 @@ DWORD crashPath(HANDLE hPipe)
     size_t size = wcslen(targetFile) * sizeof(WCHAR);
 
     if (!WriteFile(hPipe, &size, sizeof(size), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "crashPath: failed to write length of crash.json path to pipe (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleCrashPath: failed to write length of crash.json path to pipe (0x%x)", GetLastError());
     }
 
     if (!WriteFile(hPipe, &targetFile, (DWORD)size, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "crashPath: failed to write crash.json path to pipe (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleCrashPath: failed to write crash.json path to pipe (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -1044,7 +1044,7 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe)
         // Dispatch individual requests based on which event the client requested
         switch (eventId) {
             case EVT_RUN_ID:
-                generateRunId(hPipe);
+                handleGenerateRunId(hPipe);
                 break;
             case EVT_MUTATION:
                 handleMutation(hPipe);
@@ -1053,13 +1053,13 @@ DWORD WINAPI threadHandler(LPVOID lpvPipe)
                 handleReplay(hPipe);
                 break;
             case EVT_RUN_INFO:
-                serveRunInfo(hPipe);
+                handleRunInfo(hPipe);
                 break;
             case EVT_RUN_COMPLETE:
-                finalizeRun(hPipe);
+                handleFinalizeRun(hPipe);
                 break;
             case EVT_CRASH_PATH:
-                crashPath(hPipe);
+                handleCrashPath(hPipe);
                 break;
             case EVT_SESSION_TEARDOWN:
                 LOG_F(INFO, "Ending a client's session with the server.");
