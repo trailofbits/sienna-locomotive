@@ -36,13 +36,13 @@ using namespace std;
 
 // function metadata structure
 struct wizard_read_info {
-    LPVOID lpBuffer;
+    void *lpBuffer;
     size_t nNumberOfBytesToRead;
     Function function;
-    WCHAR *source;
+    wchar_t *source;
     size_t position;
     size_t retAddrOffset;
-    // TODO(ww): Make this a WCHAR * for consistency.
+    // TODO(ww): Make this a wchar_t * for consistency.
     char *argHash;
 };
 
@@ -96,7 +96,7 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
     HANDLE hEventLog                 = (HANDLE)drwrap_get_arg(wrapcxt, 0);
     DWORD  dwReadFlags               = (DWORD)drwrap_get_arg(wrapcxt, 1);
     DWORD  dwRecordOffset            = (DWORD)drwrap_get_arg(wrapcxt, 2);
-    LPVOID lpBuffer                  = (LPVOID)drwrap_get_arg(wrapcxt, 3);
+    void *lpBuffer                   = (void *)drwrap_get_arg(wrapcxt, 3);
     size_t  nNumberOfBytesToRead     = (size_t)drwrap_get_arg(wrapcxt, 4);
     DWORD  *pnBytesRead              = (DWORD *)drwrap_get_arg(wrapcxt, 5);
     DWORD  *pnMinNumberOfBytesNeeded = (DWORD *)drwrap_get_arg(wrapcxt, 6);
@@ -116,12 +116,12 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
 {
     JSON_WRAP_PRE_LOG();
 
-    HKEY    hKey        = (HKEY)drwrap_get_arg(wrapcxt, 0);
-    LPCTSTR lpValueName = (LPCTSTR)drwrap_get_arg(wrapcxt, 1);
-    LPDWORD lpReserved  = (LPDWORD)drwrap_get_arg(wrapcxt, 2);
-    LPDWORD lpType      = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
-    LPBYTE  lpData      = (LPBYTE)drwrap_get_arg(wrapcxt, 4);
-    LPDWORD lpcbData    = (LPDWORD)drwrap_get_arg(wrapcxt, 5);
+    HKEY hKey         = (HKEY)drwrap_get_arg(wrapcxt, 0);
+    char *lpValueName = (char *)drwrap_get_arg(wrapcxt, 1);
+    DWORD *lpReserved = (DWORD *)drwrap_get_arg(wrapcxt, 2);
+    DWORD *lpType     = (DWORD *)drwrap_get_arg(wrapcxt, 3);
+    BYTE *lpData      = (BYTE *)drwrap_get_arg(wrapcxt, 4);
+    DWORD *lpcbData   = (DWORD *)drwrap_get_arg(wrapcxt, 5);
 
     // get registry key path (maybe hook open key?)
 
@@ -151,9 +151,9 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
     HINTERNET hRequest                          = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
-    PVOID pvBuffer                              = drwrap_get_arg(wrapcxt, 1);
+    void *pvBuffer                              = drwrap_get_arg(wrapcxt, 1);
     DWORD dwBufferLength                        = (DWORD)drwrap_get_arg(wrapcxt, 2);
-    PDWORD pdwBytesRead                         = (PDWORD)drwrap_get_arg(wrapcxt, 3);
+    DWORD *pdwBytesRead                         = (DWORD *)drwrap_get_arg(wrapcxt, 3);
     WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE)(int)drwrap_get_arg(wrapcxt, 3);
 
     // get url
@@ -177,9 +177,9 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
     HINTERNET hFile             = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
-    LPVOID lpBuffer             = drwrap_get_arg(wrapcxt, 1);
+    void *lpBuffer             = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
-    LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
+    DWORD *lpNumberOfBytesRead = (DWORD *)drwrap_get_arg(wrapcxt, 3);
 
     // get url
     // InternetQueryOption
@@ -201,10 +201,10 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
     *user_data             = malloc(sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
-    HINTERNET hRequest          = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
-    LPVOID lpBuffer             = drwrap_get_arg(wrapcxt, 1);
-    DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
-    LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
+    HINTERNET hRequest         = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
+    void *lpBuffer             = drwrap_get_arg(wrapcxt, 1);
+    DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
+    DWORD *lpNumberOfBytesRead = (DWORD*)drwrap_get_arg(wrapcxt, 3);
 
     // get url
     // InternetQueryOption
@@ -257,10 +257,10 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
 {
     JSON_WRAP_PRE_LOG();
 
-    HANDLE hFile                = drwrap_get_arg(wrapcxt, 0);
-    LPVOID lpBuffer             = drwrap_get_arg(wrapcxt, 1);
-    DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
-    LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
+    HANDLE hFile               = drwrap_get_arg(wrapcxt, 0);
+    void *lpBuffer             = drwrap_get_arg(wrapcxt, 1);
+    DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
+    DWORD *lpNumberOfBytesRead = (DWORD *)drwrap_get_arg(wrapcxt, 3);
 
     LARGE_INTEGER offset = {0};
     LARGE_INTEGER position = {0};
@@ -286,7 +286,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->position             = fStruct.position;
 
-    info->source = (WCHAR *)malloc(sizeof(fStruct.fileName));
+    info->source = (wchar_t *) malloc(sizeof(fStruct.fileName));
     memcpy(info->source, fStruct.fileName, sizeof(fStruct.fileName));
 
     // NOTE(ww): SHA2 digests are 64 characters, so we allocate that + room for a NULL
@@ -348,7 +348,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     wstring_convert<std::codecvt_utf8<wchar_t>> utf8Converter;
 
     wizard_read_info *info = ((wizard_read_info *)user_data);
-    CHAR *functionName     = get_function_name(info->function);
+    char *functionName     = get_function_name(info->function);
 
     json j;
     j["type"]               = "id";

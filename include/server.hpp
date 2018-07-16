@@ -25,16 +25,23 @@
 // The format for files (under the run directory) containing replayable mutations.
 #define FUZZ_RUN_FKT_FMT (L"%d.fkt")
 
-// TODO: check then delete all the tracing stuff
 enum Event {
+    // Request a new run ID from the server.
     EVT_RUN_ID,             // 0
+    // Request a mutation from the server.
     EVT_MUTATION,           // 1
+    // Request a replay from the server.
     EVT_REPLAY,             // 2
+    // Request information about a run from the server.
     EVT_RUN_INFO,           // 3
+    // Tell the server to finalize a run.
     EVT_RUN_COMPLETE,       // 4
+    // Request a pathname for storing crash information from the server.
     EVT_CRASH_PATH,         // 5
-    // TODO(ww): Allow the user to shut the server down via an event.
-    // EVT_SHUTDOWN,           // 6
+    // Tell the server to end its session with this client.
+    EVT_SESSION_TEARDOWN,   // 6
+    // Use this as a default value when handling multiple events.
+    EVT_INVALID = 255,
 };
 
 #endif
