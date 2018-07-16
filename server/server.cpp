@@ -992,7 +992,11 @@ DWORD crashPath(HANDLE hPipe)
     PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
     PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_CRASH_JSON);
 
-    size_t size = (wcslen(targetFile) + 1) * sizeof(WCHAR);
+    size_t size = wcslen(targetFile) * sizeof(WCHAR);
+
+    if (!WriteFile(hPipe, &size, sizeof(size), &dwBytesWritten, NULL)) {
+        LOG_F(ERROR, "crashPath: failed to write length of crash.json path to pipe (0x%x)", GetLastError());
+    }
 
     if (!WriteFile(hPipe, &targetFile, (DWORD)size, &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "crashPath: failed to write crash.json path to pipe (0x%x)", GetLastError());
