@@ -25,8 +25,8 @@ static HANDLE hProcessMutex = INVALID_HANDLE_VALUE;
 
 static HANDLE hLog = INVALID_HANDLE_VALUE;
 
-static WCHAR FUZZ_WORKING_PATH[MAX_PATH] = L"";
-static WCHAR FUZZ_LOG[MAX_PATH] = L"";
+static wchar_t FUZZ_WORKING_PATH[MAX_PATH] = L"";
+static wchar_t FUZZ_LOG[MAX_PATH] = L"";
 
 /*
     TODO(ww): Create a formal server API. Doing so will help with:
@@ -51,7 +51,7 @@ static VOID server_cleanup()
 // NOTE(ww): We separate this from initWorkingDir so that we can log any errors that
 // happen to occur in initWorkingDir.
 VOID initLoggingFile() {
-    PWSTR roamingPath;
+    wchar_t *roamingPath;
     SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roamingPath);
 
     if (PathCchCombine(FUZZ_LOG, MAX_PATH, roamingPath, L"Trail of Bits\\fuzzkit\\log\\server.log") != S_OK) {
@@ -66,9 +66,9 @@ VOID initLoggingFile() {
 // as well as the subdirectories and files we expect individual runs to produce.
 // NOTE(ww): This should be kept up-to-date with fuzzer_config.py.
 VOID initWorkingDir() {
-    PWSTR roamingPath;
+    wchar_t *roamingPath;
     SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roamingPath);
-    WCHAR workingLocalPath[MAX_PATH] = L"Trail of Bits\\fuzzkit\\working";
+    wchar_t workingLocalPath[MAX_PATH] = L"Trail of Bits\\fuzzkit\\working";
 
     if (PathCchCombine(FUZZ_WORKING_PATH, MAX_PATH, roamingPath, workingLocalPath) != S_OK) {
         LOG_F(ERROR, "initWorkingDir: failed to combine working dir path (0x%x)", GetLastError());
@@ -85,7 +85,7 @@ DWORD handleGenerateRunId(HANDLE hPipe) {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
     UUID runId;
-    WCHAR *runId_s;
+    wchar_t *runId_s;
 
     LOG_F(INFO, "handleGenerateRunId: received request");
 
@@ -95,7 +95,7 @@ DWORD handleGenerateRunId(HANDLE hPipe) {
     UuidCreate(&runId);
     UuidToString(&runId, (RPC_WSTR *)&runId_s);
 
-    WCHAR targetDir[MAX_PATH + 1] = {0};
+    wchar_t targetDir[MAX_PATH + 1] = {0};
     PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
     if (!CreateDirectory(targetDir, NULL)) {
         LOG_F(ERROR, "handleGenerateRunId: couldn't create working directory (0x%x)", GetLastError());
@@ -108,7 +108,7 @@ DWORD handleGenerateRunId(HANDLE hPipe) {
     // get program name
     // TODO(ww): 8192 is the correct buffer size for the Windows command line, but
     // we should try to find a macro in the WINAPI for it here.
-    WCHAR commandLine[8192] = {0};
+    wchar_t commandLine[8192] = {0};
     DWORD size = 0;
     if (!ReadFile(hPipe, &size, sizeof(DWORD), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleGenerateRunId: failed to read size of program name (0x%x)", GetLastError());
@@ -125,7 +125,7 @@ DWORD handleGenerateRunId(HANDLE hPipe) {
         exit(1);
     }
 
-    WCHAR targetFile[MAX_PATH + 1] = { 0 };
+    wchar_t targetFile[MAX_PATH + 1] = { 0 };
     PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_PROGRAM_TXT);
     HANDLE hFile = CreateFileW(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
@@ -144,7 +144,7 @@ DWORD handleGenerateRunId(HANDLE hPipe) {
         exit(1);
     }
 
-    ZeroMemory(commandLine, 8192 * sizeof(WCHAR));
+    ZeroMemory(commandLine, 8192 * sizeof(wchar_t));
 
     // get program arguments
     size = 0;
@@ -163,7 +163,7 @@ DWORD handleGenerateRunId(HANDLE hPipe) {
         exit(1);
     }
 
-    ZeroMemory(targetFile, (MAX_PATH + 1) * sizeof(WCHAR));
+    ZeroMemory(targetFile, (MAX_PATH + 1) * sizeof(wchar_t));
     PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_ARGUMENTS_TXT);
     hFile = CreateFile(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
@@ -528,7 +528,7 @@ DWORD mutate(BYTE *buf, size_t size)
 }
 
 /* Writes the fkt file in the event we found a crash. Stores information about the mutation that caused it */
-DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, WCHAR *filePath, size_t position, size_t size, BYTE* buf)
+DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, wchar_t *filePath, size_t position, size_t size, BYTE* buf)
 {
     DWORD dwBytesWritten = 0;
 
@@ -548,7 +548,7 @@ DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, WCHAR *filePath, size_t
         exit(1);
     }
 
-    if (!WriteFile(hFile, filePath, pathSize * sizeof(WCHAR), &dwBytesWritten, NULL)) {
+    if (!WriteFile(hFile, filePath, pathSize * sizeof(wchar_t), &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "writeFKT: failed to write path (0x%x)", GetLastError());
         exit(1);
     }
@@ -584,7 +584,7 @@ DWORD handleMutation(HANDLE hPipe)
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
     UUID runId;
-    WCHAR *runId_s;
+    wchar_t *runId_s;
 
     if (!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleMutation: failed to read run ID (0x%x)", GetLastError());
@@ -600,7 +600,7 @@ DWORD handleMutation(HANDLE hPipe)
     }
 
     DWORD mutate_count = 0;
-    WCHAR mutate_fname[MAX_PATH + 1] = {0};
+    wchar_t mutate_fname[MAX_PATH + 1] = {0};
     if (!ReadFile(hPipe, &mutate_count, sizeof(DWORD), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleMutation: failed to read mutation count (0x%x)", GetLastError());
         exit(1);
@@ -618,13 +618,13 @@ DWORD handleMutation(HANDLE hPipe)
         exit(1);
     }
 
-    WCHAR filePath[MAX_PATH + 1] = {0};
+    wchar_t filePath[MAX_PATH + 1] = {0};
 
     // NOTE(ww): Interestingly, Windows distinguishes between a read of 0 bytes
     // and no read at all -- both the client and the server have to do either one or the
     // other, and failing to do either on one side causes a truncated read or write.
     if (pathSize > 0) {
-        if (!ReadFile(hPipe, &filePath, pathSize * sizeof(WCHAR), &dwBytesRead, NULL)) {
+        if (!ReadFile(hPipe, &filePath, pathSize * sizeof(wchar_t), &dwBytesRead, NULL)) {
             LOG_F(ERROR, "handleMutation: failed to read mutation filepath (0x%x)", GetLastError());
             exit(1);
         }
@@ -684,8 +684,8 @@ DWORD handleMutation(HANDLE hPipe)
         exit(1);
     }
 
-    WCHAR targetDir[MAX_PATH + 1] = {0};
-    WCHAR targetFile[MAX_PATH + 1] = {0};
+    wchar_t targetDir[MAX_PATH + 1] = {0};
+    wchar_t targetFile[MAX_PATH + 1] = {0};
 
     PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
     PathCchCombine(targetFile, MAX_PATH, targetDir, mutate_fname);
@@ -745,7 +745,7 @@ DWORD handleReplay(HANDLE hPipe)
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
     UUID runId;
-    WCHAR *runId_s;
+    wchar_t *runId_s;
 
     if (!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleReplay: failed to read run ID (0x%x)", GetLastError());
@@ -757,7 +757,7 @@ DWORD handleReplay(HANDLE hPipe)
     LOG_F(INFO, "Replaying for run id %S", runId_s);
 
     DWORD mutate_count = 0;
-    WCHAR mutate_fname[MAX_PATH + 1] = {0};
+    wchar_t mutate_fname[MAX_PATH + 1] = {0};
     if (!ReadFile(hPipe, &mutate_count, sizeof(DWORD), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleReplay: failed to read mutate count (0x%x)", GetLastError());
         exit(1);
@@ -785,8 +785,8 @@ DWORD handleReplay(HANDLE hPipe)
         exit(1);
     }
 
-    WCHAR targetFile[MAX_PATH + 1];
-    WCHAR targetDir[MAX_PATH + 1];
+    wchar_t targetFile[MAX_PATH + 1];
+    wchar_t targetDir[MAX_PATH + 1];
     PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
     PathCchCombine(targetFile, MAX_PATH, targetDir, mutate_fname);
 
@@ -832,7 +832,7 @@ DWORD handleRunInfo(HANDLE hPipe)
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
     UUID runId;
-    WCHAR *runId_s;
+    wchar_t *runId_s;
 
     if (!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleRunInfo: failed to read run ID (0x%x)", GetLastError());
@@ -841,9 +841,9 @@ DWORD handleRunInfo(HANDLE hPipe)
 
     UuidToString(&runId, (RPC_WSTR *)&runId_s);
 
-    WCHAR commandLine[8192] = {0};
-    WCHAR targetDir[MAX_PATH + 1] = {0};
-    WCHAR targetFile[MAX_PATH + 1] = {0};
+    wchar_t commandLine[8192] = {0};
+    wchar_t targetDir[MAX_PATH + 1] = {0};
+    wchar_t targetFile[MAX_PATH + 1] = {0};
 
     PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
     PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_PROGRAM_TXT);
@@ -854,7 +854,7 @@ DWORD handleRunInfo(HANDLE hPipe)
         exit(1);
     }
 
-    if (!ReadFile(hFile, commandLine, 8191 * sizeof(WCHAR), &dwBytesRead, NULL)) {
+    if (!ReadFile(hFile, commandLine, 8191 * sizeof(wchar_t), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleRunInfo: failed to read program name (0x%x)", GetLastError());
         exit(1);
     }
@@ -874,8 +874,8 @@ DWORD handleRunInfo(HANDLE hPipe)
         exit(1);
     }
 
-    ZeroMemory(commandLine, 8192 * sizeof(WCHAR));
-    ZeroMemory(targetFile, (MAX_PATH + 1) * sizeof(WCHAR));
+    ZeroMemory(commandLine, 8192 * sizeof(wchar_t));
+    ZeroMemory(targetFile, (MAX_PATH + 1) * sizeof(wchar_t));
     PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_ARGUMENTS_TXT);
 
     hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
@@ -885,7 +885,7 @@ DWORD handleRunInfo(HANDLE hPipe)
         exit(1);
     }
 
-    if (!ReadFile(hFile, commandLine, 8191 * sizeof(WCHAR), &dwBytesRead, NULL)) {
+    if (!ReadFile(hFile, commandLine, 8191 * sizeof(wchar_t), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleRunInfo: failed to read command line argument list (0x%x)", GetLastError());
         exit(1);
     }
@@ -915,7 +915,7 @@ DWORD handleFinalizeRun(HANDLE hPipe)
 {
     DWORD dwBytesRead = 0;
     UUID runId;
-    WCHAR *runId_s;
+    wchar_t *runId_s;
 
     if (!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleFinalizeRun: failed to read run ID (0x%x)", GetLastError());
@@ -942,7 +942,7 @@ DWORD handleFinalizeRun(HANDLE hPipe)
         LOG_F(INFO, "handleFinalizeRun: no crash, removing run %S", runId_s);
         EnterCriticalSection(&critId);
 
-        WCHAR targetDir[MAX_PATH + 1] = {0};
+        wchar_t targetDir[MAX_PATH + 1] = {0};
         PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
 
         SHFILEOPSTRUCT remove_op = {
@@ -977,7 +977,7 @@ DWORD handleCrashPath(HANDLE hPipe)
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
     UUID runId;
-    WCHAR *runId_s;
+    wchar_t *runId_s;
 
     if (!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleCrashPath: failed to read UUID (0x%x)", GetLastError());
@@ -986,13 +986,13 @@ DWORD handleCrashPath(HANDLE hPipe)
 
     UuidToString(&runId, (RPC_WSTR *)&runId_s);
 
-    WCHAR targetDir[MAX_PATH + 1] = {0};
-    WCHAR targetFile[MAX_PATH + 1] = {0};
+    wchar_t targetDir[MAX_PATH + 1] = {0};
+    wchar_t targetFile[MAX_PATH + 1] = {0};
 
     PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
     PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_CRASH_JSON);
 
-    size_t size = wcslen(targetFile) * sizeof(WCHAR);
+    size_t size = wcslen(targetFile) * sizeof(wchar_t);
 
     if (!WriteFile(hPipe, &size, sizeof(size), &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "handleCrashPath: failed to write length of crash.json path to pipe (0x%x)", GetLastError());
