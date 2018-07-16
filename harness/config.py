@@ -36,7 +36,9 @@ if not os.path.exists(sl2_config_path):
                                  'target_application_path': 'build\\corpus\\test_application\\Debug\\test_application.exe',
                                  'target_args': '0 -f',
                                  'runs': 1,
-                                 'simultaneous': 1}
+                                 'simultaneous': 1,
+                                 'inline_stdout': False
+                                 }
     with open(sl2_config_path, 'w') as configfile:
         default_config.write(configfile)
 
@@ -58,6 +60,7 @@ parser.add_argument('-s', '--simultaneous', action='store', dest='simultaneous',
 parser.add_argument('-t', '--target', action='store', dest='target_application_path', type=str, help="Path to the target application. Note: Ignores arguments in the config file")
 parser.add_argument('-e', '--stage', action='store', dest='stage', type=str, choices=['WIZARD', 'FUZZER', 'TRIAGE'], help="Synchronously re-run a single stage (for debugging purposes)")
 parser.add_argument('-a', '--arguments', action='store', dest='target_args', nargs=argparse.REMAINDER, type=str, help="Arguments for the target application (supports multiple, must come last)")
+parser.add_argument('-l', '--inline_stdout', action='store_true', dest='inline_stdout', default=False, help="Inline stdout of program under test to console stdout" )
 args = parser.parse_args()
 
 # Read the ConfigParser object into a standard dict
