@@ -818,8 +818,8 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
 
     // Get application name
     const char* mbsAppName = dr_get_application_name();
-    wchar_t wcsAppName[MAX_PATH];
-    mbstowcs(wcsAppName, mbsAppName, MAX_PATH);
+    wchar_t wcsAppName[MAX_PATH + 1] = {0};
+    mbstowcs_s(NULL, wcsAppName, MAX_PATH, mbsAppName, MAX_PATH);
 
     sl2_conn_open(&sl2_conn);
     sl2_conn_request_run_id(&sl2_conn, wcsAppName, get_target_command_line());
