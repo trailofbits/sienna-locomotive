@@ -8,6 +8,7 @@ from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem
 
 from harness import config
 from harness.state import get_target
+from harness.instrument import wizard_run
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -26,12 +27,27 @@ class MainWindow(QtWidgets.QMainWindow):
         self._layout = QtWidgets.QGridLayout(_central_widget)
         _central_widget.setLayout(self._layout)
 
-        self.target_data = get_target(config.config)
+        self.wizard_run = QtWidgets.QPushButton("Run Wizard")
+        self.wizard_run.clicked.connect(self.run_wizard)
+        self._layout.addWidget(self.wizard_run)
 
+        self.target_data = get_target(config.config)
         self._func_tree = CheckboxTreeWidget()
         self._layout.addWidget(self._func_tree)
-
         self._func_tree.itemCheckedStateChanged.connect(self.changed)
+
+        self.build_func_tree()
+
+        self.fuzzer_run = QtWidgets.QPushButton("Fuzz selected targets")
+        self._layout.addWidget(self.fuzzer_run)
+
+        self._stateDisplay = QtWidgets.QTextBrowser()
+        self._stateDisplay.setOpenLinks(False)
+        self._stateDisplay.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+        self._layout.addWidget(self._stateDisplay)
+
+    def build_func_tree(self):
+        self._func_tree.clear()
 
         for index, option in enumerate(self.target_data):
             widget = CheckboxTreeWidgetItem(self._func_tree, index)
@@ -43,14 +59,19 @@ class MainWindow(QtWidgets.QMainWindow):
                 hexstr = " ".join("{:02X}".format(c) for c in option["buffer"][address:address + 16])
                 asciistr = "".join((chr(c) if c in range(31, 127) else '.') for c in option["buffer"][address:address + 16])
                 formatted = "0x%04X:  %s  | %s" % (address, hexstr + " " * (16 * 3 - len(hexstr)), asciistr)
-                data_disp = CheckboxTreeWidgetItem(widget, [formatted])
+                data_disp = CheckboxTreeWidgetItem(widget, 0, is_checkbox=False)
+                data_disp.setText(0, formatted)
                 data_disp.setFont(0, QFontDatabase.systemFont(QFontDatabase.FixedFont))
 
             self._func_tree.insertTopLevelItem(0, widget)
 
-    def changed(self, widget, column, is_checked):
+    def changed(self, widget, _column, is_checked):
         self.target_data.update(widget.index, selected=is_checked)
-        print(widget.text(column), "Checked" if is_checked else "Unchecked")
+
+    def run_wizard(self):
+        self.target_data.set_target_list(wizard_run(config.config))
+
+        self.build_func_tree()
 
     def get_config(self):
         profile, cont = QtWidgets.QInputDialog.getItem(self,

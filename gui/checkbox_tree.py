@@ -4,11 +4,12 @@ from PyQt5.QtCore import pyqtSignal, Qt
 
 class CheckboxTreeWidgetItem(QTreeWidgetItem):
 
-    def __init__(self, parent, index, *args):
+    def __init__(self, parent, index, is_checkbox=True, *args):
         super().__init__(parent, *args)
         self.index = index
         self._parent = parent
-        self.setCheckState(0, Qt.Unchecked)
+        if is_checkbox:
+            self.setCheckState(0, Qt.Unchecked)
 
     def setData(self, column, role, value):
         should_emit = (role == Qt.CheckStateRole) and \

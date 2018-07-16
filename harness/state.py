@@ -65,6 +65,13 @@ class TargetAdapter(object):
         for key in kwargs:
             self.target_list[index][key] = kwargs[key]
 
+        self.save()
+
+    def set_target_list(self, new_targets):
+        self.target_list = new_targets
+        self.save()
+
+    def save(self):
         with open(self.filename, 'w') as jsonfile:
             json.dump(self.target_list, jsonfile)
 
