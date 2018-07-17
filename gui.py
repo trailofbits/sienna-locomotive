@@ -2,13 +2,14 @@ import sys
 
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt, QSize, QObject, pyqtSignal
-from PyQt5.QtGui import QFontDatabase
+from PyQt5.QtGui import QFontDatabase, QMovie
 
 from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem
 
 from harness import config
 from harness.state import get_target
 from harness.threads import WizardThread, FuzzerThread
+from functools import partial
 
 
 class QIntVariable(QObject):
@@ -73,6 +74,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.wizard_thread = WizardThread(config.config)
         self.wizard_thread.resultReady.connect(self.wizard_finished)
         self.wizard_run.clicked.connect(self.wizard_thread.start)
+        self.wizard_thread.started.connect(partial(self.setCursor, Qt.WaitCursor))
+        self.wizard_thread.finished.connect(self.unsetCursor)
         self._layout.addWidget(self.wizard_run)
 
         self.target_data = get_target(config.config)
@@ -106,6 +109,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.throughput.valueChanged.connect(self.throughput_adapter.update)
         self.crashes.valueChanged.connect(self.crash_adapter.update)
 
+        self.busy_label = QtWidgets.QLabel()
+        busy_gif = QMovie("gui/busy.gif")
+        self.busy_label.setMovie(busy_gif)
+        busy_gif.start()
+        self.busy_label.hide()
+
         self.fuzz_count = QtWidgets.QLabel()
         self.throughput_label = QtWidgets.QLabel()
         self.crash_count = QtWidgets.QLabel()
@@ -118,6 +127,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.fuzzer_thread.runComplete.connect(self.calculate_throughput)
         self.fuzzer_thread.foundCrash.connect(self.crashes.increment)
 
+        self.fuzzer_thread.started.connect(self.busy_label.show)
+        self.fuzzer_thread.finished.connect(self.busy_label.hide)
+
+        self._status_bar.addWidget(self.busy_label)
         self._status_bar.addWidget(self.fuzz_count)
         self._status_bar.addWidget(self.throughput_label)
         self._status_bar.addWidget(self.crash_count)
