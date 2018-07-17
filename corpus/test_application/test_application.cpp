@@ -1,10 +1,20 @@
 #include <stdio.h>
 #include <Windows.h>
+#include <stdint.h>
 
 #include "internet_read_file.h"
 #include "win_http_read_data.h"
 #include "winsock_recv.h"
 #include "win_http_web_socket_receive.h"
+
+
+void crash() {
+    printf("Crashing!!!!\n");
+    char buf[1];
+
+    memcpy( buf, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", 1000 );
+}
+
 
 // RegQueryValueEx
 int test_RegQueryValueEx(bool fuzzing) {
@@ -143,7 +153,13 @@ int test_ReadFile_inf_loop(bool fuzzing) {
     CloseHandle(file);
     return 0;
 }
-int readfile(LPWSTR path ) {
+int readfile(LPWSTR path, uint8_t* buf=nullptr ) {
+
+    BYTE bufStack[0x1000] = {};
+    if( buf==nullptr )
+        buf = (uint8_t*)bufStack;
+    
+
     printf("Reading file %S.\n", path);
     HANDLE file = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (file == INVALID_HANDLE_VALUE) {
@@ -151,7 +167,7 @@ int readfile(LPWSTR path ) {
         return 1;
     }
 
-    BYTE buf[0x1000] = {};
+    
     DWORD bytes_to_read = 8;
     DWORD bytes_read;
     if (!ReadFile(file, buf, bytes_to_read, &bytes_read, NULL) || bytes_read != bytes_to_read) {
@@ -206,22 +222,36 @@ int test_captureStdout(bool fuzzing) {
 
     printf("XXXWWWXXX\n");
     return 0;
-
 }
+
+
+int test_quickCrash(bool fuzzing) {
+    printf("Starting quickCrash()...\n");
+    char buf[1024];
+    memset(buf, 0, sizeof(buf) );
+    readfile(L"test_argCompare_win.txt", (uint8_t*)buf);
+    printf("(%s)\n", buf);
+    if( strstr( buf, "WIN!!!" ) != NULL ) {
+        crash();
+    } 
+    return 0;
+}
+
 
 int show_help(LPWSTR *argv) {
     printf("\nUSAGE: %S [TEST NUMBER] [-f]\n", argv[0]);
     printf("\nTEST NUMBERS:\n");
-    printf("\t0: test_ReadFile\n");
-    printf("\t1: test_recv\n");
-    printf("\t2: test_WinHttpReadData\n");
-    printf("\t3: test_InternetReadFile\n");
-    printf("\t4: test_RegQueryValueEx\n");
-    printf("\t5: test_WinHttpWebSocketReceive\n");
-    printf("\t6: test_fread\n");
-    printf("\t7: test_ReadFile_inf_loop\n");
-    printf("\t8: test_argCompare\n");
-    printf("\t9: test_captureStdout\n");
+    printf("\t0:  test_ReadFile\n");
+    printf("\t1:  test_recv\n");
+    printf("\t2:  test_WinHttpReadData\n");
+    printf("\t3:  test_InternetReadFile\n");
+    printf("\t4:  test_RegQueryValueEx\n");
+    printf("\t5:  test_WinHttpWebSocketReceive\n");
+    printf("\t6:  test_fread\n");
+    printf("\t7:  test_ReadFile_inf_loop\n");
+    printf("\t8:  test_argCompare\n");
+    printf("\t9:  test_captureStdout\n");
+    printf("\t10: test_quickCrash\n");
     printf("\nf:\n"); 
     printf("\tenable fuzzing mode\n");
     printf("\the crashing condition will be guarded by a conditional\n");
@@ -289,6 +319,10 @@ int main()
             test_captureStdout(fuzzing);
             break;
 
+        case 10:
+            printf("Running: test_quickCrash\n");
+            test_quickCrash(fuzzing);
+            break;
 
         default:
             show_help(argv);
