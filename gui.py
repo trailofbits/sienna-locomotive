@@ -1,57 +1,16 @@
 import sys
 
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt, QSize, QObject, pyqtSignal
+from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QFontDatabase, QMovie
 
 from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem
+from gui.QtHelpers import QIntVariable, QFloatVariable, QTextAdapter
 
 from harness import config
 from harness.state import get_target
 from harness.threads import WizardThread, FuzzerThread
 from functools import partial
-
-
-class QIntVariable(QObject):
-    valueChanged = pyqtSignal(int)
-
-    def __init__(self, value):
-        QObject.__init__(self)
-        self.value = value
-
-    def increment(self):
-        self._update(self.value + 1)
-
-    def _update(self, newval):
-        self.value = newval
-        self.valueChanged.emit(self.value)
-
-
-class QFloatVariable(QObject):
-    valueChanged = pyqtSignal(float)
-
-    def __init__(self, value):
-        QObject.__init__(self)
-        self.value = value
-
-    def update(self, newval):
-        self.value = newval
-        self.valueChanged.emit(self.value)
-
-
-class QTextAdapter(QObject):
-    updated = pyqtSignal(str)
-
-    def __init__(self, format_str, *args):
-        QObject.__init__(self)
-        self.format_str = format_str
-        self.args = args
-
-    def __str__(self):
-        return self.format_str.format(*self.args)
-
-    def update(self, *_throwaway):
-        self.updated.emit(str(self))
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -81,7 +40,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.target_data = get_target(config.config)
         self._func_tree = CheckboxTreeWidget()
         self._layout.addWidget(self._func_tree)
-        self._func_tree.itemCheckedStateChanged.connect(self.changed)
+        self._func_tree.itemCheckedStateChanged.connect(self.tree_changed)
 
         self.build_func_tree()
 
@@ -167,7 +126,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
             self._func_tree.insertTopLevelItem(0, widget)
 
-    def changed(self, widget, _column, is_checked):
+    def tree_changed(self, widget, _column, is_checked):
         self.target_data.update(widget.index, selected=is_checked)
 
     def wizard_finished(self, wizard_output):
@@ -175,6 +134,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.build_func_tree()
 
     def get_config(self):
+        """ Selects the configuration dict from config.py """
         profile, cont = QtWidgets.QInputDialog.getItem(self,
                                                        "Select Configuration Profile",
                                                        "Select Configuration Profile",
