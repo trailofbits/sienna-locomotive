@@ -16,6 +16,7 @@
 
 #include <picosha2.h>
 
+#include "common/mutation.hpp"
 #include "common/sl2_server_api.hpp"
 #include "common/sl2_dr_client.hpp"
 
@@ -33,7 +34,7 @@ static SL2Client   client;
 static sl2_conn sl2_conn;
 static bool crashed = false;
 static uint64_t baseAddr;
-static DWORD mutateCount = 0;
+static DWORD mut_count = 0;
 
 // Metadata object for a target function call
 struct fuzzer_read_info {
@@ -178,9 +179,9 @@ event_exit(void)
 
 /* Hands bytes off to the mutation server, gets mutated bytes, and writes them into memory. */
 static bool
-mutate(Function function, HANDLE hFile, size_t position, void *buf, size_t size)
+mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bufsize)
 {
-    wchar_t filePath[MAX_PATH + 1] = {0};
+    wchar_t resource[MAX_PATH + 1] = {0};
 
     // Check that ReadFile calls are to something actually valid
     // TODO(ww): Add fread and fread_s here once the _getosfhandle problem is fixed.
@@ -190,19 +191,24 @@ mutate(Function function, HANDLE hFile, size_t position, void *buf, size_t size)
             return false;
         }
 
-        GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, 0);
-        SL2_DR_DEBUG("mutate: filePath: %S", filePath);
+        GetFinalPathNameByHandle(hFile, resource, MAX_PATH, 0);
+        SL2_DR_DEBUG("mutate: resource: %S\n", resource);
     }
 
-    // generate_mutation(buf, size);
+    sl2_mutation mutation;
 
-    DWORD type = static_cast<DWORD>(function);
+    mutation.function = static_cast<DWORD>(function);
+    mutation.mut_count = mut_count;
+    mutation.resource = resource;
+    mutation.position = position;
+    mutation.bufsize = bufsize;
+    mutation.buffer = (unsigned char *) buffer;
 
-    sl2_conn_request_mutation(&sl2_conn, type, mutateCount, filePath, position, size, buf);
+    mutate_buffer(mutation.buffer, mutation.bufsize);
 
-    // sl2_conn_register_mutation(&sl2_conn, type, mutateCount, filePath, position, size, buf);
+    sl2_conn_register_mutation(&sl2_conn, &mutation);
 
-    mutateCount++;
+    mut_count++;
 
     return true;
 }

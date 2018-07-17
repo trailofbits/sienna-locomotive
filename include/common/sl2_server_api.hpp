@@ -83,18 +83,6 @@ __declspec(dllexport) SL2Response sl2_conn_request_run_id(sl2_conn *conn, wchar_
 // Associates this connection with an extant run ID.
 __declspec(dllexport) SL2Response sl2_conn_assign_run_id(sl2_conn *conn, UUID run_id);
 
-// Requests a mutation from the SL2 server.
-// `func_type` corresponds to one of the Function enums in sl2_dr_client.hpp.
-// `mut_count` is the Nth mutation requested.
-// `filename` contains the fully qualified path to the file whose buffer is being mutated.
-// NOTE(ww): In the current implementation, `filename` can be NULL.
-// `position` is the offset within `filename` that the buffer begins at.
-// NOTE(ww): In the current implementation, `position` isn't used (but is recorded in the FKT).
-// `bufsize` is the size of the mutable buffer, in bytes.
-// `buffer` is the mutable buffer. This function both reads from and writes to `buffer`.
-// TODO(ww): Allow the caller to request a particular mutation type?
-__declspec(dllexport) SL2Response sl2_conn_request_mutation(sl2_conn *conn, DWORD func_type, DWORD mut_count, wchar_t *filename, size_t position, size_t bufsize, void *buffer);
-
 // Registers a mutation with the SL2 server.
 // `mutation` is a pointer to a `sl2_mutation` containing the mutation's state.
 __declspec(dllexport) SL2Response sl2_conn_register_mutation(sl2_conn *conn, sl2_mutation *mutation);

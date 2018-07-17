@@ -94,56 +94,6 @@ __declspec(dllexport) SL2Response sl2_conn_assign_run_id(sl2_conn *conn, UUID ru
     return SL2Response::OK;
 }
 
-__declspec(dllexport) SL2Response sl2_conn_request_mutation(
-    sl2_conn *conn,
-    DWORD func_type,
-    DWORD mut_count,
-    wchar_t *filename,
-    size_t position,
-    size_t bufsize,
-    void *buffer)
-{
-    BYTE event = EVT_MUTATION;
-    DWORD txsize;
-
-    // If the connection doesn't have a run ID, then we don't have any state
-    // to request a mutation against.
-    if (!conn->has_run_id) {
-        return SL2Response::MissingRunID;
-    }
-
-    // First, tell the server that we're requesting a mutation.
-    WriteFile(conn->pipe, &event, sizeof(event), &txsize, NULL);
-
-    // Then, give the server our run ID.
-    WriteFile(conn->pipe, &(conn->run_id), sizeof(conn->run_id), &txsize, NULL);
-
-    // Then, tell the server the fuction type receiving the mutation.
-    // NOTE(ww): The server doesn't currently use this information, other
-    // than dumping it to the FTK. See sl2_dr_client.hpp for the mapping
-    // of these numbers to function names.
-    WriteFile(conn->pipe, &func_type, sizeof(func_type), &txsize, NULL);
-
-    // Then, tell the server the current mutation count.
-    // NOTE(ww): The server uses this to construct the FTK's path,
-    // e.g., "...\0.ftk". But with the current implementation, this number
-    // is always 0, so it might be worth just removing.
-    WriteFile(conn->pipe, &mut_count, sizeof(mut_count), &txsize, NULL);
-
-    sl2_conn_write_prefixed_string(conn, filename);
-
-    // Then, send the position within and total size of the incoming buffer.
-    WriteFile(conn->pipe, &position, sizeof(position), &txsize, NULL);
-    WriteFile(conn->pipe, &bufsize, sizeof(bufsize), &txsize, NULL);
-
-    // Finally, both send the buffer and receive it, mutating it in place.
-    WriteFile(conn->pipe, buffer, bufsize, &txsize, NULL);
-    ReadFile(conn->pipe, buffer, bufsize, &txsize, NULL);
-
-    // TODO(ww): error returns
-    return SL2Response::OK;
-}
-
 __declspec(dllexport) SL2Response sl2_conn_register_mutation(
     sl2_conn *conn,
     sl2_mutation *mutation)
