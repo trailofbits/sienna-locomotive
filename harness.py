@@ -11,7 +11,7 @@ import json
 import atexit
 import harness.config
 import harness.statz
-from harness.state import get_target_dir, get_targets, get_runs, stringify_program_array
+from harness.state import get_target_dir, get_all_targets, get_runs, stringify_program_array
 from harness.instrument import print_l, wizard_run, fuzzer_run, triage_run, start_server, fuzz_and_triage, kill
 
 
@@ -62,7 +62,7 @@ def select_and_dump_wizard_findings(wizard_findings, target_file):
 def hexdump(buffer, lines=4, line_len=16):
     """ Dump buffer byte array to stdout """
     for address in range(0, len(buffer), line_len):
-        if address > lines * 16:
+        if address > lines * line_len:
             print_l('...')
             break
         hexstr = " ".join("{:02X}".format(c) for c in buffer[address:address + line_len])
@@ -85,7 +85,7 @@ def main():
 
         # Parse the list of targets and select one to fuzz
         if config['stage'] == 'FUZZER':
-            targets = get_targets()
+            targets = get_all_targets()
             mapping = []
             for target in targets:
                 print("{}) [{}]  {}".format(len(mapping),
@@ -111,7 +111,7 @@ def main():
             config['target_application_path'], config['target_args'] = runs[run_id]
             config['client_args'].append('-t')
             config['client_args'].append(target_file)
-            triage_run(config, run_id[-36:])
+            print(triage_run(config, run_id[-36:]))
 
     else:
         # Run the wizard to select a target function if we don't have one saved

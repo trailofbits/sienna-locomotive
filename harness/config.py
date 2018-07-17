@@ -12,7 +12,7 @@ import configparser
 
 # NOTE(ww): Keep these up-to-data with include/server.hpp!
 sl2_server_pipe_path = "\\\\.\\pipe\\fuzz_server"
-sl2_dir = os.path.join(os.getenv('APPDATA'), 'Trail of Bits', 'fuzzkit')
+sl2_dir = os.path.join(os.getenv('APPDATA', default="."), 'Trail of Bits', 'fuzzkit')
 sl2_working_dir = os.path.join(sl2_dir, 'working')
 sl2_log_dir = os.path.join(sl2_dir, 'log')
 sl2_targets_dir = os.path.join(sl2_dir, 'targets')
@@ -49,6 +49,7 @@ _config.read(sl2_config_path)
 # Set up argument parser
 parser = argparse.ArgumentParser(description='Run the DynamoRIO fuzzing harness. You can pass arguments to the command line to override the defaults in config.ini')
 parser.add_argument('-v', '--verbose', action='store_true', dest='verbose', default=False, help="Tell drrun to run in verbose mode")
+parser.add_argument('-d', '--debug', action='store_true', dest='debug', default=False, help="Tell drrun to run in debug mode")
 parser.add_argument('-n', '--nopersist', action='store_true', dest='nopersist', default=False, help="Tell drrun not to use persistent code caches (slower)")
 parser.add_argument('-p', '--profile', action='store', dest='profile', default='DEFAULT', type=str, help="Pull configuration from a specific section in config.ini. Defaults to DEFAULT")
 parser.add_argument('-c', '--continuous', action='store_true', dest='continuous', default=False, help="Continuously fuzz the target application")
@@ -65,40 +66,57 @@ args = parser.parse_args()
 
 # Read the ConfigParser object into a standard dict
 config = {}  # This is what gets exported
-for key in _config[args.profile]:
-    config[key] = _config[args.profile].get(key)
 
-# Convert numeric arguments into ints. Need to update this list manually if adding anything.
-int_options = ['runs', 'simultaneous']
-for opt in int_options:
-    config[opt] = int(config[opt])
 
-# Convert comma-separated arguments into lists
-list_options = ['drrun_args', 'client_args', 'target_args']
-for opt in list_options:
-    config[opt] = [] if (len(config[opt]) == 0) else config[opt].split(',')
+def set_profile(new_profile):
+    global config
+    config = {}  # This is what gets exported
+    for key in _config[new_profile]:
+        config[key] = _config[new_profile].get(key)
 
-if args.target_application_path is not None and len(config['target_args']) > 0:
-    config['target_args'] = []
+    update_config_from_args()
 
-if args.verbose:
-    config['drrun_args'].append('-verbose')
 
-if not args.nopersist:
-    config['drrun_args'].append('-persist')
+def update_config_from_args():
+    global config
+    # Convert numeric arguments into ints. Need to update this list manually if adding anything.
+    int_options = ['runs', 'simultaneous']
+    for opt in int_options:
+        config[opt] = int(config[opt])
 
-# Replace any values in the config dict with the optional value from the argument.
-# Note that if you set a default value for an arg, this will overwrite its value in the config
-# file even if the argument is not explicitly set by the user, so make sure you use keys that aren't
-# in the config file for any arguments that have default values.
-for arg in vars(args):
-    if getattr(args, arg) is not None:
-        config[arg] = getattr(args, arg)
+    # Convert comma-separated arguments into lists
+    list_options = ['drrun_args', 'client_args', 'target_args']
+    for opt in list_options:
+        config[opt] = [] if (len(config[opt]) == 0) else config[opt].split(',')
 
-for key in config:
-    if 'path' in key:
-        if not os.path.exists(config[key]):
-            print("WARNING: {key} = {dest}, which does not exist.".format(key=key, dest=config[key]))
+    if args.target_application_path is not None and len(config['target_args']) > 0:
+        config['target_args'] = []
+
+    if args.verbose:
+        config['drrun_args'].append('-verbose')
+
+    if args.debug:
+        config['drrun_args'].append('-debug')
+
+    if not args.nopersist:
+        config['drrun_args'].append('-persist')
+
+    # Replace any values in the config dict with the optional value from the argument.
+    # Note that if you set a default value for an arg, this will overwrite its value in the config
+    # file even if the argument is not explicitly set by the user, so make sure you use keys that aren't
+    # in the config file for any arguments that have default values.
+    for arg in vars(args):
+        if getattr(args, arg) is not None:
+            config[arg] = getattr(args, arg)
+
+    for key in config:
+        if 'path' in key:
+            if not os.path.exists(config[key]):
+                print("WARNING: {key} = {dest}, which does not exist.".format(key=key, dest=config[key]))
+
+
+set_profile(args.profile)
+
 
 if __name__ == '__main__':
     from pprint import pprint
