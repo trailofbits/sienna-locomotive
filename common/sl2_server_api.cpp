@@ -4,16 +4,19 @@
 
 #include "common/sl2_server_api.hpp"
 
+#define SL2_CONN_WRITE(conn, thing, size) (WriteFile(conn->pipe, thing, size, &txsize, NULL))
+#define SL2_CONN_READ(conn, thing, size) (ReadFile(conn->pipe, thing, size, &txsize, NULL))
+
 static void sl2_conn_write_prefixed_string(sl2_conn *conn, wchar_t *message)
 {
     DWORD txsize;
     size_t len = lstrlen(message) * sizeof(wchar_t);
 
-    WriteFile(conn->pipe, &len, sizeof(len), &txsize, NULL);
+    SL2_CONN_WRITE(conn, &len, sizeof(len));
 
     // If the string is empty, don't bother sending it.
     if (len > 0) {
-        WriteFile(conn->pipe, message, len, &txsize, NULL);
+        SL2_CONN_WRITE(conn, message, len);
     }
 }
 
@@ -47,7 +50,7 @@ __declspec(dllexport) SL2Response sl2_conn_close(sl2_conn *conn)
     DWORD txsize;
 
     // Tell the server that we want to end our session.
-    WriteFile(conn->pipe, &event, sizeof(event), &txsize, NULL);
+    SL2_CONN_WRITE(conn, &event, sizeof(event));
 
     CloseHandle(conn->pipe);
 
@@ -65,10 +68,10 @@ __declspec(dllexport) SL2Response sl2_conn_request_run_id(
     DWORD txsize;
 
     // First, tell the server that we're requesting a UUID.
-    WriteFile(conn->pipe, &event, sizeof(event), &txsize, NULL);
+    SL2_CONN_WRITE(conn, &event, sizeof(event));
 
     // Then, read the UUID from the server.
-    ReadFile(conn->pipe, &run_id, sizeof(run_id), &txsize, NULL);
+    SL2_CONN_READ(conn, &run_id, sizeof(run_id));
 
     sl2_conn_write_prefixed_string(conn, target_name);
     sl2_conn_write_prefixed_string(conn, target_args);
@@ -153,19 +156,19 @@ __declspec(dllexport) SL2Response sl2_conn_register_mutation(
     }
 
     // First, tell the server that we're registering a mutation.
-    WriteFile(conn->pipe, &event, sizeof(event), &txsize, NULL);
+    SL2_CONN_WRITE(conn, &event, sizeof(event));
 
     // Then, tell the server which run the mutation is associated with.
-    WriteFile(conn->pipe, &(conn->run_id), sizeof(conn->run_id), &txsize, NULL);
+    SL2_CONN_WRITE(conn, &(conn->run_id), sizeof(conn->run_id));
 
     // Then, send our mutation state over.
     // TODO(ww): Check for truncated writes.
-    WriteFile(conn->pipe, mutation->function, sizeof(mutation->function), &txsize, NULL);
-    WriteFile(conn->pipe, mutation->mut_count, sizeof(mutation->mut_count), &txsize, NULL);
+    SL2_CONN_WRITE(conn, &(mutation->function), sizeof(mutation->function));
+    SL2_CONN_WRITE(conn, &(mutation->mut_count), sizeof(mutation->mut_count));
     sl2_conn_write_prefixed_string(conn, mutation->resource);
-    WriteFile(conn->pipe, mutation->position, sizeof(mutation->position), &txsize, NULL);
-    WriteFile(conn->pipe, mutation->bufsize, sizeof(mutation->bufsize), &txsize, NULL);
-    WriteFile(conn->pipe, mutation->buffer, mutation->bufsize, &txsize, NULL);
+    SL2_CONN_WRITE(conn, &(mutation->position), sizeof(mutation->position));
+    SL2_CONN_WRITE(conn, &(mutation->bufsize), sizeof(mutation->bufsize));
+    SL2_CONN_WRITE(conn, mutation->buffer, mutation->bufsize);
 
     return SL2Response::OK;
 }
@@ -186,18 +189,18 @@ __declspec(dllexport) SL2Response sl2_conn_request_replay(
     }
 
     // First, tell the server that we're requesting a replay.
-    WriteFile(conn->pipe, &event, sizeof(event), &txsize, NULL);
+    SL2_CONN_WRITE(conn, &event, sizeof(event));
 
     // Then, tell the server which run we're requesting the replay for.
-    WriteFile(conn->pipe, &(conn->run_id), sizeof(conn->run_id), &txsize, NULL);
+    SL2_CONN_WRITE(conn, &(conn->run_id), sizeof(conn->run_id));
 
     // Then, tell the server which mutation we're expecting from that run.
-    WriteFile(conn->pipe, &mut_count, sizeof(mut_count), &txsize, NULL);
+    SL2_CONN_WRITE(conn, &mut_count, sizeof(mut_count));
 
     // Finally, tell the server how many bytes we expect to receive and
     // receive those bytes into the buffer.
-    WriteFile(conn->pipe, &bufsize, sizeof(bufsize), &txsize, NULL);
-    ReadFile(conn->pipe, buffer, bufsize, &txsize, NULL);
+    SL2_CONN_WRITE(conn, &bufsize, sizeof(bufsize));
+    SL2_CONN_READ(conn, buffer, bufsize);
 
     return SL2Response::OK;
 }
@@ -214,33 +217,33 @@ __declspec(dllexport) SL2Response sl2_conn_request_run_info(
     }
 
     // First, tell the server that we're requesting information about a run.
-    WriteFile(conn->pipe, &event, sizeof(event), &txsize, NULL);
+    SL2_CONN_WRITE(conn, &event, sizeof(event));
 
     // Then, tell the server which run we want information for.
-    WriteFile(conn->pipe, &(conn->run_id), sizeof(conn->run_id), &txsize, NULL);
+    SL2_CONN_WRITE(conn, &(conn->run_id), sizeof(conn->run_id));
 
     // Then, read the length-prefixed program pathname and argument list.
     // NOTE(ww): The server sends us the length of the buffer, not the length of
     // the widechar string (which would be half of the buffer's size).
     size_t len;
 
-    ReadFile(conn->pipe, &len, sizeof(len), &txsize, NULL);
+    SL2_CONN_READ(conn, &len, sizeof(len));
 
     if (len > MAX_PATH) {
         return SL2Response::MaxPath;
     }
 
     memset(info->program, 0, len + 1);
-    ReadFile(conn->pipe, info->program, len, &txsize, NULL);
+    SL2_CONN_READ(conn, info->program, len);
 
-    ReadFile(conn->pipe, &len, sizeof(len), &txsize, NULL);
+    SL2_CONN_READ(conn, &len, sizeof(len));
 
     if (len > MAX_PATH) {
         return SL2Response::MaxPath;
     }
 
     memset(info->arguments, 0, len + 1);
-    ReadFile(conn->pipe, info->arguments, len, &txsize, NULL);
+    SL2_CONN_READ(conn, info->arguments, len);
 
     return SL2Response::OK;
 }
@@ -259,17 +262,17 @@ __declspec(dllexport) SL2Response sl2_conn_finalize_run(
     }
 
     // First, tell the server that we're finalizing a run.
-    WriteFile(conn->pipe, &event, sizeof(event), &txsize, NULL);
+    SL2_CONN_WRITE(conn, &event, sizeof(event));
 
     // Then, tell the server which run we're finalizing.
-    WriteFile(conn->pipe, &(conn->run_id), sizeof(conn->run_id), &txsize, NULL);
+    SL2_CONN_WRITE(conn, &(conn->run_id), sizeof(conn->run_id));
 
     // Then, tell the server whether we've found a crash.
-    WriteFile(conn->pipe, &crash, sizeof(crash), &txsize, NULL);
+    SL2_CONN_WRITE(conn, &crash, sizeof(crash));
 
     // Finally, tell the server if we'd like to preserve the run's on-disk state,
     // even without a crash. This is only checked if by the server if crash is false.
-    WriteFile(conn->pipe, &preserve, sizeof(preserve), &txsize, NULL);
+    SL2_CONN_WRITE(conn, &preserve, sizeof(preserve));
 
     return SL2Response::OK;
 }
@@ -288,24 +291,24 @@ __declspec(dllexport) SL2Response sl2_conn_request_crash_path(
     }
 
     // First, tell the server that we're requesting a crash path.
-    WriteFile(conn->pipe, &event, sizeof(event), &txsize, NULL);
+    SL2_CONN_WRITE(conn, &event, sizeof(event));
 
     // Then, tell the server which run we want the crash path for.
-    WriteFile(conn->pipe, &(conn->run_id), sizeof(conn->run_id), &txsize, NULL);
+    SL2_CONN_WRITE(conn, &(conn->run_id), sizeof(conn->run_id));
 
     // Finally, read the length-prefixed crash path from the server.
     // NOTE(ww): Like EVT_RUN_INFO, the lengths here are buffer lengths,
     // not string lengths.
     size_t len;
 
-    ReadFile(conn->pipe, &len, sizeof(len), &txsize, NULL);
+    SL2_CONN_READ(conn, &len, sizeof(len));
 
     if (len > MAX_PATH) {
         return SL2Response::MaxPath;
     }
 
     memset(crash_path, 0, len + 1);
-    ReadFile(conn->pipe, crash_path, len, &txsize, NULL);
+    SL2_CONN_READ(conn, crash_path, len);
 
     return SL2Response::OK;
 }
@@ -324,24 +327,24 @@ __declspec(dllexport) SL2Response sl2_conn_request_minidump_path(
     }
 
     // First, tell the server that we're requesting a dump path.
-    WriteFile(conn->pipe, &event, sizeof(event), &txsize, NULL);
+    SL2_CONN_WRITE(conn, &event, sizeof(event));
 
     // Then, tell the server which run we want the dump path for.
-    WriteFile(conn->pipe, &(conn->run_id), sizeof(conn->run_id), &txsize, NULL);
+    SL2_CONN_WRITE(conn, &(conn->run_id), sizeof(conn->run_id));
 
     // Finally, read the length-prefixed dump path from the server.
     // NOTE(ww): Like EVT_RUN_INFO, the lengths here are buffer lengths,
     // not string lengths.
     size_t len;
 
-    ReadFile(conn->pipe, &len, sizeof(len), &txsize, NULL);
+    SL2_CONN_READ(conn, &len, sizeof(len));
 
     if (len > MAX_PATH) {
         return SL2Response::MaxPath;
     }
 
     memset(dump_path, 0, len + 1);
-    ReadFile(conn->pipe, dump_path, len, &txsize, NULL);
+    SL2_CONN_READ(conn, dump_path, len);
 
     return SL2Response::OK;
 }
