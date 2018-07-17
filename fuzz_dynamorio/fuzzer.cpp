@@ -19,20 +19,6 @@
 #include "common/sl2_server_api.hpp"
 #include "common/sl2_dr_client.hpp"
 
-#ifdef WINDOWS
-#define IF_WINDOWS_ELSE(x,y) x
-#else
-#define IF_WINDOWS_ELSE(x,y) y
-#endif
-
-#ifdef WINDOWS
-#define DISPLAY_STRING(msg) dr_messagebox(msg)
-#else
-#define DISPLAY_STRING(msg) dr_printf("%s\n", msg);
-#endif
-
-#define NULL_TERMINATE(buf) buf[(sizeof(buf)/sizeof(buf[0])) - 1] = '\0'
-
 static bool mutate(HANDLE hFile, size_t position, void *buf, size_t size);
 
 // structure for getting command line client options in dynamorio
