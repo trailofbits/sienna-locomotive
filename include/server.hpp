@@ -40,6 +40,8 @@ enum Event {
     EVT_CRASH_PATH,         // 5
     // Tell the server to end its session with this client.
     EVT_SESSION_TEARDOWN,   // 6
+    // Request a pathname for storing a memory dump from the server.
+    EVT_MEM_DMP_PATH,       // 7
     // Use this as a default value when handling multiple events.
     EVT_INVALID = 255,
 };

@@ -95,4 +95,9 @@ __declspec(dllexport) SL2Response sl2_conn_finalize_run(sl2_conn *conn, bool cra
 // Clients should `free` `crash_path` when no longer needed.
 __declspec(dllexport) SL2Response sl2_conn_request_crash_path(sl2_conn *conn, wchar_t **crash_path);
 
+// Requests a path for storing a minidump for a run from the SL2 server.
+// `dump_path` is a pointer to a wide C string, which gets allocated internally.
+// Clients should `free` `dump_path` when no longer needed.
+__declspec(dllexport) SL2Response sl2_conn_request_minidump_path(sl2_conn *conn, wchar_t **dump_path);
+
 #endif

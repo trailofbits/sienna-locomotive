@@ -287,3 +287,35 @@ __declspec(dllexport) SL2Response sl2_conn_request_crash_path(
     return SL2Response::OK;
 }
 
+__declspec(dllexport) SL2Response sl2_conn_request_minidump_path(
+    sl2_conn *conn,
+    wchar_t **dump_path)
+{
+    BYTE event = EVT_MEM_DMP_PATH;
+    DWORD txsize;
+
+    // If the connection doesn't have a run ID, then we don't know which dump path to
+    // request.
+    if (!conn->has_run_id) {
+        return SL2Response::MissingRunID;
+    }
+
+    // First, tell the server that we're requesting a dump path.
+    WriteFile(conn->pipe, &event, sizeof(event), &txsize, NULL);
+
+    // Then, tell the server which run we want the dump path for.
+    WriteFile(conn->pipe, &(conn->run_id), sizeof(conn->run_id), &txsize, NULL);
+
+    // Finally, read the length-prefixed dump path from the server.
+    // NOTE(ww): Like EVT_RUN_INFO, the lengths here are buffer lengths,
+    // not string lengths.
+    size_t len;
+
+    ReadFile(conn->pipe, &len, sizeof(len), &txsize, NULL);
+    *dump_path = (wchar_t *) malloc(len + 1);
+    memset(*dump_path, 0, len + 1);
+
+    ReadFile(conn->pipe, *dump_path, len, &txsize, NULL);
+
+    return SL2Response::OK;
+}
