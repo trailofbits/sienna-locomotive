@@ -953,7 +953,9 @@ DWORD handleRunInfo(HANDLE hPipe)
         exit(1);
     }
 
-    if (!WriteFile(hPipe, &dwBytesRead, sizeof(DWORD), &dwBytesWritten, NULL)) {
+    size_t len = dwBytesRead;
+
+    if (!WriteFile(hPipe, &len, sizeof(len), &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "handleRunInfo: failed to write program name size (0x%x)", GetLastError());
         exit(1);
     }
@@ -984,7 +986,9 @@ DWORD handleRunInfo(HANDLE hPipe)
         exit(1);
     }
 
-    if (!WriteFile(hPipe, &dwBytesRead, sizeof(DWORD), &dwBytesWritten, NULL)) {
+    len = dwBytesRead;
+
+    if (!WriteFile(hPipe, &len, sizeof(len), &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "handleRunInfo: failed to write argument list size (0x%x)", GetLastError());
         exit(1);
     }
