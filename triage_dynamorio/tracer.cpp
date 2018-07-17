@@ -946,6 +946,23 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
         }
 
         free(crash_path);
+
+        wchar_t *dump_path;
+        sl2_conn_request_minidump_path(&sl2_conn, &dump_path);
+
+        HANDLE hDumpFile = CreateFile(dump_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+        if (hDumpFile == INVALID_HANDLE_VALUE) {
+            SL2_DR_DEBUG("tracer#dump_crash: could not open the dump file (%x)", GetLastError());
+        }
+
+        // NOTE(ww): Switching back to the application's state is necessary, as we don't want
+        // parts of the instrumentation showing up in our memory dump.
+        dr_switch_to_app_state(drcontext);
+
+        MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hDumpFile, MiniDumpWithFullMemory, NULL, NULL, NULL);
+
+        dr_switch_to_dr_state(drcontext);
     }
 
     dr_exit_process(1);

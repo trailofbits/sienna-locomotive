@@ -936,7 +936,7 @@ DWORD handleFinalizeRun(HANDLE hPipe)
         SHFileOperation(&remove_op);
         LeaveCriticalSection(&critId);
     }
-    else if (!crash && !remove) {
+    else if (!crash && preserve) {
         LOG_F(INFO, "handleFinalizeRun: no crash, but not removing files (requested)");
     }
     else {
@@ -948,7 +948,8 @@ DWORD handleFinalizeRun(HANDLE hPipe)
     return 0;
 }
 
-/* Return the location of the crash.json file for a given run ID */
+// TODO(ww): This and handleMiniDumpPath should be consolidated into a single
+// event and function.
 DWORD handleCrashPath(HANDLE hPipe)
 {
     DWORD dwBytesRead = 0;
@@ -977,6 +978,42 @@ DWORD handleCrashPath(HANDLE hPipe)
 
     if (!WriteFile(hPipe, &targetFile, (DWORD)size, &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "handleCrashPath: failed to write crash.json path to pipe (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    RpcStringFree((RPC_WSTR *)&runId_s);
+
+    return 0;
+}
+
+DWORD handleMiniDumpPath(HANDLE hPipe)
+{
+    DWORD dwBytesRead = 0;
+    DWORD dwBytesWritten = 0;
+    UUID runId;
+    wchar_t *runId_s;
+
+    if (!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "handleMiniDumpPath: failed to read UUID (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    UuidToString(&runId, (RPC_WSTR *)&runId_s);
+
+    wchar_t targetDir[MAX_PATH + 1] = {0};
+    wchar_t targetFile[MAX_PATH + 1] = {0};
+
+    PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
+    PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_MEM_DMP);
+
+    size_t size = wcslen(targetFile) * sizeof(wchar_t);
+
+    if (!WriteFile(hPipe, &size, sizeof(size), &dwBytesWritten, NULL)) {
+        LOG_F(ERROR, "handleCrashPath: failed to write length of mem.dmp path to pipe (0x%x)", GetLastError());
+    }
+
+    if (!WriteFile(hPipe, &targetFile, (DWORD)size, &dwBytesWritten, NULL)) {
+        LOG_F(ERROR, "handleCrashPath: failed to write mem.dmp path to pipe (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -1037,6 +1074,9 @@ DWORD WINAPI threadHandler(void *lpvPipe)
                 break;
             case EVT_CRASH_PATH:
                 handleCrashPath(hPipe);
+                break;
+            case EVT_MEM_DMP_PATH:
+                handleMiniDumpPath(hPipe);
                 break;
             case EVT_SESSION_TEARDOWN:
                 LOG_F(INFO, "Ending a client's session with the server.");
