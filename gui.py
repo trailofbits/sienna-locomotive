@@ -26,6 +26,18 @@ class QIntVariable(QObject):
         self.valueChanged.emit(self.value)
 
 
+class QFloatVariable(QObject):
+    valueChanged = pyqtSignal(float)
+
+    def __init__(self, value):
+        QObject.__init__(self)
+        self.value = value
+
+    def update(self, newval):
+        self.value = newval
+        self.valueChanged.emit(self.value)
+
+
 class QTextAdapter(QObject):
     updated = pyqtSignal(str)
 
@@ -86,22 +98,32 @@ class MainWindow(QtWidgets.QMainWindow):
         self._layout.addWidget(self._status_bar)
 
         self.runs, self.crashes = QIntVariable(0), QIntVariable(0)
-        self.run_adapter = QTextAdapter("Fuzzing Runs: {0.value}\t", self.runs)
-        self.crash_adapter = QTextAdapter("Crashes Found: {0.value}", self.crashes)
+        self.throughput = QFloatVariable(0.0)
+        self.run_adapter = QTextAdapter("Fuzzing Runs: {0.value} ", self.runs)
+        self.throughput_adapter = QTextAdapter(" {0.value:.3f} Runs/s: ", self.throughput)
+        self.crash_adapter = QTextAdapter(" Crashes Found: {0.value} ", self.crashes)
         self.runs.valueChanged.connect(self.run_adapter.update)
+        self.throughput.valueChanged.connect(self.throughput_adapter.update)
         self.crashes.valueChanged.connect(self.crash_adapter.update)
 
         self.fuzz_count = QtWidgets.QLabel()
+        self.throughput_label = QtWidgets.QLabel()
         self.crash_count = QtWidgets.QLabel()
 
         self.run_adapter.updated.connect(self.fuzz_count.setText)
+        self.throughput_adapter.updated.connect(self.throughput_label.setText)
         self.crash_adapter.updated.connect(self.crash_count.setText)
 
         self.fuzzer_thread.runComplete.connect(self.runs.increment)
+        self.fuzzer_thread.runComplete.connect(self.calculate_throughput)
         self.fuzzer_thread.foundCrash.connect(self.crashes.increment)
 
         self._status_bar.addWidget(self.fuzz_count)
+        self._status_bar.addWidget(self.throughput_label)
         self._status_bar.addWidget(self.crash_count)
+
+    def calculate_throughput(self, total_time):
+        self.throughput.update(self.runs.value / total_time)
 
     def build_func_tree(self):
         self._func_tree.clear()
