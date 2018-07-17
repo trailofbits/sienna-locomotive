@@ -58,15 +58,15 @@ Next, install the following dependencies
 Then, from the root of the Sienna Locomotive repository:
 In powershell, run make.ps1:
 
-`PS C:\proj\sl2\sienna-locomotive> .\make.ps1` 
+`PS C:\proj\sl2\sienna-locomotive> .\make.ps1`
 
-This should download and install DynamoRIO in the sienna-locomotive directive if it does not already exist.  It will then compile the project.  
+This should download and install DynamoRIO in the sienna-locomotive directive if it does not already exist.  It will then compile the project.
 
 If you're not familiar with cmake - the first invocation configures it, the second compiles the project. To recompile, just run the final command again.
 
 You might need to use the Visual Studio Developer Command Prompt in order for cmake to be able to see the VS compiler.
 
-Use `.\make.ps1 clean` for a clean build . 
+Use `.\make.ps1 clean` for a clean build .
 
 Usage `make.ps1 help` for more info.
 
@@ -87,7 +87,7 @@ reconfig
 
 help
     This info
-```    
+```
 
 ### Configuring
 Open up powershell in the project root and run harness.py for the first time.
@@ -159,9 +159,9 @@ Variable based on type.
 
 `wchar_t path[file_size]`
 
-`uint64 position`
+`size_t position`
 
-`uint size`
+`size_t size`
 
 `uchar data[size]`
 
