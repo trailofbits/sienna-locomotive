@@ -90,7 +90,7 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
 {
     JSON_WRAP_PRE_LOG();
 
-    *user_data             = malloc(sizeof(wizard_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
     HANDLE hEventLog                 = (HANDLE)drwrap_get_arg(wrapcxt, 0);
@@ -126,7 +126,7 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
     // get registry key path (maybe hook open key?)
 
     if (lpData != NULL && lpcbData != NULL) {
-        *user_data             = malloc(sizeof(wizard_read_info));
+        *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
         wizard_read_info *info = (wizard_read_info *) *user_data;
 
         info->lpBuffer             = lpData;
@@ -147,7 +147,7 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
 {
     JSON_WRAP_PRE_LOG();
 
-    *user_data             = malloc(sizeof(wizard_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
     HINTERNET hRequest                          = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
@@ -173,7 +173,7 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
 {
     JSON_WRAP_PRE_LOG();
 
-    *user_data             = malloc(sizeof(wizard_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
     HINTERNET hFile             = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
@@ -198,7 +198,7 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
 {
     JSON_WRAP_PRE_LOG();
 
-    *user_data             = malloc(sizeof(wizard_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
     HINTERNET hRequest         = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
@@ -223,7 +223,7 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data)
 {
     JSON_WRAP_PRE_LOG();
 
-    *user_data             = malloc(sizeof(wizard_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
     SOCKET s  = (SOCKET)drwrap_get_arg(wrapcxt, 0);
@@ -277,7 +277,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     std::string hash_str;
     picosha2::hash256_hex_string(blob_vec, hash_str);
 
-    *user_data             = malloc(sizeof(wizard_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
     info->lpBuffer             = lpBuffer;
@@ -286,11 +286,11 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->position             = fStruct.position;
 
-    info->source = (wchar_t *) malloc(sizeof(fStruct.fileName));
+    info->source = (wchar_t *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(fStruct.fileName));
     memcpy(info->source, fStruct.fileName, sizeof(fStruct.fileName));
 
     // NOTE(ww): SHA2 digests are 64 characters, so we allocate that + room for a NULL
-    info->argHash = (char *) malloc(65);
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), 65);
     memset(info->argHash, 0, 65);
     memcpy(info->argHash, hash_str.c_str(), 64);
 }
@@ -300,7 +300,7 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data)
 {
     JSON_WRAP_PRE_LOG();
 
-    *user_data             = malloc(sizeof(wizard_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
@@ -321,7 +321,7 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
 {
     JSON_WRAP_PRE_LOG();
 
-    *user_data             = malloc(sizeof(wizard_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
@@ -379,14 +379,15 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 
     SL2_LOG_JSONL(j);
 
+    // TODO(ww): Remove these hardcoded sizes.
     if (info->source) {
-        free(info->source);
+        dr_thread_free(drwrap_get_drcontext(wrapcxt), info->source, MAX_PATH + 1);
     }
     if (info->argHash) {
-        free(info->argHash);
+        dr_thread_free(drwrap_get_drcontext(wrapcxt), info->argHash, 65);
     }
 
-    free(info);
+    dr_thread_free(drwrap_get_drcontext(wrapcxt), info, sizeof(wizard_read_info));
 }
 
 /* Runs every time we load a new module. Wraps functions we can target. See fuzzer.cpp for a more-detailed version */

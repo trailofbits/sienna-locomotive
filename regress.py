@@ -20,14 +20,6 @@ def runAndCaptureOutput( cmd ):
 class TestWizard(unittest.TestCase):
     
     
-    # def test_noargs(self):
-    #     cmd =  [ r'python.exe',
-    #         r'harness.py' ]
-        
-    #     stdout, stderr = runAndCaptureOutput(cmd)
-    #     self.assertTrue( 'caused EXCEPTION_ACCESS_VIOLATION'  in stdout )
-    #     self.assertRegex(  stdout,  r"0x[a-f0-9]+: mov.*%rax.*-> %edx" )
-
 
     def test_0(self):
         
@@ -80,6 +72,13 @@ class TestWizard(unittest.TestCase):
         output = runAndCaptureOutput(cmd)
         self.assertTrue( 'Process completed after' in output )
 
+    def test_quickCrash(self):
+        cmd =  r'echo 0 | python .\harness.py -c -x -l -v -t build\corpus\test_application\Debug\test_application.exe -a 10 -f'
+        output = runAndCaptureOutput(cmd)
+        self.assertTrue( 'Process completed after' in output )
+        self.assertRegex(  output, r'Triage .*: breakpoint .*caused EXCEPTION_BREAKPOINT'  )
+        self.assertTrue( 'int3' in output )
+
 
 def main():
     support.run_unittest(TestWizard)
@@ -87,4 +86,5 @@ def main():
 
 if __name__ == '__main__':
     #unittest.main()
+    print("Make sure to  .\make reconfig  first.")
     main()

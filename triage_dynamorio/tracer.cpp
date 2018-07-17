@@ -927,13 +927,13 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
 static void
 dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t score, std::string disassembly)
 {
+    sl2_crash_paths crash_paths = {0};
     std::string crash_json = dump_json(drcontext, score, reason, excpt, disassembly);
 
     if (replay) {
-        wchar_t *crash_path;
-        sl2_conn_request_crash_path(&sl2_conn, &crash_path);
+        sl2_conn_request_crash_paths(&sl2_conn, &crash_paths);
 
-        HANDLE hCrashFile = CreateFile(crash_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        HANDLE hCrashFile = CreateFile(crash_paths.crash_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         if (hCrashFile == INVALID_HANDLE_VALUE) {
             SL2_DR_DEBUG("tracer#dump_crash: could not open the crash file (%x)", GetLastError());
             exit(1);
@@ -945,7 +945,19 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
             exit(1);
         }
 
-        free(crash_path);
+        HANDLE hDumpFile = CreateFile(crash_paths.dump_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+        if (hDumpFile == INVALID_HANDLE_VALUE) {
+            SL2_DR_DEBUG("tracer#dump_crash: could not open the dump file (%x)", GetLastError());
+        }
+
+        // NOTE(ww): Switching back to the application's state is necessary, as we don't want
+        // parts of the instrumentation showing up in our memory dump.
+        dr_switch_to_app_state(drcontext);
+
+        MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hDumpFile, MiniDumpWithFullMemory, NULL, NULL, NULL);
+
+        dr_switch_to_dr_state(drcontext);
     }
 
     dr_exit_process(1);
@@ -1128,7 +1140,7 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
     DWORD  *pnBytesRead              = (DWORD *)drwrap_get_arg(wrapcxt, 5);
     DWORD  *pnMinNumberOfBytesNeeded = (DWORD *)drwrap_get_arg(wrapcxt, 6);
 
-    *user_data             = malloc(sizeof(client_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
 
     info->lpBuffer             = lpBuffer;
@@ -1150,7 +1162,7 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
     DWORD *lpcbData   = (DWORD *)drwrap_get_arg(wrapcxt, 5);
 
     if (lpData != NULL && lpcbData != NULL) {
-        *user_data             = malloc(sizeof(client_read_info));
+        *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
         client_read_info *info = (client_read_info *) *user_data;
 
         info->lpBuffer             = lpData;
@@ -1174,7 +1186,7 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
     DWORD *pdwBytesRead                         = (DWORD *)drwrap_get_arg(wrapcxt, 3);
     WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE)(int)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data             = malloc(sizeof(client_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
 
     info->lpBuffer = pvBuffer;
@@ -1193,7 +1205,7 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
     DWORD *lpNumberOfBytesRead  = (DWORD*)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data             = malloc(sizeof(client_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
 
     info->lpBuffer             = lpBuffer;
@@ -1212,7 +1224,7 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
     DWORD *lpNumberOfBytesRead  = (DWORD*)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data             = malloc(sizeof(client_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
 
     info->lpBuffer             = lpBuffer;
@@ -1231,7 +1243,7 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data)
     int len   = (int)drwrap_get_arg(wrapcxt, 2);
     int flags = (int)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data             = malloc(sizeof(client_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
 
     info->lpBuffer             = buf;
@@ -1265,7 +1277,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     std::string hash_str;
     picosha2::hash256_hex_string(blob_vec, hash_str);
 
-    *user_data             = malloc(sizeof(client_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
 
     info->lpBuffer             = lpBuffer;
@@ -1274,7 +1286,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
     // NOTE(ww): SHA2 digests are 64 characters, so we allocate that + room for a NULL
-    info->argHash = (char *) malloc(65);
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), 65);
     memset(info->argHash, 0, 65);
     memcpy(info->argHash, hash_str.c_str(), 64);
 }
@@ -1287,7 +1299,7 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 2);
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data             = malloc(sizeof(client_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
 
     info->function             = Function::fread;
@@ -1305,7 +1317,7 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data)
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 1);
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
 
-    *user_data             = malloc(sizeof(client_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
 
     info->function             = Function::fread;
@@ -1352,11 +1364,12 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
         dr_mutex_unlock(mutatex);
     }
 
+    // TODO(ww): Remove this hardcoded size.
     if (info->argHash) {
-        free(info->argHash);
+        dr_thread_free(drwrap_get_drcontext(wrapcxt), info->argHash, 65);
     }
 
-    free(info);
+    dr_thread_free(drwrap_get_drcontext(wrapcxt), info, sizeof(client_read_info));
 }
 
 /* Register function pre/post callbacks in each module */

@@ -12,6 +12,8 @@ enum class SL2Response {
     OK,
     // The pipe used to talk to the server is invalid or closed.
     BadPipe,
+    // We expected a valid path from the server, but were given something too long.
+    MaxPath,
     // The server is not running, or not accepting connections.
     ServerNotRunning,
     // We expected more bytes from the server than we received.
@@ -37,8 +39,16 @@ struct sl2_conn {
 // populating this structure and `sl2_conn_destroy_run_info`
 // for destroying it.
 struct sl2_run_info {
-    wchar_t *program;
-    wchar_t *arguments;
+    wchar_t program[MAX_PATH + 1];
+    wchar_t arguments[MAX_PATH + 1];
+};
+
+// A structure containing valid pathnames for storage
+// of JSON-formatted crash data and a minidump-formatted
+// memory dump, respectively, for a run.
+struct sl2_crash_paths {
+    wchar_t crash_path[MAX_PATH + 1];
+    wchar_t dump_path[MAX_PATH + 1];
 };
 
 // Opens a new connection to the SL2 server.
@@ -78,12 +88,7 @@ __declspec(dllexport) SL2Response sl2_conn_request_replay(sl2_conn *conn, DWORD 
 
 // Requests information about a run from the SL2 server.
 // Stores run information within a `sl2_run_info` structure.
-// The `sl2_run_info` structure passed to this function should be freed using
-// `sl2_conn_destroy_run_info` when no longer needed.
 __declspec(dllexport) SL2Response sl2_conn_request_run_info(sl2_conn *conn, sl2_run_info *info);
-
-// Destroys the given `sl2_run_info`.
-__declspec(dllexport) SL2Response sl2_conn_destroy_run_info(sl2_run_info *info);
 
 // Finalizes a run with the SL2 server.
 // `crash` indicates whether the run crashed or not.
@@ -91,8 +96,17 @@ __declspec(dllexport) SL2Response sl2_conn_destroy_run_info(sl2_run_info *info);
 __declspec(dllexport) SL2Response sl2_conn_finalize_run(sl2_conn *conn, bool crash, bool preserve);
 
 // Requests a path for storing crash information for a run from the SL2 server.
-// `crash_path` is a pointer to a wide C string, which gets allocated internally.
-// Clients should `free` `crash_path` when no longer needed.
-__declspec(dllexport) SL2Response sl2_conn_request_crash_path(sl2_conn *conn, wchar_t **crash_path);
+// `crash_path` is a buffer capable of storing MAX_PATH wide characters, plus a null terminator.
+__declspec(dllexport) SL2Response sl2_conn_request_crash_path(sl2_conn *conn, wchar_t *crash_path);
+
+// Requests a path for storing a minidump for a run from the SL2 server.
+// `dump_path` is a buffer capable of storing MAX_PATH wide characters, plus a null terminator.
+__declspec(dllexport) SL2Response sl2_conn_request_minidump_path(sl2_conn *conn, wchar_t *dump_path);
+
+// Requests information about a run's crash from the SL2 server.
+// Stores crash information within a `sl2_crash_paths` structure.
+// NOTE(ww): This should be preferred over calling `sl2_conn_request_crash_path` and
+// `sl2_conn_request_minidump_path` individually.
+__declspec(dllexport) SL2Response sl2_conn_request_crash_paths(sl2_conn *conn, sl2_crash_paths *paths);
 
 #endif
