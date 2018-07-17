@@ -309,7 +309,7 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
     DWORD  *pnBytesRead = (DWORD *)drwrap_get_arg(wrapcxt, 5);
     DWORD  *pnMinNumberOfBytesNeeded = (DWORD *)drwrap_get_arg(wrapcxt, 6);
 
-    *user_data             = malloc(sizeof(client_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
 
     info->function             = Function::ReadEventLog;
@@ -347,7 +347,7 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
     LPDWORD lpcbData = (LPDWORD)drwrap_get_arg(wrapcxt, 5);
 
     if (lpData != NULL && lpcbData != NULL) {
-        *user_data             = malloc(sizeof(client_read_info));
+        *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
         client_read_info *info = (client_read_info *) *user_data;
 
 
@@ -391,7 +391,7 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
     // DWORD positionLow = InternetSetFilePointer(hRequest, 0, &positionHigh, FILE_CURRENT);
     // uint64_t position = positionHigh;
 
-    *user_data             = malloc(sizeof(client_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
 
     info->function             = Function::WinHttpWebSocketReceive;
@@ -427,7 +427,7 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
     // DWORD positionLow = InternetSetFilePointer(hFile, 0, &positionHigh, FILE_CURRENT);
     // uint64_t position = positionHigh;
 
-    *user_data             = malloc(sizeof(client_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
 
     info->function             = Function::InternetReadFile;
@@ -463,7 +463,7 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
     // DWORD positionLow = InternetSetFilePointer(hRequest, 0, &positionHigh, FILE_CURRENT);
     // uint64_t position = positionHigh;
 
-    *user_data             = malloc(sizeof(client_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
 
     info->function             = Function::WinHttpReadData;
@@ -496,7 +496,7 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data)
     int len   = (int)drwrap_get_arg(wrapcxt, 2);
     int flags = (int)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data             = malloc(sizeof(client_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
 
     info->function             = Function::recv;
@@ -544,7 +544,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     std::string hash_str;
     picosha2::hash256_hex_string(blob_vec, hash_str);
 
-    *user_data             = malloc(sizeof(client_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
 
     info->function             = Function::ReadFile;
@@ -556,7 +556,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
     // NOTE(ww): SHA2 digests are 64 characters, so we allocate that + room for a NULL
-    info->argHash = (char *) malloc(65);
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), 65);
     memset(info->argHash, 0, 65);
     memcpy(info->argHash, hash_str.c_str(), 64);
 }
@@ -570,7 +570,7 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 3);
     FILE *file   = (FILE *)drwrap_get_arg(wrapcxt, 4);
 
-    *user_data             = malloc(sizeof(client_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
 
     info->function             = Function::fread_s;
@@ -594,7 +594,7 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data)
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
     FILE *file   = (FILE *)drwrap_get_arg(wrapcxt, 3);
 
-    *user_data             = malloc(sizeof(client_read_info));
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
 
     info->function             = Function::fread;
@@ -643,11 +643,12 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
         }
     }
 
+    // TODO(ww): Remove this hardcoded size.
     if (info->argHash) {
-        free(info->argHash);
+        dr_thread_free(drwrap_get_drcontext(wrapcxt), info->argHash, 65);
     }
 
-    free(info);
+    dr_thread_free(drwrap_get_drcontext(wrapcxt), info, sizeof(fuzzer_read_info));
 }
 
 /* Runs when a new module (typically an exe or dll) is loaded. Tells DynamoRIO to hook all the interesting functions
