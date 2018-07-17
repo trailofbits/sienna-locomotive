@@ -3,8 +3,6 @@
 
 #include "server.hpp"
 
-// TODO(ww): macros for abstracting ReadFile/WriteFile.
-
 // An enum of response codes used by the calls below to indicate
 // their success or failure.
 enum class SL2Response {
@@ -34,11 +32,28 @@ struct sl2_conn {
     bool has_run_id;
 };
 
+// Represents the state associated with a mutation, including
+// the function whose input has been mutated, the mutation count,
+// the resource behind the mutation, the position within the resource,
+// the size of the mutated buffer, and the mutated buffer itself.
+//
+// May represent the state *before* a mutation, meaning that `buffer` has not
+// changed yet.
+struct sl2_mutation {
+    DWORD function;
+    DWORD mut_count;
+    wchar_t *resource;
+    size_t position;
+    size_t bufsize;
+    unsigned char *buffer;
+};
+
 // A structure containing the executable name and arguments of a
 // targeted application. See `sl2_conn_request_run_info` for
 // populating this structure and `sl2_conn_destroy_run_info`
 // for destroying it.
 struct sl2_run_info {
+    // TODO(ww): This should be 8192, not MAX_PATH.
     wchar_t program[MAX_PATH + 1];
     wchar_t arguments[MAX_PATH + 1];
 };
@@ -79,6 +94,10 @@ __declspec(dllexport) SL2Response sl2_conn_assign_run_id(sl2_conn *conn, UUID ru
 // `buffer` is the mutable buffer. This function both reads from and writes to `buffer`.
 // TODO(ww): Allow the caller to request a particular mutation type?
 __declspec(dllexport) SL2Response sl2_conn_request_mutation(sl2_conn *conn, DWORD func_type, DWORD mut_count, wchar_t *filename, size_t position, size_t bufsize, void *buffer);
+
+// Registers a mutation with the SL2 server.
+// `mutation` is a pointer to a `sl2_mutation` containing the mutation's state.
+__declspec(dllexport) SL2Response sl2_conn_register_mutation(sl2_conn *conn, sl2_mutation *mutation);
 
 // Requests a replay (of a previously mutated buffer) from the SL2 server.
 // `mut_count` is the Nth mutation requested.

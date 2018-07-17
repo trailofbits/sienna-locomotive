@@ -4,6 +4,19 @@
 
 #include "common/sl2_server_api.hpp"
 
+static void sl2_conn_write_prefixed_string(sl2_conn *conn, wchar_t *message)
+{
+    DWORD txsize;
+    size_t len = lstrlen(message) * sizeof(wchar_t);
+
+    WriteFile(conn->pipe, &len, sizeof(len), &txsize, NULL);
+
+    // If the string is empty, don't bother sending it.
+    if (len > 0) {
+        WriteFile(conn->pipe, message, len, &txsize, NULL);
+    }
+}
+
 __declspec(dllexport) SL2Response sl2_conn_open(sl2_conn *conn)
 {
     HANDLE pipe;
@@ -57,14 +70,8 @@ __declspec(dllexport) SL2Response sl2_conn_request_run_id(
     // Then, read the UUID from the server.
     ReadFile(conn->pipe, &run_id, sizeof(run_id), &txsize, NULL);
 
-    // Finally, send the server our length-prefixed program name and arguments.
-    DWORD len = lstrlen(target_name) * sizeof(wchar_t);
-    WriteFile(conn->pipe, &len, sizeof(len), &txsize, NULL);
-    WriteFile(conn->pipe, target_name, len, &txsize, NULL);
-
-    len = lstrlen(target_args) * sizeof(wchar_t);
-    WriteFile(conn->pipe, &len, sizeof(len), &txsize, NULL);
-    WriteFile(conn->pipe, target_args, len, &txsize, NULL);
+    sl2_conn_write_prefixed_string(conn, target_name);
+    sl2_conn_write_prefixed_string(conn, target_args);
 
     conn->run_id = run_id;
     conn->has_run_id = true;
@@ -120,16 +127,7 @@ __declspec(dllexport) SL2Response sl2_conn_request_mutation(
     // is always 0, so it might be worth just removing.
     WriteFile(conn->pipe, &mut_count, sizeof(mut_count), &txsize, NULL);
 
-    // Then, send the length-prefixed filename associated with the mutation buffer.
-    // NOTE(ww): If the filename is NULL (as it currently is for many of the functions
-    // we mutate from), then we send only the length (0) to tell the server not
-    // to expect a filename.
-    DWORD len = lstrlen(filename) * sizeof(wchar_t);
-    WriteFile(conn->pipe, &len, sizeof(len), &txsize, NULL);
-
-    if (len > 0) {
-        WriteFile(conn->pipe, filename, len, &txsize, NULL);
-    }
+    sl2_conn_write_prefixed_string(conn, filename);
 
     // Then, send the position within and total size of the incoming buffer.
     WriteFile(conn->pipe, &position, sizeof(position), &txsize, NULL);
@@ -140,6 +138,35 @@ __declspec(dllexport) SL2Response sl2_conn_request_mutation(
     ReadFile(conn->pipe, buffer, bufsize, &txsize, NULL);
 
     // TODO(ww): error returns
+    return SL2Response::OK;
+}
+
+__declspec(dllexport) SL2Response sl2_conn_register_mutation(
+    sl2_conn *conn,
+    sl2_mutation *mutation)
+{
+    BYTE event = EVT_REGISTER_MUTATION;
+    DWORD txsize;
+
+    if (!conn->has_run_id) {
+        return SL2Response::MissingRunID;
+    }
+
+    // First, tell the server that we're registering a mutation.
+    WriteFile(conn->pipe, &event, sizeof(event), &txsize, NULL);
+
+    // Then, tell the server which run the mutation is associated with.
+    WriteFile(conn->pipe, &(conn->run_id), sizeof(conn->run_id), &txsize, NULL);
+
+    // Then, send our mutation state over.
+    // TODO(ww): Check for truncated writes.
+    WriteFile(conn->pipe, mutation->function, sizeof(mutation->function), &txsize, NULL);
+    WriteFile(conn->pipe, mutation->mut_count, sizeof(mutation->mut_count), &txsize, NULL);
+    sl2_conn_write_prefixed_string(conn, mutation->resource);
+    WriteFile(conn->pipe, mutation->position, sizeof(mutation->position), &txsize, NULL);
+    WriteFile(conn->pipe, mutation->bufsize, sizeof(mutation->bufsize), &txsize, NULL);
+    WriteFile(conn->pipe, mutation->buffer, mutation->bufsize, &txsize, NULL);
+
     return SL2Response::OK;
 }
 
@@ -195,7 +222,7 @@ __declspec(dllexport) SL2Response sl2_conn_request_run_info(
     // Then, read the length-prefixed program pathname and argument list.
     // NOTE(ww): The server sends us the length of the buffer, not the length of
     // the widechar string (which would be half of the buffer's size).
-    DWORD len;
+    size_t len;
 
     ReadFile(conn->pipe, &len, sizeof(len), &txsize, NULL);
 
