@@ -20,29 +20,44 @@ class WizardThread(QThread):
 class FuzzerThread(QThread):
     foundCrash = pyqtSignal(str)
     runComplete = pyqtSignal(float)
+    paused = pyqtSignal()
 
-    def __init__(self, config_dict, target_file, continuous=False):
+    def __init__(self, config_dict, target_file):
         QThread.__init__(self)
         self.target_file = target_file
         self.config_dict = config_dict
-        self.continuous = continuous
-        self.start_time = 0
+        self.should_fuzz = True
+        self.start_time = time.time()
 
     def __del__(self):
-        self.continuous = False
+        self.should_fuzz = False
         self.wait()
 
+    def pause(self):
+        self.should_fuzz = False
+        self.paused.emit()
+
     def run(self):
+        self.should_fuzz = True
+
         start_server()
 
         self.config_dict['client_args'].append('-t')
         self.config_dict['client_args'].append(self.target_file)
 
-        self.start_time = time.time()
+        # self.start_time = time.time()
 
-        while self.continuous:
+        while self.should_fuzz:
             crashed, run_id = fuzzer_run(self.config_dict)
+
             if crashed:
                 formatted = triage_run(self.config_dict, run_id)
                 self.foundCrash.emit(formatted)
+
+                if self.config_dict['exit_early']:
+                    self.should_fuzz = False
+
             self.runComplete.emit(float(time.time() - self.start_time))
+
+            if not self.config_dict['continuous']:
+                break

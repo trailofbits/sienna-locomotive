@@ -93,9 +93,19 @@ class MainWindow(QtWidgets.QMainWindow):
         self._stateDisplay.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self._layout.addWidget(self._stateDisplay)
 
-        self.fuzzer_thread = FuzzerThread(config.config, self.target_data.filename, continuous=True)
+        self.fuzzer_thread = FuzzerThread(config.config, self.target_data.filename)
         self.fuzzer_thread.foundCrash.connect(self._stateDisplay.append)
         self.fuzzer_run.clicked.connect(self.fuzzer_thread.start)
+
+        self.stop_button = QtWidgets.QPushButton("Stop Fuzzing")
+        self.stop_button.hide()
+        self._layout.addWidget(self.stop_button)
+
+        self.stop_button.clicked.connect(self.fuzzer_thread.pause)
+        if config.config['continuous']:
+            self.fuzzer_thread.started.connect(self.stop_button.show)
+        self.fuzzer_thread.finished.connect(self.stop_button.hide)
+        self.fuzzer_thread.paused.connect(self.stop_button.hide)
 
         self._status_bar = QtWidgets.QStatusBar()
         self._layout.addWidget(self._status_bar)
