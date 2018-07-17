@@ -963,6 +963,8 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
         MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hDumpFile, MiniDumpWithFullMemory, NULL, NULL, NULL);
 
         dr_switch_to_dr_state(drcontext);
+
+        free(dump_path);
     }
 
     dr_exit_process(1);
