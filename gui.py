@@ -1,7 +1,7 @@
 import sys
 
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtCore import Qt, QSize, QObject, pyqtSignal
 from PyQt5.QtGui import QFontDatabase
 
 from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem
@@ -9,6 +9,36 @@ from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem
 from harness import config
 from harness.state import get_target
 from harness.threads import WizardThread, FuzzerThread
+
+
+class QIntVariable(QObject):
+    valueChanged = pyqtSignal(int)
+
+    def __init__(self, value):
+        QObject.__init__(self)
+        self.value = value
+
+    def increment(self):
+        self._update(self.value + 1)
+
+    def _update(self, newval):
+        self.value = newval
+        self.valueChanged.emit(self.value)
+
+
+class QTextAdapter(QObject):
+    updated = pyqtSignal(str)
+
+    def __init__(self, format_str, *args):
+        QObject.__init__(self)
+        self.format_str = format_str
+        self.args = args
+
+    def __str__(self):
+        return self.format_str.format(*self.args)
+
+    def update(self, *_throwaway):
+        self.updated.emit(str(self))
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -54,6 +84,24 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._status_bar = QtWidgets.QStatusBar()
         self._layout.addWidget(self._status_bar)
+
+        self.runs, self.crashes = QIntVariable(0), QIntVariable(0)
+        self.run_adapter = QTextAdapter("Fuzzing Runs: {0.value}\t", self.runs)
+        self.crash_adapter = QTextAdapter("Crashes Found: {0.value}", self.crashes)
+        self.runs.valueChanged.connect(self.run_adapter.update)
+        self.crashes.valueChanged.connect(self.crash_adapter.update)
+
+        self.fuzz_count = QtWidgets.QLabel()
+        self.crash_count = QtWidgets.QLabel()
+
+        self.run_adapter.updated.connect(self.fuzz_count.setText)
+        self.crash_adapter.updated.connect(self.crash_count.setText)
+
+        self.fuzzer_thread.runComplete.connect(self.runs.increment)
+        self.fuzzer_thread.foundCrash.connect(self.crashes.increment)
+
+        self._status_bar.addWidget(self.fuzz_count)
+        self._status_bar.addWidget(self.crash_count)
 
     def build_func_tree(self):
         self._func_tree.clear()
