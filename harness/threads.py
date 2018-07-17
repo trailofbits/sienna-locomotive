@@ -1,5 +1,5 @@
 from PyQt5.QtCore import QThread, pyqtSignal
-from .instrument import wizard_run, fuzzer_run, triage_run
+from .instrument import wizard_run, fuzzer_run, triage_run, start_server
 
 
 class WizardThread(QThread):
@@ -18,20 +18,27 @@ class WizardThread(QThread):
 
 class FuzzerThread(QThread):
     foundCrash = pyqtSignal(str)
+    runComplete = pyqtSignal(str)
 
-    def __init__(self, config_dict, target_file):
+    def __init__(self, config_dict, target_file, continuous=False):
         QThread.__init__(self)
         self.target_file = target_file
         self.config_dict = config_dict
+        self.continuous = continuous
 
     def __del__(self):
+        self.continuous = False
         self.wait()
 
     def run(self):
+        start_server()
+
         self.config_dict['client_args'].append('-t')
         self.config_dict['client_args'].append(self.target_file)
-        crashed, run_id = fuzzer_run(self.config_dict)
-        if crashed:
-            formatted = triage_run(self.config_dict, run_id)
-            self.foundCrash.emit(formatted)
 
+        while self.continuous:
+            crashed, run_id = fuzzer_run(self.config_dict)
+            if crashed:
+                formatted = triage_run(self.config_dict, run_id)
+                self.foundCrash.emit(formatted)
+            self.runComplete.emit(run_id)

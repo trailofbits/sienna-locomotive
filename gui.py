@@ -48,9 +48,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self._stateDisplay.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self._layout.addWidget(self._stateDisplay)
 
-        self.fuzzer_thread = FuzzerThread(config.config, self.target_data.filename)
+        self.fuzzer_thread = FuzzerThread(config.config, self.target_data.filename, continuous=True)
         self.fuzzer_thread.foundCrash.connect(self._stateDisplay.append)
         self.fuzzer_run.clicked.connect(self.fuzzer_thread.start)
+
+        self._status_bar = QtWidgets.QStatusBar()
+        self._layout.addWidget(self._status_bar)
 
     def build_func_tree(self):
         self._func_tree.clear()
