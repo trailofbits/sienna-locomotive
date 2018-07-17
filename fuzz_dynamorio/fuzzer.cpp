@@ -816,7 +816,11 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     wchar_t wcsAppName[MAX_PATH + 1] = {0};
     mbstowcs_s(NULL, wcsAppName, MAX_PATH, mbsAppName, MAX_PATH);
 
-    sl2_conn_open(&sl2_conn);
+    if (sl2_conn_open(&sl2_conn) != SL2Response::OK) {
+        SL2_DR_DEBUG("ERROR: Couldn't open a connection to the server!\n");
+        dr_abort();
+    }
+
     sl2_conn_request_run_id(&sl2_conn, wcsAppName, get_target_command_line());
 
     wchar_t run_id_s[SL2_UUID_SIZE];
