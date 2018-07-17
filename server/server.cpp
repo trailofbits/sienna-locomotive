@@ -577,14 +577,15 @@ DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, wchar_t *filePath, size
 }
 
 /* handles mutation requests over the named pipe from the fuzzing harness */
+// TODO(ww): Remove this.
 DWORD handleMutation(HANDLE hPipe)
 {
-    LOG_F(INFO, "handleMutation: starting mutation request");
-
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
     UUID runId;
     wchar_t *runId_s;
+
+    LOG_F(INFO, "handleMutation: starting mutation request");
 
     if (!ReadFile(hPipe, &runId, sizeof(runId), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleMutation: failed to read run ID (0x%x)", GetLastError());
@@ -691,7 +692,118 @@ DWORD handleMutation(HANDLE hPipe)
         exit(1);
     }
 
-    LOG_F(INFO, "calling writeFKT with targetFile: %S", targetFile);
+    writeFKT(hFile, type, pathSize, filePath, position, size, buf);
+
+    RpcStringFree((RPC_WSTR *)&runId_s);
+
+    return 0;
+}
+
+DWORD handleRegisterMutation(HANDLE hPipe)
+{
+    DWORD dwBytesRead = 0;
+    DWORD dwBytesWritten = 0;
+    UUID runId;
+    wchar_t *runId_s;
+
+    LOG_F(INFO, "handleRegisterMutation: starting mutation registration");
+
+    if (!ReadFile(hPipe, &runId, sizeof(runId), &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "handleRegisterMutation: failed to read run ID (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    UuidToString(&runId, (RPC_WSTR *)&runId_s);
+
+    DWORD type = 0;
+    if (!ReadFile(hPipe, &type, sizeof(type), &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "handleRegisterMutation: failed to read function type (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    DWORD mutate_count = 0;
+    wchar_t mutate_fname[MAX_PATH + 1] = {0};
+    if (!ReadFile(hPipe, &mutate_count, sizeof(mutate_count), &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "handleRegisterMutation: failed to read mutation count (0x%x)", GetLastError());
+        exit(1);
+    }
+    StringCchPrintfW(mutate_fname, MAX_PATH, FUZZ_RUN_FKT_FMT, mutate_count);
+
+    DWORD pathSize = 0;
+    if (!ReadFile(hPipe, &pathSize, sizeof(pathSize), &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "handleRegisterMutation: failed to read size of mutation filepath (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    if (pathSize > MAX_PATH) {
+        LOG_F(ERROR, "handleRegisterMutation: pathSize > MAX_PATH", GetLastError());
+        exit(1);
+    }
+
+    wchar_t filePath[MAX_PATH + 1] = {0};
+
+    // NOTE(ww): Interestingly, Windows distinguishes between a read of 0 bytes
+    // and no read at all -- both the client and the server have to do either one or the
+    // other, and failing to do either on one side causes a truncated read or write.
+    if (pathSize > 0) {
+        if (!ReadFile(hPipe, &filePath, pathSize * sizeof(wchar_t), &dwBytesRead, NULL)) {
+            LOG_F(ERROR, "handleRegisterMutation: failed to read mutation filepath (0x%x)", GetLastError());
+            exit(1);
+        }
+
+        filePath[pathSize] = 0;
+
+        LOG_F(INFO, "handleRegisterMutation: mutation file path: %S", filePath);
+    }
+    else {
+        LOG_F(WARNING, "handleRegisterMutation: the fuzzer didn't send us a file path!");
+    }
+
+    size_t position = 0;
+    if (!ReadFile(hPipe, &position, sizeof(position), &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "handleRegisterMutation: failed to read mutation offset (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    size_t size = 0;
+    if (!ReadFile(hPipe, &size, sizeof(size), &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "handleRegisterMutation: failed to read size of mutation buffer (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    BYTE *buf = (BYTE *) malloc(size);
+
+    if (buf == NULL) {
+        LOG_F(ERROR, "handleRegisterMutation: failed to allocate mutation buffer (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    if (!ReadFile(hPipe, buf, (DWORD)size, &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "handleRegisterMutation: failed to read mutation buffer from pipe (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    if (dwBytesRead < size) {
+        LOG_F(WARNING, "handleRegisterMutation: read fewer bytes than expected (%d < %lu)", dwBytesRead, size);
+        size = dwBytesRead;
+    }
+
+    if (size < 0) {
+        LOG_F(WARNING, "handleRegisterMutation: got an unexpectedly small buffer (%lu < 0), skipping mutation");
+    }
+
+    wchar_t targetDir[MAX_PATH + 1] = {0};
+    wchar_t targetFile[MAX_PATH + 1] = {0};
+
+    PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
+    PathCchCombine(targetFile, MAX_PATH, targetDir, mutate_fname);
+
+    HANDLE hFile = CreateFile(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
+
+    if (hFile == INVALID_HANDLE_VALUE) {
+        LOG_F(ERROR, "handleRegisterMutation: failed to create FTK: %S (0x%x)", targetFile, GetLastError());
+        exit(1);
+    }
 
     writeFKT(hFile, type, pathSize, filePath, position, size, buf);
 
@@ -1060,8 +1172,13 @@ DWORD WINAPI threadHandler(void *lpvPipe)
             case EVT_RUN_ID:
                 handleGenerateRunId(hPipe);
                 break;
+            // TODO(ww): Remove/disable.
             case EVT_MUTATION:
+                LOG_F(WARNING, "threadHandler: deprecated event requested: EVT_MUTATION");
                 handleMutation(hPipe);
+                break;
+            case EVT_REGISTER_MUTATION:
+                handleRegisterMutation(hPipe);
                 break;
             case EVT_REPLAY:
                 handleReplay(hPipe);
