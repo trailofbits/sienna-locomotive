@@ -927,13 +927,13 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
 static void
 dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t score, std::string disassembly)
 {
+    sl2_crash_paths crash_paths = {0};
     std::string crash_json = dump_json(drcontext, score, reason, excpt, disassembly);
 
     if (replay) {
-        wchar_t *crash_path;
-        sl2_conn_request_crash_path(&sl2_conn, &crash_path);
+        sl2_conn_request_crash_paths(&sl2_conn, &crash_paths);
 
-        HANDLE hCrashFile = CreateFile(crash_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        HANDLE hCrashFile = CreateFile(crash_paths.crash_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         if (hCrashFile == INVALID_HANDLE_VALUE) {
             SL2_DR_DEBUG("tracer#dump_crash: could not open the crash file (%x)", GetLastError());
             exit(1);
@@ -945,12 +945,7 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
             exit(1);
         }
 
-        free(crash_path);
-
-        wchar_t *dump_path;
-        sl2_conn_request_minidump_path(&sl2_conn, &dump_path);
-
-        HANDLE hDumpFile = CreateFile(dump_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        HANDLE hDumpFile = CreateFile(crash_paths.dump_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
         if (hDumpFile == INVALID_HANDLE_VALUE) {
             SL2_DR_DEBUG("tracer#dump_crash: could not open the dump file (%x)", GetLastError());
@@ -963,8 +958,6 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
         MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hDumpFile, MiniDumpWithFullMemory, NULL, NULL, NULL);
 
         dr_switch_to_dr_state(drcontext);
-
-        free(dump_path);
     }
 
     dr_exit_process(1);

@@ -198,29 +198,22 @@ __declspec(dllexport) SL2Response sl2_conn_request_run_info(
     DWORD len;
 
     ReadFile(conn->pipe, &len, sizeof(len), &txsize, NULL);
-    info->program = (wchar_t *) malloc(len + 1);
-    memset(info->program, 0, len + 1);
 
+    if (len > MAX_PATH) {
+        return SL2Response::MaxPath;
+    }
+
+    memset(info->program, 0, len + 1);
     ReadFile(conn->pipe, info->program, len, &txsize, NULL);
 
     ReadFile(conn->pipe, &len, sizeof(len), &txsize, NULL);
-    info->arguments = (wchar_t *) malloc(len + 1);
+
+    if (len > MAX_PATH) {
+        return SL2Response::MaxPath;
+    }
+
     memset(info->arguments, 0, len + 1);
-
     ReadFile(conn->pipe, info->arguments, len, &txsize, NULL);
-
-    return SL2Response::OK;
-}
-
-__declspec(dllexport) SL2Response sl2_conn_destroy_run_info(sl2_run_info *info)
-{
-    if (info->program) {
-        free(info->program);
-    }
-
-    if (info->arguments) {
-        free(info->arguments);
-    }
 
     return SL2Response::OK;
 }
@@ -256,7 +249,7 @@ __declspec(dllexport) SL2Response sl2_conn_finalize_run(
 
 __declspec(dllexport) SL2Response sl2_conn_request_crash_path(
     sl2_conn *conn,
-    wchar_t **crash_path)
+    wchar_t *crash_path)
 {
     BYTE event = EVT_CRASH_PATH;
     DWORD txsize;
@@ -279,17 +272,20 @@ __declspec(dllexport) SL2Response sl2_conn_request_crash_path(
     size_t len;
 
     ReadFile(conn->pipe, &len, sizeof(len), &txsize, NULL);
-    *crash_path = (wchar_t *) malloc(len + 1);
-    memset(*crash_path, 0, len + 1);
 
-    ReadFile(conn->pipe, *crash_path, len, &txsize, NULL);
+    if (len > MAX_PATH) {
+        return SL2Response::MaxPath;
+    }
+
+    memset(crash_path, 0, len + 1);
+    ReadFile(conn->pipe, crash_path, len, &txsize, NULL);
 
     return SL2Response::OK;
 }
 
 __declspec(dllexport) SL2Response sl2_conn_request_minidump_path(
     sl2_conn *conn,
-    wchar_t **dump_path)
+    wchar_t *dump_path)
 {
     BYTE event = EVT_MEM_DMP_PATH;
     DWORD txsize;
@@ -312,10 +308,30 @@ __declspec(dllexport) SL2Response sl2_conn_request_minidump_path(
     size_t len;
 
     ReadFile(conn->pipe, &len, sizeof(len), &txsize, NULL);
-    *dump_path = (wchar_t *) malloc(len + 1);
-    memset(*dump_path, 0, len + 1);
 
-    ReadFile(conn->pipe, *dump_path, len, &txsize, NULL);
+    if (len > MAX_PATH) {
+        return SL2Response::MaxPath;
+    }
+
+    memset(dump_path, 0, len + 1);
+    ReadFile(conn->pipe, dump_path, len, &txsize, NULL);
+
+    return SL2Response::OK;
+}
+
+__declspec(dllexport) SL2Response sl2_conn_request_crash_paths(
+    sl2_conn *conn,
+    sl2_crash_paths *paths)
+{
+    SL2Response resp;
+
+    if ((resp = sl2_conn_request_crash_path(conn, paths->crash_path)) != SL2Response::OK) {
+        return resp;
+    }
+
+    if ((resp = sl2_conn_request_minidump_path(conn, paths->dump_path)) != SL2Response::OK) {
+        return resp;
+    }
 
     return SL2Response::OK;
 }
