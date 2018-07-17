@@ -194,9 +194,13 @@ mutate(Function function, HANDLE hFile, size_t position, void *buf, size_t size)
         SL2_DR_DEBUG("mutate: filePath: %S", filePath);
     }
 
+    // generate_mutation(buf, size);
+
     DWORD type = static_cast<DWORD>(function);
 
     sl2_conn_request_mutation(&sl2_conn, type, mutateCount, filePath, position, size, buf);
+
+    // sl2_conn_register_mutation(&sl2_conn, type, mutateCount, filePath, position, size, buf);
 
     mutateCount++;
 
@@ -628,7 +632,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     info->retAddrOffset         = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
     // Identify whether this is the function we want to target
-    bool targeted = client.isFunctionTargeted( function, info );
+    bool targeted = client.isFunctionTargeted(function, info);
     client.incrementCallCountForFunction(function);
 
     if (info->lpNumberOfBytesRead) {
