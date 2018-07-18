@@ -189,7 +189,7 @@ DWORD handleGenerateRunId(HANDLE hPipe) {
 }
 
 /* Writes the fkt file in the event we found a crash. Stores information about the mutation that caused it */
-DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, wchar_t *filePath, size_t position, size_t size, BYTE* buf)
+DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, wchar_t *filePath, size_t position, size_t size, uint8_t* buf)
 {
     DWORD dwBytesWritten = 0;
 
@@ -309,7 +309,7 @@ DWORD handleRegisterMutation(HANDLE pipe)
         exit(1);
     }
 
-    BYTE *buf = (BYTE *) malloc(size);
+    uint8_t *buf = (uint8_t *) malloc(size);
 
     if (buf == NULL) {
         LOG_F(ERROR, "handleRegisterMutation: failed to allocate mutation buffer (0x%x)", GetLastError());
@@ -351,7 +351,7 @@ DWORD handleRegisterMutation(HANDLE pipe)
 }
 
 /* Gets the mutated bytes stored in the FKT file for mutation replay */
-DWORD getBytesFKT(HANDLE hFile, BYTE *buf, size_t size)
+DWORD getBytesFKT(HANDLE hFile, uint8_t *buf, size_t size)
 {
     DWORD dwBytesRead = 0;
     size_t buf_size = 0;
@@ -410,7 +410,7 @@ DWORD handleReplay(HANDLE hPipe)
         exit(1);
     }
 
-    BYTE *buf = (BYTE *) malloc(size);
+    uint8_t *buf = (uint8_t *) malloc(size);
 
     if (buf == NULL) {
         LOG_F(ERROR, "handleReplay: failed to allocate replay buffer (0x%x)", GetLastError());
@@ -574,7 +574,7 @@ DWORD WINAPI threadHandler(void *lpvPipe)
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
 
-    BYTE event = EVT_INVALID;
+    uint8_t event = EVT_INVALID;
 
     // NOTE(ww): This is a second event loop, inside of the infinite event loop that
     // creates each thread and calls threadHandler. We do this so that clients can
@@ -585,7 +585,7 @@ DWORD WINAPI threadHandler(void *lpvPipe)
     // is in scare quotes because each session is essentially anonymous -- the server
     // only sees when they end, not which runs or events they correspond to.
     do {
-        if (!ReadFile(hPipe, &event, sizeof(BYTE), &dwBytesRead, NULL)) {
+        if (!ReadFile(hPipe, &event, sizeof(uint8_t), &dwBytesRead, NULL)) {
             if (GetLastError() != ERROR_BROKEN_PIPE){
                 LOG_F(ERROR, "threadHandler: failed to read event (0x%x)", GetLastError());
                 exit(1);

@@ -12,21 +12,24 @@
   Mutation strategies. The server selects one each time the fuzzing harness requests mutated bytes
 */
 
-static void strategyAAAA(unsigned char *buf, size_t size)
+// NOTE(ww): Keep this up-to-date with the number of strategy functions we implement.
+#define NUM_STRATEGIES 8
+
+static void strategyAAAA(uint8_t *buf, size_t size)
 {
     memset(buf, 'A', size);
 }
 
-static void strategyFlipBit(unsigned char *buf, size_t size)
+static void strategyFlipBit(uint8_t *buf, size_t size)
 {
     size_t pos = dr_get_random_value(size);
-    unsigned char byte = buf[pos];
+    uint8_t byte = buf[pos];
 
-    unsigned char mask = 1 << dr_get_random_value(8);
+    uint8_t mask = 1 << dr_get_random_value(8);
     buf[pos] = byte ^ mask;
 }
 
-static void strategyRepeatBytes(unsigned char *buf, size_t size)
+static void strategyRepeatBytes(uint8_t *buf, size_t size)
 {
     // pos -> zero to second to last byte
     size_t pos = dr_get_random_value(size - 1);
@@ -51,7 +54,7 @@ static void strategyRepeatBytes(unsigned char *buf, size_t size)
     }
 }
 
-static void strategyRepeatBytesBackward(unsigned char *buf, size_t size)
+static void strategyRepeatBytesBackward(uint8_t *buf, size_t size)
 {
     size_t start = dr_get_random_value(size - 1);
     size_t end = start + dr_get_random_value((size + 1) - start);
@@ -59,7 +62,7 @@ static void strategyRepeatBytesBackward(unsigned char *buf, size_t size)
     std::reverse(buf + start, buf + end);
 }
 
-static void strategyDeleteBytes(unsigned char *buf, size_t size)
+static void strategyDeleteBytes(uint8_t *buf, size_t size)
 {
     // pos -> zero to second to last byte
     size_t pos = 0;
@@ -80,7 +83,7 @@ static void strategyDeleteBytes(unsigned char *buf, size_t size)
     }
 }
 
-static void strategyRandValues(unsigned char *buf, size_t size)
+static void strategyRandValues(uint8_t *buf, size_t size)
 {
     size_t rand_size = 0;
     size_t max = 0;
@@ -98,12 +101,12 @@ static void strategyRandValues(unsigned char *buf, size_t size)
     size_t pos = dr_get_random_value(max);
 
     for (size_t i=0; i<rand_size; i++) {
-        unsigned char mut = dr_get_random_value(256);
+        uint8_t mut = dr_get_random_value(256);
         buf[pos + i] = mut;
     }
 }
 
-static void strategyKnownValues(unsigned char *buf, size_t size)
+static void strategyKnownValues(uint8_t *buf, size_t size)
 {
     int8_t values1[] = { KNOWN_VALUES1 };
     int16_t values2[] = { KNOWN_VALUES1, KNOWN_VALUES2 };
@@ -155,7 +158,7 @@ static void strategyKnownValues(unsigned char *buf, size_t size)
     }
 }
 
-static void strategyAddSubKnownValues(unsigned char *buf, size_t size)
+static void strategyAddSubKnownValues(uint8_t *buf, size_t size)
 {
     int8_t values1[] = { KNOWN_VALUES1 };
     int16_t values2[] = { KNOWN_VALUES1, KNOWN_VALUES2 };
@@ -177,7 +180,7 @@ static void strategyAddSubKnownValues(unsigned char *buf, size_t size)
     size_t pos = dr_get_random_value(max);
     bool endian = dr_get_random_value(2);
 
-    unsigned char sub = 1;
+    uint8_t sub = 1;
     if (dr_get_random_value(2)) {
         sub = -1;
     }
@@ -211,7 +214,7 @@ static void strategyAddSubKnownValues(unsigned char *buf, size_t size)
     }
 }
 
-static void strategyEndianSwap(unsigned char *buf, size_t size)
+static void strategyEndianSwap(uint8_t *buf, size_t size)
 {
     size_t rand_size = 0;
     size_t max = 0;
@@ -248,14 +251,14 @@ static void strategyEndianSwap(unsigned char *buf, size_t size)
 }
 
 /* Selects a mutations strategy at random */
-__declspec(dllexport) DWORD mutate_buffer(unsigned char *buf, size_t size)
+__declspec(dllexport) DWORD mutate_buffer(uint8_t *buf, size_t size)
 {
     // afl for inspiration
     if (size == 0) {
         return 0;
     }
 
-    DWORD choice = dr_get_random_value(8);
+    DWORD choice = dr_get_random_value(NUM_STRATEGIES);
 
     switch (choice) {
         case 0:
@@ -291,7 +294,6 @@ __declspec(dllexport) DWORD mutate_buffer(unsigned char *buf, size_t size)
     // insert bytes
     // move bytes
     // add random bytes to space
-    // inject random NULL(s)
 
     return 0;
 }

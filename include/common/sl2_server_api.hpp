@@ -49,7 +49,7 @@ struct sl2_mutation {
     wchar_t *resource;
     size_t position;
     size_t bufsize;
-    unsigned char *buffer;
+    uint8_t *buffer;
 };
 
 // A structure containing valid pathnames for storage

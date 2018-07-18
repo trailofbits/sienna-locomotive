@@ -203,7 +203,7 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
     mutation.resource = resource;
     mutation.position = position;
     mutation.bufsize = bufsize;
-    mutation.buffer = (unsigned char *) buffer;
+    mutation.buffer = (uint8_t *) buffer;
 
     mutate_buffer(mutation.buffer, mutation.bufsize);
 

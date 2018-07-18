@@ -7,7 +7,7 @@
 #define KNOWN_VALUES4 -2147483648, -100663046, -32769, 32768, 65536, 100663045, 2147483647, 4294967295
 #define KNOWN_VALUES8  -9151314442816848000, -2147483649, 2147483648, 4294967296, 432345564227567365, 18446744073709551615
 
-__declspec(dllexport) DWORD mutate_buffer(unsigned char *buf, size_t size);
+__declspec(dllexport) DWORD mutate_buffer(uint8_t *buf, size_t size);
 
 #endif
 

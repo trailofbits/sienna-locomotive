@@ -67,7 +67,7 @@ __declspec(dllexport) SL2Response sl2_conn_open(sl2_conn *conn)
 
 __declspec(dllexport) SL2Response sl2_conn_close(sl2_conn *conn)
 {
-    BYTE event = EVT_SESSION_TEARDOWN;
+    uint8_t event = EVT_SESSION_TEARDOWN;
     DWORD txsize;
 
     // Tell the server that we want to end our session.
@@ -85,7 +85,7 @@ __declspec(dllexport) SL2Response sl2_conn_request_run_id(
     wchar_t *target_args)
 {
     UUID run_id;
-    BYTE event = EVT_RUN_ID;
+    uint8_t event = EVT_RUN_ID;
     DWORD txsize;
 
     // First, tell the server that we're requesting a UUID.
@@ -119,7 +119,7 @@ __declspec(dllexport) SL2Response sl2_conn_register_mutation(
     sl2_conn *conn,
     sl2_mutation *mutation)
 {
-    BYTE event = EVT_REGISTER_MUTATION;
+    uint8_t event = EVT_REGISTER_MUTATION;
     DWORD txsize;
 
     if (!conn->has_run_id) {
@@ -150,7 +150,7 @@ __declspec(dllexport) SL2Response sl2_conn_request_replay(
     size_t bufsize,
     void *buffer)
 {
-    BYTE event = EVT_REPLAY;
+    uint8_t event = EVT_REPLAY;
     DWORD txsize;
 
     // If the connection doesn't have a run ID, then we don't know which
@@ -181,7 +181,7 @@ __declspec(dllexport) SL2Response sl2_conn_finalize_run(
     bool crash,
     bool preserve)
 {
-    BYTE event = EVT_RUN_COMPLETE;
+    uint8_t event = EVT_RUN_COMPLETE;
     DWORD txsize;
 
     // If the connection doesn't a run ID, then we don't have a run to finalize.
@@ -209,7 +209,7 @@ __declspec(dllexport) SL2Response sl2_conn_request_crash_paths(
     sl2_conn *conn,
     sl2_crash_paths *paths)
 {
-    BYTE event = EVT_CRASH_PATHS;
+    uint8_t event = EVT_CRASH_PATHS;
     DWORD txsize;
 
     // If the connection doesn't a run ID, then we don't have a run to finalize.
