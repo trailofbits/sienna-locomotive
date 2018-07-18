@@ -453,94 +453,6 @@ DWORD handleReplay(HANDLE hPipe)
     return 0;
 }
 
-/* Dump information about a given run into the named pipe */
-DWORD handleRunInfo(HANDLE hPipe)
-{
-    DWORD dwBytesRead = 0;
-    DWORD dwBytesWritten = 0;
-    UUID runId;
-    wchar_t *runId_s;
-
-    if (!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "handleRunInfo: failed to read run ID (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    UuidToString(&runId, (RPC_WSTR *)&runId_s);
-
-    wchar_t commandLine[8192] = {0};
-    wchar_t targetDir[MAX_PATH + 1] = {0};
-    wchar_t targetFile[MAX_PATH + 1] = {0};
-
-    PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
-    PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_PROGRAM_TXT);
-    HANDLE hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
-
-    if (hFile == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "handleRunInfo: failed to open program.txt: %S (0x%x)", targetFile, GetLastError());
-        exit(1);
-    }
-
-    if (!ReadFile(hFile, commandLine, 8191 * sizeof(wchar_t), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "handleRunInfo: failed to read program name (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    if (!CloseHandle(hFile)) {
-        LOG_F(ERROR, "handleRunInfo: failed to close program.txt (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    size_t len = dwBytesRead;
-
-    if (!WriteFile(hPipe, &len, sizeof(len), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "handleRunInfo: failed to write program name size (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    if (!WriteFile(hPipe, commandLine, dwBytesRead, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "handleRunInfo: failed to write program name (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    ZeroMemory(commandLine, 8192 * sizeof(wchar_t));
-    ZeroMemory(targetFile, (MAX_PATH + 1) * sizeof(wchar_t));
-    PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_ARGUMENTS_TXT);
-
-    hFile = CreateFile(targetFile, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
-
-    if (hFile == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "handleRunInfo: failed to open arguments.txt: %S (0x%x)", targetFile, GetLastError());
-        exit(1);
-    }
-
-    if (!ReadFile(hFile, commandLine, 8191 * sizeof(wchar_t), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "handleRunInfo: failed to read command line argument list (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    if (!CloseHandle(hFile)) {
-        LOG_F(ERROR, "handleRunInfo: failed to close arguments.txt (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    len = dwBytesRead;
-
-    if (!WriteFile(hPipe, &len, sizeof(len), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "handleRunInfo: failed to write argument list size (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    if (!WriteFile(hPipe, commandLine, dwBytesRead, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "handleRunInfo: faield to write argument list (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    RpcStringFree((RPC_WSTR *)&runId_s);
-
-    return 0;
-}
-
 /* Deletes the run files to free up a Run ID if the last run didn't find a crash */
 DWORD handleFinalizeRun(HANDLE hPipe)
 {
@@ -714,18 +626,11 @@ DWORD WINAPI threadHandler(void *lpvPipe)
             case EVT_RUN_ID:
                 handleGenerateRunId(hPipe);
                 break;
-            case EVT_MUTATION:
-                LOG_F(WARNING, "threadHandler: deprecated event requested: EVT_MUTATION");
-                event = EVT_INVALID;
-                break;
             case EVT_REGISTER_MUTATION:
                 handleRegisterMutation(hPipe);
                 break;
             case EVT_REPLAY:
                 handleReplay(hPipe);
-                break;
-            case EVT_RUN_INFO:
-                handleRunInfo(hPipe);
                 break;
             case EVT_RUN_COMPLETE:
                 handleFinalizeRun(hPipe);
@@ -738,6 +643,11 @@ DWORD WINAPI threadHandler(void *lpvPipe)
                 break;
             case EVT_SESSION_TEARDOWN:
                 LOG_F(INFO, "Ending a client's session with the server.");
+                break;
+            case EVT_MUTATION:
+            case EVT_RUN_INFO:
+                LOG_F(WARNING, "threadHandler: deprecated event requested: EVT_MUTATION");
+                event = EVT_INVALID;
                 break;
             default:
                 LOG_F(ERROR, "Unknown or invalid event %d", event);

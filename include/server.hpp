@@ -34,6 +34,7 @@ enum Event {
     // Request a replay from the server.
     EVT_REPLAY,             // 2
     // Request information about a run from the server.
+    // NOTE(ww): Deprecated; the server will complain and may die if you send this.
     EVT_RUN_INFO,           // 3
     // Tell the server to finalize a run.
     EVT_RUN_COMPLETE,       // 4

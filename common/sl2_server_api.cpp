@@ -155,49 +155,6 @@ __declspec(dllexport) SL2Response sl2_conn_request_replay(
     return SL2Response::OK;
 }
 
-__declspec(dllexport) SL2Response sl2_conn_request_run_info(
-    sl2_conn *conn,
-    sl2_run_info *info)
-{
-    BYTE event = EVT_RUN_INFO;
-    DWORD txsize;
-
-    if (!conn->has_run_id) {
-        return SL2Response::MissingRunID;
-    }
-
-    // First, tell the server that we're requesting information about a run.
-    SL2_CONN_WRITE(conn, &event, sizeof(event));
-
-    // Then, tell the server which run we want information for.
-    SL2_CONN_WRITE(conn, &(conn->run_id), sizeof(conn->run_id));
-
-    // Then, read the length-prefixed program pathname and argument list.
-    // NOTE(ww): The server sends us the length of the buffer, not the length of
-    // the widechar string (which would be half of the buffer's size).
-    size_t len;
-
-    SL2_CONN_READ(conn, &len, sizeof(len));
-
-    if (len > MAX_PATH) {
-        return SL2Response::MaxPath;
-    }
-
-    memset(info->program, 0, len + 1);
-    SL2_CONN_READ(conn, info->program, len);
-
-    SL2_CONN_READ(conn, &len, sizeof(len));
-
-    if (len > MAX_PATH) {
-        return SL2Response::MaxPath;
-    }
-
-    memset(info->arguments, 0, len + 1);
-    SL2_CONN_READ(conn, info->arguments, len);
-
-    return SL2Response::OK;
-}
-
 __declspec(dllexport) SL2Response sl2_conn_finalize_run(
     sl2_conn *conn,
     bool crash,

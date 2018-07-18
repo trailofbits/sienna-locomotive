@@ -48,16 +48,6 @@ struct sl2_mutation {
     unsigned char *buffer;
 };
 
-// A structure containing the executable name and arguments of a
-// targeted application. See `sl2_conn_request_run_info` for
-// populating this structure and `sl2_conn_destroy_run_info`
-// for destroying it.
-struct sl2_run_info {
-    // TODO(ww): This should be 8192, not MAX_PATH.
-    wchar_t program[MAX_PATH + 1];
-    wchar_t arguments[MAX_PATH + 1];
-};
-
 // A structure containing valid pathnames for storage
 // of JSON-formatted crash data and a minidump-formatted
 // memory dump, respectively, for a run.
@@ -92,10 +82,6 @@ __declspec(dllexport) SL2Response sl2_conn_register_mutation(sl2_conn *conn, sl2
 // `bufsize` is the size of the mutable buffer, in bytes.
 // `buffer` is the mutable buffer. This function writes to `buffer`.
 __declspec(dllexport) SL2Response sl2_conn_request_replay(sl2_conn *conn, DWORD mut_count, size_t bufsize, void *buffer);
-
-// Requests information about a run from the SL2 server.
-// Stores run information within a `sl2_run_info` structure.
-__declspec(dllexport) SL2Response sl2_conn_request_run_info(sl2_conn *conn, sl2_run_info *info);
 
 // Finalizes a run with the SL2 server.
 // `crash` indicates whether the run crashed or not.
