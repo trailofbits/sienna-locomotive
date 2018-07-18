@@ -7,6 +7,7 @@
 #define SL2_CONN_WRITE(conn, thing, size) (WriteFile(conn->pipe, thing, size, &txsize, NULL))
 #define SL2_CONN_READ(conn, thing, size) (ReadFile(conn->pipe, thing, size, &txsize, NULL))
 
+// Writes a length-prefixed wide string to the server.
 static void sl2_conn_write_prefixed_string(sl2_conn *conn, wchar_t *message)
 {
     DWORD txsize;
@@ -18,6 +19,26 @@ static void sl2_conn_write_prefixed_string(sl2_conn *conn, wchar_t *message)
     if (len > 0) {
         SL2_CONN_WRITE(conn, message, len);
     }
+}
+
+// Reads a length-prefixed wide string from the server, up to `maxlen` wide chars.
+// `maxlen` does *not* include the trailing NULL, so callers *must* ensure that
+// `message` can hold at at least `(maxlen * sizeof(wchar_t)) + 1` bytes.
+static SL2Response sl2_conn_read_prefixed_string(sl2_conn *conn, wchar_t *message, size_t maxlen)
+{
+    DWORD txsize;
+    size_t len;
+
+    SL2_CONN_READ(conn, &len, sizeof(len));
+
+    if ((len / sizeof(wchar_t)) > maxlen) {
+        return SL2Response::LongRead;
+    }
+
+    SL2_CONN_READ(conn, message, len);
+    message[len / sizeof(wchar_t)] = '\0';
+
+    return SL2Response::OK;
 }
 
 __declspec(dllexport) SL2Response sl2_conn_open(sl2_conn *conn)
@@ -184,91 +205,27 @@ __declspec(dllexport) SL2Response sl2_conn_finalize_run(
     return SL2Response::OK;
 }
 
-__declspec(dllexport) SL2Response sl2_conn_request_crash_path(
-    sl2_conn *conn,
-    wchar_t *crash_path)
-{
-    BYTE event = EVT_CRASH_PATH;
-    DWORD txsize;
-
-    // If the connection doesn't have a run ID, then we don't know which crash path to
-    // request.
-    if (!conn->has_run_id) {
-        return SL2Response::MissingRunID;
-    }
-
-    // First, tell the server that we're requesting a crash path.
-    SL2_CONN_WRITE(conn, &event, sizeof(event));
-
-    // Then, tell the server which run we want the crash path for.
-    SL2_CONN_WRITE(conn, &(conn->run_id), sizeof(conn->run_id));
-
-    // Finally, read the length-prefixed crash path from the server.
-    // NOTE(ww): Like EVT_RUN_INFO, the lengths here are buffer lengths,
-    // not string lengths.
-    size_t len;
-
-    SL2_CONN_READ(conn, &len, sizeof(len));
-
-    if (len > MAX_PATH) {
-        return SL2Response::MaxPath;
-    }
-
-    memset(crash_path, 0, len + 1);
-    SL2_CONN_READ(conn, crash_path, len);
-
-    return SL2Response::OK;
-}
-
-__declspec(dllexport) SL2Response sl2_conn_request_minidump_path(
-    sl2_conn *conn,
-    wchar_t *dump_path)
-{
-    BYTE event = EVT_MEM_DMP_PATH;
-    DWORD txsize;
-
-    // If the connection doesn't have a run ID, then we don't know which dump path to
-    // request.
-    if (!conn->has_run_id) {
-        return SL2Response::MissingRunID;
-    }
-
-    // First, tell the server that we're requesting a dump path.
-    SL2_CONN_WRITE(conn, &event, sizeof(event));
-
-    // Then, tell the server which run we want the dump path for.
-    SL2_CONN_WRITE(conn, &(conn->run_id), sizeof(conn->run_id));
-
-    // Finally, read the length-prefixed dump path from the server.
-    // NOTE(ww): Like EVT_RUN_INFO, the lengths here are buffer lengths,
-    // not string lengths.
-    size_t len;
-
-    SL2_CONN_READ(conn, &len, sizeof(len));
-
-    if (len > MAX_PATH) {
-        return SL2Response::MaxPath;
-    }
-
-    memset(dump_path, 0, len + 1);
-    SL2_CONN_READ(conn, dump_path, len);
-
-    return SL2Response::OK;
-}
-
 __declspec(dllexport) SL2Response sl2_conn_request_crash_paths(
     sl2_conn *conn,
     sl2_crash_paths *paths)
 {
-    SL2Response resp;
+    BYTE event = EVT_CRASH_PATHS;
+    DWORD txsize;
 
-    if ((resp = sl2_conn_request_crash_path(conn, paths->crash_path)) != SL2Response::OK) {
-        return resp;
+    // If the connection doesn't a run ID, then we don't have a run to finalize.
+    if (!conn->has_run_id) {
+        return SL2Response::MissingRunID;
     }
 
-    if ((resp = sl2_conn_request_minidump_path(conn, paths->dump_path)) != SL2Response::OK) {
-        return resp;
-    }
+    // First, tell the server that we'd like the crash paths for a run.
+    SL2_CONN_WRITE(conn, &event, sizeof(event));
+
+    // Then, tell the server which run we're requesting crash paths for.
+    SL2_CONN_WRITE(conn, &(conn->run_id), sizeof(conn->run_id));
+
+    // Finally, read the actual crash paths from the server.
+    sl2_conn_read_prefixed_string(conn, paths->crash_path, MAX_PATH);
+    sl2_conn_read_prefixed_string(conn, paths->dump_path, MAX_PATH);
 
     return SL2Response::OK;
 }

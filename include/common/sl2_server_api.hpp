@@ -18,6 +18,10 @@ enum class SL2Response {
     ShortRead,
     // We wrote fewer bytes to the server than we expected.
     ShortWrite,
+    // We expected fewer bytes from the server than we received.
+    LongRead,
+    // We wrote more bytes to the server that it expected.
+    LongWrite,
     // We tried to perform an action on the server without a run ID.
     MissingRunID,
     // We tried to request a run ID from the server while already having one.
@@ -88,18 +92,8 @@ __declspec(dllexport) SL2Response sl2_conn_request_replay(sl2_conn *conn, DWORD 
 // `preserve` indicates whether to keep the run on disk, even without a crash.
 __declspec(dllexport) SL2Response sl2_conn_finalize_run(sl2_conn *conn, bool crash, bool preserve);
 
-// Requests a path for storing crash information for a run from the SL2 server.
-// `crash_path` is a buffer capable of storing MAX_PATH wide characters, plus a null terminator.
-__declspec(dllexport) SL2Response sl2_conn_request_crash_path(sl2_conn *conn, wchar_t *crash_path);
-
-// Requests a path for storing a minidump for a run from the SL2 server.
-// `dump_path` is a buffer capable of storing MAX_PATH wide characters, plus a null terminator.
-__declspec(dllexport) SL2Response sl2_conn_request_minidump_path(sl2_conn *conn, wchar_t *dump_path);
-
 // Requests information about a run's crash from the SL2 server.
 // Stores crash information within a `sl2_crash_paths` structure.
-// NOTE(ww): This should be preferred over calling `sl2_conn_request_crash_path` and
-// `sl2_conn_request_minidump_path` individually.
 __declspec(dllexport) SL2Response sl2_conn_request_crash_paths(sl2_conn *conn, sl2_crash_paths *paths);
 
 #endif

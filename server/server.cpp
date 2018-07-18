@@ -514,45 +514,81 @@ DWORD handleFinalizeRun(HANDLE hPipe)
     return 0;
 }
 
-// TODO(ww): This and handleMiniDumpPath should be consolidated into a single
-// event and function.
-DWORD handleCrashPath(HANDLE hPipe)
-{
-    DWORD dwBytesRead = 0;
-    DWORD dwBytesWritten = 0;
-    UUID runId;
-    wchar_t *runId_s;
+// // TODO(ww): This and handleMiniDumpPath should be consolidated into a single
+// // event and function.
+// DWORD handleCrashPath(HANDLE hPipe)
+// {
+//     DWORD dwBytesRead = 0;
+//     DWORD dwBytesWritten = 0;
+//     UUID runId;
+//     wchar_t *runId_s;
 
-    if (!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "handleCrashPath: failed to read UUID (0x%x)", GetLastError());
-        exit(1);
-    }
+//     if (!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
+//         LOG_F(ERROR, "handleCrashPath: failed to read UUID (0x%x)", GetLastError());
+//         exit(1);
+//     }
 
-    UuidToString(&runId, (RPC_WSTR *)&runId_s);
+//     UuidToString(&runId, (RPC_WSTR *)&runId_s);
 
-    wchar_t targetDir[MAX_PATH + 1] = {0};
-    wchar_t targetFile[MAX_PATH + 1] = {0};
+//     wchar_t targetDir[MAX_PATH + 1] = {0};
+//     wchar_t targetFile[MAX_PATH + 1] = {0};
 
-    PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
-    PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_CRASH_JSON);
+//     PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
+//     PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_CRASH_JSON);
 
-    size_t size = wcslen(targetFile) * sizeof(wchar_t);
+//     size_t size = wcslen(targetFile) * sizeof(wchar_t);
 
-    if (!WriteFile(hPipe, &size, sizeof(size), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "handleCrashPath: failed to write length of crash.json path to pipe (0x%x)", GetLastError());
-    }
+//     if (!WriteFile(hPipe, &size, sizeof(size), &dwBytesWritten, NULL)) {
+//         LOG_F(ERROR, "handleCrashPath: failed to write length of crash.json path to pipe (0x%x)", GetLastError());
+//     }
 
-    if (!WriteFile(hPipe, &targetFile, (DWORD)size, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "handleCrashPath: failed to write crash.json path to pipe (0x%x)", GetLastError());
-        exit(1);
-    }
+//     if (!WriteFile(hPipe, &targetFile, (DWORD)size, &dwBytesWritten, NULL)) {
+//         LOG_F(ERROR, "handleCrashPath: failed to write crash.json path to pipe (0x%x)", GetLastError());
+//         exit(1);
+//     }
 
-    RpcStringFree((RPC_WSTR *)&runId_s);
+//     RpcStringFree((RPC_WSTR *)&runId_s);
 
-    return 0;
-}
+//     return 0;
+// }
 
-DWORD handleMiniDumpPath(HANDLE hPipe)
+// DWORD handleMiniDumpPath(HANDLE hPipe)
+// {
+//     DWORD dwBytesRead = 0;
+//     DWORD dwBytesWritten = 0;
+//     UUID runId;
+//     wchar_t *runId_s;
+
+//     if (!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
+//         LOG_F(ERROR, "handleMiniDumpPath: failed to read UUID (0x%x)", GetLastError());
+//         exit(1);
+//     }
+
+//     UuidToString(&runId, (RPC_WSTR *)&runId_s);
+
+//     wchar_t targetDir[MAX_PATH + 1] = {0};
+//     wchar_t targetFile[MAX_PATH + 1] = {0};
+
+//     PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
+//     PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_MEM_DMP);
+
+//     size_t size = wcslen(targetFile) * sizeof(wchar_t);
+
+//     if (!WriteFile(hPipe, &size, sizeof(size), &dwBytesWritten, NULL)) {
+//         LOG_F(ERROR, "handleCrashPath: failed to write length of mem.dmp path to pipe (0x%x)", GetLastError());
+//     }
+
+//     if (!WriteFile(hPipe, &targetFile, (DWORD)size, &dwBytesWritten, NULL)) {
+//         LOG_F(ERROR, "handleCrashPath: failed to write mem.dmp path to pipe (0x%x)", GetLastError());
+//         exit(1);
+//     }
+
+//     RpcStringFree((RPC_WSTR *)&runId_s);
+
+//     return 0;
+// }
+
+DWORD handleCrashPaths(HANDLE hPipe)
 {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
@@ -570,12 +606,28 @@ DWORD handleMiniDumpPath(HANDLE hPipe)
     wchar_t targetFile[MAX_PATH + 1] = {0};
 
     PathCchCombine(targetDir, MAX_PATH, FUZZ_WORKING_PATH, runId_s);
+    PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_CRASH_JSON);
+
+    size_t size = lstrlen(targetFile) * sizeof(wchar_t);
+
+    if (!WriteFile(hPipe, &size, sizeof(size), &dwBytesWritten, NULL)) {
+        LOG_F(ERROR, "handleCrashPaths: failed to write length of crash.json to pipe (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    if (!WriteFile(hPipe, &targetFile, (DWORD)size, &dwBytesWritten, NULL)) {
+        LOG_F(ERROR, "handleCrashPath: failed to write crash.json path to pipe (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    memset(targetFile, 0, MAX_PATH + 1);
     PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_MEM_DMP);
 
-    size_t size = wcslen(targetFile) * sizeof(wchar_t);
+    size = lstrlen(targetFile) * sizeof(wchar_t);
 
     if (!WriteFile(hPipe, &size, sizeof(size), &dwBytesWritten, NULL)) {
         LOG_F(ERROR, "handleCrashPath: failed to write length of mem.dmp path to pipe (0x%x)", GetLastError());
+        exit(1);
     }
 
     if (!WriteFile(hPipe, &targetFile, (DWORD)size, &dwBytesWritten, NULL)) {
@@ -629,23 +681,22 @@ DWORD WINAPI threadHandler(void *lpvPipe)
             case EVT_REGISTER_MUTATION:
                 handleRegisterMutation(hPipe);
                 break;
+            case EVT_CRASH_PATHS:
+                handleCrashPaths(hPipe);
+                break;
             case EVT_REPLAY:
                 handleReplay(hPipe);
                 break;
             case EVT_RUN_COMPLETE:
                 handleFinalizeRun(hPipe);
                 break;
-            case EVT_CRASH_PATH:
-                handleCrashPath(hPipe);
-                break;
-            case EVT_MEM_DMP_PATH:
-                handleMiniDumpPath(hPipe);
-                break;
             case EVT_SESSION_TEARDOWN:
                 LOG_F(INFO, "Ending a client's session with the server.");
                 break;
             case EVT_MUTATION:
             case EVT_RUN_INFO:
+            case EVT_CRASH_PATH:
+            case EVT_MEM_DMP_PATH:
                 LOG_F(WARNING, "threadHandler: deprecated event requested: EVT_MUTATION");
                 event = EVT_INVALID;
                 break;
