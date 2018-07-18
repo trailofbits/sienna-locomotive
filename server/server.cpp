@@ -143,7 +143,7 @@ DWORD handleGenerateRunId(HANDLE hPipe) {
         exit(1);
     }
 
-    ZeroMemory(commandLine, 8192 * sizeof(wchar_t));
+    memset(commandLine, 0, 8192 * sizeof(wchar_t));
 
     // get program arguments
     size = 0;
@@ -162,7 +162,7 @@ DWORD handleGenerateRunId(HANDLE hPipe) {
         exit(1);
     }
 
-    ZeroMemory(targetFile, (MAX_PATH + 1) * sizeof(wchar_t));
+    memset(targetFile, 0, (MAX_PATH + 1) * sizeof(wchar_t));
     PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_ARGUMENTS_TXT);
     hFile = CreateFile(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
@@ -546,7 +546,7 @@ DWORD handleCrashPaths(HANDLE hPipe)
         exit(1);
     }
 
-    memset(targetFile, 0, MAX_PATH + 1);
+    memset(targetFile, 0, (MAX_PATH + 1) * sizeof(wchar_t));
     PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_MEM_DMP);
 
     size = lstrlen(targetFile) * sizeof(wchar_t);
