@@ -16,6 +16,7 @@
 
 #include <picosha2.h>
 
+#include "common/mutation.hpp"
 #include "common/sl2_server_api.hpp"
 #include "common/sl2_dr_client.hpp"
 
@@ -33,7 +34,7 @@ static SL2Client   client;
 static sl2_conn sl2_conn;
 static bool crashed = false;
 static uint64_t baseAddr;
-static DWORD mutateCount = 0;
+static DWORD mut_count = 0;
 
 // Metadata object for a target function call
 struct fuzzer_read_info {
@@ -176,11 +177,12 @@ event_exit(void)
     drmgr_exit();
 }
 
-/* Hands bytes off to the mutation server, gets mutated bytes, and writes them into memory. */
+// Mutates a function's input buffer, registers the mutation with the server, and writes the
+// buffer into memory for fuzzing.
 static bool
-mutate(Function function, HANDLE hFile, size_t position, void *buf, size_t size)
+mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bufsize)
 {
-    wchar_t filePath[MAX_PATH + 1] = {0};
+    wchar_t resource[MAX_PATH + 1] = {0};
 
     // Check that ReadFile calls are to something actually valid
     // TODO(ww): Add fread and fread_s here once the _getosfhandle problem is fixed.
@@ -190,15 +192,24 @@ mutate(Function function, HANDLE hFile, size_t position, void *buf, size_t size)
             return false;
         }
 
-        GetFinalPathNameByHandle(hFile, filePath, MAX_PATH, 0);
-        SL2_DR_DEBUG("mutate: filePath: %S", filePath);
+        GetFinalPathNameByHandle(hFile, resource, MAX_PATH, 0);
+        SL2_DR_DEBUG("mutate: resource: %S\n", resource);
     }
 
-    DWORD type = static_cast<DWORD>(function);
+    sl2_mutation mutation;
 
-    sl2_conn_request_mutation(&sl2_conn, type, mutateCount, filePath, position, size, buf);
+    mutation.function = static_cast<DWORD>(function);
+    mutation.mut_count = mut_count;
+    mutation.resource = resource;
+    mutation.position = position;
+    mutation.bufsize = bufsize;
+    mutation.buffer = (unsigned char *) buffer;
 
-    mutateCount++;
+    mutate_buffer(mutation.buffer, mutation.bufsize);
+
+    sl2_conn_register_mutation(&sl2_conn, &mutation);
+
+    mut_count++;
 
     return true;
 }
@@ -628,7 +639,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     info->retAddrOffset         = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
     // Identify whether this is the function we want to target
-    bool targeted = client.isFunctionTargeted( function, info );
+    bool targeted = client.isFunctionTargeted(function, info);
     client.incrementCallCountForFunction(function);
 
     if (info->lpNumberOfBytesRead) {
@@ -806,7 +817,11 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     wchar_t wcsAppName[MAX_PATH + 1] = {0};
     mbstowcs_s(NULL, wcsAppName, MAX_PATH, mbsAppName, MAX_PATH);
 
-    sl2_conn_open(&sl2_conn);
+    if (sl2_conn_open(&sl2_conn) != SL2Response::OK) {
+        SL2_DR_DEBUG("ERROR: Couldn't open a connection to the server!\n");
+        dr_abort();
+    }
+
     sl2_conn_request_run_id(&sl2_conn, wcsAppName, get_target_command_line());
 
     wchar_t run_id_s[SL2_UUID_SIZE];
