@@ -177,7 +177,8 @@ event_exit(void)
     drmgr_exit();
 }
 
-/* Hands bytes off to the mutation server, gets mutated bytes, and writes them into memory. */
+// Mutates a function's input buffer, registers the mutation with the server, and writes the
+// buffer into memory for fuzzing.
 static bool
 mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bufsize)
 {
