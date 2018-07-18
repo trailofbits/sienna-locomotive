@@ -19,7 +19,7 @@
 #include <codecvt>
 #include <locale>
 
-#include <picosha2.h>
+#include "vendor/picosha2.h"
 using namespace std;
 
 #include "common/sl2_dr_client.hpp"

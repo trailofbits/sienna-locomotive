@@ -10,7 +10,7 @@
 // to perform the includes.
 
 #include <string>
-#include "json.hpp"
+#include "vendor/json.hpp"
 using json = nlohmann::json;
 using namespace std;
 
@@ -115,7 +115,7 @@ struct client_read_info {
 class SL2Client {
 
 private:
-    
+
 
 public:
     SL2Client();
@@ -130,7 +130,7 @@ public:
     bool        isFunctionTargeted(Function function,  client_read_info* info);
     void        loadJson(string json);
     uint64_t    incrementCallCountForFunction(Function function);
-    
+
 };
 
 // Returns a C-string corresponding to the requested `function`.
