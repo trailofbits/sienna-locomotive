@@ -1439,6 +1439,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         hookFunctionPost = NULL;
 
         // if we have a post hook function, use it
+        // TODO(ww): Why do we do this, instead of just assigning above?
         if (toHookPost.find(functionName) != toHookPost.end()) {
             hookFunctionPost = toHookPost[functionName];
         }
