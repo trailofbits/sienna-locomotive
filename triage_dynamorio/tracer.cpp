@@ -21,7 +21,7 @@
 #include "dr_ir_instr.h"
 #include "droption.h"
 
-#include <picosha2.h>
+#include "vendor/picosha2.h"
 
 extern "C" {
     #include "tracer_utils.h"

@@ -14,7 +14,7 @@
 #include "drwrap.h"
 #include "droption.h"
 
-#include <picosha2.h>
+#include "vendor/picosha2.h"
 
 #include "common/mutation.hpp"
 #include "common/sl2_server_api.hpp"
