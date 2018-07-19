@@ -431,7 +431,6 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
     std::map<char *, SL2_PRE_PROTO>::iterator it;
     for (it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
-        std::string strFunctionName(functionName);
 
         void(__cdecl *hookFunctionPre)(void *, void **);
         hookFunctionPre = it->second;
@@ -445,14 +444,22 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
 
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
         const char *mod_name = dr_module_preferred_name(mod);
-        if (strcmp(functionName, "ReadFile") == 0) {
-            if (strcmp(mod_name, "KERNELBASE.dll") != 0) {
+
+        // TODO(ww): Consolidate this between the wizard, fuzzer, and tracer.
+        if (STREQ(functionName, "ReadFile")) {
+            if (!STREQI(mod_name, "KERNELBASE.dll")) {
                 continue;
             }
         }
 
-        if (strcmp(functionName, "RegQueryValueExA") == 0 || strcmp(functionName, "RegQueryValueExW") == 0) {
-            if (strcmp(mod_name, "KERNELBASE.dll") != 0) {
+        if (STREQ(functionName, "RegQueryValueExA") || STREQ(functionName, "RegQueryValueExW")) {
+            if (!STREQI(mod_name, "KERNELBASE.dll")) {
+                continue;
+            }
+        }
+
+        if (STREQ(functionName, "fread") || STREQ(functionName, "fread_s")) {
+            if (!STREQI(mod_name, "UCRTBASE.DLL")) {
                 continue;
             }
         }

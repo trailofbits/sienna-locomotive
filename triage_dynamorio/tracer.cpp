@@ -1418,16 +1418,15 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         bool hook = false;
 
         // Look for function matching the target specified on the command line
-        std::string strFunctionName(functionName);
         for (targetFunction t : client.parsedJson) {
-          if (t.selected && t.functionName == strFunctionName) {
-            hook = true;
-          }
-          else if (t.selected && (strFunctionName == "RegQueryValueExW" || strFunctionName == "RegQueryValueExA")) {
-            if (t.functionName != "RegQueryValueEx") {
-              hook = false;
+            if (t.selected && STREQ(t.functionName.c_str(), functionName)){
+                hook = true;
             }
-          }
+            else if (t.selected && (STREQ(functionName, "RegQueryValueExW") || STREQ(functionName, "RegQueryValueExA"))) {
+                if (!STREQ(t.functionName.c_str(), "RegQueryValueEx")) {
+                  hook = false;
+                }
+            }
         }
 
         if (!hook)
@@ -1447,18 +1446,21 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         // find target function in module
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
 
-        // special cases
-        // ReadFile and RegQueryValueEx* are in multiple DLLs
-        // only use the ones in KERNELBASE.dll
-
-        if (strcmp(functionName, "ReadFile") == 0) {
-            if (strcmp(mod_name, "KERNELBASE.dll") != 0) {
+        // TODO(ww): Consolidate this between the wizard, fuzzer, and tracer.
+        if (STREQ(functionName, "ReadFile")) {
+            if (!STREQI(mod_name, "KERNELBASE.dll") != 0) {
                 continue;
             }
         }
 
-        if (strcmp(functionName, "RegQueryValueExA") == 0 || strcmp(functionName, "RegQueryValueExW") == 0) {
-            if (strcmp(mod_name, "KERNELBASE.dll") != 0) {
+        if (STREQ(functionName, "RegQueryValueExA") || STREQ(functionName, "RegQueryValueExW")) {
+            if (!STREQI(mod_name, "KERNELBASE.dll") != 0) {
+                continue;
+            }
+        }
+
+        if (STREQ(functionName, "fread") || STREQ(functionName, "fread_s")) {
+            if (!STREQI(mod_name, "UCRTBASE.DLL")) {
                 continue;
             }
         }

@@ -16,6 +16,7 @@ using namespace std;
 
 
 extern "C" {
+    #include "util.h"
     #include "uuid.h"
 }
 

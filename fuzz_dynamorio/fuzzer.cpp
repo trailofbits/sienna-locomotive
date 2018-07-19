@@ -703,15 +703,12 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         char *functionName = it->first;
         bool hook = false;
 
-        // Look for function matching the target specified on the command line
-        std::string strFunctionName(functionName);
-
         for (targetFunction t : client.parsedJson) {
-            if (t.selected && t.functionName == strFunctionName){
+            if (t.selected && STREQ(t.functionName.c_str(), functionName)){
                 hook = true;
             }
-            else if (t.selected && (strFunctionName == "RegQueryValueExW" || strFunctionName == "RegQueryValueExA")) {
-                if (t.functionName != "RegQueryValueEx") {
+            else if (t.selected && (STREQ(functionName, "RegQueryValueExW") || STREQ(functionName, "RegQueryValueExA"))) {
+                if (!STREQ(t.functionName.c_str(), "RegQueryValueEx")) {
                   hook = false;
                 }
             }
@@ -734,22 +731,21 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
         const char *mod_name = dr_module_preferred_name(mod);
 
-        if (strFunctionName == "ReadFile") {
-            if (_stricmp(mod_name, "KERNELBASE.dll") != 0) {
+        // TODO(ww): Consolidate this between the wizard, fuzzer, and tracer.
+        if (STREQ(functionName, "ReadFile")) {
+            if (!STREQI(mod_name, "KERNELBASE.dll")) {
                 continue;
             }
         }
 
-        // Only hook registry queries in the kernel
-        if (strFunctionName == "RegQueryValueExA" || strFunctionName == "RegQueryValueExW") {
-            if (_stricmp(mod_name, "KERNELBASE.dll") != 0) {
+        if (STREQ(functionName, "RegQueryValueExA") || STREQ(functionName, "RegQueryValueExW")) {
+            if (!STREQI(mod_name, "KERNELBASE.dll")) {
                 continue;
             }
         }
 
-        // Only hook fread(_s) calls from the C runtime
-        if (strFunctionName == "fread" || strFunctionName == "fread_s") {
-            if (_stricmp(mod_name, "UCRTBASE.DLL") != 0) {
+        if (STREQ(functionName, "fread") || STREQ(functionName, "fread_s")) {
+            if (!STREQI(mod_name, "UCRTBASE.DLL")) {
                 continue;
             }
         }
