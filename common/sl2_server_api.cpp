@@ -65,13 +65,22 @@ __declspec(dllexport) SL2Response sl2_conn_open(sl2_conn *conn)
     return SL2Response::OK;
 }
 
-__declspec(dllexport) SL2Response sl2_conn_close(sl2_conn *conn)
+__declspec(dllexport) SL2Response sl2_conn_end_session(sl2_conn *conn)
 {
     uint8_t event = EVT_SESSION_TEARDOWN;
     DWORD txsize;
 
     // Tell the server that we want to end our session.
     SL2_CONN_WRITE(conn, &event, sizeof(event));
+
+    conn->has_run_id = false;
+
+    return SL2Response::OK;
+}
+
+__declspec(dllexport) SL2Response sl2_conn_close(sl2_conn *conn)
+{
+    sl2_conn_end_session(conn);
 
     CloseHandle(conn->pipe);
 
