@@ -16,24 +16,24 @@ foreach(CompilerFlag ${CompilerFlags})
   string(REPLACE "/MTd" "/MT" ${CompilerFlag} "${${CompilerFlag}}")
 endforeach()
 
-include(ExternalProject)
+# include(ExternalProject)
 
 ################################################################################################
 # Breakpad stuff for triage/minidump/exploitability/etc...
 # This checks out the src for the header files only
-set(  BREAKPAD_DIR        ${CMAKE_SOURCE_DIR}/breakpad/src/breakpad/src)
-# the library is prebuilt here
-file( GLOB BREAKPAD_LIBS  ${CMAKE_SOURCE_DIR}/deps/Release/*.lib )
+# set(  BREAKPAD_DIR        ${CMAKE_SOURCE_DIR}/breakpad/src/breakpad/src)
+# # the library is prebuilt here
+# file( GLOB BREAKPAD_LIBS  ${CMAKE_SOURCE_DIR}/deps/Release/*.lib )
 
-ExternalProject_Add(
-  breakpad
-  GIT_REPOSITORY     https://github.com/google/breakpad.git
-  CONFIGURE_COMMAND  ""
-  BUILD_COMMAND      ""
-  INSTALL_COMMAND    ""
-  TEST_COMMAND       ""
-  PREFIX             "../breakpad"
- )
+# ExternalProject_Add(
+#   breakpad
+#   GIT_REPOSITORY     https://github.com/google/breakpad.git
+#   CONFIGURE_COMMAND  ""
+#   BUILD_COMMAND      ""
+#   INSTALL_COMMAND    ""
+#   TEST_COMMAND       ""
+#   PREFIX             "../breakpad"
+#  )
 
 
 include_directories(include)
