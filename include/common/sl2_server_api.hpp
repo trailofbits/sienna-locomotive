@@ -65,6 +65,10 @@ struct sl2_crash_paths {
 // *or* `sl2_conn_assign_run_id`, depending on the client's needs.
 __declspec(dllexport) SL2Response sl2_conn_open(sl2_conn *conn);
 
+// Ends a session with the SL2 server, *without* closing the connection.
+// This allows an `sl2_conn` to be reused across multiple runs.
+__declspec(dllexport) SL2Response sl2_conn_end_session(sl2_conn *conn);
+
 // Closes an active connection with the SL2 server.
 // Clients *must not* exit before calling this.
 __declspec(dllexport) SL2Response sl2_conn_close(sl2_conn *conn);
