@@ -1,7 +1,7 @@
 import sys
 
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtCore import Qt, QSize, QSortFilterProxyModel
 from PyQt5.QtGui import QFontDatabase, QMovie, QStandardItem
 
 from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem, CheckboxTreeModel
@@ -45,8 +45,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.target_data = get_target(config.config)
         self.model = CheckboxTreeModel()
+        self.proxy_model = QSortFilterProxyModel()
+        self.proxy_model.setSourceModel(self.model)
         self.build_func_tree()
-        self._func_tree.setModel(self.model)
+        self._func_tree.setModel(self.proxy_model)
 
         # Set up fuzzer button and thread
         self.fuzzer_button = QtWidgets.QPushButton("Fuzz selected targets")
@@ -140,22 +142,30 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def build_func_tree(self):
         """ Build the function target display tree """
+        self._func_tree.setSortingEnabled(False)
         self.model.clear()
+        self.model.setColumnCount(3)
 
         for index, option in enumerate(self.target_data):
-            widget = CheckboxTreeWidgetItem(self._func_tree, index, ("{func_name} from {source}:{start}-{end}" if 'source' in option
-                                            else "{func_name}").format(**option))
-            widget.setCheckState(Qt.Checked if option["selected"] else Qt.Unchecked)
+            funcname_widget = CheckboxTreeWidgetItem(self._func_tree, index, "{func_name}".format(**option))
+            filename_widget = QStandardItem(option.get('source', None))
+            funcname_widget.setCheckState(Qt.Checked if option["selected"] else Qt.Unchecked)
+            funcname_widget.setColumnCount(3)
 
             for address in range(0, min(len(option["buffer"]), 16*5), 16):
-                hexstr = " ".join("{:02X}".format(c) for c in option["buffer"][address:address + 16])
-                asciistr = "".join((chr(c) if c in range(31, 127) else '.') for c in option["buffer"][address:address + 16])
-                formatted = "0x%04X:  %s  | %s" % (address, hexstr + " " * (16 * 3 - len(hexstr)), asciistr)
-                data_disp = QStandardItem(formatted)
-                data_disp.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
-                widget.appendRow(data_disp)
+                addr = QStandardItem("0x%04X" % address)
+                hexstr = QStandardItem(" ".join("{:02X}".format(c) for c in option["buffer"][address:address + 16]))
+                asciistr = QStandardItem("".join((chr(c) if c in range(31, 127) else '.') for c in option["buffer"][address:address + 16]))
+                addr.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+                hexstr.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+                asciistr.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+                funcname_widget.appendRow([addr, hexstr, asciistr])
 
-            self.model.appendRow(widget)
+            self.model.appendRow([funcname_widget, filename_widget])
+        self._func_tree.resizeColumnToContents(0)
+        self._func_tree.resizeColumnToContents(1)
+        self._func_tree.setSortingEnabled(True)
+
 
     def tree_changed(self, widget, is_checked):
         """ Handle when an item in the function tree is checked """
@@ -168,6 +178,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def get_config(self):
         """ Selects the configuration dict from config.py """
+        # print("TODO FIX ME")  # TODO - fix me
         profile, cont = QtWidgets.QInputDialog.getItem(self,
                                                        "Select Configuration Profile",
                                                        "Select Configuration Profile",
