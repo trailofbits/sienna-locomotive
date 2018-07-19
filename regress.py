@@ -4,22 +4,14 @@ import test.support as support
 import sys
 import subprocess
 import shlex
-
+import glob
 
 def runAndCaptureOutput( cmd ):
     if type(cmd) == type([]):
         cmd = " ".join(cmd)
-
     return subprocess.getoutput(cmd)
-    # p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,  stderr=subprocess.PIPE, close_fds=True)
-    # stdout, stderr = p.communicate()
-    # stdout = str(stdout)
-    # stderr = str(stderr)
-    # return stdout, stderr
 
 class TestWizard(unittest.TestCase):
-    
-    
 
     def test_0(self):
         
@@ -79,6 +71,20 @@ class TestWizard(unittest.TestCase):
         self.assertRegex(  output, r'Triage .*: breakpoint .*caused EXCEPTION_BREAKPOINT'  )
         self.assertTrue( 'int3' in output )
 
+
+    def test_minidump(self):
+        minidumpsdir = "breakpad/src/breakpad/src/processor/testdata"
+        pattern = "%s/*.dmp" % minidumpsdir
+        print("pattern", pattern)
+        i = 0
+        for file in glob.glob(  pattern ):            
+            cmd = r'build\triage\Debug\triage.exe ' + file
+            out = runAndCaptureOutput(cmd)
+            self.assertTrue( 'Minidump opened' in out )
+            self.assertTrue( 'Minidump closing minidump' in out )
+
+            if i > 10:
+                return
 
 def main():
     support.run_unittest(TestWizard)
