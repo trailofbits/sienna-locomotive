@@ -1,31 +1,38 @@
-from PyQt5.QtWidgets import QTreeWidget, QTreeWidgetItem
+from PyQt5.QtWidgets import QTreeView
+from PyQt5.QtGui import QStandardItem, QStandardItemModel
 from PyQt5.QtCore import pyqtSignal, Qt
 
 
-class CheckboxTreeWidgetItem(QTreeWidgetItem):
+class CheckboxTreeWidgetItem(QStandardItem):
 
-    def __init__(self, parent, index, is_checkbox=True, *args):
-        super().__init__(parent, *args)
+    def __init__(self, parent, index, *args):
+        super().__init__(*args)
         self.index = index
         self._parent = parent
-        if is_checkbox:
-            self.setCheckState(0, Qt.Unchecked)
+        self.setCheckState(Qt.Unchecked)
+        self.setCheckable(True)
+        self.setEditable(False)
 
-    def setData(self, column, role, value):
+    def setData(self, value, role):
         should_emit = (role == Qt.CheckStateRole) and \
-                      (column == 0) and \
-                      (self.data(column, role) is not None) and \
-                      (self.checkState(0) != value)
-        super().setData(column, role, value)
+                      (self.data(role) is not None) and \
+                      (self.checkState() != value)
+        super().setData(value, role)
         if should_emit:
             parent = self._parent
             if type(parent) is CheckboxTreeWidget:
-                parent.itemCheckedStateChanged.emit(self, 0, True if self.checkState(0) == Qt.Checked else False)
+                parent.itemCheckedStateChanged.emit(self, True if self.checkState() == Qt.Checked else False)
 
 
-class CheckboxTreeWidget(QTreeWidget):
+class CheckboxTreeModel(QStandardItemModel):
 
-    itemCheckedStateChanged = pyqtSignal(CheckboxTreeWidgetItem, int, bool)
+    def __init__(self):
+        super().__init__()
+
+
+class CheckboxTreeWidget(QTreeView):
+
+    itemCheckedStateChanged = pyqtSignal(CheckboxTreeWidgetItem, bool)
 
     def __init__(self, *args):
         super().__init__(*args)

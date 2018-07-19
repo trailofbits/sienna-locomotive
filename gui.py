@@ -2,9 +2,9 @@ import sys
 
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QFontDatabase, QMovie
+from PyQt5.QtGui import QFontDatabase, QMovie, QStandardItem
 
-from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem
+from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem, CheckboxTreeModel
 from gui.QtHelpers import QIntVariable, QFloatVariable, QTextAdapter
 
 from harness import config
@@ -40,11 +40,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Set up function tree display
         self._func_tree = CheckboxTreeWidget()
-        self._func_tree.setHeaderLabel("Target Function Options")
+        # self._func_tree.setHeaderLabel("Target Function Options")
         self._layout.addWidget(self._func_tree)
 
         self.target_data = get_target(config.config)
+        self.model = CheckboxTreeModel()
         self.build_func_tree()
+        self._func_tree.setModel(self.model)
 
         # Set up fuzzer button and thread
         self.fuzzer_button = QtWidgets.QPushButton("Fuzz selected targets")
@@ -138,25 +140,24 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def build_func_tree(self):
         """ Build the function target display tree """
-        self._func_tree.clear()
+        self.model.clear()
 
         for index, option in enumerate(self.target_data):
-            widget = CheckboxTreeWidgetItem(self._func_tree, index)
-            widget.setText(0, ("{func_name} from {source}:{start}-{end}" if 'source' in option
-                               else "{func_name}").format(**option))
-            widget.setCheckState(0, Qt.Checked if option["selected"] else Qt.Unchecked)
+            widget = CheckboxTreeWidgetItem(self._func_tree, index, ("{func_name} from {source}:{start}-{end}" if 'source' in option
+                                            else "{func_name}").format(**option))
+            widget.setCheckState(Qt.Checked if option["selected"] else Qt.Unchecked)
 
             for address in range(0, min(len(option["buffer"]), 16*5), 16):
                 hexstr = " ".join("{:02X}".format(c) for c in option["buffer"][address:address + 16])
                 asciistr = "".join((chr(c) if c in range(31, 127) else '.') for c in option["buffer"][address:address + 16])
                 formatted = "0x%04X:  %s  | %s" % (address, hexstr + " " * (16 * 3 - len(hexstr)), asciistr)
-                data_disp = CheckboxTreeWidgetItem(widget, 0, is_checkbox=False)
-                data_disp.setText(0, formatted)
-                data_disp.setFont(0, QFontDatabase.systemFont(QFontDatabase.FixedFont))
+                data_disp = QStandardItem(formatted)
+                data_disp.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+                widget.appendRow(data_disp)
 
-            self._func_tree.insertTopLevelItem(0, widget)
+            self.model.appendRow(widget)
 
-    def tree_changed(self, widget, _column, is_checked):
+    def tree_changed(self, widget, is_checked):
         """ Handle when an item in the function tree is checked """
         self.target_data.update(widget.index, selected=is_checked)
 
