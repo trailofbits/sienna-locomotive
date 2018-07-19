@@ -40,6 +40,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Set up function tree display
         self._func_tree = CheckboxTreeWidget()
+        self._func_tree.setHeaderLabel("Target Function Options")
         self._layout.addWidget(self._func_tree)
 
         self.target_data = get_target(config.config)
