@@ -8,7 +8,7 @@
   4. It's has a thought-out exploitability feature that includes disassembly.
   5. It has a stackwalker.
   6. It supports symbols, including pdbs. 
-  7. Can parse minidumps, and ever convert to corefiles.
+  7. Can parse minidumps, and even convert to corefiles.
   8. It has it's own exception handlers (although we probably don't care about this)
 
 
