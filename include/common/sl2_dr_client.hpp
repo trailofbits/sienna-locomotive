@@ -123,6 +123,7 @@ public:
 
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Variables
+    // TODO(ww): Subsume sl2_conn under SL2Client.
     map<Function, uint64_t>     call_counts;
     json                        parsedJson;
 
