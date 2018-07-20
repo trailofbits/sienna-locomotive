@@ -50,8 +50,7 @@ struct fuzzer_read_info {
 };
 
 /* Read the PEB of the target application and get the full command line */
-static LPTSTR
-get_target_command_line()
+static wchar_t *get_target_command_line(size_t *len)
 {
     // see: https://github.com/DynamoRIO/dynamorio/issues/2662
     // alternatively: https://wj32.org/wp/2009/01/24/howto-get-the-command-line-of-processes/
@@ -66,7 +65,8 @@ get_target_command_line()
     }
 
     // Allocate space for the command line
-    wchar_t* commandLineContents = (wchar_t *) dr_global_alloc(parameterBlock.CommandLine.Length);
+    wchar_t* commandLineContents = (wchar_t *) dr_global_alloc(parameterBlock.CommandLine.Length + 1);
+    memset(commandLineContents, 0, parameterBlock.CommandLine.Length + 1);
 
     // Read the command line from the parameter block
     if (!dr_safe_read(parameterBlock.CommandLine.Buffer, parameterBlock.CommandLine.Length, commandLineContents, &byte_counter)) {
@@ -74,6 +74,7 @@ get_target_command_line()
         dr_exit_process(1);
     }
 
+    *len = parameterBlock.CommandLine.Length + 1;
     return commandLineContents;
 }
 
@@ -819,7 +820,10 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_abort();
     }
 
-    sl2_conn_request_run_id(&sl2_conn, wcsAppName, get_target_command_line());
+    size_t target_argv_size;
+    wchar_t *target_argv = get_target_command_line(&target_argv_size);
+    sl2_conn_request_run_id(&sl2_conn, wcsAppName, target_argv);
+    dr_global_free(target_argv, target_argv_size);
 
     wchar_t run_id_s[SL2_UUID_SIZE];
     sl2_uuid_to_wstring(sl2_conn.run_id, run_id_s);
