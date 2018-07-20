@@ -163,7 +163,12 @@ class MainWindow(QtWidgets.QMainWindow):
         """ Build the function target display tree """
         self._func_tree.setSortingEnabled(False)
         self.model.clear()
-        self.model.setHorizontalHeaderLabels(["Function Name", "File", ""])
+        self.model.setHorizontalHeaderLabels(["Function Name", "File", "Order Seen", "Binary Offset"])
+        self.model.horizontalHeaderItem(0).setToolTip("The name of a fuzzable function")
+        self.model.horizontalHeaderItem(1).setToolTip("The name of the file (if any) the function tried to read")
+        self.model.horizontalHeaderItem(2).setToolTip("The order in which the wizard encountered this function")
+        self.model.horizontalHeaderItem(3).setToolTip("How far (in memory) away from the start of the target program the call to this function occurred. Lower values are usually better targets.")
+
 
         for index, option in enumerate(self.target_data):
             funcname_widget = CheckboxTreeWidgetItem(self._func_tree, index, "{func_name}".format(**option))
@@ -186,13 +191,18 @@ class MainWindow(QtWidgets.QMainWindow):
             asciistr.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
             funcname_widget.appendRow([addr, hexstr, asciistr])
 
-            self.model.appendRow([funcname_widget, filename_widget])
+            self.model.appendRow([funcname_widget,
+                                  filename_widget,
+                                  QStandardItem(str(index)),
+                                  QStandardItem(str(option.get('retAddrOffset', None)))])
 
         # TODO - None of these things work. Maybe something with the way we build the tree?
         self._func_tree.expandAll()
         self._func_tree.resizeColumnToContents(0)
         self._func_tree.resizeColumnToContents(1)
+        self._func_tree.resizeColumnToContents(3)
 
+        self._func_tree.sortByColumn(2, Qt.AscendingOrder)
         self._func_tree.setSortingEnabled(True)
 
     def tree_changed(self, widget, is_checked):
