@@ -10,12 +10,13 @@
 // to perform the includes.
 
 #include <string>
-#include "json.hpp"
+#include "vendor/json.hpp"
 using json = nlohmann::json;
 using namespace std;
 
 
 extern "C" {
+    #include "util.h"
     #include "uuid.h"
 }
 
@@ -26,12 +27,12 @@ extern "C" {
 // of 2048, and our JSON objects frequently exceed that. When that happens,
 // dr_fprintf silently truncates them and confuses the harness with invalid JSON.
 // We circumvent this by chunking the output.
-#define SL2_LOG_JSONL(json) do { \
-    auto jsonl_str = json.dump(); \
-    for (int i = 0; i < jsonl_str.length(); i += 1024) { \
+#define SL2_LOG_JSONL(json) do {                                     \
+    auto jsonl_str = json.dump();                                    \
+    for (int i = 0; i < jsonl_str.length(); i += 1024) {             \
         dr_fprintf(STDERR, "%s", jsonl_str.substr(i, 1024).c_str()); \
-    } \
-    dr_fprintf(STDERR, "\n"); \
+    }                                                                \
+    dr_fprintf(STDERR, "\n");                                        \
 } while(0)
 
 // Macros for the function prototypes passed to pre- and post-function hooks.
@@ -115,13 +116,14 @@ struct client_read_info {
 class SL2Client {
 
 private:
-    
+
 
 public:
     SL2Client();
 
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Variables
+    // TODO(ww): Subsume sl2_conn under SL2Client.
     map<Function, uint64_t>     call_counts;
     json                        parsedJson;
 
@@ -130,7 +132,7 @@ public:
     bool        isFunctionTargeted(Function function,  client_read_info* info);
     void        loadJson(string json);
     uint64_t    incrementCallCountForFunction(Function function);
-    
+
 };
 
 // Returns a C-string corresponding to the requested `function`.

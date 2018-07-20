@@ -16,7 +16,7 @@ foreach(CompilerFlag ${CompilerFlags})
   string(REPLACE "/MTd" "/MT" ${CompilerFlag} "${${CompilerFlag}}")
 endforeach()
 
-include_directories(include include/common)
+include_directories(include)
 add_subdirectory(common)
 add_subdirectory(fuzz_dynamorio)
 add_subdirectory(server)

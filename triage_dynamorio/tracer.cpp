@@ -21,7 +21,7 @@
 #include "dr_ir_instr.h"
 #include "droption.h"
 
-#include <picosha2.h>
+#include "vendor/picosha2.h"
 
 extern "C" {
     #include "tracer_utils.h"
@@ -945,7 +945,9 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
             exit(1);
         }
 
-        HANDLE hDumpFile = CreateFile(crash_paths.dump_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        CloseHandle(hCrashFile);
+
+        HANDLE hDumpFile = CreateFile(crash_paths.mem_dump_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
         if (hDumpFile == INVALID_HANDLE_VALUE) {
             SL2_DR_DEBUG("tracer#dump_crash: could not open the dump file (%x)", GetLastError());
@@ -955,9 +957,16 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
         // parts of the instrumentation showing up in our memory dump.
         dr_switch_to_app_state(drcontext);
 
-        MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hDumpFile, MiniDumpWithFullMemory, NULL, NULL, NULL);
+        MiniDumpWriteDump(
+            GetCurrentProcess(),
+            GetCurrentProcessId(),
+            hDumpFile,
+            MiniDumpWithFullMemory,
+            NULL, NULL, NULL);
 
         dr_switch_to_dr_state(drcontext);
+
+        CloseHandle(hDumpFile);
     }
 
     dr_exit_process(1);
@@ -1418,16 +1427,15 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         bool hook = false;
 
         // Look for function matching the target specified on the command line
-        std::string strFunctionName(functionName);
         for (targetFunction t : client.parsedJson) {
-          if (t.selected && t.functionName == strFunctionName) {
-            hook = true;
-          }
-          else if (t.selected && (strFunctionName == "RegQueryValueExW" || strFunctionName == "RegQueryValueExA")) {
-            if (t.functionName != "RegQueryValueEx") {
-              hook = false;
+            if (t.selected && STREQ(t.functionName.c_str(), functionName)){
+                hook = true;
             }
-          }
+            else if (t.selected && (STREQ(functionName, "RegQueryValueExW") || STREQ(functionName, "RegQueryValueExA"))) {
+                if (!STREQ(t.functionName.c_str(), "RegQueryValueEx")) {
+                  hook = false;
+                }
+            }
         }
 
         if (!hook)
@@ -1439,6 +1447,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         hookFunctionPost = NULL;
 
         // if we have a post hook function, use it
+        // TODO(ww): Why do we do this, instead of just assigning above?
         if (toHookPost.find(functionName) != toHookPost.end()) {
             hookFunctionPost = toHookPost[functionName];
         }
@@ -1446,18 +1455,21 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         // find target function in module
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
 
-        // special cases
-        // ReadFile and RegQueryValueEx* are in multiple DLLs
-        // only use the ones in KERNELBASE.dll
-
-        if (strcmp(functionName, "ReadFile") == 0) {
-            if (strcmp(mod_name, "KERNELBASE.dll") != 0) {
+        // TODO(ww): Consolidate this between the wizard, fuzzer, and tracer.
+        if (STREQ(functionName, "ReadFile")) {
+            if (!STREQI(mod_name, "KERNELBASE.dll") != 0) {
                 continue;
             }
         }
 
-        if (strcmp(functionName, "RegQueryValueExA") == 0 || strcmp(functionName, "RegQueryValueExW") == 0) {
-            if (strcmp(mod_name, "KERNELBASE.dll") != 0) {
+        if (STREQ(functionName, "RegQueryValueExA") || STREQ(functionName, "RegQueryValueExW")) {
+            if (!STREQI(mod_name, "KERNELBASE.dll") != 0) {
+                continue;
+            }
+        }
+
+        if (STREQ(functionName, "fread") || STREQ(functionName, "fread_s")) {
+            if (!STREQI(mod_name, "UCRTBASE.DLL")) {
                 continue;
             }
         }
@@ -1554,6 +1566,7 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
     // NOTE(ww): We open the client's connection to the server here,
     // but the client isn't ready to use until it's been given a run ID.
     // See inside of `tracer` for that.
+    // TODO(ww): Check the response code here.
     sl2_conn_open(&sl2_conn);
 
     tracer(id, argc, argv);

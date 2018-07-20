@@ -12,7 +12,7 @@ using namespace std;
 // the DR build process eventually and be the superclass of Fuzzer and Tracer subclasses.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 SL2Client::SL2Client() {
-    
+
 }
 
 
@@ -22,9 +22,9 @@ SL2Client::SL2Client() {
 // Returns true if the current function should be targeted.
 bool SL2Client::
 isFunctionTargeted(Function function, client_read_info* info) {
-    
+
     std::string strFunctionName(get_function_name(function));
-    
+
     for (targetFunction t : parsedJson){
         if (t.selected && t.functionName == strFunctionName) {
             if (t.mode & MATCH_INDEX && call_counts[function] == t.index) {
@@ -35,7 +35,7 @@ isFunctionTargeted(Function function, client_read_info* info) {
             }
             else if (t.mode & MATCH_ARG_HASH && !strcmp(t.argHash.c_str(), info->argHash)) {
                 return true;
-            } 
+            }
             else if( t.mode & MATCH_ARG_COMPARE ) {
                 size_t  minimum = 16;
                 int     comp;
@@ -55,6 +55,20 @@ isFunctionTargeted(Function function, client_read_info* info) {
     }
     return false;
 }
+
+// TODO(ww): Use this instead of duplicating code across all three clients.
+// bool SL2Client::functionIsInUnexpectedModule(char *function, char *module)
+// {
+//     #define FUNC_AND_MOD(exp_f, exp_m) ((STREQ(exp_f, function) && STREQI(exp_m, module)))
+
+//     return (FUNC_AND_MOD("ReadFile", "KERNELBASE.DLL")
+//             || FUNC_AND_MOD("RegQueryValueExA", "KERNELBASE.DLL")
+//             || FUNC_AND_MOD("RegQueryValueExW", "KERNELBASE.DLL")
+//             || FUNC_AND_MOD("fread", "UCRTBASE.DLL")
+//             || FUNC_AND_MOD("fread_s", "UCRTBASE.DLL"))
+
+//     #undef FUNC_AND_MOD
+// }
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -119,5 +133,5 @@ __declspec(dllexport) void from_json(const json& j, targetFunction& t)
     t.functionName  = j.value("func_name", "");
     t.argHash       = j.value("argHash", "");
     t.buffer        = j["buffer"].get<vector<uint8_t>>();
-    
+
 }
