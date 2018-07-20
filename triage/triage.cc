@@ -10,7 +10,11 @@
 #include "google_breakpad/processor/minidump.h"
 #include "google_breakpad/processor/minidump_processor.h"
 #include "google_breakpad/processor/process_state.h"
-#include "exploitability_sl2.h"
+
+#include "Xploitability.h"
+#include "XploitabilitySL2.h"
+#include "XploitabilityBangExploitable.h"
+
 #include <algorithm>
 #include <numeric>
 #include <filesystem>
@@ -49,7 +53,6 @@ Triage::Triage( const string& path )
 }
 
 Triage::~Triage( )  {
-    delete xploitabilityBreakpad_;
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -74,11 +77,15 @@ StatusCode Triage::process() {
     }
 
     // Calculate score from breakpad
-    xploitabilityBreakpad_ = new ExploitabilitySL2( &dump_, &state_);
-    xploitabilityBreakpad_->CheckPlatformExploitability();
-    scores_.push_back( xploitabilityBreakpad_->exploitabilityScore()  );
+    Xploitability* xploitability = new XploitabilitySL2( &dump_, &state_);    
+    scores_.push_back( xploitability->exploitabilityScore()  );
+    delete xploitability;
 
-    
+    xploitability = new XploitabilityBangExploitable( &dump_, &state_);    
+    scores_.push_back( xploitability->exploitabilityScore()  );
+    delete xploitability;
+
+
     return StatusCode::GOOD;
 }
 
@@ -134,24 +141,26 @@ double Triage::exploitabilityScore() {
     
     for( auto score : scores_  ) {
         score  = Triage::normalize(score);
-        ret += score;
+        // We are assuming the algorithms are conservative and increasing the weight of higher estimations
+        ret += (score*score);
     }
 
-    return ret / scores_.size();
-
-
+    ret =  ret / scores_.size();
+    ret = sqrt(ret);
+    ret = Triage::normalize(ret);
+    return ret;
 }
 
 const string Triage::exploitability() {
 
     double score = exploitabilityScore();
-    if(         kHighCutoff   <= score ) {
+    if(         kHighCutoff         <= score ) {
         return "High";
-    } else if(  kMediumCutoff <= score ) {
+    } else if(  kMediumCutoff       <= score ) {
         return "Medium";
-    } else if(  kLowCutoff    <= score ) {
+    } else if(  kLowCutoff          <= score ) {
         return "Low";
-    } else if(  kInterestingCutoff <= score ) {
+    } else if(  kInterestingCutoff  <= score ) {
         return "Interesting";
     } else  {
         return "None";

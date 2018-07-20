@@ -36,7 +36,7 @@
 
 #include <vector>
 
-#include "exploitability_sl2.h"
+#include "XploitabilitySL2.h"
 #include <iostream>
 
 #include "common/scoped_ptr.h"
@@ -70,11 +70,15 @@ static const size_t kHugeBump          = 90;
 // The maximum number of bytes to disassemble past the program counter.
 static const size_t kDisassembleBytesBeyondPC = 2048;
 
-ExploitabilitySL2::ExploitabilitySL2(Minidump *dump,
+XploitabilitySL2::XploitabilitySL2(Minidump *dump,
                                      ProcessState *process_state)
-    : Exploitability(dump, process_state) { }
+    : Xploitability(dump, process_state) { 
+      CheckPlatformExploitability();
+    }
 
-ExploitabilityRating ExploitabilitySL2::CheckPlatformExploitability() {
+
+
+ExploitabilityRating XploitabilitySL2::CheckPlatformExploitability() {
   MinidumpException *exception = dump_->GetException();
   if (!exception) {
     BPLOG(INFO) << "Minidump does not have exception record.";
@@ -280,7 +284,7 @@ ExploitabilityRating ExploitabilitySL2::CheckPlatformExploitability() {
   return EXPLOITABILITY_NONE;
 }
 
-double ExploitabilitySL2::exploitabilityScore() {
+double XploitabilitySL2::exploitabilityScore() {
   return exploitabilityWeight_/100.0;
 }
 
