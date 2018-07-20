@@ -47,6 +47,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.model = CheckboxTreeModel()
         self.proxy_model = QSortFilterProxyModel()
         self.proxy_model.setSourceModel(self.model)
+        self.proxy_model.setRecursiveFilteringEnabled(False)
         self.build_func_tree()
         self._func_tree.setModel(self.proxy_model)
 
@@ -152,14 +153,20 @@ class MainWindow(QtWidgets.QMainWindow):
             funcname_widget.setCheckState(Qt.Checked if option["selected"] else Qt.Unchecked)
             funcname_widget.setColumnCount(3)
 
+            add = []
+            hx = []
+            asc = []
             for address in range(0, min(len(option["buffer"]), 16*5), 16):
-                addr = QStandardItem("0x%04X" % address)
-                hexstr = QStandardItem(" ".join("{:02X}".format(c) for c in option["buffer"][address:address + 16]))
-                asciistr = QStandardItem("".join((chr(c) if c in range(31, 127) else '.') for c in option["buffer"][address:address + 16]))
-                addr.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
-                hexstr.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
-                asciistr.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
-                funcname_widget.appendRow([addr, hexstr, asciistr])
+                add.append("0x%04X" % address)
+                hx.append(" ".join("{:02X}".format(c) for c in option["buffer"][address:address + 16]))
+                asc.append("".join((chr(c) if c in range(31, 127) else '.') for c in option["buffer"][address:address + 16]))
+            addr = QStandardItem('\n'.join(add))
+            hexstr = QStandardItem('\n'.join(hx))
+            asciistr = QStandardItem('\n'.join(asc))
+            addr.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+            hexstr.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+            asciistr.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+            funcname_widget.appendRow([addr, hexstr, asciistr])
 
             self.model.appendRow([funcname_widget, filename_widget])
         self._func_tree.resizeColumnToContents(0)
