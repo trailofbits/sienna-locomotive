@@ -27,12 +27,12 @@ extern "C" {
 // of 2048, and our JSON objects frequently exceed that. When that happens,
 // dr_fprintf silently truncates them and confuses the harness with invalid JSON.
 // We circumvent this by chunking the output.
-#define SL2_LOG_JSONL(json) do { \
-    auto jsonl_str = json.dump(); \
-    for (int i = 0; i < jsonl_str.length(); i += 1024) { \
+#define SL2_LOG_JSONL(json) do {                                     \
+    auto jsonl_str = json.dump();                                    \
+    for (int i = 0; i < jsonl_str.length(); i += 1024) {             \
         dr_fprintf(STDERR, "%s", jsonl_str.substr(i, 1024).c_str()); \
-    } \
-    dr_fprintf(STDERR, "\n"); \
+    }                                                                \
+    dr_fprintf(STDERR, "\n");                                        \
 } while(0)
 
 // Macros for the function prototypes passed to pre- and post-function hooks.
