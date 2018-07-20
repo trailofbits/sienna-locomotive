@@ -54,6 +54,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.build_func_tree()
         self._func_tree.setModel(self.file_proxy_model)
 
+        # These need to happen after we set the model
+        self._func_tree.expandAll()
+        self._func_tree.resizeColumnToContents(0)
+        self._func_tree.resizeColumnToContents(1)
+        self._func_tree.resizeColumnToContents(2)
+        self._func_tree.resizeColumnToContents(3)
+
         # Build layout for function filter text boxes
         self.filter_layout = QtWidgets.QHBoxLayout()
         self.filter_layout.addWidget(QtWidgets.QLabel("Filter Function: "))
@@ -170,7 +177,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.model.horizontalHeaderItem(3).setToolTip("The order in which the wizard encountered this function")
         self.model.horizontalHeaderItem(4).setToolTip("How far (in memory) away from the start of the target program the call to this function occurred. Lower values are usually better targets.")
 
-
         for index, option in enumerate(self.target_data):
             funcname_widget = CheckboxTreeWidgetItem(self._func_tree, index, "{func_name}".format(**option))
             filename_widget = QStandardItem(option.get('source', None))
@@ -201,13 +207,13 @@ class MainWindow(QtWidgets.QMainWindow):
                                   QStandardItem(str(index)),
                                   QStandardItem(str(option.get('retAddrOffset', None)))])
 
-        # TODO - None of these things work. Maybe something with the way we build the tree?
         self._func_tree.expandAll()
         self._func_tree.resizeColumnToContents(0)
         self._func_tree.resizeColumnToContents(1)
+        self._func_tree.resizeColumnToContents(2)
         self._func_tree.resizeColumnToContents(3)
 
-        self._func_tree.sortByColumn(2, Qt.AscendingOrder)
+        self._func_tree.sortByColumn(3, Qt.AscendingOrder)
         self._func_tree.setSortingEnabled(True)
 
     def tree_changed(self, widget, is_checked):
