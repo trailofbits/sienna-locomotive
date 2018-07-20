@@ -34,6 +34,7 @@ extern "C" {
 
 static SL2Client   client;
 static sl2_conn sl2_conn;
+static sl2_exception_ctx trace_exception_ctx;
 static void *mutatex;
 static bool replay;
 static DWORD mutate_count;
@@ -934,14 +935,15 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
         sl2_conn_request_crash_paths(&sl2_conn, &crash_paths);
 
         HANDLE hCrashFile = CreateFile(crash_paths.crash_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
         if (hCrashFile == INVALID_HANDLE_VALUE) {
-            SL2_DR_DEBUG("tracer#dump_crash: could not open the crash file (%x)", GetLastError());
+            SL2_DR_DEBUG("tracer#dump_crash: could not open the crash file (%x)\n", GetLastError());
             exit(1);
         }
 
         DWORD bytesWritten;
         if (!WriteFile(hCrashFile, crash_json.c_str(), crash_json.length(), &bytesWritten, NULL)) {
-            SL2_DR_DEBUG("tracer#dump_crash: could not write to the crash file (%x)", GetLastError());
+            SL2_DR_DEBUG("tracer#dump_crash: could not write to the crash file (%x)\n", GetLastError());
             exit(1);
         }
 
@@ -950,8 +952,18 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
         HANDLE hDumpFile = CreateFile(crash_paths.mem_dump_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
         if (hDumpFile == INVALID_HANDLE_VALUE) {
-            SL2_DR_DEBUG("tracer#dump_crash: could not open the dump file (%x)", GetLastError());
+            SL2_DR_DEBUG("tracer#dump_crash: could not open the dump file (%x)\n", GetLastError());
         }
+
+        EXCEPTION_POINTERS exception_pointers = {0};
+        MINIDUMP_EXCEPTION_INFORMATION mdump_info = {0};
+
+        exception_pointers.ExceptionRecord = &(trace_exception_ctx.record);
+        exception_pointers.ContextRecord = &(trace_exception_ctx.thread_ctx);
+
+        mdump_info.ThreadId = trace_exception_ctx.thread_id;
+        mdump_info.ExceptionPointers = &exception_pointers;
+        mdump_info.ClientPointers = true;
 
         // NOTE(ww): Switching back to the application's state is necessary, as we don't want
         // parts of the instrumentation showing up in our memory dump.
@@ -962,7 +974,8 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
             GetCurrentProcessId(),
             hDumpFile,
             MiniDumpWithFullMemory,
-            NULL, NULL, NULL);
+            &mdump_info,
+            NULL, NULL);
 
         dr_switch_to_dr_state(drcontext);
 
@@ -977,6 +990,14 @@ static bool
 onexception(void *drcontext, dr_exception_t *excpt)
 {
     DWORD exception_code = excpt->record->ExceptionCode;
+
+    dr_switch_to_app_state(drcontext);
+    trace_exception_ctx.thread_id = GetCurrentThreadId();
+    dr_mcontext_to_context(&(trace_exception_ctx.thread_ctx), excpt->mcontext);
+    dr_switch_to_dr_state(drcontext);
+
+    // Make our own copy of the exception record.
+    memcpy(&(trace_exception_ctx.record), excpt->record, sizeof(EXCEPTION_RECORD));
 
     reg_id_t reg_pc = reg_to_full_width64(DR_REG_NULL);
     reg_id_t reg_stack = reg_to_full_width64(DR_REG_ESP);

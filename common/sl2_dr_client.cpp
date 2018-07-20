@@ -1,9 +1,6 @@
 #include "common/sl2_dr_client.hpp"
-#include <string>
-#include <fstream>
 
 using namespace std;
-
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // SL2Client
@@ -133,5 +130,4 @@ __declspec(dllexport) void from_json(const json& j, targetFunction& t)
     t.functionName  = j.value("func_name", "");
     t.argHash       = j.value("argHash", "");
     t.buffer        = j["buffer"].get<vector<uint8_t>>();
-
 }
