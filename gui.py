@@ -42,6 +42,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._func_tree = CheckboxTreeWidget()
         self._layout.addWidget(self._func_tree)
 
+        # Set up underlying model for exposing function data
         self.target_data = get_target(config.config)
         self.model = CheckboxTreeModel()
         self.func_proxy_model = QSortFilterProxyModel()
@@ -53,14 +54,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.build_func_tree()
         self._func_tree.setModel(self.file_proxy_model)
 
+        # Build layout for function filter text boxes
         self.filter_layout = QtWidgets.QHBoxLayout()
         self.filter_layout.addWidget(QtWidgets.QLabel("Filter Function: "))
-
         self.func_filter_box = QtWidgets.QLineEdit()
         self.filter_layout.addWidget(self.func_filter_box)
-
         self.filter_layout.addWidget(QtWidgets.QLabel("Filter Files: "))
-
         self.file_filter_box = QtWidgets.QLineEdit()
         self.filter_layout.addWidget(self.file_filter_box)
 
@@ -138,6 +137,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.wizard_thread.finished.connect(self.unsetCursor)
         self.wizard_thread.resultReady.connect(self.wizard_finished)
 
+        # Filter the list of functions displayed when we type things into the boxes
         self.func_filter_box.textChanged.connect(self.func_proxy_model.setFilterFixedString)
         self.file_filter_box.textChanged.connect(self.file_proxy_model.setFilterFixedString)
 
@@ -163,16 +163,20 @@ class MainWindow(QtWidgets.QMainWindow):
         """ Build the function target display tree """
         self._func_tree.setSortingEnabled(False)
         self.model.clear()
-        self.model.setHorizontalHeaderLabels(["Function Name", "File", "Order Seen", "Binary Offset"])
+        self.model.setHorizontalHeaderLabels(["Function Name", "File", "File Offset", "Order Seen", "Binary Offset"])
         self.model.horizontalHeaderItem(0).setToolTip("The name of a fuzzable function")
         self.model.horizontalHeaderItem(1).setToolTip("The name of the file (if any) the function tried to read")
-        self.model.horizontalHeaderItem(2).setToolTip("The order in which the wizard encountered this function")
-        self.model.horizontalHeaderItem(3).setToolTip("How far (in memory) away from the start of the target program the call to this function occurred. Lower values are usually better targets.")
+        self.model.horizontalHeaderItem(2).setToolTip("The bytes in the file that the program tried to read (if available)")
+        self.model.horizontalHeaderItem(3).setToolTip("The order in which the wizard encountered this function")
+        self.model.horizontalHeaderItem(4).setToolTip("How far (in memory) away from the start of the target program the call to this function occurred. Lower values are usually better targets.")
 
 
         for index, option in enumerate(self.target_data):
             funcname_widget = CheckboxTreeWidgetItem(self._func_tree, index, "{func_name}".format(**option))
             filename_widget = QStandardItem(option.get('source', None))
+            offset_widget = QStandardItem("0x{:x} - 0x{:x}".format(option['start'], option['end'])
+                                          if ('end' in option and 'start' in option)
+                                          else None)
             funcname_widget.setCheckState(Qt.Checked if option["selected"] else Qt.Unchecked)
             funcname_widget.setColumnCount(3)
 
@@ -193,6 +197,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
             self.model.appendRow([funcname_widget,
                                   filename_widget,
+                                  offset_widget,
                                   QStandardItem(str(index)),
                                   QStandardItem(str(option.get('retAddrOffset', None)))])
 
@@ -230,6 +235,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
+
+    try:
+        import qdarkstyle
+        app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
+    except ImportError:
+        pass
+
     mainWin = MainWindow()
     mainWin.show()
     sys.exit(app.exec_())
