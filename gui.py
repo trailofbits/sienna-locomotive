@@ -23,11 +23,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Set up basic window
         self.setWindowTitle("Sienna Locomotive 2")
-        self.setMinimumSize(QSize(1300, 800))
+        self.setMinimumSize(QSize(1600, 1200))
 
         _central_widget = QtWidgets.QWidget(self)
         self.setCentralWidget(_central_widget)
-        self._layout = QtWidgets.QGridLayout(_central_widget)
+        self._layout = QtWidgets.QVBoxLayout(_central_widget)
         _central_widget.setLayout(self._layout)
 
         # CREATE WIDGETS #
@@ -40,16 +40,31 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Set up function tree display
         self._func_tree = CheckboxTreeWidget()
-        # self._func_tree.setHeaderLabel("Target Function Options")
         self._layout.addWidget(self._func_tree)
 
         self.target_data = get_target(config.config)
         self.model = CheckboxTreeModel()
-        self.proxy_model = QSortFilterProxyModel()
-        self.proxy_model.setSourceModel(self.model)
-        self.proxy_model.setRecursiveFilteringEnabled(False)
+        self.func_proxy_model = QSortFilterProxyModel()
+        self.func_proxy_model.setSourceModel(self.model)
+        self.func_proxy_model.setFilterKeyColumn(0)
+        self.file_proxy_model = QSortFilterProxyModel()
+        self.file_proxy_model.setSourceModel(self.func_proxy_model)
+        self.file_proxy_model.setFilterKeyColumn(1)
         self.build_func_tree()
-        self._func_tree.setModel(self.proxy_model)
+        self._func_tree.setModel(self.file_proxy_model)
+
+        self.filter_layout = QtWidgets.QHBoxLayout()
+        self.filter_layout.addWidget(QtWidgets.QLabel("Filter Function: "))
+
+        self.func_filter_box = QtWidgets.QLineEdit()
+        self.filter_layout.addWidget(self.func_filter_box)
+
+        self.filter_layout.addWidget(QtWidgets.QLabel("Filter Files: "))
+
+        self.file_filter_box = QtWidgets.QLineEdit()
+        self.filter_layout.addWidget(self.file_filter_box)
+
+        self._layout.addLayout(self.filter_layout)
 
         # Set up fuzzer button and thread
         self.fuzzer_button = QtWidgets.QPushButton("Fuzz selected targets")
@@ -123,6 +138,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.wizard_thread.finished.connect(self.unsetCursor)
         self.wizard_thread.resultReady.connect(self.wizard_finished)
 
+        self.func_filter_box.textChanged.connect(self.func_proxy_model.setFilterFixedString)
+        self.file_filter_box.textChanged.connect(self.file_proxy_model.setFilterFixedString)
+
         # Handle checks/unchecks in the target tree
         self._func_tree.itemCheckedStateChanged.connect(self.tree_changed)
 
@@ -145,7 +163,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """ Build the function target display tree """
         self._func_tree.setSortingEnabled(False)
         self.model.clear()
-        self.model.setColumnCount(3)
+        self.model.setHorizontalHeaderLabels(["Function Name", "File", ""])
 
         for index, option in enumerate(self.target_data):
             funcname_widget = CheckboxTreeWidgetItem(self._func_tree, index, "{func_name}".format(**option))
@@ -169,10 +187,13 @@ class MainWindow(QtWidgets.QMainWindow):
             funcname_widget.appendRow([addr, hexstr, asciistr])
 
             self.model.appendRow([funcname_widget, filename_widget])
+
+        # TODO - None of these things work. Maybe something with the way we build the tree?
+        self._func_tree.expandAll()
         self._func_tree.resizeColumnToContents(0)
         self._func_tree.resizeColumnToContents(1)
-        self._func_tree.setSortingEnabled(True)
 
+        self._func_tree.setSortingEnabled(True)
 
     def tree_changed(self, widget, is_checked):
         """ Handle when an item in the function tree is checked """
