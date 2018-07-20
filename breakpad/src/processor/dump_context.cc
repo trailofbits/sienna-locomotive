@@ -38,7 +38,7 @@
 #ifdef _WIN32
 #include <io.h>
 #else  // _WIN32
-#include <unistd.h>
+#include <io.h>
 #endif  // _WIN32
 
 #include "common/stdio_wrapper.h"

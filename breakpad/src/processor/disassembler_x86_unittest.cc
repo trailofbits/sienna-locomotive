@@ -27,7 +27,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 
-#include <unistd.h>
+#include <io.h>
 
 #include "breakpad_googletest_includes.h"
 #include "processor/disassembler_x86.h"

@@ -34,7 +34,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
+#include <io.h>
 
 #include "common/scoped_ptr.h"
 #include "google_breakpad/processor/minidump.h"

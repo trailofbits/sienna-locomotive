@@ -20,10 +20,8 @@ endforeach()
 
 ################################################################################################
 # Breakpad stuff for triage/minidump/exploitability/etc...
-# This checks out the src for the header files only
-# set(  BREAKPAD_DIR        ${CMAKE_SOURCE_DIR}/breakpad/src/breakpad/src)
-# # the library is prebuilt here
-# file( GLOB BREAKPAD_LIBS  ${CMAKE_SOURCE_DIR}/deps/Release/*.lib )
+set(  BREAKPAD_DIR        ${CMAKE_SOURCE_DIR}/breakpad/src )
+file( GLOB BREAKPAD_LIBS  ${BREAKPAD_DIR}/client/windows/Release/lib/*.lib ${BREAKPAD_DIR}/tools/windows/Release/lib/*.lib )
 
 # ExternalProject_Add(
 #   breakpad
@@ -43,7 +41,6 @@ add_subdirectory(server)
 add_subdirectory(triage_dynamorio)
 add_subdirectory(wizard)
 add_subdirectory(corpus/test_application)
-
-
 add_subdirectory(triage)
+
 target_compile_definitions(server PRIVATE -DUNICODE)
