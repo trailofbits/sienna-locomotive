@@ -21,7 +21,6 @@ using google_breakpad::MinidumpProcessor;
 using google_breakpad::ProcessState;
 using google_breakpad::SimpleSymbolSupplier;
 
-
 namespace sl2 {
 
 ////////////////////////////////////////////////////////////////////////////

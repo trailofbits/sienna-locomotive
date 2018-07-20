@@ -3,6 +3,10 @@ file(
     GLOB SOURCES ${BREAKPAD_DIR}/third_party/libdisasm/*.c
 )
 
+
+add_compile_definitions( BPLOG_MINIMUM_SEVERITY=SEVERITY_CRITICAL )
+
+
 #GLOB SOURCES ${BREAKPAD_DIR}/processor/*.cc
 
 # include(ExternalProject)
@@ -21,6 +25,7 @@ file(
 # # )
 # add_dependencies(gtest googletest)
 # #add_dependencies(gtest_main googletest)
+
 
 
 

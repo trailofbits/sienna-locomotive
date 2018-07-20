@@ -20,9 +20,22 @@ endforeach()
 
 ################################################################################################
 # Breakpad stuff for triage/minidump/exploitability/etc...
+set(  CONFIGMODE         "Release")
 set(  BREAKPAD_DIR        ${CMAKE_SOURCE_DIR}/breakpad/src )
-file( GLOB BREAKPAD_LIBS  ${BREAKPAD_DIR}/client/windows/Release/lib/*.lib ${BREAKPAD_DIR}/tools/windows/Release/lib/*.lib )
+file( GLOB BREAKPAD_LIBS  ${BREAKPAD_DIR}/client/windows/${CONFIGMODE}/lib/*.lib ${BREAKPAD_DIR}/tools/windows/${CONFIGMODE}/lib/*.lib )
 
+
+# TODO:  This should work, but I can't get them to build in Release mode, which is the only mode that
+# links correctly.
+#
+# include_external_msproject( bpad ${BREAKPAD_DIR}/client/windows/common.vcxproj PLATFORM x64 )
+# include_external_msproject( bpad ${BREAKPAD_DIR}/common/windows/common_windows_lib.vcxproj PLATFORM x64 )
+# include_external_msproject( bpad ${BREAKPAD_DIR}/tools/windows/dump_syms/dump_syms.vcxproj PLATFORM x64 )
+# include_external_msproject( bpad ${BREAKPAD_DIR}/client/windows/unittests/processor_bits.vcxproj PLATFORM x64 )
+# set_target_properties(bpad PROPERTIES 
+# 	MAP_IMPORTED_CONFIG_RELEASE "${CONFIGMODE}"
+#   MAP_IMPORTED_CONFIG_RELWITHDEBINFO "${CONFIGMODE}")
+  
 # ExternalProject_Add(
 #   breakpad
 #   GIT_REPOSITORY     https://github.com/google/breakpad.git
@@ -34,6 +47,8 @@ file( GLOB BREAKPAD_LIBS  ${BREAKPAD_DIR}/client/windows/Release/lib/*.lib ${BRE
 #  )
 
 
+
+################################################################################################
 include_directories(include)
 add_subdirectory(common)
 add_subdirectory(fuzz_dynamorio)
