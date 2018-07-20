@@ -57,7 +57,8 @@ struct sl2_mutation {
 // memory dump, respectively, for a run.
 struct sl2_crash_paths {
     wchar_t crash_path[MAX_PATH + 1];
-    wchar_t dump_path[MAX_PATH + 1];
+    wchar_t mem_dump_path[MAX_PATH + 1];
+    wchar_t initial_dump_path[MAX_PATH + 1];
 };
 
 // Opens a new connection to the SL2 server.

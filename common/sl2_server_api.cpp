@@ -234,7 +234,8 @@ __declspec(dllexport) SL2Response sl2_conn_request_crash_paths(
 
     // Finally, read the actual crash paths from the server.
     sl2_conn_read_prefixed_string(conn, paths->crash_path, MAX_PATH);
-    sl2_conn_read_prefixed_string(conn, paths->dump_path, MAX_PATH);
+    sl2_conn_read_prefixed_string(conn, paths->mem_dump_path, MAX_PATH);
+    sl2_conn_read_prefixed_string(conn, paths->initial_dump_path, MAX_PATH);
 
     return SL2Response::OK;
 }
