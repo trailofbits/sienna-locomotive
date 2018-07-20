@@ -77,7 +77,7 @@ class TestWizard(unittest.TestCase):
         pattern = "%s/*.dmp" % minidumpsdir
         i = 0
         for file in glob.glob(  pattern ):            
-            cmd = r'build\triage\Debug\triage.exe ' + file
+            cmd = r'build\triage\Debug\triager.exe ' + file
             print("cmd", cmd)
             out = runAndCaptureOutput(cmd)
             print(out)

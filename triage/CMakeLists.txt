@@ -29,6 +29,6 @@ include_directories(
     ${BREAKPAD_DIR}/processor
 )
 
-add_executable(triage ${SOURCES})
+add_executable(triager ${SOURCES})
 
-target_link_libraries(triage ${BREAKPAD_LIBS})
+target_link_libraries(triager ${BREAKPAD_LIBS})
