@@ -16,7 +16,7 @@ import traceback
 import sys
 from enum import IntEnum
 
-from .state import parse_triage_output, finalize, write_output_files
+from .state import parse_triage_output, finalize, write_output_files, stringify_program_array
 from . import config
 
 
@@ -54,12 +54,12 @@ def run_dr(config_dict, save_stderr=False, verbose=False, timeout=None):
         ['--', config_dict['target_application_path']] + config_dict['target_args']
 
     if verbose:
-        print_l("Executing drrun: %s" % ' '.join((k if " " not in k else "\"{}\"".format(k)) for k in program_arr))
+        print_l("Executing drrun: %s" % stringify_program_array(program_arr[0], program_arr[1:]))
 
     # Run client on target application
     started = time.time()
 
-    stdout = sys.stdout if config_dict['inline_stdout']  else  subprocess.PIPE
+    stdout = sys.stdout if config_dict['inline_stdout'] else subprocess.PIPE
     stderr = subprocess.PIPE
     popen_obj = subprocess.Popen(program_arr,
                                  stdout=stdout,

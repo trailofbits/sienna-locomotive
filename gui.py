@@ -1,10 +1,10 @@
 import sys
 
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QFontDatabase, QMovie
+from PyQt5.QtCore import Qt, QSize, QSortFilterProxyModel
+from PyQt5.QtGui import QFontDatabase, QMovie, QStandardItem
 
-from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem
+from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem, CheckboxTreeModel
 from gui.QtHelpers import QIntVariable, QFloatVariable, QTextAdapter
 
 from harness import config
@@ -23,11 +23,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Set up basic window
         self.setWindowTitle("Sienna Locomotive 2")
-        self.setMinimumSize(QSize(1300, 800))
+        self.setMinimumSize(QSize(1600, 1200))
 
         _central_widget = QtWidgets.QWidget(self)
         self.setCentralWidget(_central_widget)
-        self._layout = QtWidgets.QGridLayout(_central_widget)
+        self._layout = QtWidgets.QVBoxLayout(_central_widget)
         _central_widget.setLayout(self._layout)
 
         # CREATE WIDGETS #
@@ -42,8 +42,35 @@ class MainWindow(QtWidgets.QMainWindow):
         self._func_tree = CheckboxTreeWidget()
         self._layout.addWidget(self._func_tree)
 
+        # Set up underlying model for exposing function data
         self.target_data = get_target(config.config)
+        self.model = CheckboxTreeModel()
+        self.func_proxy_model = QSortFilterProxyModel()
+        self.func_proxy_model.setSourceModel(self.model)
+        self.func_proxy_model.setFilterKeyColumn(0)
+        self.file_proxy_model = QSortFilterProxyModel()
+        self.file_proxy_model.setSourceModel(self.func_proxy_model)
+        self.file_proxy_model.setFilterKeyColumn(1)
         self.build_func_tree()
+        self._func_tree.setModel(self.file_proxy_model)
+
+        # These need to happen after we set the model
+        self._func_tree.expandAll()
+        self._func_tree.resizeColumnToContents(0)
+        self._func_tree.resizeColumnToContents(1)
+        self._func_tree.resizeColumnToContents(2)
+        self._func_tree.resizeColumnToContents(3)
+
+        # Build layout for function filter text boxes
+        self.filter_layout = QtWidgets.QHBoxLayout()
+        self.filter_layout.addWidget(QtWidgets.QLabel("Filter Function: "))
+        self.func_filter_box = QtWidgets.QLineEdit()
+        self.filter_layout.addWidget(self.func_filter_box)
+        self.filter_layout.addWidget(QtWidgets.QLabel("Filter Files: "))
+        self.file_filter_box = QtWidgets.QLineEdit()
+        self.filter_layout.addWidget(self.file_filter_box)
+
+        self._layout.addLayout(self.filter_layout)
 
         # Set up fuzzer button and thread
         self.fuzzer_button = QtWidgets.QPushButton("Fuzz selected targets")
@@ -117,6 +144,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.wizard_thread.finished.connect(self.unsetCursor)
         self.wizard_thread.resultReady.connect(self.wizard_finished)
 
+        # Filter the list of functions displayed when we type things into the boxes
+        self.func_filter_box.textChanged.connect(self.func_proxy_model.setFilterFixedString)
+        self.file_filter_box.textChanged.connect(self.file_proxy_model.setFilterFixedString)
+
         # Handle checks/unchecks in the target tree
         self._func_tree.itemCheckedStateChanged.connect(self.tree_changed)
 
@@ -137,25 +168,55 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def build_func_tree(self):
         """ Build the function target display tree """
-        self._func_tree.clear()
+        self._func_tree.setSortingEnabled(False)
+        self.model.clear()
+        self.model.setHorizontalHeaderLabels(["Function Name", "File", "File Offset", "Order Seen", "Binary Offset"])
+        self.model.horizontalHeaderItem(0).setToolTip("The name of a fuzzable function")
+        self.model.horizontalHeaderItem(1).setToolTip("The name of the file (if any) the function tried to read")
+        self.model.horizontalHeaderItem(2).setToolTip("The bytes in the file that the program tried to read (if available)")
+        self.model.horizontalHeaderItem(3).setToolTip("The order in which the wizard encountered this function")
+        self.model.horizontalHeaderItem(4).setToolTip("How far (in memory) away from the start of the target program the call to this function occurred. Lower values are usually better targets.")
 
         for index, option in enumerate(self.target_data):
-            widget = CheckboxTreeWidgetItem(self._func_tree, index)
-            widget.setText(0, ("{func_name} from {source}:{start}-{end}" if 'source' in option
-                               else "{func_name}").format(**option))
-            widget.setCheckState(0, Qt.Checked if option["selected"] else Qt.Unchecked)
+            funcname_widget = CheckboxTreeWidgetItem(self._func_tree, index, "{func_name}".format(**option))
+            filename_widget = QStandardItem(option.get('source', None))
+            offset_widget = QStandardItem("0x{:x} - 0x{:x}".format(option['start'], option['end'])
+                                          if ('end' in option and 'start' in option)
+                                          else None)
+            funcname_widget.setCheckState(Qt.Checked if option["selected"] else Qt.Unchecked)
+            funcname_widget.setColumnCount(3)
 
+            add = []
+            hx = []
+            asc = []
             for address in range(0, min(len(option["buffer"]), 16*5), 16):
-                hexstr = " ".join("{:02X}".format(c) for c in option["buffer"][address:address + 16])
-                asciistr = "".join((chr(c) if c in range(31, 127) else '.') for c in option["buffer"][address:address + 16])
-                formatted = "0x%04X:  %s  | %s" % (address, hexstr + " " * (16 * 3 - len(hexstr)), asciistr)
-                data_disp = CheckboxTreeWidgetItem(widget, 0, is_checkbox=False)
-                data_disp.setText(0, formatted)
-                data_disp.setFont(0, QFontDatabase.systemFont(QFontDatabase.FixedFont))
+                add.append("0x%04X" % address)
+                hx.append(" ".join("{:02X}".format(c) for c in option["buffer"][address:address + 16]))
+                asc.append("".join((chr(c) if c in range(31, 127) else '.') for c in option["buffer"][address:address + 16]))
+            addr = QStandardItem('\n'.join(add))
+            hexstr = QStandardItem('\n'.join(hx))
+            asciistr = QStandardItem('\n'.join(asc))
+            addr.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+            hexstr.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+            asciistr.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+            funcname_widget.appendRow([addr, hexstr, asciistr])
 
-            self._func_tree.insertTopLevelItem(0, widget)
+            self.model.appendRow([funcname_widget,
+                                  filename_widget,
+                                  offset_widget,
+                                  QStandardItem(str(index)),
+                                  QStandardItem(str(option.get('retAddrOffset', None)))])
 
-    def tree_changed(self, widget, _column, is_checked):
+        self._func_tree.expandAll()
+        self._func_tree.resizeColumnToContents(0)
+        self._func_tree.resizeColumnToContents(1)
+        self._func_tree.resizeColumnToContents(2)
+        self._func_tree.resizeColumnToContents(3)
+
+        self._func_tree.sortByColumn(3, Qt.AscendingOrder)
+        self._func_tree.setSortingEnabled(True)
+
+    def tree_changed(self, widget, is_checked):
         """ Handle when an item in the function tree is checked """
         self.target_data.update(widget.index, selected=is_checked)
 
@@ -166,6 +227,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def get_config(self):
         """ Selects the configuration dict from config.py """
+        # print("TODO FIX ME")  # TODO - fix me
         profile, cont = QtWidgets.QInputDialog.getItem(self,
                                                        "Select Configuration Profile",
                                                        "Select Configuration Profile",
@@ -179,6 +241,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
+
+    try:
+        import qdarkstyle
+        app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
+    except ImportError:
+        pass
+
     mainWin = MainWindow()
     mainWin.show()
     sys.exit(app.exec_())
