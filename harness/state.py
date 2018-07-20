@@ -8,6 +8,7 @@ import re
 import struct
 import json
 from hashlib import sha1
+from csv import DictWriter
 
 from . import config
 
@@ -131,6 +132,15 @@ def parse_triage_output(run_id):
             return formatted, results
     except FileNotFoundError:
         return "Triage run %s exited improperly, but no crash file could be found)" % run_id, None
+
+
+def export_crash_data_to_csv(crashes, csv_filename):
+    with open(csv_filename, 'w') as csvfile:
+        writer = DictWriter(csvfile, ['score', 'run_id', 'exception', 'reason', 'instruction', 'location'], extrasaction='ignore')
+
+        writer.writeheader()
+        writer.writerows(crashes)
+
 
 
 def finalize(run_id, crashed):

@@ -197,8 +197,8 @@ def triage_run(config_dict, run_id):
     # Write stdout and stderr to files
     write_output_files(completed_process, run_id, 'triage')
 
-    formatted, _ = parse_triage_output(run_id)
-    return formatted
+    formatted, raw = parse_triage_output(run_id)
+    return formatted, raw
 
 
 def fuzz_and_triage(config_dict):
@@ -209,7 +209,7 @@ def fuzz_and_triage(config_dict):
         while can_fuzz:
             crashed, run_id = fuzzer_run(config_dict)
             if crashed:
-                formatted = triage_run(config_dict, run_id)
+                formatted, _ = triage_run(config_dict, run_id)
                 print_l(formatted)
 
                 if config_dict['exit_early']:

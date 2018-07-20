@@ -1,5 +1,6 @@
 import sys
 
+from PyQt5.QtWidgets import QFileDialog
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt, QSize, QSortFilterProxyModel
 from PyQt5.QtGui import QFontDatabase, QMovie, QStandardItem
@@ -8,7 +9,7 @@ from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem, Checkb
 from gui.QtHelpers import QIntVariable, QFloatVariable, QTextAdapter
 
 from harness import config
-from harness.state import get_target
+from harness.state import get_target, export_crash_data_to_csv
 from harness.threads import WizardThread, FuzzerThread
 from functools import partial
 
@@ -17,6 +18,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self):
         QtWidgets.QMainWindow.__init__(self)
+        self.crashes = []
 
         # Select config profile before starting
         self.get_config()
@@ -89,16 +91,19 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stop_button.hide()
         self._layout.addWidget(self.stop_button)
 
+        self.save_button = QtWidgets.QPushButton("Save Triage Results")
+        self._layout.addWidget(self.save_button)
+
         # Set up status bar
         self.status_bar = QtWidgets.QStatusBar()
         self._layout.addWidget(self.status_bar)
 
         # Create helper variables for storing counters with signals attached
-        self.runs, self.crashes = QIntVariable(0), QIntVariable(0)
+        self.runs, self.crash_counter = QIntVariable(0), QIntVariable(0)
         self.throughput = QFloatVariable(0.0)
         self.run_adapter = QTextAdapter("Fuzzing Runs: {0.value} ", self.runs)
         self.throughput_adapter = QTextAdapter(" {0.value:.3f} Runs/s ", self.throughput)
-        self.crash_adapter = QTextAdapter(" Crashes Found: {0.value} ", self.crashes)
+        self.crash_adapter = QTextAdapter(" Crashes Found: {0.value} ", self.crash_counter)
 
         # Create the busy label
         self.busy_label = QtWidgets.QLabel()
@@ -123,7 +128,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Update the text of the status bar adapters whenever the underlying variables change
         self.runs.valueChanged.connect(self.run_adapter.update)
         self.throughput.valueChanged.connect(self.throughput_adapter.update)
-        self.crashes.valueChanged.connect(self.crash_adapter.update)
+        self.crash_counter.valueChanged.connect(self.crash_adapter.update)
 
         self.run_adapter.updated.connect(self.fuzz_count.setText)
         self.throughput_adapter.updated.connect(self.throughput_label.setText)
@@ -132,7 +137,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Update the run/crash/throughput variables after every fuzzing run
         self.fuzzer_thread.runComplete.connect(self.runs.increment)
         self.fuzzer_thread.runComplete.connect(self.calculate_throughput)
-        self.fuzzer_thread.foundCrash.connect(self.crashes.increment)
+        self.fuzzer_thread.foundCrash.connect(self.crash_counter.increment)
 
         # Show the busy symbol while we're fuzzing and hide it while we're not
         self.fuzzer_thread.started.connect(self.busy_label.show)
@@ -152,8 +157,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._func_tree.itemCheckedStateChanged.connect(self.tree_changed)
 
         # Start the fuzzer and display triage output
-        self.fuzzer_thread.foundCrash.connect(self.triage_output.append)
+        self.fuzzer_thread.foundCrash.connect(self.handle_new_crash)
         self.fuzzer_button.clicked.connect(self.fuzzer_thread.start)
+        self.save_button.clicked.connect(self.save_crashes)
 
         # Connect the stop button to the thread so we can pause it
         self.stop_button.clicked.connect(self.fuzzer_thread.pause)
@@ -225,9 +231,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.target_data.set_target_list(wizard_output)
         self.build_func_tree()
 
+    def handle_new_crash(self, formatted, crash):
+        self.triage_output.append(formatted)
+        self.crashes.append(crash)
+
+    def save_crashes(self):
+        saveFile = QFileDialog.getSaveFileName(self, filter="*.csv")
+        export_crash_data_to_csv(self.crashes, saveFile[0])
+
     def get_config(self):
         """ Selects the configuration dict from config.py """
-        # print("TODO FIX ME")  # TODO - fix me
         profile, cont = QtWidgets.QInputDialog.getItem(self,
                                                        "Select Configuration Profile",
                                                        "Select Configuration Profile",
