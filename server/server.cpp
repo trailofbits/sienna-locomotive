@@ -561,6 +561,21 @@ DWORD handleCrashPaths(HANDLE hPipe)
         exit(1);
     }
 
+    memset(targetFile, 0, (MAX_PATH + 1) * sizeof(wchar_t));
+    PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_INITIAL_DMP);
+
+    size = lstrlen(targetFile) * sizeof(wchar_t);
+
+    if (!WriteFile(hPipe, &size, sizeof(size), &dwBytesWritten, NULL)) {
+        LOG_F(ERROR, "handleCrashPath: failed to write length of initial.dmp path to pipe (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    if (!WriteFile(hPipe, &targetFile, (DWORD)size, &dwBytesWritten, NULL)) {
+        LOG_F(ERROR, "handleCrashPath: failed to write initial.dmp path to pipe (0x%x)", GetLastError());
+        exit(1);
+    }
+
     RpcStringFree((RPC_WSTR *)&runId_s);
 
     return 0;

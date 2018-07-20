@@ -945,7 +945,9 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
             exit(1);
         }
 
-        HANDLE hDumpFile = CreateFile(crash_paths.dump_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        CloseHandle(hCrashFile);
+
+        HANDLE hDumpFile = CreateFile(crash_paths.mem_dump_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
         if (hDumpFile == INVALID_HANDLE_VALUE) {
             SL2_DR_DEBUG("tracer#dump_crash: could not open the dump file (%x)", GetLastError());
@@ -955,9 +957,16 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
         // parts of the instrumentation showing up in our memory dump.
         dr_switch_to_app_state(drcontext);
 
-        MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hDumpFile, MiniDumpWithFullMemory, NULL, NULL, NULL);
+        MiniDumpWriteDump(
+            GetCurrentProcess(),
+            GetCurrentProcessId(),
+            hDumpFile,
+            MiniDumpWithFullMemory,
+            NULL, NULL, NULL);
 
         dr_switch_to_dr_state(drcontext);
+
+        CloseHandle(hDumpFile);
     }
 
     dr_exit_process(1);

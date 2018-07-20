@@ -16,6 +16,9 @@
 // The file (under the run directory) in which the program's memory dump is stored.
 #define FUZZ_RUN_MEM_DMP (L"mem.dmp")
 
+// The file (under the run directory) in which the program's initial minidump is stored.
+#define FUZZ_RUN_INITIAL_DMP (L"initial.dmp")
+
 // The file (under the run directory) in which the program's crash state is stored.
 #define FUZZ_RUN_EXECUTION_CSH (L"execution.csh")
 
