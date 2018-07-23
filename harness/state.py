@@ -6,7 +6,7 @@ import os
 import glob
 import re
 import struct
-import json
+import json, msgpack
 from hashlib import sha1
 from csv import DictWriter
 
@@ -73,17 +73,18 @@ class TargetAdapter(object):
         self.save()
 
     def save(self):
-        with open(self.filename, 'w') as jsonfile:
-            json.dump(self.target_list, jsonfile)
+        with open(self.filename, 'wb') as msgfile:
+            msgpack.dump(self.target_list, msgfile)
 
 
 def get_target(_config):
-    target_file = os.path.join(get_target_dir(_config), 'targets.json')
+    target_file = os.path.join(get_target_dir(_config), 'targets.msg')
     try:
-        with open(target_file) as target_json:
-            return TargetAdapter(json.load(target_json), target_file)
+        with open(target_file, 'rb') as target_msg:
+            return TargetAdapter(msgpack.load(target_msg, encoding='utf-8'), target_file)
     except FileNotFoundError:
         return TargetAdapter([], target_file)
+
 
 def get_all_targets():
     """ Returns a dict mapping target directories to the contents of the argument file """
