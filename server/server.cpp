@@ -24,6 +24,7 @@ static HANDLE hProcessMutex = INVALID_HANDLE_VALUE;
 static HANDLE hLog = INVALID_HANDLE_VALUE;
 
 static wchar_t FUZZ_WORKING_PATH[MAX_PATH] = L"";
+static wchar_t FUZZ_ARENAS_PATH[MAX_PATH] = L"";
 static wchar_t FUZZ_LOG[MAX_PATH] = L"";
 
 /*
@@ -46,8 +47,8 @@ static void server_cleanup()
 }
 
 // Initialize the global variable (FUZZ_LOG) containing the path to the logging file.
-// NOTE(ww): We separate this from initWorkingDir so that we can log any errors that
-// happen to occur in initWorkingDir.
+// NOTE(ww): We separate this from initWorkingDirs so that we can log any errors that
+// happen to occur in initWorkingDirs.
 void initLoggingFile() {
     wchar_t *roamingPath;
     SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roamingPath);
@@ -63,14 +64,20 @@ void initLoggingFile() {
 // Initialize the global variables containins the paths to the working directory,
 // as well as the subdirectories and files we expect individual runs to produce.
 // NOTE(ww): This should be kept up-to-date with fuzzer_config.py.
-void initWorkingDir() {
+void initWorkingDirs() {
     wchar_t *roamingPath;
     SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roamingPath);
-    wchar_t workingLocalPath[MAX_PATH] = L"Trail of Bits\\fuzzkit\\working";
+    wchar_t runsLocalPath[MAX_PATH] = L"Trail of Bits\\fuzzkit\\runs";
 
-    if (PathCchCombine(FUZZ_WORKING_PATH, MAX_PATH, roamingPath, workingLocalPath) != S_OK) {
-        LOG_F(ERROR, "initWorkingDir: failed to combine working dir path (0x%x)", GetLastError());
+    if (PathCchCombine(FUZZ_WORKING_PATH, MAX_PATH, roamingPath, runsLocalPath) != S_OK) {
+        LOG_F(ERROR, "initWorkingDirs: failed to combine working dir path (0x%x)", GetLastError());
         exit(1);
+    }
+
+    wchar_t arenasLocalPath[MAX_PATH] = L"Trail of Bits\\fuzzkit\\arenas";
+
+    if (PathCchCombine(FUZZ_ARENAS_PATH, MAX_PATH, roamingPath, arenasLocalPath) != S_OK) {
+        LOG_F(ERROR, "initWorkingDirs: failed to combine arenas dir path (0x%x)", GetLastError());
     }
 
     CoTaskMemFree(roamingPath);
@@ -697,7 +704,7 @@ int main(int mArgc, char **mArgv)
 
     std::atexit(server_cleanup);
 
-    initWorkingDir();
+    initWorkingDirs();
 
     LOG_F(INFO, "main: server started!");
 
