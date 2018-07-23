@@ -56,6 +56,7 @@ static sl2_conn sl2_conn;
 static sl2_exception_ctx fuzz_exception_ctx;
 static bool crashed = false;
 static uint64_t baseAddr;
+static uint32_t mut_count = 0;
 static sl2_arena arena = {0};
 static bool coverage_guided = false;
 
@@ -258,7 +259,7 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
     sl2_mutation mutation;
 
     mutation.function = static_cast<DWORD>(function);
-    mutation.mut_count = 0; // TODO(ww): Remove this entirely.
+    mutation.mut_count = mut_count++;
     mutation.resource = resource;
     mutation.position = position;
     mutation.bufsize = bufsize;
