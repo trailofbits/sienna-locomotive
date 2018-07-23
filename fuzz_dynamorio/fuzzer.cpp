@@ -44,12 +44,13 @@ static droption_t<std::string> op_target(
     "targetfile",
     "JSON file in which to look for targets");
 
-static SL2Client   client;
+static SL2Client client;
 static sl2_conn sl2_conn;
 static sl2_exception_ctx fuzz_exception_ctx;
 static bool crashed = false;
 static uint64_t baseAddr;
-static DWORD mut_count = 0;
+static sl2_arena arena = {0};
+static bool using_arena = false;
 
 /* Read the PEB of the target application and get the full command line */
 static wchar_t *get_target_command_line(size_t *len)
@@ -250,17 +251,20 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
     sl2_mutation mutation;
 
     mutation.function = static_cast<DWORD>(function);
-    mutation.mut_count = mut_count;
+    mutation.mut_count = 0; // TODO(ww): Remove this entirely.
     mutation.resource = resource;
     mutation.position = position;
     mutation.bufsize = bufsize;
     mutation.buffer = (uint8_t *) buffer;
 
-    mutate_buffer(mutation.buffer, mutation.bufsize);
+    if (false) { // TODO(ww): if (using_arena)
+        // mutate_buffer_arena(mutation.buffer, mutation.bufsize, arena);
+    }
+    else {
+        mutate_buffer(mutation.buffer, mutation.bufsize);
+    }
 
     sl2_conn_register_mutation(&sl2_conn, &mutation);
-
-    mut_count++;
 
     return true;
 }
@@ -676,7 +680,6 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data)
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data)
 {
-
     SL2_DR_DEBUG("<in wrap_post_Generic>\n");
     if (user_data == NULL) {
         return;
@@ -858,12 +861,22 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_log(NULL, DR_LOG_ALL, ERROR, "Client SL Fuzzer is running\n");
     }
 
-    //TODO: support multiple passes over one binary without re-running drrun
+    // TODO: support multiple passes over one binary without re-running drrun
 
     // Get application name
     const char* mbsAppName = dr_get_application_name();
     wchar_t wcsAppName[MAX_PATH + 1] = {0};
     mbstowcs_s(NULL, wcsAppName, MAX_PATH, mbsAppName, MAX_PATH);
+
+    // Check whether we can use coverage arena with this fuzzing run
+    using_arena = client.areTargetsArenaCompatible();
+
+    if (using_arena) {
+        SL2_DR_DEBUG("dr_client_main: targets are arena compatible!\n");
+    }
+    else {
+        SL2_DR_DEBUG("dr_client_main: targets are NOT arena compatible!\n");
+    }
 
     if (sl2_conn_open(&sl2_conn) != SL2Response::OK) {
         SL2_DR_DEBUG("ERROR: Couldn't open a connection to the server!\n");

@@ -53,6 +53,24 @@ isFunctionTargeted(Function function, client_read_info* info) {
     return false;
 }
 
+// Returns true if the function targets identified by the client can be used with
+// a coverage arena.
+//
+// NOTE(ww): Eventually, this should always be true. However, for the time being,
+// we're using the "index" targetting mode to create a stable identifier for a
+// coverage arena. As such, only function targets that were created with that
+// mode are currently arena-compatible.
+bool SL2Client::
+areTargetsArenaCompatible() {
+    for (targetFunction t : parsedJson) {
+        if (t.mode != MATCH_INDEX) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 // TODO(ww): Use this instead of duplicating code across all three clients.
 // bool SL2Client::functionIsInUnexpectedModule(char *function, char *module)
 // {

@@ -127,6 +127,7 @@ public:
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Methods
     bool        isFunctionTargeted(Function function,  client_read_info* info);
+    bool        areTargetsArenaCompatible();
     void        loadJson(string json);
     uint64_t    incrementCallCountForFunction(Function function);
 
