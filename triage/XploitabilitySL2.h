@@ -9,8 +9,13 @@ public:
     
     XploitabilitySL2( Minidump* dmp, ProcessState* state );
 
-    virtual double                  exploitabilityScore();    
+    //virtual double                  exploitabilityScore();    
+    virtual XploitabilityRank               rank();
+
     virtual ExploitabilityRating    CheckPlatformExploitability();
+
+private:
+    ExploitabilityRating            rating_;
 
 };
 

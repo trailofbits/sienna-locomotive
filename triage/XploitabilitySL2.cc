@@ -73,12 +73,14 @@ static const size_t kDisassembleBytesBeyondPC = 2048;
 XploitabilitySL2::XploitabilitySL2(Minidump *dump,
                                      ProcessState *process_state)
     : Xploitability(dump, process_state) { 
-      CheckPlatformExploitability();
+      rating_ = CheckPlatformExploitability();
     }
 
 
 
 ExploitabilityRating XploitabilitySL2::CheckPlatformExploitability() {
+  uint64_t exploitabilityWeight = 0;
+
   MinidumpException *exception = dump_->GetException();
   if (!exception) {
     BPLOG(INFO) << "Minidump does not have exception record.";
@@ -123,12 +125,12 @@ ExploitabilityRating XploitabilitySL2::CheckPlatformExploitability() {
   // Check if we are executing on the stack.
   if (instruction_ptr <= (stack_ptr + kProbableStackOffset) &&
       instruction_ptr >= (stack_ptr - kProbableStackOffset))
-    exploitabilityWeight_ += kHugeBump;
+    exploitabilityWeight += kHugeBump;
 
   switch (exception_code) {
     // This is almost certainly recursion.
     case MD_EXCEPTION_CODE_WIN_STACK_OVERFLOW:
-      exploitabilityWeight_ += kTinyBump;
+      exploitabilityWeight += kTinyBump;
       break;
 
     // These exceptions tend to be benign and we can generally ignore them.
@@ -139,7 +141,7 @@ ExploitabilityRating XploitabilitySL2::CheckPlatformExploitability() {
     case MD_EXCEPTION_CODE_WIN_FLOAT_OVERFLOW:
     case MD_EXCEPTION_CODE_WIN_FLOAT_UNDERFLOW:
     case MD_EXCEPTION_CODE_WIN_IN_PAGE_ERROR:
-      exploitabilityWeight_ += kTinyBump;
+      exploitabilityWeight += kTinyBump;
       break;
 
     // These exceptions will typically mean that we have jumped where we
@@ -147,22 +149,22 @@ ExploitabilityRating XploitabilitySL2::CheckPlatformExploitability() {
     case MD_EXCEPTION_CODE_WIN_ILLEGAL_INSTRUCTION:
     case MD_EXCEPTION_CODE_WIN_FLOAT_INVALID_OPERATION:
     case MD_EXCEPTION_CODE_WIN_PRIVILEGED_INSTRUCTION:
-      exploitabilityWeight_ += kLargeBump;
+      exploitabilityWeight += kLargeBump;
       break;
 
     // These represent bugs in exception handlers.
     case MD_EXCEPTION_CODE_WIN_INVALID_DISPOSITION:
     case MD_EXCEPTION_CODE_WIN_NONCONTINUABLE_EXCEPTION:
-      exploitabilityWeight_ += kSmallBump;
+      exploitabilityWeight += kSmallBump;
       break;
 
     case MD_EXCEPTION_CODE_WIN_HEAP_CORRUPTION:
     case MD_EXCEPTION_CODE_WIN_STACK_BUFFER_OVERRUN:
-      exploitabilityWeight_ += kHugeBump;
+      exploitabilityWeight += kHugeBump;
       break;
 
     case MD_EXCEPTION_CODE_WIN_GUARD_PAGE_VIOLATION:
-      exploitabilityWeight_ += kLargeBump;
+      exploitabilityWeight += kLargeBump;
       break;
 
     case MD_EXCEPTION_CODE_WIN_ACCESS_VIOLATION:
@@ -177,22 +179,22 @@ ExploitabilityRating XploitabilitySL2::CheckPlatformExploitability() {
           case MD_ACCESS_VIOLATION_WIN_READ:
             bad_read = true;
             if (near_null)
-              exploitabilityWeight_ += kSmallBump;
+              exploitabilityWeight += kSmallBump;
             else
-              exploitabilityWeight_ += kMediumBump;
+              exploitabilityWeight += kMediumBump;
             break;
           case MD_ACCESS_VIOLATION_WIN_WRITE:
             bad_write = true;
             if (near_null)
-              exploitabilityWeight_ += kSmallBump;
+              exploitabilityWeight += kSmallBump;
             else
-              exploitabilityWeight_ += kHugeBump;
+              exploitabilityWeight += kHugeBump;
             break;
           case MD_ACCESS_VIOLATION_WIN_EXEC:
             if (near_null)
-              exploitabilityWeight_ += kSmallBump;
+              exploitabilityWeight += kSmallBump;
             else
-              exploitabilityWeight_ += kHugeBump;
+              exploitabilityWeight += kHugeBump;
             break;
           default:
             BPLOG(INFO) << "Unrecognized access violation type.";
@@ -230,10 +232,10 @@ ExploitabilityRating XploitabilitySL2::CheckPlatformExploitability() {
               // several interesting groups.
               switch (disassembler.currentInstructionGroup()) {
                 case libdis::insn_controlflow:
-                  exploitabilityWeight_ += kLargeBump;
+                  exploitabilityWeight += kLargeBump;
                   break;
                 case libdis::insn_string:
-                  exploitabilityWeight_ += kHugeBump;
+                  exploitabilityWeight += kHugeBump;
                   break;
                 default:
                   break;
@@ -246,24 +248,24 @@ ExploitabilityRating XploitabilitySL2::CheckPlatformExploitability() {
                      !disassembler.endOfBlock())
                 continue;
               if (disassembler.flags() & DISX86_BAD_BRANCH_TARGET)
-                exploitabilityWeight_ += kLargeBump;
+                exploitabilityWeight += kLargeBump;
               if (disassembler.flags() & DISX86_BAD_ARGUMENT_PASSED)
-                exploitabilityWeight_ += kTinyBump;
+                exploitabilityWeight += kTinyBump;
               if (disassembler.flags() & DISX86_BAD_WRITE)
-                exploitabilityWeight_ += kMediumBump;
+                exploitabilityWeight += kMediumBump;
               if (disassembler.flags() & DISX86_BAD_BLOCK_WRITE)
-                exploitabilityWeight_ += kMediumBump;
+                exploitabilityWeight += kMediumBump;
               if (disassembler.flags() & DISX86_BAD_READ)
-                exploitabilityWeight_ += kTinyBump;
+                exploitabilityWeight += kTinyBump;
               if (disassembler.flags() & DISX86_BAD_BLOCK_READ)
-                exploitabilityWeight_ += kTinyBump;
+                exploitabilityWeight += kTinyBump;
               if (disassembler.flags() & DISX86_BAD_COMPARISON)
-                exploitabilityWeight_ += kTinyBump;
+                exploitabilityWeight += kTinyBump;
             }
           }
         }
         if (!near_null && AddressIsAscii(address))
-          exploitabilityWeight_ += kMediumBump;
+          exploitabilityWeight += kMediumBump;
       } else {
         BPLOG(INFO) << "Access violation type parameter missing.";
         return EXPLOITABILITY_ERR_PROCESSING;
@@ -271,21 +273,34 @@ ExploitabilityRating XploitabilitySL2::CheckPlatformExploitability() {
   }
 
   // Based on the calculated weight we return a simplified classification.
-  //std::cout << "Calculated exploitability weight: " << exploitabilityWeight_;
-  if (exploitabilityWeight_ >= kHighCutoff)
+  //std::cout << "Calculated exploitability weight: " << exploitabilityWeight;
+  if (exploitabilityWeight >= kHighCutoff)
     return EXPLOITABILITY_HIGH;
-  if (exploitabilityWeight_ >= kMediumCutoff)
+  if (exploitabilityWeight >= kMediumCutoff)
     return EXPLOITABLITY_MEDIUM;
-  if (exploitabilityWeight_ >= kLowCutoff)
+  if (exploitabilityWeight >= kLowCutoff)
     return EXPLOITABILITY_LOW;
-  if (exploitabilityWeight_ >= kInterestingCutoff)
+  if (exploitabilityWeight >= kInterestingCutoff)
     return EXPLOITABILITY_INTERESTING;
 
   return EXPLOITABILITY_NONE;
 }
 
-double XploitabilitySL2::exploitabilityScore() {
-  return exploitabilityWeight_/100.0;
+XploitabilityRank XploitabilitySL2::rank() {
+    switch(rating_) {
+        case EXPLOITABILITY_HIGH:
+            return XPLOITABILITY_HIGH;
+        case EXPLOITABILITY_MEDIUM:
+            return XPLOITABILITY_MEDIUM;
+        case EXPLOITABILITY_LOW:
+            return XPLOITABILITY_LOW;
+        case EXPLOITABILITY_INTERESTING:
+            return XPLOITABILITY_UNKNOWN;
+        default:
+            return XPLOITABILITY_NONE;
+    }
+
+
 }
 
 }  // namespace google_breakpad

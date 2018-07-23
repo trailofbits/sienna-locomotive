@@ -78,11 +78,11 @@ StatusCode Triage::process() {
 
     // Calculate score from breakpad
     Xploitability* xploitability = new XploitabilitySL2( &dump_, &state_);    
-    scores_.push_back( xploitability->exploitabilityScore()  );
+    ranks_.push_back( xploitability->rank()  );
     delete xploitability;
 
     xploitability = new XploitabilityBangExploitable( &dump_, &state_);    
-    scores_.push_back( xploitability->exploitabilityScore()  );
+    ranks_.push_back( xploitability->rank()  );
     delete xploitability;
 
 
@@ -132,49 +132,43 @@ const string Triage::crashReason() {
 ////////////////////////////////////////////////////////////////////////////
 // exploitability()
 //      returns value from 0.0 to 1.0 for exploitabilty
-double Triage::exploitabilityScore() {
-    double ret = 0.0;
-
-    if( scores_.size()==0 ) {
-        return 0.0;
-    }
+XploitabilityRank Triage::exploitabilityRank() {
     
-    for( auto score : scores_  ) {
-        score  = Triage::normalize(score);
-        // We are assuming the algorithms are conservative and increasing the weight of higher estimations
-        ret += (score*score);
+    XploitabilityRank rank = XPLOITABILITY_NONE;
+
+    for( auto arank : ranks_ ) {
+        if( arank > rank ) {
+            rank = arank;
+        }
     }
 
-    ret =  ret / scores_.size();
-    ret = sqrt(ret);
-    ret = Triage::normalize(ret);
-    return ret;
+
+    return rank;
+
+    // for( auto score : ranks_  ) {
+    //     score  = Triage::normalize(score);
+    //     ret += (score*score);
+    // }
+    // ret =  ret / ranks_.size();
+    // ret = sqrt(ret);
+    // ret = Triage::normalize(ret);
+
+
+    
 }
 
 const string Triage::exploitability() {
-
-    double score = exploitabilityScore();
-    if(         kHighCutoff         <= score ) {
-        return "High";
-    } else if(  kMediumCutoff       <= score ) {
-        return "Medium";
-    } else if(  kLowCutoff          <= score ) {
-        return "Low";
-    } else if(  kInterestingCutoff  <= score ) {
-        return "Interesting";
-    } else  {
-        return "None";
-    }
+    return Xploitability::rankToString( exploitabilityRank() );
 }
 
 ////////////////////////////////////////////////////////////////////////////
 // <<()
 ostream& operator<<(ostream& os, Triage& self) {
 
-    os << "Exploitability Score: "  << self.exploitabilityScore()   << endl;
-    os << "Exploitability Rating: " << self.exploitability()        << endl;
+    os << "Exploitability: "        << self.exploitability()        << endl;
+    os << "Exploitability Rank: "   << self.exploitabilityRank()    << endl;
     os << "Crash Reason: "          << self.crashReason()           << endl;
-    os << "Tag: "                   << self.triagePath()           << endl;
+    os << "Tag: "                   << self.triagePath()            << endl;
     return os;  
 }  
   
