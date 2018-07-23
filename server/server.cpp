@@ -86,7 +86,7 @@ void initWorkingDirs() {
 /* Generates a new run UUID, writes relevant run metadata files into the corresponding run metadata dir
     This, like many things in the server, is pretty overzealous about exiting after any errors, often without an
     explanation of what happened. TODO - fix this */
-DWORD handleGenerateRunId(HANDLE hPipe) {
+void handleGenerateRunId(HANDLE hPipe) {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
     UUID runId;
@@ -191,12 +191,10 @@ DWORD handleGenerateRunId(HANDLE hPipe) {
     RpcStringFree((RPC_WSTR *)&runId_s);
 
     LOG_F(INFO, "handleGenerateRunId: finished");
-
-    return 0;
 }
 
 /* Writes the fkt file in the event we found a crash. Stores information about the mutation that caused it */
-DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, wchar_t *filePath, size_t position, size_t size, uint8_t* buf)
+void writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, wchar_t *filePath, size_t position, size_t size, uint8_t* buf)
 {
     DWORD dwBytesWritten = 0;
 
@@ -240,11 +238,9 @@ DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, wchar_t *filePath, size
         LOG_F(ERROR, "writeFKT: failed to close FKT (0x%x)", GetLastError());
         exit(1);
     }
-
-    return 0;
 }
 
-DWORD handleRegisterMutation(HANDLE pipe)
+void handleRegisterMutation(HANDLE pipe)
 {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
@@ -353,12 +349,10 @@ DWORD handleRegisterMutation(HANDLE pipe)
     writeFKT(file, type, resource_size, resource_path, position, size, buf);
 
     RpcStringFree((RPC_WSTR *)&run_id_s);
-
-    return 0;
 }
 
 /* Gets the mutated bytes stored in the FKT file for mutation replay */
-DWORD getBytesFKT(HANDLE hFile, uint8_t *buf, size_t size)
+void getBytesFKT(HANDLE hFile, uint8_t *buf, size_t size)
 {
     DWORD dwBytesRead = 0;
     size_t buf_size = 0;
@@ -381,12 +375,10 @@ DWORD getBytesFKT(HANDLE hFile, uint8_t *buf, size_t size)
     }
 
     LOG_F(INFO, "getBytesFKT: read in %02x %02x %02x %02x %02x %02x %02x %02x\n", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
-
-    return 0;
 }
 
 /* Handles requests over the named pipe from the triage client for replays of mutated bytes */
-DWORD handleReplay(HANDLE hPipe)
+void handleReplay(HANDLE hPipe)
 {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
@@ -456,12 +448,10 @@ DWORD handleReplay(HANDLE hPipe)
     }
 
     RpcStringFree((RPC_WSTR *)&runId_s);
-
-    return 0;
 }
 
 /* Deletes the run files to free up a Run ID if the last run didn't find a crash */
-DWORD handleFinalizeRun(HANDLE hPipe)
+void handleFinalizeRun(HANDLE hPipe)
 {
     DWORD dwBytesRead = 0;
     UUID runId;
@@ -517,8 +507,21 @@ DWORD handleFinalizeRun(HANDLE hPipe)
     }
 
     RpcStringFree((RPC_WSTR *)&runId_s);
+}
 
-    return 0;
+void handleGetArena(HANDLE hPipe)
+{
+    // read target application name, target function names and indices
+    // generate an arena identifier
+    // check if the arena exists:
+        // if it exists, return it
+        // if it doesn't, create a new one and return it
+}
+
+void handleSetArena(HANDLE hPipe)
+{
+    // read the arena from the pipe, extract the identifier
+    // save it to disk
 }
 
 DWORD handleCrashPaths(HANDLE hPipe)
@@ -638,12 +641,14 @@ DWORD WINAPI threadHandler(void *lpvPipe)
             case EVT_RUN_COMPLETE:
                 handleFinalizeRun(hPipe);
                 break;
+            case EVT_GET_ARENA:
+                handleGetArena(hPipe);
+                break;
+            case EVT_SET_ARENA:
+                handleSetArena(hPipe);
+                break;
             case EVT_SESSION_TEARDOWN:
                 LOG_F(INFO, "Ending a client's session with the server.");
-                break;
-            case EVT_GET_ARENA:
-            case EVT_SET_ARENA:
-                LOG_F(ERROR, "WIP events.");
                 break;
             case EVT_MUTATION:
             case EVT_RUN_INFO:

@@ -91,8 +91,9 @@ struct sl2_crash_paths {
 };
 
 // Our version of the AFL coverage map.
-typedef struct sl2_arena {
-    uint8_t arena[FUZZ_ARENA_SIZE];
-} sl2_arena;
+struct sl2_arena {
+    wchar_t identifier[MAX_PATH + 1];
+    uint8_t map[FUZZ_ARENA_SIZE];
+};
 
 #endif
