@@ -273,6 +273,7 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
         mutate_buffer(mutation.buffer, mutation.bufsize);
     }
 
+    // Tell the server about our mutation.
     sl2_conn_register_mutation(&sl2_conn, &mutation);
 
     return true;
@@ -708,15 +709,12 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
         nNumberOfBytesToRead = *info->lpNumberOfBytesRead;
     }
 
-    // Talk to the server and mutate the bytes
     if (targeted) {
         if (!mutate(function, info->hFile, info->position, info->lpBuffer, nNumberOfBytesToRead)) {
-            // TODO: fallback mutations?
             exit(1);
         }
     }
 
-    // TODO(ww): Remove this hardcoded size.
     if (info->argHash) {
         dr_thread_free(drwrap_get_drcontext(wrapcxt), info->argHash, SL2_HASH_LEN + 1);
     }
