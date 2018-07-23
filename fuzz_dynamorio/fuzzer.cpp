@@ -258,7 +258,8 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
     mutation.buffer = (uint8_t *) buffer;
 
     if (false) { // TODO(ww): if (using_arena)
-        // mutate_buffer_arena(mutation.buffer, mutation.bufsize, arena);
+        // mutate_buffer_arena(mutation.buffer, mutation.bufsize, &arena);
+        sl2_conn_register_arena(&sl2_conn, &arena);
     }
     else {
         mutate_buffer(mutation.buffer, mutation.bufsize);

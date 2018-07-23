@@ -268,9 +268,21 @@ SL2Response sl2_conn_request_arena(sl2_conn *conn, sl2_arena *arena)
 __declspec(dllexport)
 SL2Response sl2_conn_register_arena(sl2_conn *conn, sl2_arena *arena)
 {
+    uint8_t event = EVT_SET_ARENA;
+    DWORD txsize;
+
     if (!arena->id) {
         return SL2Response::MissingArenaID;
     }
+
+    // First, tell the server that we're sending it a coverage arena.
+    SL2_CONN_WRITE(conn, &event, sizeof(event));
+
+    // Then, tell the server which ID the arena is associated with.
+    sl2_conn_write_prefixed_string(conn, arena->id);
+
+    // Finally, write the arena data to the server.
+    SL2_CONN_WRITE(conn, arena->map, FUZZ_ARENA_SIZE);
 
     return SL2Response::OK;
 }
