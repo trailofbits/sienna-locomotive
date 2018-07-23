@@ -65,14 +65,6 @@ enum Event {
     EVT_INVALID = 255,
 };
 
-// A structure representing an active connection between a
-// DynamoRIO client and the SL2 server.
-struct sl2_conn {
-    HANDLE pipe;
-    UUID run_id;
-    bool has_run_id;
-};
-
 // Represents the state associated with a mutation, including
 // the function whose input has been mutated, the mutation count,
 // the resource behind the mutation, the position within the resource,

@@ -28,6 +28,14 @@ enum class SL2Response {
     AlreadyHasRunID,
 };
 
+// A structure representing an active connection between a
+// DynamoRIO client and the SL2 server.
+struct sl2_conn {
+    HANDLE pipe;
+    UUID run_id;
+    bool has_run_id;
+};
+
 // Opens a new connection to the SL2 server.
 // This function should be used in conjunction with either `sl2_conn_request_run_id`
 // *or* `sl2_conn_assign_run_id`, depending on the client's needs.
