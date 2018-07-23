@@ -28,6 +28,9 @@
 // The format for files (under the run directory) containing replayable mutations.
 #define FUZZ_RUN_FKT_FMT (L"%d.fkt")
 
+// The size, in bytes, of our fuzzing arena.
+#define FUZZ_ARENA_SIZE 65536
+
 enum Event {
     // Request a new run ID from the server.
     EVT_RUN_ID,             // 0
@@ -53,9 +56,51 @@ enum Event {
     EVT_REGISTER_MUTATION,  // 8
     // Request any and all paths containing crash information from the server.
     EVT_CRASH_PATHS,        // 9
+    // Request the coverage arena for a given run.
+    EVT_GET_ARENA,          // 10
+    // Register the (modified) coverage arena for a given run.
+    EVT_SET_ARENA,          // 11
     // Use this as a default value when handling multiple events.
     // NOTE(ww): The server will complain and may die if you send this.
     EVT_INVALID = 255,
 };
+
+// A structure representing an active connection between a
+// DynamoRIO client and the SL2 server.
+struct sl2_conn {
+    HANDLE pipe;
+    UUID run_id;
+    bool has_run_id;
+};
+
+// Represents the state associated with a mutation, including
+// the function whose input has been mutated, the mutation count,
+// the resource behind the mutation, the position within the resource,
+// the size of the mutated buffer, and the mutated buffer itself.
+//
+// May represent the state *before* a mutation, meaning that `buffer` has not
+// changed yet.
+struct sl2_mutation {
+    DWORD function;
+    DWORD mut_count;
+    wchar_t *resource;
+    size_t position;
+    size_t bufsize;
+    uint8_t *buffer;
+};
+
+// A structure containing valid pathnames for storage
+// of JSON-formatted crash data and a minidump-formatted
+// memory dump, respectively, for a run.
+struct sl2_crash_paths {
+    wchar_t crash_path[MAX_PATH + 1];
+    wchar_t mem_dump_path[MAX_PATH + 1];
+    wchar_t initial_dump_path[MAX_PATH + 1];
+};
+
+// Our version of the AFL coverage map.
+typedef struct sl2_arena {
+    uint8_t arena[FUZZ_ARENA_SIZE];
+} sl2_arena;
 
 #endif

@@ -28,39 +28,6 @@ enum class SL2Response {
     AlreadyHasRunID,
 };
 
-// A structure representing an active connection between a
-// DynamoRIO client and the SL2 server.
-struct sl2_conn {
-    HANDLE pipe;
-    UUID run_id;
-    bool has_run_id;
-};
-
-// Represents the state associated with a mutation, including
-// the function whose input has been mutated, the mutation count,
-// the resource behind the mutation, the position within the resource,
-// the size of the mutated buffer, and the mutated buffer itself.
-//
-// May represent the state *before* a mutation, meaning that `buffer` has not
-// changed yet.
-struct sl2_mutation {
-    DWORD function;
-    DWORD mut_count;
-    wchar_t *resource;
-    size_t position;
-    size_t bufsize;
-    uint8_t *buffer;
-};
-
-// A structure containing valid pathnames for storage
-// of JSON-formatted crash data and a minidump-formatted
-// memory dump, respectively, for a run.
-struct sl2_crash_paths {
-    wchar_t crash_path[MAX_PATH + 1];
-    wchar_t mem_dump_path[MAX_PATH + 1];
-    wchar_t initial_dump_path[MAX_PATH + 1];
-};
-
 // Opens a new connection to the SL2 server.
 // This function should be used in conjunction with either `sl2_conn_request_run_id`
 // *or* `sl2_conn_assign_run_id`, depending on the client's needs.

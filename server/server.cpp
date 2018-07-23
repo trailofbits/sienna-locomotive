@@ -634,6 +634,10 @@ DWORD WINAPI threadHandler(void *lpvPipe)
             case EVT_SESSION_TEARDOWN:
                 LOG_F(INFO, "Ending a client's session with the server.");
                 break;
+            case EVT_GET_ARENA:
+            case EVT_SET_ARENA:
+                LOG_F(ERROR, "WIP events.");
+                break;
             case EVT_MUTATION:
             case EVT_RUN_INFO:
             case EVT_CRASH_PATH:
