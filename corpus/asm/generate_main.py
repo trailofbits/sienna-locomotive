@@ -75,7 +75,7 @@ def main():
     with open(backup, 'w') as  f:
         f.write(original)
 
-    print 'Backup written to %s' % backup
+    print('Backup written to %s' % backup)
 
     with open('crash.asm', 'w') as f:
         f.write(modified)
