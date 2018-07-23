@@ -44,13 +44,20 @@ static droption_t<std::string> op_target(
     "targetfile",
     "JSON file in which to look for targets");
 
+static droption_t<bool> op_no_coverage(
+    DROPTION_SCOPE_CLIENT,
+    "n",
+    false,
+    "nocoverage",
+    "disable coverage, even when possible");
+
 static SL2Client client;
 static sl2_conn sl2_conn;
 static sl2_exception_ctx fuzz_exception_ctx;
 static bool crashed = false;
 static uint64_t baseAddr;
 static sl2_arena arena = {0};
-static bool using_arena = false;
+static bool coverage_guided = false;
 
 /* Read the PEB of the target application and get the full command line */
 static wchar_t *get_target_command_line(size_t *len)
@@ -257,7 +264,7 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
     mutation.bufsize = bufsize;
     mutation.buffer = (uint8_t *) buffer;
 
-    if (false) { // TODO(ww): if (using_arena)
+    if (false) { // TODO(ww): if (coverage_guided)
         // mutate_buffer_arena(mutation.buffer, mutation.bufsize, &arena);
         sl2_conn_register_arena(&sl2_conn, &arena);
     }
@@ -845,6 +852,8 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_abort();
     }
 
+    bool no_coverage = op_no_coverage.get_value();
+
     try {
         client.loadJson(target);
     } catch (const char* msg) {
@@ -873,18 +882,16 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_abort();
     }
 
-    // Check whether we can use coverage arena with this fuzzing run
-    using_arena = client.areTargetsArenaCompatible();
+    // Check whether we can use coverage on this fuzzing run
+    coverage_guided = client.areTargetsArenaCompatible() && !no_coverage;
 
-    if (using_arena) {
+    if (coverage_guided) {
         SL2_DR_DEBUG("dr_client_main: targets are arena compatible!\n");
         client.generateArenaId(arena.id);
-        SL2_DR_DEBUG("dr_client_main: arena ID: %S\n", arena.id);
         sl2_conn_request_arena(&sl2_conn, &arena);
-        SL2_DR_DEBUG("dr_client_main: should have finished arena request\n");
     }
     else {
-        SL2_DR_DEBUG("dr_client_main: targets are NOT arena compatible!\n");
+        SL2_DR_DEBUG("dr_client_main: targets are NOT arena compatible OR user has requested fuzzing without coverage!\n");
     }
 
     size_t target_argv_size;
