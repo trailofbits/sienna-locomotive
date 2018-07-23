@@ -1,6 +1,8 @@
 #ifndef SL2_SERVER_HPP
 #define SL2_SERVER_HPP
 
+#include "common/util.h"
+
 // The path to the local named pipe, used by the server to communicate with clients.
 #define FUZZ_SERVER_PATH (L"\\\\.\\pipe\\fuzz_server")
 
@@ -25,7 +27,7 @@
 // The file (under the run directory) in which the program's crash triage info is stored.
 #define FUZZ_RUN_CRASH_JSON (L"crash.json")
 
-// The format for files (under the run directory) containing replayable mutations.
+// The format for files (under a run directory) containing replayable mutations.
 #define FUZZ_RUN_FKT_FMT (L"%d.fkt")
 
 // The size, in bytes, of our fuzzing arena.
@@ -90,9 +92,10 @@ struct sl2_crash_paths {
     wchar_t initial_dump_path[MAX_PATH + 1];
 };
 
+
 // Our version of the AFL coverage map.
 struct sl2_arena {
-    wchar_t identifier[MAX_PATH + 1];
+    wchar_t id[SL2_HASH_LEN + 1];
     uint8_t map[FUZZ_ARENA_SIZE];
 };
 

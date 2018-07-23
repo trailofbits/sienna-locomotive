@@ -8,7 +8,8 @@
 #define SL2_CONN_READ(conn, thing, size) (ReadFile(conn->pipe, thing, size, &txsize, NULL))
 
 // Writes a length-prefixed wide string to the server.
-static void sl2_conn_write_prefixed_string(sl2_conn *conn, wchar_t *message)
+static
+void sl2_conn_write_prefixed_string(sl2_conn *conn, wchar_t *message)
 {
     DWORD txsize;
     size_t len = lstrlen(message) * sizeof(wchar_t);
@@ -24,7 +25,8 @@ static void sl2_conn_write_prefixed_string(sl2_conn *conn, wchar_t *message)
 // Reads a length-prefixed wide string from the server, up to `maxlen` wide chars.
 // `maxlen` does *not* include the trailing NULL, so callers *must* ensure that
 // `message` can hold at at least `(maxlen * sizeof(wchar_t)) + 1` bytes.
-static SL2Response sl2_conn_read_prefixed_string(sl2_conn *conn, wchar_t *message, size_t maxlen)
+static
+SL2Response sl2_conn_read_prefixed_string(sl2_conn *conn, wchar_t *message, size_t maxlen)
 {
     DWORD txsize;
     size_t len;
@@ -41,7 +43,8 @@ static SL2Response sl2_conn_read_prefixed_string(sl2_conn *conn, wchar_t *messag
     return SL2Response::OK;
 }
 
-__declspec(dllexport) SL2Response sl2_conn_open(sl2_conn *conn)
+__declspec(dllexport)
+SL2Response sl2_conn_open(sl2_conn *conn)
 {
     HANDLE pipe;
 
@@ -65,7 +68,8 @@ __declspec(dllexport) SL2Response sl2_conn_open(sl2_conn *conn)
     return SL2Response::OK;
 }
 
-__declspec(dllexport) SL2Response sl2_conn_end_session(sl2_conn *conn)
+__declspec(dllexport)
+SL2Response sl2_conn_end_session(sl2_conn *conn)
 {
     uint8_t event = EVT_SESSION_TEARDOWN;
     DWORD txsize;
@@ -78,7 +82,8 @@ __declspec(dllexport) SL2Response sl2_conn_end_session(sl2_conn *conn)
     return SL2Response::OK;
 }
 
-__declspec(dllexport) SL2Response sl2_conn_close(sl2_conn *conn)
+__declspec(dllexport)
+SL2Response sl2_conn_close(sl2_conn *conn)
 {
     sl2_conn_end_session(conn);
 
@@ -88,10 +93,8 @@ __declspec(dllexport) SL2Response sl2_conn_close(sl2_conn *conn)
     return SL2Response::OK;
 }
 
-__declspec(dllexport) SL2Response sl2_conn_request_run_id(
-    sl2_conn *conn,
-    wchar_t *target_name,
-    wchar_t *target_args)
+__declspec(dllexport)
+SL2Response sl2_conn_request_run_id(sl2_conn *conn, wchar_t *target_name, wchar_t *target_args)
 {
     UUID run_id;
     uint8_t event = EVT_RUN_ID;
@@ -112,7 +115,8 @@ __declspec(dllexport) SL2Response sl2_conn_request_run_id(
     return SL2Response::OK;
 }
 
-__declspec(dllexport) SL2Response sl2_conn_assign_run_id(sl2_conn *conn, UUID run_id)
+__declspec(dllexport)
+SL2Response sl2_conn_assign_run_id(sl2_conn *conn, UUID run_id)
 {
     if (conn->has_run_id) {
         return SL2Response::AlreadyHasRunID;
@@ -124,9 +128,8 @@ __declspec(dllexport) SL2Response sl2_conn_assign_run_id(sl2_conn *conn, UUID ru
     return SL2Response::OK;
 }
 
-__declspec(dllexport) SL2Response sl2_conn_register_mutation(
-    sl2_conn *conn,
-    sl2_mutation *mutation)
+__declspec(dllexport)
+SL2Response sl2_conn_register_mutation(sl2_conn *conn, sl2_mutation *mutation)
 {
     uint8_t event = EVT_REGISTER_MUTATION;
     DWORD txsize;
@@ -185,10 +188,8 @@ __declspec(dllexport) SL2Response sl2_conn_request_replay(
     return SL2Response::OK;
 }
 
-__declspec(dllexport) SL2Response sl2_conn_finalize_run(
-    sl2_conn *conn,
-    bool crash,
-    bool preserve)
+__declspec(dllexport)
+SL2Response sl2_conn_finalize_run(sl2_conn *conn, bool crash, bool preserve)
 {
     uint8_t event = EVT_RUN_COMPLETE;
     DWORD txsize;
@@ -214,9 +215,8 @@ __declspec(dllexport) SL2Response sl2_conn_finalize_run(
     return SL2Response::OK;
 }
 
-__declspec(dllexport) SL2Response sl2_conn_request_crash_paths(
-    sl2_conn *conn,
-    sl2_crash_paths *paths)
+__declspec(dllexport)
+SL2Response sl2_conn_request_crash_paths(sl2_conn *conn, sl2_crash_paths *paths)
 {
     uint8_t event = EVT_CRASH_PATHS;
     DWORD txsize;
@@ -239,3 +239,40 @@ __declspec(dllexport) SL2Response sl2_conn_request_crash_paths(
 
     return SL2Response::OK;
 }
+
+__declspec(dllexport)
+SL2Response sl2_conn_request_arena(sl2_conn *conn, sl2_arena *arena)
+{
+    uint8_t event = EVT_GET_ARENA;
+    DWORD txsize;
+
+    if (!arena->id) {
+        return SL2Response::MissingArenaID;
+    }
+
+    // First, tell the server that we'd like a coverage arena.
+    SL2_CONN_WRITE(conn, &event, sizeof(event));
+
+    // Then, tell the server which coverage arena we'd like.
+    // NOTE(ww): This identifier is a hash of targetting information known to
+    // every instance of the fuzzer, meaning that each run on the same target application
+    // and function(s) should produce the same identifier.
+    sl2_conn_write_prefixed_string(conn, arena->id);
+
+    // Finally, read the arena from the server.
+    SL2_CONN_READ(conn, arena->map, FUZZ_ARENA_SIZE);
+
+    return SL2Response::OK;
+}
+
+__declspec(dllexport)
+SL2Response sl2_conn_register_arena(sl2_conn *conn, sl2_arena *arena)
+{
+    if (!arena->id) {
+        return SL2Response::MissingArenaID;
+    }
+
+    return SL2Response::OK;
+}
+
+

@@ -621,10 +621,9 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     info->position             = fStruct.position;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
-    // NOTE(ww): SHA2 digests are 64 characters, so we allocate that + room for a NULL
-    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), 65);
-    memset(info->argHash, 0, 65);
-    memcpy(info->argHash, hash_str.c_str(), 64);
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    memset(info->argHash, 0, SL2_HASH_LEN + 1);
+    memcpy(info->argHash, hash_str.c_str(), SL2_HASH_LEN);
 }
 
 static void
@@ -710,7 +709,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 
     // TODO(ww): Remove this hardcoded size.
     if (info->argHash) {
-        dr_thread_free(drwrap_get_drcontext(wrapcxt), info->argHash, 65);
+        dr_thread_free(drwrap_get_drcontext(wrapcxt), info->argHash, SL2_HASH_LEN + 1);
     }
 
     dr_thread_free(drwrap_get_drcontext(wrapcxt), info, sizeof(fuzzer_read_info));
@@ -868,19 +867,23 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     wchar_t wcsAppName[MAX_PATH + 1] = {0};
     mbstowcs_s(NULL, wcsAppName, MAX_PATH, mbsAppName, MAX_PATH);
 
+    if (sl2_conn_open(&sl2_conn) != SL2Response::OK) {
+        SL2_DR_DEBUG("ERROR: Couldn't open a connection to the server!\n");
+        dr_abort();
+    }
+
     // Check whether we can use coverage arena with this fuzzing run
     using_arena = client.areTargetsArenaCompatible();
 
     if (using_arena) {
         SL2_DR_DEBUG("dr_client_main: targets are arena compatible!\n");
+        client.generateArenaId(arena.id);
+        SL2_DR_DEBUG("dr_client_main: arena ID: %S\n", arena.id);
+        sl2_conn_request_arena(&sl2_conn, &arena);
+        SL2_DR_DEBUG("dr_client_main: should have finished arena request\n");
     }
     else {
         SL2_DR_DEBUG("dr_client_main: targets are NOT arena compatible!\n");
-    }
-
-    if (sl2_conn_open(&sl2_conn) != SL2Response::OK) {
-        SL2_DR_DEBUG("ERROR: Couldn't open a connection to the server!\n");
-        dr_abort();
     }
 
     size_t target_argv_size;

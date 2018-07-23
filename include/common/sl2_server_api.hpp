@@ -26,6 +26,8 @@ enum class SL2Response {
     MissingRunID,
     // We tried to request a run ID from the server while already having one.
     AlreadyHasRunID,
+    // We tried to perform an action on the server without an arena ID.
+    MissingArenaID,
 };
 
 // A structure representing an active connection between a
@@ -75,5 +77,13 @@ __declspec(dllexport) SL2Response sl2_conn_finalize_run(sl2_conn *conn, bool cra
 // Requests information about a run's crash from the SL2 server.
 // Stores crash information within a `sl2_crash_paths` structure.
 __declspec(dllexport) SL2Response sl2_conn_request_crash_paths(sl2_conn *conn, sl2_crash_paths *paths);
+
+// Requests a coverage arena from the SL2 server.
+// `arena` is a pointer to an allocated (but potentially uninitialized) `sl2_arena`.
+__declspec(dllexport) SL2Response sl2_conn_request_arena(sl2_conn *conn, sl2_arena *arena);
+
+// Registers a coverage arena with the SL2 server.
+// `arena` is a pointer to an allocated `sl2_arena`.
+__declspec(dllexport) SL2Response sl2_conn_register_arena(sl2_conn *conn, sl2_arena *arena);
 
 #endif

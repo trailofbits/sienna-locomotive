@@ -3,6 +3,9 @@
 
 #include <string.h>
 
+// The size of a SHA256 hash.
+#define SL2_HASH_LEN 64
+
 // Convenience macros for testing normal and wide strings
 // for equality and case equality.
 #define STREQ(a, b) (!strcmp(a, b))
