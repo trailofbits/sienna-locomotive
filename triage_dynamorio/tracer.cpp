@@ -61,8 +61,6 @@ static droption_t<std::string> op_target(
     "target",
     "Specific call to target.");
 
-
-
 /* Mostly used to debug if taint tracking is too slow */
 static droption_t<unsigned int> op_no_taint(
     DROPTION_SCOPE_CLIENT,
