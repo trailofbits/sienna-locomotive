@@ -18,7 +18,7 @@ class WizardThread(QThread):
 
 
 class FuzzerThread(QThread):
-    foundCrash = pyqtSignal(str)
+    foundCrash = pyqtSignal(str, object)
     runComplete = pyqtSignal(float)
     paused = pyqtSignal()
 
@@ -51,8 +51,8 @@ class FuzzerThread(QThread):
             crashed, run_id = fuzzer_run(self.config_dict)
 
             if crashed:
-                formatted = triage_run(self.config_dict, run_id)
-                self.foundCrash.emit(formatted)
+                formatted, raw = triage_run(self.config_dict, run_id)
+                self.foundCrash.emit(formatted, raw)
 
                 if self.config_dict['exit_early']:
                     self.should_fuzz = False
