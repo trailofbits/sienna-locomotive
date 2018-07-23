@@ -21,22 +21,6 @@
 #include "common/sl2_server_api.hpp"
 #include "common/sl2_dr_client.hpp"
 
-static bool mutate(HANDLE hFile, size_t position, void *buf, size_t size);
-
-// structure for getting command line client options in dynamorio
-static droption_t<std::string> op_target(
-    DROPTION_SCOPE_CLIENT,
-    "t",
-    "",
-    "targetfile",
-    "JSON file in which to look for targets");
-
-static SL2Client   client;
-static sl2_conn sl2_conn;
-static bool crashed = false;
-static uint64_t baseAddr;
-static DWORD mut_count = 0;
-
 // Metadata object for a target function call
 struct fuzzer_read_info {
     Function function;
@@ -49,6 +33,23 @@ struct fuzzer_read_info {
     // TODO(ww): Make this a wchar_t * for consistency.
     char *argHash;
 };
+
+static bool mutate(HANDLE hFile, size_t position, void *buf, size_t size);
+
+// structure for getting command line client options in dynamorio
+static droption_t<std::string> op_target(
+    DROPTION_SCOPE_CLIENT,
+    "t",
+    "",
+    "targetfile",
+    "JSON file in which to look for targets");
+
+static SL2Client   client;
+static sl2_conn sl2_conn;
+static sl2_exception_ctx fuzz_exception_ctx;
+static bool crashed = false;
+static uint64_t baseAddr;
+static DWORD mut_count = 0;
 
 /* Read the PEB of the target application and get the full command line */
 static wchar_t *get_target_command_line(size_t *len)
@@ -87,7 +88,15 @@ onexception(void *drcontext, dr_exception_t *excpt)
     crashed = true;
     DWORD exceptionCode = excpt->record->ExceptionCode;
 
-    switch (exceptionCode){
+    dr_switch_to_app_state(drcontext);
+    fuzz_exception_ctx.thread_id = GetCurrentThreadId();
+    dr_mcontext_to_context(&(fuzz_exception_ctx.thread_ctx), excpt->mcontext);
+    dr_switch_to_dr_state(drcontext);
+
+    // Make our own copy of the exception record.
+    memcpy(&(fuzz_exception_ctx.record), excpt->record, sizeof(EXCEPTION_RECORD));
+
+    switch (exceptionCode) {
         case EXCEPTION_ACCESS_VIOLATION:
             SL2_DR_DEBUG("EXCEPTION_ACCESS_VIOLATION\n");
             break;
@@ -172,7 +181,26 @@ event_exit(void)
         sl2_crash_paths crash_paths = {0};
         sl2_conn_request_crash_paths(&sl2_conn, &crash_paths);
 
-        HANDLE hDumpFile = CreateFile(crash_paths.initial_dump_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        HANDLE hDumpFile = CreateFile(crash_paths.initial_dump_path,
+            GENERIC_WRITE,
+            NULL, NULL,
+            CREATE_ALWAYS,
+            FILE_ATTRIBUTE_NORMAL,
+            NULL);
+
+        if (hDumpFile == INVALID_HANDLE_VALUE) {
+            SL2_DR_DEBUG("fuzzer#event_exit: could not open the initial dump file (0x%x)\n", GetLastError());
+        }
+
+        EXCEPTION_POINTERS exception_pointers = {0};
+        MINIDUMP_EXCEPTION_INFORMATION mdump_info = {0};
+
+        exception_pointers.ExceptionRecord = &(fuzz_exception_ctx.record);
+        exception_pointers.ContextRecord = &(fuzz_exception_ctx.thread_ctx);
+
+        mdump_info.ThreadId = fuzz_exception_ctx.thread_id;
+        mdump_info.ExceptionPointers = &exception_pointers;
+        mdump_info.ClientPointers = true;
 
         // NOTE(ww): Switching back to the application's state is necessary, as we don't want
         // parts of the instrumentation showing up in our initial dump.
@@ -183,7 +211,8 @@ event_exit(void)
             GetCurrentProcessId(),
             hDumpFile,
             MiniDumpNormal,
-            NULL, NULL, NULL);
+            &mdump_info,
+            NULL, NULL);
 
         dr_switch_to_dr_state(dr_get_current_drcontext());
 
