@@ -124,9 +124,11 @@ def write_output_files(proc, run_id, stage_name):
 def parse_triage_output(run_id):
     # Parse triage results and print them
     try:
-        with open(get_path_to_run_file(run_id, 'crash.json'), 'r') as crash_json:
+        crash_file = get_path_to_run_file(run_id, 'crash.json')
+        with open(crash_file, 'r') as crash_json:
             results = json.loads(crash_json.read())
             results['run_id'] = run_id
+            results['crash_file'] = crash_file
             formatted = "Triage ({score}): {reason} in run {run_id} caused {exception}".format(**results)
             formatted += ("\n\t0x{location:02x}: {instruction}".format(**results))
             return formatted, results
@@ -136,7 +138,8 @@ def parse_triage_output(run_id):
 
 def export_crash_data_to_csv(crashes, csv_filename):
     with open(csv_filename, 'w') as csvfile:
-        writer = DictWriter(csvfile, ['score', 'run_id', 'exception', 'reason', 'instruction', 'location'], extrasaction='ignore')
+        writer = DictWriter(csvfile, ['score', 'run_id', 'exception', 'reason', 'instruction', 'location', 'crash_file'],
+                            extrasaction='ignore')
 
         writer.writeheader()
         writer.writerows(crashes)
