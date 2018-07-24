@@ -77,17 +77,21 @@ StatusCode Triage::process() {
     }
 
     // Calculate score from breakpad
-    cout << "SL2" << endl;
+    
+    cout << "!x: -----------------------------------------------" << endl;
+    cout << "!x: " << path_ << endl;
+
     Xploitability* xploitability = new XploitabilitySL2( &dump_, &state_);    
-    ranks_.push_back( xploitability->rank()  );
+    auto rank = xploitability->rank();
+    //cout << "SL2: " << rank << endl;
+    ranks_.push_back( rank );
     delete xploitability;
 
     cout << "!exploitable" << endl;
     xploitability = new XploitabilityBangExploitable( &dump_, &state_);    
     ranks_.push_back( xploitability->rank()  );
     delete xploitability;
-
-
+    
     return StatusCode::GOOD;
 }
 
@@ -136,7 +140,7 @@ const string Triage::crashReason() {
 //      returns value from 0.0 to 1.0 for exploitabilty
 XploitabilityRank Triage::exploitabilityRank() {
     
-    XploitabilityRank rank = XPLOITABILITY_NONE;
+    XploitabilityRank rank = XploitabilityRank::XPLOITABILITY_NONE;
 
     for( auto arank : ranks_ ) {
         if( arank > rank ) {
@@ -160,7 +164,10 @@ XploitabilityRank Triage::exploitabilityRank() {
 }
 
 const string Triage::exploitability() {
-    return Xploitability::rankToString( exploitabilityRank() );
+    //return Xploitability::rankToString( exploitabilityRank() );
+    XploitabilityRank rank = exploitabilityRank();
+    // XXX TODO FIX
+    return "test";
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -168,7 +175,7 @@ const string Triage::exploitability() {
 ostream& operator<<(ostream& os, Triage& self) {
 
     os << "Exploitability: "        << self.exploitability()        << endl;
-    os << "Exploitability Rank: "   << self.exploitabilityRank()    << endl;
+    //os << "Exploitability Rank: "   << self.exploitabilityRank()    << endl;
     os << "Crash Reason: "          << self.crashReason()           << endl;
     os << "Tag: "                   << self.triagePath()            << endl;
     return os;  

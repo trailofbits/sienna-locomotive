@@ -1,31 +1,37 @@
 #ifndef Xploitability_H
 #define Xploitability_H
 
+
+#include <string>
+#include <sstream>
+
 #include "google_breakpad/common/breakpad_types.h"
 #include "google_breakpad/processor/exploitability.h"
 #include "google_breakpad/processor/process_state.h"
 
-using namespace google_breakpad;
 
+using namespace google_breakpad;
+using namespace std;
 
 namespace sl2 {
 
-enum XploitabilityRank {
+enum class XploitabilityRank {
     XPLOITABILITY_HIGH      = 4,
     XPLOITABILITY_MEDIUM    = 3,
     XPLOITABILITY_LOW       = 2,
-    XPLOITABILITY_UNKNOWN   = 1,
+    XPLOITABILITY_UNKNOWN   = 1,    
     XPLOITABILITY_NONE      = 0
+
 };
 
+
+
+
+////////////////////////////////////////////////////////////////////////////
+// XploitabilityResult
+////////////////////////////////////////////////////////////////////////////
 class XploitabilityResult {
 public:
-
-    XploitabilityResult() :
-        isFinal(false) {        
-    }
-
-    bool                    isFinal;
     XploitabilityRank       rank;
 };
 
@@ -33,33 +39,28 @@ public:
 class Xploitability : public Exploitability {
 
 public:
+
+    Xploitability( Minidump* dmp, ProcessState* state );
     
-    Xploitability( Minidump* dmp, ProcessState* state ): Exploitability(dmp, state){  }
     //virtual double                  exploitabilityScore() = 0;
     virtual XploitabilityRank               rank() = 0;
 
-    static string rankToString(XploitabilityRank r) {
-        switch(r) {
-            case XPLOITABILITY_HIGH:
-                return "High";
-            case XPLOITABILITY_MEDIUM:
-                return "Medium";
-            case XPLOITABILITY_LOW:
-                return "Low";
-            case XPLOITABILITY_UNKNOWN:
-                return "Unknown";
-            case XPLOITABILITY_NONE:
-                return "None";
-            default:
-                return "None";
-        }
-    }
+    bool isExceptionAddressInUser();
+    bool isExceptionAddressNearNull();
+
+
 
 protected:
     virtual ExploitabilityRating    CheckPlatformExploitability() = 0;
 
-    XploitabilityRank  rank_;
-
+    XploitabilityRank               rank_;
+    const MDRawExceptionStream*     rawException_;
+    const MinidumpContext*          context_;
+    uint64_t                        stackPtr_           = 0;
+    uint64_t                        instructionPtr_     = 0;
+    uint32_t                        exceptionCode_      = 0;
+    bool                            memoryAvailable_    = true;
+    MinidumpMemoryList*             memoryList_;
 };
 
 

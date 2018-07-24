@@ -79,55 +79,14 @@ XploitabilitySL2::XploitabilitySL2(Minidump *dump,
 
 
 ExploitabilityRating XploitabilitySL2::CheckPlatformExploitability() {
-  uint64_t exploitabilityWeight = 0;
-
-  MinidumpException *exception = dump_->GetException();
-  if (!exception) {
-    BPLOG(INFO) << "Minidump does not have exception record.";
-    return EXPLOITABILITY_ERR_PROCESSING;
-  }
-
-  const MDRawExceptionStream *raw_exception = exception->exception();
-  if (!raw_exception) {
-    BPLOG(INFO) << "Could not obtain raw exception info.";
-    return EXPLOITABILITY_ERR_PROCESSING;
-  }
-
-  const MinidumpContext *context = exception->GetContext();
-  if (!context) {
-    BPLOG(INFO) << "Could not obtain exception context.";
-    return EXPLOITABILITY_ERR_PROCESSING;
-  }
-
-  MinidumpMemoryList *memory_list = dump_->GetMemoryList();
-  bool memory_available = true;
-  if (!memory_list) {
-    BPLOG(INFO) << "Minidump memory segments not available.";
-    memory_available = false;
-  }
-  uint64_t address = process_state_->crash_address();
-  uint32_t exception_code = raw_exception->exception_record.exception_code;
-
-
-  uint64_t stack_ptr = 0;
-  uint64_t instruction_ptr = 0;
-
-  // Getting the instruction pointer.
-  if (!context->GetInstructionPointer(&instruction_ptr)) {
-    return EXPLOITABILITY_ERR_PROCESSING;
-  }
-
-  // Getting the stack pointer.
-  if (!context->GetStackPointer(&stack_ptr)) {
-    return EXPLOITABILITY_ERR_PROCESSING;
-  }
+    uint64_t exploitabilityWeight = 0;
 
   // Check if we are executing on the stack.
-  if (instruction_ptr <= (stack_ptr + kProbableStackOffset) &&
-      instruction_ptr >= (stack_ptr - kProbableStackOffset))
+  if (instructionPtr_ <= (stackPtr_ + kProbableStackOffset) &&
+      instructionPtr_ >= (stackPtr_ - kProbableStackOffset))
     exploitabilityWeight += kHugeBump;
 
-  switch (exception_code) {
+  switch (exceptionCode_) {
     // This is almost certainly recursion.
     case MD_EXCEPTION_CODE_WIN_STACK_OVERFLOW:
       exploitabilityWeight += kTinyBump;
@@ -168,13 +127,13 @@ ExploitabilityRating XploitabilitySL2::CheckPlatformExploitability() {
       break;
 
     case MD_EXCEPTION_CODE_WIN_ACCESS_VIOLATION:
-      bool near_null = (address <= kProbableNullOffset);
+      bool near_null = (process_state_->crash_address() <= kProbableNullOffset);
       bool bad_read = false;
       bool bad_write = false;
-      if (raw_exception->exception_record.number_parameters >= 1) {
+      if (rawException_->exception_record.number_parameters >= 1) {
         MDAccessViolationTypeWin av_type =
             static_cast<MDAccessViolationTypeWin>
-            (raw_exception->exception_record.exception_information[0]);
+            (rawException_->exception_record.exception_information[0]);
         switch (av_type) {
           case MD_ACCESS_VIOLATION_WIN_READ:
             bad_read = true;
@@ -202,16 +161,16 @@ ExploitabilityRating XploitabilitySL2::CheckPlatformExploitability() {
             break;
         }
         MinidumpMemoryRegion *instruction_region = 0;
-        if (memory_available) {
+        if (memoryAvailable_) {
           instruction_region =
-              memory_list->GetMemoryRegionForAddress(instruction_ptr);
+              memoryList_->GetMemoryRegionForAddress(instructionPtr_);
         }
         if (!near_null && instruction_region &&
-            context->GetContextCPU() == MD_CONTEXT_X86 &&
+            context_->GetContextCPU() == MD_CONTEXT_X86 &&
             (bad_read || bad_write)) {
           // Perform checks related to memory around instruction pointer.
           uint32_t memory_offset =
-              instruction_ptr - instruction_region->GetBase();
+              instructionPtr_ - instruction_region->GetBase();
           uint32_t available_memory =
               instruction_region->GetSize() - memory_offset;
           available_memory = available_memory > kDisassembleBytesBeyondPC ?
@@ -221,7 +180,7 @@ ExploitabilityRating XploitabilitySL2::CheckPlatformExploitability() {
                 instruction_region->GetMemory() + memory_offset;
             DisassemblerX86 disassembler(raw_memory,
                                          available_memory,
-                                         instruction_ptr);
+                                         instructionPtr_);
             disassembler.NextInstruction();
             if (bad_read)
               disassembler.setBadRead();
@@ -264,7 +223,7 @@ ExploitabilityRating XploitabilitySL2::CheckPlatformExploitability() {
             }
           }
         }
-        if (!near_null && AddressIsAscii(address))
+        if (!near_null && AddressIsAscii(process_state_->crash_address()))
           exploitabilityWeight += kMediumBump;
       } else {
         BPLOG(INFO) << "Access violation type parameter missing.";
@@ -289,15 +248,15 @@ ExploitabilityRating XploitabilitySL2::CheckPlatformExploitability() {
 XploitabilityRank XploitabilitySL2::rank() {
     switch(rating_) {
         case EXPLOITABILITY_HIGH:
-            return XPLOITABILITY_HIGH;
+            return XploitabilityRank::XPLOITABILITY_HIGH;
         case EXPLOITABILITY_MEDIUM:
-            return XPLOITABILITY_MEDIUM;
+            return XploitabilityRank::XPLOITABILITY_MEDIUM;
         case EXPLOITABILITY_LOW:
-            return XPLOITABILITY_LOW;
+            return XploitabilityRank::XPLOITABILITY_LOW;
         case EXPLOITABILITY_INTERESTING:
-            return XPLOITABILITY_UNKNOWN;
+            return XploitabilityRank::XPLOITABILITY_UNKNOWN;
         default:
-            return XPLOITABILITY_NONE;
+            return XploitabilityRank::XPLOITABILITY_NONE;
     }
 
 
