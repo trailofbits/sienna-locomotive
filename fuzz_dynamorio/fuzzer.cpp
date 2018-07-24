@@ -14,6 +14,7 @@
 #include "drmgr.h"
 #include "drwrap.h"
 #include "droption.h"
+#include "drreg.h"
 
 #include "vendor/picosha2.h"
 
@@ -51,6 +52,8 @@ static droption_t<bool> op_no_coverage(
     "nocoverage",
     "disable coverage, even when possible");
 
+// TODO(ww): These should all go in one class/struct, probably a "Fuzzer" subclass
+// of SL2Client.
 static SL2Client client;
 static sl2_conn sl2_conn;
 static sl2_exception_ctx fuzz_exception_ctx;
@@ -59,6 +62,7 @@ static uint64_t baseAddr;
 static uint32_t mut_count = 0;
 static sl2_arena arena = {0};
 static bool coverage_guided = false;
+static module_data_t *target_mod;
 
 /* Read the PEB of the target application and get the full command line */
 static wchar_t *get_target_command_line(size_t *len)
@@ -87,6 +91,35 @@ static wchar_t *get_target_command_line(size_t *len)
 
     *len = parameterBlock.CommandLine.Length + 1;
     return commandLineContents;
+}
+
+static dr_emit_flags_t
+on_bb(void *drcontext, void *tag, instrlist_t *bb, instr_t *inst, bool for_trace, bool translating, void *user_data)
+{
+    app_pc start_pc;
+    uint16_t offset;
+
+    if (!drmgr_is_first_instr(drcontext, inst)) {
+        return DR_EMIT_DEFAULT;
+    }
+
+    start_pc = dr_fragment_app_pc(tag);
+    // NOTE(ww): This suffices for a fuzzing target that's a single executable.
+    // For more complex targets, will we need to allow the user to supply a list of modules to
+    // instrument.
+    if (!dr_module_contains_addr(target_mod, start_pc)) {
+        return DR_EMIT_DEFAULT;
+    }
+
+    offset = start_pc - target_mod->start;
+    offset &= FUZZ_ARENA_SIZE - 1;
+
+    drreg_reserve_aflags(drcontext, bb, inst);
+    instrlist_meta_preinsert(bb, inst, INSTR_CREATE_inc(drcontext,
+        OPND_CREATE_ABSMEM(&(arena.map[offset]), OPSZ_1)));
+    drreg_unreserve_aflags(drcontext, bb, inst);
+
+    return DR_EMIT_DEFAULT;
 }
 
 /* Maps exception code to an exit status. Print it out, then exit. */
@@ -231,6 +264,8 @@ event_exit(void)
     sl2_conn_finalize_run(&sl2_conn, crashed, false);
     sl2_conn_close(&sl2_conn);
 
+    dr_free_module_data(target_mod);
+
     // Clean up DynamoRIO
     dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#event_exit: Dynamorio Exiting\n");
     drwrap_exit();
@@ -267,10 +302,13 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
 
     if (false) { // TODO(ww): if (coverage_guided)
         // mutate_buffer_arena(mutation.buffer, mutation.bufsize, &arena);
-        sl2_conn_register_arena(&sl2_conn, &arena);
     }
     else {
         mutate_buffer(mutation.buffer, mutation.bufsize);
+    }
+
+    if (coverage_guided) {
+        sl2_conn_register_arena(&sl2_conn, &arena);
     }
 
     // Tell the server about our mutation.
@@ -278,82 +316,6 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
 
     return true;
 }
-
-/*
-    drwrap_skip_call does not invoke the post function
-
-    that means we need to cache the return value
-    and properly set all the other variables in the call
-
-    we also need to find out about stdcall arguments size
-    for the functions we're hooking (so it can clean up)
-
-    for things with file pointers, those need to be updated
-    to the correct position
-
-    make getlasterror work as expected
-
-    on the server we need some mapping like below for the
-    read / recevied bytes
-
-    run_id ->
-        command_line
-    command_line ->
-        function ->
-            bytes
-
-    std::map<DWORD, std::wstring> mapRunIdCommandLine;
-    std::map<std::wstring, std::map<std::wstring, BYTE *>> mapCommandLineFunctionBytes;
-
-    // set the cache in get run id
-    std::wstring strCommandLine(commandLine);
-    mapRunIdCommandLine[runId] = strCommandLine;
-
-    // set the bytes in mutate
-*/
-/*
-static bool
-check_cache() {
-    std::string target = op_target.get_value();
-    if(target == "") {
-        return false;
-    }
-
-    bool cached = false;
-    HANDLE h_pipe = CreateFile(
-        L"\\\\.\\pipe\\fuzz_server",
-        GENERIC_READ | GENERIC_WRITE,
-        0,
-        NULL,
-        OPEN_EXISTING,
-        0,
-        NULL);
-
-    if (h_pipe != INVALID_HANDLE_VALUE) {
-        DWORD read_mode = PIPE_READMODE_MESSAGE;
-        SetNamedPipeHandleState(
-            h_pipe,
-            &read_mode,
-            NULL,
-            NULL);
-
-        DWORD bytes_read = 0;
-        DWORD bytes_written = 0;
-
-        BYTE event_id = //TODO;
-        bool cached = false;
-
-        WriteFile(h_pipe, &event_id, sizeof(BYTE), &bytes_written, NULL);
-        WriteFile(h_pipe, &run_id, sizeof(DWORD), &bytes_written, NULL);
-        WriteFile(h_pipe, target.c_str(), target.length(), , &bytes_written, NULL);
-        ReadFile(h_pipe, &cached, sizeof(bool), &bytes_read, NULL);
-
-        CloseHandle(h_pipe);
-    }
-
-    return cached;
-}
-//*/
 
 /*
   The next several functions are wrappers that DynamoRIO calls before each of the targeted functions runs. Each of them
@@ -869,41 +831,40 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_log(NULL, DR_LOG_ALL, ERROR, "Client SL Fuzzer is running\n");
     }
 
-    // TODO: support multiple passes over one binary without re-running drrun
-
     // Get application name
-    const char* mbsAppName = dr_get_application_name();
-    wchar_t wcsAppName[MAX_PATH + 1] = {0};
-    mbstowcs_s(NULL, wcsAppName, MAX_PATH, mbsAppName, MAX_PATH);
+    const char* target_app_name_mbs = dr_get_application_name();
+    wchar_t target_app_name[MAX_PATH + 1] = {0};
+    mbstowcs_s(NULL, target_app_name, MAX_PATH, target_app_name_mbs, MAX_PATH);
 
     if (sl2_conn_open(&sl2_conn) != SL2Response::OK) {
         SL2_DR_DEBUG("ERROR: Couldn't open a connection to the server!\n");
         dr_abort();
     }
 
+    size_t target_argv_size;
+    wchar_t *target_argv = get_target_command_line(&target_argv_size);
+    sl2_conn_request_run_id(&sl2_conn, target_app_name, target_argv);
+    dr_global_free(target_argv, target_argv_size);
+
+    drmgr_init();
+    drwrap_init();
+
     // Check whether we can use coverage on this fuzzing run
     coverage_guided = client.areTargetsArenaCompatible() && !no_coverage;
+
+    // Cache our main module, so that we don't have to retrieve it during each
+    // basic block event.
+    target_mod = dr_get_main_module();
 
     if (coverage_guided) {
         SL2_DR_DEBUG("dr_client_main: targets are arena compatible!\n");
         client.generateArenaId(arena.id);
         sl2_conn_request_arena(&sl2_conn, &arena);
+        drmgr_register_bb_instrumentation_event(NULL, on_bb, NULL);
     }
     else {
-        SL2_DR_DEBUG("dr_client_main: targets are NOT arena compatible OR user has requested fuzzing without coverage!\n");
+        SL2_DR_DEBUG("dr_client_main: targets are NOT arena compatible OR user has requested dumb fuzzing!\n");
     }
-
-    size_t target_argv_size;
-    wchar_t *target_argv = get_target_command_line(&target_argv_size);
-    sl2_conn_request_run_id(&sl2_conn, wcsAppName, target_argv);
-    dr_global_free(target_argv, target_argv_size);
-
-    wchar_t run_id_s[SL2_UUID_SIZE];
-    sl2_uuid_to_wstring(sl2_conn.run_id, run_id_s);
-    // Initialize DynamoRIO and register callbacks
-    SL2_DR_DEBUG("Beginning fuzzing run %S\n\n", run_id_s);
-    drmgr_init();
-    drwrap_init();
 
     drmgr_register_exception_event(onexception);
     dr_register_exit_event(event_exit);
