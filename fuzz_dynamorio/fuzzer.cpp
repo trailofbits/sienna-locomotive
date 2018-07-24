@@ -846,6 +846,10 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     sl2_conn_request_run_id(&sl2_conn, target_app_name, target_argv);
     dr_global_free(target_argv, target_argv_size);
 
+    wchar_t run_id_s[SL2_UUID_SIZE];
+    sl2_uuid_to_wstring(sl2_conn.run_id, run_id_s);
+    SL2_DR_DEBUG("Beginning fuzzing run %S\n\n", run_id_s);
+
     drmgr_init();
     drwrap_init();
 
