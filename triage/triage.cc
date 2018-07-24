@@ -77,10 +77,12 @@ StatusCode Triage::process() {
     }
 
     // Calculate score from breakpad
+    cout << "SL2" << endl;
     Xploitability* xploitability = new XploitabilitySL2( &dump_, &state_);    
     ranks_.push_back( xploitability->rank()  );
     delete xploitability;
 
+    cout << "!exploitable" << endl;
     xploitability = new XploitabilityBangExploitable( &dump_, &state_);    
     ranks_.push_back( xploitability->rank()  );
     delete xploitability;
