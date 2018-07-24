@@ -52,6 +52,10 @@ static droption_t<bool> op_no_coverage(
     "nocoverage",
     "disable coverage, even when possible");
 
+
+// TODO(ww): Add options here for edge/bb coverage,
+// if we decided to support edge as well.
+
 // TODO(ww): These should all go in one class/struct, probably a "Fuzzer" subclass
 // of SL2Client.
 static SL2Client client;
