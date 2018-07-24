@@ -37,7 +37,7 @@ static sl2_conn sl2_conn;
 static sl2_exception_ctx trace_exception_ctx;
 static void *mutatex;
 static bool replay;
-static DWORD mutate_count;
+static uint32_t mutate_count;
 
 static std::set<reg_id_t> tainted_regs;
 static std::set<app_pc> tainted_mems;
@@ -60,8 +60,6 @@ static droption_t<std::string> op_target(
     "",
     "target",
     "Specific call to target.");
-
-
 
 /* Mostly used to debug if taint tracking is too slow */
 static droption_t<unsigned int> op_no_taint(
@@ -1315,10 +1313,9 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     info->function             = Function::ReadFile;
     info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
-    // NOTE(ww): SHA2 digests are 64 characters, so we allocate that + room for a NULL
-    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), 65);
-    memset(info->argHash, 0, 65);
-    memcpy(info->argHash, hash_str.c_str(), 64);
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    memset(info->argHash, 0, SL2_HASH_LEN + 1);
+    memcpy(info->argHash, hash_str.c_str(), SL2_HASH_LEN);
 }
 
 static void
@@ -1396,7 +1393,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 
     // TODO(ww): Remove this hardcoded size.
     if (info->argHash) {
-        dr_thread_free(drwrap_get_drcontext(wrapcxt), info->argHash, 65);
+        dr_thread_free(drwrap_get_drcontext(wrapcxt), info->argHash, SL2_HASH_LEN + 1);
     }
 
     dr_thread_free(drwrap_get_drcontext(wrapcxt), info, sizeof(client_read_info));

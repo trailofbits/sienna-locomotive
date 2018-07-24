@@ -1,3 +1,5 @@
+#include "vendor/picosha2.h"
+
 #include "common/sl2_dr_client.hpp"
 #include "dr_api.h"
 
@@ -52,6 +54,52 @@ isFunctionTargeted(Function function, client_read_info* info) {
         }
     }
     return false;
+}
+
+// Returns true if the function targets identified by the client can be used with
+// a coverage arena.
+//
+// NOTE(ww): Eventually, this should always be true. However, for the time being,
+// we're using the "index" targetting mode to create a stable identifier for a
+// coverage arena. As such, only function targets that were created with that
+// mode are currently arena-compatible.
+bool SL2Client::
+areTargetsArenaCompatible()
+{
+    for (targetFunction t : parsedJson) {
+        if (t.mode != MATCH_INDEX) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// Generates an arena ID based upon the indices and names of the client's targeted functions.
+// `id` *must* be large enough to hold `SL2_HASH_LEN + 1` widechars.
+void SL2Client::
+generateArenaId(wchar_t *id)
+{
+    picosha2::hash256_one_by_one hasher;
+
+    for (targetFunction t : parsedJson) {
+        std::string index = std::to_string(t.index);
+
+        hasher.process(index.begin(), index.end());
+        hasher.process(t.functionName.begin(), t.functionName.end());
+    }
+
+    hasher.finish();
+
+    // NOTE(ww): This cheeses C++ into using a stack-allocated string.
+    // We do this because allocating a std::string within picosha2 freaks
+    // DynamoRIO out. I'm not proud of it.
+    char cheese[SL2_HASH_LEN + 1] = {0};
+    std::string stdcheese(cheese);
+
+    picosha2::get_hash_hex_string(hasher, stdcheese);
+    mbstowcs_s(NULL, id, SL2_HASH_LEN + 1, stdcheese.c_str(), SL2_HASH_LEN);
+    id[SL2_HASH_LEN] = '\0';
 }
 
 // TODO(ww): Use this instead of duplicating code across all three clients.
