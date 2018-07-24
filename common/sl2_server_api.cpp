@@ -4,8 +4,16 @@
 
 #include "common/sl2_server_api.hpp"
 
-#define SL2_CONN_WRITE(conn, thing, size) (WriteFile(conn->pipe, thing, size, &txsize, NULL))
-#define SL2_CONN_READ(conn, thing, size) (ReadFile(conn->pipe, thing, size, &txsize, NULL))
+// NOTE(ww): The macros below assume the following state:
+// conn: an `sl2_conn *`
+// txsize: a `DWORD`
+#define SL2_CONN_WRITE(thing, size) (WriteFile(conn->pipe, thing, size, &txsize, NULL))
+#define SL2_CONN_READ(thing, size) (ReadFile(conn->pipe, thing, size, &txsize, NULL))
+
+#define SL2_CONN_EVT(event) do {       \
+    uint8_t evt = event;                     \
+    SL2_CONN_WRITE(&evt, sizeof(evt)); \
+} while(0)
 
 // Writes a length-prefixed wide string to the server.
 static
@@ -14,11 +22,11 @@ void sl2_conn_write_prefixed_string(sl2_conn *conn, wchar_t *message)
     DWORD txsize;
     size_t len = lstrlen(message) * sizeof(wchar_t);
 
-    SL2_CONN_WRITE(conn, &len, sizeof(len));
+    SL2_CONN_WRITE(&len, sizeof(len));
 
     // If the string is empty, don't bother sending it.
     if (len > 0) {
-        SL2_CONN_WRITE(conn, message, len);
+        SL2_CONN_WRITE(message, len);
     }
 }
 
@@ -31,13 +39,13 @@ SL2Response sl2_conn_read_prefixed_string(sl2_conn *conn, wchar_t *message, size
     DWORD txsize;
     size_t len;
 
-    SL2_CONN_READ(conn, &len, sizeof(len));
+    SL2_CONN_READ(&len, sizeof(len));
 
     if ((len / sizeof(wchar_t)) > maxlen) {
         return SL2Response::LongRead;
     }
 
-    SL2_CONN_READ(conn, message, len);
+    SL2_CONN_READ(message, len);
     message[len / sizeof(wchar_t)] = '\0';
 
     return SL2Response::OK;
@@ -71,11 +79,10 @@ SL2Response sl2_conn_open(sl2_conn *conn)
 __declspec(dllexport)
 SL2Response sl2_conn_end_session(sl2_conn *conn)
 {
-    uint8_t event = EVT_SESSION_TEARDOWN;
     DWORD txsize;
 
     // Tell the server that we want to end our session.
-    SL2_CONN_WRITE(conn, &event, sizeof(event));
+    SL2_CONN_EVT(EVT_SESSION_TEARDOWN);
 
     conn->has_run_id = false;
 
@@ -97,14 +104,13 @@ __declspec(dllexport)
 SL2Response sl2_conn_request_run_id(sl2_conn *conn, wchar_t *target_name, wchar_t *target_args)
 {
     UUID run_id;
-    uint8_t event = EVT_RUN_ID;
     DWORD txsize;
 
     // First, tell the server that we're requesting a UUID.
-    SL2_CONN_WRITE(conn, &event, sizeof(event));
+    SL2_CONN_EVT(EVT_RUN_ID);
 
     // Then, read the UUID from the server.
-    SL2_CONN_READ(conn, &run_id, sizeof(run_id));
+    SL2_CONN_READ(&run_id, sizeof(run_id));
 
     sl2_conn_write_prefixed_string(conn, target_name);
     sl2_conn_write_prefixed_string(conn, target_args);
@@ -131,7 +137,6 @@ SL2Response sl2_conn_assign_run_id(sl2_conn *conn, UUID run_id)
 __declspec(dllexport)
 SL2Response sl2_conn_register_mutation(sl2_conn *conn, sl2_mutation *mutation)
 {
-    uint8_t event = EVT_REGISTER_MUTATION;
     DWORD txsize;
 
     if (!conn->has_run_id) {
@@ -139,19 +144,19 @@ SL2Response sl2_conn_register_mutation(sl2_conn *conn, sl2_mutation *mutation)
     }
 
     // First, tell the server that we're registering a mutation.
-    SL2_CONN_WRITE(conn, &event, sizeof(event));
+    SL2_CONN_EVT(EVT_REGISTER_MUTATION);
 
     // Then, tell the server which run the mutation is associated with.
-    SL2_CONN_WRITE(conn, &(conn->run_id), sizeof(conn->run_id));
+    SL2_CONN_WRITE(&(conn->run_id), sizeof(conn->run_id));
 
     // Then, send our mutation state over.
     // TODO(ww): Check for truncated writes.
-    SL2_CONN_WRITE(conn, &(mutation->function), sizeof(mutation->function));
-    SL2_CONN_WRITE(conn, &(mutation->mut_count), sizeof(mutation->mut_count));
+    SL2_CONN_WRITE(&(mutation->function), sizeof(mutation->function));
+    SL2_CONN_WRITE(&(mutation->mut_count), sizeof(mutation->mut_count));
     sl2_conn_write_prefixed_string(conn, mutation->resource);
-    SL2_CONN_WRITE(conn, &(mutation->position), sizeof(mutation->position));
-    SL2_CONN_WRITE(conn, &(mutation->bufsize), sizeof(mutation->bufsize));
-    SL2_CONN_WRITE(conn, mutation->buffer, mutation->bufsize);
+    SL2_CONN_WRITE(&(mutation->position), sizeof(mutation->position));
+    SL2_CONN_WRITE(&(mutation->bufsize), sizeof(mutation->bufsize));
+    SL2_CONN_WRITE(mutation->buffer, mutation->bufsize);
 
     return SL2Response::OK;
 }
@@ -162,7 +167,6 @@ __declspec(dllexport) SL2Response sl2_conn_request_replay(
     size_t bufsize,
     void *buffer)
 {
-    uint8_t event = EVT_REPLAY;
     DWORD txsize;
 
     // If the connection doesn't have a run ID, then we don't know which
@@ -172,18 +176,18 @@ __declspec(dllexport) SL2Response sl2_conn_request_replay(
     }
 
     // First, tell the server that we're requesting a replay.
-    SL2_CONN_WRITE(conn, &event, sizeof(event));
+    SL2_CONN_EVT(EVT_REPLAY);
 
     // Then, tell the server which run we're requesting the replay for.
-    SL2_CONN_WRITE(conn, &(conn->run_id), sizeof(conn->run_id));
+    SL2_CONN_WRITE(&(conn->run_id), sizeof(conn->run_id));
 
     // Then, tell the server which mutation we're expecting from that run.
-    SL2_CONN_WRITE(conn, &mut_count, sizeof(mut_count));
+    SL2_CONN_WRITE(&mut_count, sizeof(mut_count));
 
     // Finally, tell the server how many bytes we expect to receive and
     // receive those bytes into the buffer.
-    SL2_CONN_WRITE(conn, &bufsize, sizeof(bufsize));
-    SL2_CONN_READ(conn, buffer, bufsize);
+    SL2_CONN_WRITE(&bufsize, sizeof(bufsize));
+    SL2_CONN_READ(buffer, bufsize);
 
     return SL2Response::OK;
 }
@@ -191,7 +195,6 @@ __declspec(dllexport) SL2Response sl2_conn_request_replay(
 __declspec(dllexport)
 SL2Response sl2_conn_finalize_run(sl2_conn *conn, bool crash, bool preserve)
 {
-    uint8_t event = EVT_RUN_COMPLETE;
     DWORD txsize;
 
     // If the connection doesn't a run ID, then we don't have a run to finalize.
@@ -200,17 +203,17 @@ SL2Response sl2_conn_finalize_run(sl2_conn *conn, bool crash, bool preserve)
     }
 
     // First, tell the server that we're finalizing a run.
-    SL2_CONN_WRITE(conn, &event, sizeof(event));
+    SL2_CONN_EVT(EVT_RUN_COMPLETE);
 
     // Then, tell the server which run we're finalizing.
-    SL2_CONN_WRITE(conn, &(conn->run_id), sizeof(conn->run_id));
+    SL2_CONN_WRITE(&(conn->run_id), sizeof(conn->run_id));
 
     // Then, tell the server whether we've found a crash.
-    SL2_CONN_WRITE(conn, &crash, sizeof(crash));
+    SL2_CONN_WRITE(&crash, sizeof(crash));
 
     // Finally, tell the server if we'd like to preserve the run's on-disk state,
     // even without a crash. This is only checked if by the server if crash is false.
-    SL2_CONN_WRITE(conn, &preserve, sizeof(preserve));
+    SL2_CONN_WRITE(&preserve, sizeof(preserve));
 
     return SL2Response::OK;
 }
@@ -218,7 +221,6 @@ SL2Response sl2_conn_finalize_run(sl2_conn *conn, bool crash, bool preserve)
 __declspec(dllexport)
 SL2Response sl2_conn_request_crash_paths(sl2_conn *conn, sl2_crash_paths *paths)
 {
-    uint8_t event = EVT_CRASH_PATHS;
     DWORD txsize;
 
     // If the connection doesn't a run ID, then we don't have a run to finalize.
@@ -227,10 +229,10 @@ SL2Response sl2_conn_request_crash_paths(sl2_conn *conn, sl2_crash_paths *paths)
     }
 
     // First, tell the server that we'd like the crash paths for a run.
-    SL2_CONN_WRITE(conn, &event, sizeof(event));
+    SL2_CONN_EVT(EVT_CRASH_PATHS);
 
     // Then, tell the server which run we're requesting crash paths for.
-    SL2_CONN_WRITE(conn, &(conn->run_id), sizeof(conn->run_id));
+    SL2_CONN_WRITE(&(conn->run_id), sizeof(conn->run_id));
 
     // Finally, read the actual crash paths from the server.
     sl2_conn_read_prefixed_string(conn, paths->crash_path, MAX_PATH);
@@ -243,7 +245,6 @@ SL2Response sl2_conn_request_crash_paths(sl2_conn *conn, sl2_crash_paths *paths)
 __declspec(dllexport)
 SL2Response sl2_conn_request_arena(sl2_conn *conn, sl2_arena *arena)
 {
-    uint8_t event = EVT_GET_ARENA;
     DWORD txsize;
 
     if (!arena->id) {
@@ -251,7 +252,7 @@ SL2Response sl2_conn_request_arena(sl2_conn *conn, sl2_arena *arena)
     }
 
     // First, tell the server that we'd like a coverage arena.
-    SL2_CONN_WRITE(conn, &event, sizeof(event));
+    SL2_CONN_EVT(EVT_GET_ARENA);
 
     // Then, tell the server which coverage arena we'd like.
     // NOTE(ww): This identifier is a hash of targetting information known to
@@ -260,7 +261,7 @@ SL2Response sl2_conn_request_arena(sl2_conn *conn, sl2_arena *arena)
     sl2_conn_write_prefixed_string(conn, arena->id);
 
     // Finally, read the arena from the server.
-    SL2_CONN_READ(conn, arena->map, FUZZ_ARENA_SIZE);
+    SL2_CONN_READ(arena->map, FUZZ_ARENA_SIZE);
 
     return SL2Response::OK;
 }
@@ -268,7 +269,6 @@ SL2Response sl2_conn_request_arena(sl2_conn *conn, sl2_arena *arena)
 __declspec(dllexport)
 SL2Response sl2_conn_register_arena(sl2_conn *conn, sl2_arena *arena)
 {
-    uint8_t event = EVT_SET_ARENA;
     DWORD txsize;
 
     if (!arena->id) {
@@ -276,13 +276,13 @@ SL2Response sl2_conn_register_arena(sl2_conn *conn, sl2_arena *arena)
     }
 
     // First, tell the server that we're sending it a coverage arena.
-    SL2_CONN_WRITE(conn, &event, sizeof(event));
+    SL2_CONN_EVT(EVT_SET_ARENA);
 
     // Then, tell the server which ID the arena is associated with.
     sl2_conn_write_prefixed_string(conn, arena->id);
 
     // Finally, write the arena data to the server.
-    SL2_CONN_WRITE(conn, arena->map, FUZZ_ARENA_SIZE);
+    SL2_CONN_WRITE(arena->map, FUZZ_ARENA_SIZE);
 
     return SL2Response::OK;
 }
