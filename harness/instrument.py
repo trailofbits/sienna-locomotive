@@ -16,9 +16,8 @@ import traceback
 import sys
 from enum import IntEnum
 
-from .state import parse_triage_output, finalize, write_output_files, stringify_program_array
+from .state import parse_triage_output, finalize, write_output_files, create_invokation_statement
 from . import config
-
 
 print_lock = threading.Lock()
 can_fuzz = True
@@ -49,12 +48,10 @@ def start_server():
 
 def run_dr(config_dict, verbose=False, timeout=None):
     """ Runs dynamorio with the given config. Clobbers console output if save_stderr/stdout are true """
-    program_arr = [config_dict['drrun_path'], '-pidfile', 'pidfile'] + config_dict['drrun_args'] + \
-        ['-c', config_dict['client_path']] + config_dict['client_args'] + \
-        ['--', config_dict['target_application_path']] + config_dict['target_args']
+    program_arr, program_str = create_invokation_statement(config_dict)
 
     if verbose:
-        print_l("Executing drrun: %s" % stringify_program_array(program_arr[0], program_arr[1:]))
+        print_l("Executing drrun: %s" % program_str)
 
     # Run client on target application
     started = time.time()
