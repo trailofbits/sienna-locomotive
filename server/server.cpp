@@ -328,13 +328,13 @@ void handleRegisterMutation(HANDLE pipe)
 
     UuidToString(&run_id, (RPC_WSTR *)&run_id_s);
 
-    DWORD type = 0;
+    uint32_t type = 0;
     if (!ReadFile(pipe, &type, sizeof(type), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleRegisterMutation: failed to read function type (0x%x)", GetLastError());
         exit(1);
     }
 
-    DWORD mutate_count = 0;
+    uint32_t mutate_count = 0;
     wchar_t mutate_fname[MAX_PATH + 1] = {0};
     if (!ReadFile(pipe, &mutate_count, sizeof(mutate_count), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleRegisterMutation: failed to read mutation count (0x%x)", GetLastError());
@@ -431,7 +431,7 @@ void handleReplay(HANDLE hPipe)
     UUID runId;
     wchar_t *runId_s;
 
-    if (!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &runId, sizeof(runId), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleReplay: failed to read run ID (0x%x)", GetLastError());
         exit(1);
     }
@@ -440,9 +440,9 @@ void handleReplay(HANDLE hPipe)
 
     LOG_F(INFO, "Replaying for run id %S", runId_s);
 
-    DWORD mutate_count = 0;
+    uint32_t mutate_count = 0;
     wchar_t mutate_fname[MAX_PATH + 1] = {0};
-    if (!ReadFile(hPipe, &mutate_count, sizeof(DWORD), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &mutate_count, sizeof(mutate_count), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleReplay: failed to read mutate count (0x%x)", GetLastError());
         exit(1);
     }
@@ -450,7 +450,7 @@ void handleReplay(HANDLE hPipe)
     StringCchPrintfW(mutate_fname, MAX_PATH, FUZZ_RUN_FKT_FMT, mutate_count);
 
     size_t size = 0;
-    if (!ReadFile(hPipe, &size, sizeof(size_t), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &size, sizeof(size), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleReplay: failed to read size of replay buffer (0x%x)", GetLastError());
         exit(1);
     }
@@ -632,7 +632,7 @@ void handleSetArena(HANDLE hPipe)
     dump_arena(arena_path, &arena);
 }
 
-DWORD handleCrashPaths(HANDLE hPipe)
+void handleCrashPaths(HANDLE hPipe)
 {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
@@ -695,8 +695,6 @@ DWORD handleCrashPaths(HANDLE hPipe)
     }
 
     RpcStringFree((RPC_WSTR *)&runId_s);
-
-    return 0;
 }
 
 /* Handles incoming connections from clients */
@@ -718,7 +716,7 @@ DWORD WINAPI threadHandler(void *lpvPipe)
     // is in scare quotes because each session is essentially anonymous -- the server
     // only sees when they end, not which runs or events they correspond to.
     do {
-        if (!ReadFile(hPipe, &event, sizeof(uint8_t), &dwBytesRead, NULL)) {
+        if (!ReadFile(hPipe, &event, sizeof(event), &dwBytesRead, NULL)) {
             if (GetLastError() != ERROR_BROKEN_PIPE){
                 LOG_F(ERROR, "threadHandler: failed to read event (0x%x)", GetLastError());
                 exit(1);
@@ -756,17 +754,17 @@ DWORD WINAPI threadHandler(void *lpvPipe)
                 handleSetArena(hPipe);
                 break;
             case EVT_SESSION_TEARDOWN:
-                LOG_F(INFO, "Ending a client's session with the server.");
+                LOG_F(INFO, "threadHandler: ending a client's session with the server.");
                 break;
             case EVT_MUTATION:
             case EVT_RUN_INFO:
             case EVT_CRASH_PATH:
             case EVT_MEM_DMP_PATH:
-                LOG_F(WARNING, "threadHandler: deprecated event requested: EVT_MUTATION");
+                LOG_F(WARNING, "threadHandler: deprecated event requested.");
                 event = EVT_INVALID;
                 break;
             default:
-                LOG_F(ERROR, "Unknown or invalid event %d", event);
+                LOG_F(ERROR, "threadHandler: unknown or invalid event %d", event);
                 break;
         }
     } while (event != EVT_SESSION_TEARDOWN && event != EVT_INVALID);
@@ -792,7 +790,7 @@ DWORD WINAPI threadHandler(void *lpvPipe)
 /* concurrency protection */
 void lockProcess()
 {
-    hProcessMutex = CreateMutex(NULL, FALSE, L"fuzz_server_mutex");
+    hProcessMutex = CreateMutex(NULL, false, L"fuzz_server_mutex");
     if (!hProcessMutex || hProcessMutex == INVALID_HANDLE_VALUE) {
         LOG_F(ERROR, "lockProcess: could not get process lock (handle)");
         exit(1);
@@ -843,7 +841,7 @@ int main(int mArgc, char **mArgv)
         }
 
         bool connected = ConnectNamedPipe(hPipe, NULL) ?
-            TRUE : (GetLastError() == ERROR_PIPE_CONNECTED);
+            true : (GetLastError() == ERROR_PIPE_CONNECTED);
 
         if (connected) {
             DWORD threadID;

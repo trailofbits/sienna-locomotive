@@ -75,8 +75,8 @@ enum Event {
 // May represent the state *before* a mutation, meaning that `buffer` has not
 // changed yet.
 struct sl2_mutation {
-    DWORD function;
-    DWORD mut_count;
+    uint32_t function;
+    uint32_t mut_count;
     wchar_t *resource;
     size_t position;
     size_t bufsize;

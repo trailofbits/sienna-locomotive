@@ -163,7 +163,7 @@ SL2Response sl2_conn_register_mutation(sl2_conn *conn, sl2_mutation *mutation)
 
 __declspec(dllexport) SL2Response sl2_conn_request_replay(
     sl2_conn *conn,
-    DWORD mut_count,
+    uint32_t mut_count,
     size_t bufsize,
     void *buffer)
 {

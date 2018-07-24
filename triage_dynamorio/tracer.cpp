@@ -37,7 +37,7 @@ static sl2_conn sl2_conn;
 static sl2_exception_ctx trace_exception_ctx;
 static void *mutatex;
 static bool replay;
-static DWORD mutate_count;
+static uint32_t mutate_count;
 
 static std::set<reg_id_t> tainted_regs;
 static std::set<app_pc> tainted_mems;

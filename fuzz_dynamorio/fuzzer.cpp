@@ -304,7 +304,7 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
 
     sl2_mutation mutation;
 
-    mutation.function = static_cast<DWORD>(function);
+    mutation.function = static_cast<uint32_t>(function);
     mutation.mut_count = mut_count++;
     mutation.resource = resource;
     mutation.position = position;
