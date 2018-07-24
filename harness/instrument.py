@@ -47,7 +47,7 @@ def start_server():
         time.sleep(1)
 
 
-def run_dr(config_dict, save_stderr=False, verbose=False, timeout=None):
+def run_dr(config_dict, verbose=False, timeout=None):
     """ Runs dynamorio with the given config. Clobbers console output if save_stderr/stdout are true """
     program_arr = [config_dict['drrun_path'], '-pidfile', 'pidfile'] + config_dict['drrun_args'] + \
         ['-c', config_dict['client_path']] + config_dict['client_args'] + \
@@ -119,9 +119,8 @@ def wizard_run(config_dict):
                                 'client_args': [],
                                 'target_application_path': config_dict['target_application_path'],
                                 'target_args': config_dict['target_args'],
-                                'inline_stdout': config_dict['inline_stdout'] },
-                                save_stderr=True,
-                                verbose=config_dict['verbose'])
+                                'inline_stdout': config_dict['inline_stdout']},
+                               verbose=config_dict['verbose'])
     wizard_output = completed_process.stderr.decode('utf-8')
     wizard_findings = []
 
@@ -146,8 +145,7 @@ def wizard_run(config_dict):
 
 def fuzzer_run(config_dict):
     """ Runs the fuzzer """
-    completed_process = run_dr(config_dict, True,
-                               verbose=config_dict['verbose'], timeout=config_dict.get('fuzz_timeout', None))
+    completed_process = run_dr(config_dict, verbose=config_dict['verbose'], timeout=config_dict.get('fuzz_timeout', None))
 
     # Parse run ID from fuzzer output
     run_id = 'ERR'
@@ -190,7 +188,6 @@ def triage_run(config_dict, run_id):
                                 'target_application_path': config_dict['target_application_path'],
                                 'target_args': config_dict['target_args'],
                                 'inline_stdout': config_dict['inline_stdout']},
-                               True,
                                config_dict['verbose'],
                                config_dict.get('triage_timeout', None))
 
