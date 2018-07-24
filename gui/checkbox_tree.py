@@ -44,6 +44,7 @@ class CheckboxTreeSortFilterProxyModel(QSortFilterProxyModel):
         super().__init__(*args)
 
     def lessThan(self, QModelIndex_l, QModelIndex_r):
+        """ Convert strings to ints before sorting (if possible) """
         try:
             left = self.sourceModel().data(QModelIndex_l)
             right = self.sourceModel().data(QModelIndex_r)
@@ -51,3 +52,11 @@ class CheckboxTreeSortFilterProxyModel(QSortFilterProxyModel):
             return int(left) < int(right)
         except ValueError:
             return super().lessThan(QModelIndex_l, QModelIndex_r)
+
+    def filterAcceptsRow(self, p_int, QModelIndex):
+        """ Keep child rows when we filter on the top-level items """
+        super_accepts = super().filterAcceptsRow(p_int, QModelIndex)
+        accepts_parent = super().filterAcceptsRow(QModelIndex.row(), self.parent(QModelIndex))
+        is_child = QModelIndex.row() != -1 and p_int == 0
+
+        return super_accepts or (is_child and accepts_parent)
