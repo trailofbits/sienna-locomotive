@@ -6,19 +6,23 @@ import os
 import glob
 import re
 import struct
-import json
+import json, msgpack
 from hashlib import sha1
 from csv import DictWriter
 
 from . import config
 
+def esc_quote(raw):
+    if " " not in raw or '\"' in raw:
+        return raw
+    else:
+        return "\"{}\"".format(raw)
 
 # TODO(ww): Use shlex or something similar here.
 def stringify_program_array(target_application_path, target_args_array):
     """ Escape paths with spaces in them by surrounding them with quotes """
-    return "{} {}\n".format(target_application_path if " " not in target_application_path
-                                                    else "\"{}\"".format(target_application_path),
-                            ' '.join((k if " " not in k else "\"{}\"".format(k))for k in target_args_array))
+    out = "{} {}\n".format(esc_quote(target_application_path), ' '.join(esc_quote(k) for k in target_args_array))
+    return out
 
 
 # TODO: Use shlex or something similar here.
@@ -28,13 +32,12 @@ def unstringify_program_array(stringified):
     invoke = []
     split = re.split('(\".*?\")', stringified)  # TODO use this for config file parsing
     for token in split:
-        if len(token) > 0:
-            if "\"" in token:
-                invoke.append(token)
-            else:
-                for inner_token in token.split(' '):
-                    invoke.append(inner_token)
-
+        if "\"" in token:
+            invoke.append(token)
+        else:
+            for inner_token in token.split(' '):
+                invoke.append(inner_token)
+    invoke = list(filter(lambda b: len(b) > 0, invoke))
     return invoke[0], invoke[1:]
 
 
@@ -73,17 +76,18 @@ class TargetAdapter(object):
         self.save()
 
     def save(self):
-        with open(self.filename, 'w') as jsonfile:
-            json.dump(self.target_list, jsonfile)
+        with open(self.filename, 'wb') as msgfile:
+            msgpack.dump(self.target_list, msgfile)
 
 
 def get_target(_config):
-    target_file = os.path.join(get_target_dir(_config), 'targets.json')
+    target_file = os.path.join(get_target_dir(_config), 'targets.msg')
     try:
-        with open(target_file) as target_json:
-            return TargetAdapter(json.load(target_json), target_file)
+        with open(target_file, 'rb') as target_msg:
+            return TargetAdapter(msgpack.load(target_msg, encoding='utf-8'), target_file)
     except FileNotFoundError:
         return TargetAdapter([], target_file)
+
 
 def get_all_targets():
     """ Returns a dict mapping target directories to the contents of the argument file """

@@ -374,7 +374,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     char *lpBuffer = (char *) info->lpBuffer;
     size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
 
-    vector<unsigned char> x(lpBuffer, lpBuffer + nNumberOfBytesToRead);
+    vector<unsigned char> x(lpBuffer, lpBuffer + min(nNumberOfBytesToRead, 64));
     j["buffer"] = x;
 
     SL2_LOG_JSONL(j);

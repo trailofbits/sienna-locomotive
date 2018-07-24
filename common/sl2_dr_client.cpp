@@ -1,4 +1,5 @@
 #include "common/sl2_dr_client.hpp"
+#include "dr_api.h"
 
 using namespace std;
 
@@ -7,7 +8,7 @@ using namespace std;
 //
 // Intended to be for common functionality for DynamoRio clients. This should be moved inside
 // the DR build process eventually and be the superclass of Fuzzer and Tracer subclasses.
-///////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////
 SL2Client::SL2Client() {
 
 }
@@ -85,8 +86,23 @@ incrementCallCountForFunction(Function function) {
 void SL2Client::
 loadJson(string target) {
 
-    std::ifstream jsonStream(target); // TODO ifstream can sometimes cause performance issues
-    jsonStream >> parsedJson;
+    std::ifstream msgStream(target, std::ios::binary); // TODO ifstream can sometimes cause performance issues
+    std::streampos fileSize;
+
+    // Read size of file
+    msgStream.seekg(0, std::ios::end);
+    fileSize = msgStream.tellg();
+    msgStream.seekg(0, std::ios::beg);
+
+    char * fileBuf = (char *) dr_global_alloc(fileSize);
+    msgStream.read(fileBuf, fileSize);
+    msgStream.close();
+
+    std::vector<std::uint8_t> msg(fileBuf, fileBuf + fileSize);
+
+    parsedJson = json::from_msgpack(msg);
+
+    dr_global_free(fileBuf, fileSize);
     if (!parsedJson.is_array()) {
       throw("Document root is not an array\n");
     }
