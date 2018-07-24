@@ -2,10 +2,10 @@ import sys
 
 from PyQt5.QtWidgets import QFileDialog
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt, QSize, QSortFilterProxyModel
+from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QFontDatabase, QMovie, QStandardItem
 
-from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem, CheckboxTreeModel
+from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem, CheckboxTreeModel, CheckboxTreeSortFilterProxyModel
 from gui.QtHelpers import QIntVariable, QFloatVariable, QTextAdapter
 
 from harness import config
@@ -47,10 +47,10 @@ class MainWindow(QtWidgets.QMainWindow):
         # Set up underlying model for exposing function data
         self.target_data = get_target(config.config)
         self.model = CheckboxTreeModel()
-        self.func_proxy_model = QSortFilterProxyModel()
+        self.func_proxy_model = CheckboxTreeSortFilterProxyModel()
         self.func_proxy_model.setSourceModel(self.model)
         self.func_proxy_model.setFilterKeyColumn(0)
-        self.file_proxy_model = QSortFilterProxyModel()
+        self.file_proxy_model = CheckboxTreeSortFilterProxyModel()
         self.file_proxy_model.setSourceModel(self.func_proxy_model)
         self.file_proxy_model.setFilterKeyColumn(1)
         self.build_func_tree()
