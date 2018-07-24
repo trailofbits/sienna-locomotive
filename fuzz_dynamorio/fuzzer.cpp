@@ -119,6 +119,8 @@ on_bb(void *drcontext, void *tag, instrlist_t *bb, instr_t *inst, bool for_trace
     offset &= FUZZ_ARENA_SIZE - 1;
 
     drreg_reserve_aflags(drcontext, bb, inst);
+    // TODO(ww): Is it really necessary to inject an instruction here?
+    // This is how WinAFL does it, but we don't use shared memory like they do.
     instrlist_meta_preinsert(bb, inst, INSTR_CREATE_inc(drcontext,
         OPND_CREATE_ABSMEM(&(arena.map[offset]), OPSZ_1)));
     drreg_unreserve_aflags(drcontext, bb, inst);
@@ -217,10 +219,9 @@ event_exit(void)
 {
     SL2_DR_DEBUG("Dynamorio exiting (fuzzer)\n");
 
-    wchar_t run_id_s[SL2_UUID_SIZE];
-    sl2_uuid_to_wstring(sl2_conn.run_id, run_id_s);
-
     if (crashed) {
+        wchar_t run_id_s[SL2_UUID_SIZE];
+        sl2_uuid_to_wstring(sl2_conn.run_id, run_id_s);
         SL2_DR_DEBUG("<crash found for run id %S>\n", run_id_s);
         dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#event_exit: Crash found for run id %S!", run_id_s);
 
@@ -265,6 +266,11 @@ event_exit(void)
         CloseHandle(hDumpFile);
     }
 
+    if (coverage_guided) {
+        sl2_conn_register_arena(&sl2_conn, &arena);
+    }
+
+
     sl2_conn_finalize_run(&sl2_conn, crashed, false);
     sl2_conn_close(&sl2_conn);
 
@@ -274,6 +280,7 @@ event_exit(void)
     dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#event_exit: Dynamorio Exiting\n");
     drwrap_exit();
     drmgr_exit();
+    drreg_exit();
 }
 
 // Mutates a function's input buffer, registers the mutation with the server, and writes the
@@ -304,15 +311,14 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
     mutation.bufsize = bufsize;
     mutation.buffer = (uint8_t *) buffer;
 
-    if (false) { // TODO(ww): if (coverage_guided)
-        // mutate_buffer_arena(mutation.buffer, mutation.bufsize, &arena);
+    if (coverage_guided) {
+        // sl2_mutation_advice advice;
+        // sl2_conn_advise_mutation(&sl2_conn, &arena, &advice);
+        // mutate_buffer_arena(mutation.buffer, mutation.bufsize, &advice);
+        mutate_buffer(mutation.buffer, mutation.bufsize);
     }
     else {
         mutate_buffer(mutation.buffer, mutation.bufsize);
-    }
-
-    if (coverage_guided) {
-        sl2_conn_register_arena(&sl2_conn, &arena);
     }
 
     // Tell the server about our mutation.
@@ -856,6 +862,10 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
 
     drmgr_init();
     drwrap_init();
+
+    drreg_options_t reg_opts = {0};
+    reg_opts.struct_size = sizeof(drreg_options_t);
+    drreg_init(&reg_opts);
 
     // Check whether we can use coverage on this fuzzing run
     coverage_guided = client.areTargetsArenaCompatible() && !no_coverage;
