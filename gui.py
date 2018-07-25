@@ -72,13 +72,33 @@ class MainWindow(QtWidgets.QMainWindow):
         self.file_filter_box = QtWidgets.QLineEdit()
         self.filter_layout.addWidget(self.file_filter_box)
 
-        self._layout.addLayout(self.filter_layout)
-
         # Set up fuzzer button and thread
         self.fuzzer_button = QtWidgets.QPushButton("Fuzz selected targets")
-        self._layout.addWidget(self.fuzzer_button)
-
         self.fuzzer_thread = FuzzerThread(config.config, self.target_data.filename)
+
+        # Create checkboxes for continuous mode
+        self.continuous_mode_cbox = QtWidgets.QCheckBox("Continuous")
+        self.pause_mode_cbox = QtWidgets.QCheckBox("Pause on crash")
+        if config.config['continuous']:
+            self.continuous_mode_cbox.setChecked(True)
+        if config.config['exit_early']:
+            self.pause_mode_cbox.setChecked(True)
+
+        # Create layouts for fuzzing controls
+        self.fuzz_controls_outer_layout = QtWidgets.QHBoxLayout()
+        self.fuzz_controls_inner_left = QtWidgets.QVBoxLayout()
+        self.fuzz_controls_inner_right = QtWidgets.QVBoxLayout()
+
+        # Add widgets to left and right layouts
+        self.fuzz_controls_inner_left.addLayout(self.filter_layout)
+        self.fuzz_controls_inner_left.addWidget(self.fuzzer_button)
+        self.fuzz_controls_inner_right.addWidget(self.continuous_mode_cbox)
+        self.fuzz_controls_inner_right.addWidget(self.pause_mode_cbox)
+
+        # Compose layouts
+        self.fuzz_controls_outer_layout.addLayout(self.fuzz_controls_inner_left)
+        self.fuzz_controls_outer_layout.addLayout(self.fuzz_controls_inner_right)
+        self._layout.addLayout(self.fuzz_controls_outer_layout)
 
         # Set up text window displaying triage output
         self.triage_output = QtWidgets.QTextBrowser()
@@ -142,6 +162,9 @@ class MainWindow(QtWidgets.QMainWindow):
         # Show the busy symbol while we're fuzzing and hide it while we're not
         self.fuzzer_thread.started.connect(self.busy_label.show)
         self.fuzzer_thread.finished.connect(self.busy_label.hide)
+
+        self.continuous_mode_cbox.stateChanged.connect(self.fuzzer_thread.continuous_state_changed)
+        self.pause_mode_cbox.stateChanged.connect(self.fuzzer_thread.pause_state_changed)
 
         # Start the wizard when we click the button and update the tree when we're done
         self.wizard_button.clicked.connect(self.wizard_thread.start)
@@ -236,8 +259,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.crashes.append(crash)
 
     def save_crashes(self):
-        saveFile = QFileDialog.getSaveFileName(self, filter="*.csv")
-        export_crash_data_to_csv(self.crashes, saveFile[0])
+        savefile = QFileDialog.getSaveFileName(self, filter="*.csv")
+        if savefile[1]:
+            export_crash_data_to_csv(self.crashes, savefile[0])
 
     def get_config(self):
         """ Selects the configuration dict from config.py """
