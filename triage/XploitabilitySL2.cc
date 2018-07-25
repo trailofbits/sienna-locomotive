@@ -72,13 +72,11 @@ static const size_t kDisassembleBytesBeyondPC = 2048;
 
 XploitabilitySL2::XploitabilitySL2(Minidump *dump,
                                      ProcessState *process_state)
-    : Xploitability(dump, process_state) { 
-      rating_ = CheckPlatformExploitability();
+    : Xploitability(dump, process_state, "breakzpad") {       
     }
 
 
-
-ExploitabilityRating XploitabilitySL2::CheckPlatformExploitability() {
+ExploitabilityRating XploitabilitySL2::processExploitabilityRating() {
     uint64_t exploitabilityWeight = 0;
 
   // Check if we are executing on the stack.
@@ -244,22 +242,39 @@ ExploitabilityRating XploitabilitySL2::CheckPlatformExploitability() {
 
   return EXPLOITABILITY_NONE;
 }
-
-XploitabilityRank XploitabilitySL2::rank() {
-    switch(rating_) {
+////////////////////////////////////////////////////////////////////////////
+// <<()
+//      Converts a google breakpad rating to an sl2 result with a ranking
+XploitabilityResult& operator<<( XploitabilityResult& result, ExploitabilityRating& rating ) {
+    switch(rating) {
         case EXPLOITABILITY_HIGH:
-            return XploitabilityRank::XPLOITABILITY_HIGH;
+            result.rank = XploitabilityRank::XPLOITABILITY_HIGH;
+            break;
         case EXPLOITABILITY_MEDIUM:
-            return XploitabilityRank::XPLOITABILITY_MEDIUM;
+            result.rank = XploitabilityRank::XPLOITABILITY_MEDIUM;
+            break;
         case EXPLOITABILITY_LOW:
-            return XploitabilityRank::XPLOITABILITY_LOW;
+            result.rank = XploitabilityRank::XPLOITABILITY_LOW;
+            break;
         case EXPLOITABILITY_INTERESTING:
-            return XploitabilityRank::XPLOITABILITY_UNKNOWN;
+            result.rank = XploitabilityRank::XPLOITABILITY_UNKNOWN;
+            break;
         default:
-            return XploitabilityRank::XPLOITABILITY_NONE;
+            result.rank = XploitabilityRank::XPLOITABILITY_NONE;
+
     }
+    return result;
+}
+    
+XploitabilityResult XploitabilitySL2::process() {
+    XploitabilityResult result;
+    ExploitabilityRating rating = processExploitabilityRating();
+
+    result << rating;
 
 
+
+    return result;
 }
 
 }  // namespace google_breakpad

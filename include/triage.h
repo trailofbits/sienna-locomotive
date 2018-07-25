@@ -25,23 +25,23 @@ public:
     ~Triage( );
 
 
-    StatusCode          process();
-    const string        triagePath();
-    const string        crashReason();
-    const string        exploitability();
-    XploitabilityRank   exploitabilityRank();
-    friend ostream&     operator<< (ostream& os, Triage& self);
-    int                 signalType();
-    static double       normalize(double x);
+    StatusCode                  process();
+    const string                triagePath();
+    const string                crashReason();
+    const string                exploitability();
+    XploitabilityRank           exploitabilityRank();
+    friend ostream&             operator<< (ostream& os, Triage& self);
+    int                         signalType();
+    static double               normalize(double x);
+    vector<XploitabilityRank>   ranks();
 
 private:
-    const string            path_;
-    ProcessState            state_;
-    MinidumpProcessor       proc_;
-    SimpleSymbolSupplier    symbolSupplier_;
-    BasicSourceLineResolver resolver_;
-    Minidump                dump_;
-    //vector<double>          scores_;
+    const string                path_;
+    ProcessState                state_;
+    MinidumpProcessor           proc_;
+    SimpleSymbolSupplier        symbolSupplier_;
+    BasicSourceLineResolver     resolver_;
+    Minidump                    dump_;
     vector<XploitabilityRank>   ranks_;
 
 

@@ -8,13 +8,14 @@ class XploitabilitySL2 : public Xploitability {
 public:
     
     XploitabilitySL2( Minidump* dmp, ProcessState* state );
+    virtual XploitabilityResult              process();
+    
+    
+    friend XploitabilityResult& operator<<( XploitabilityResult& result, ExploitabilityRating& rating );
 
-    //virtual double                  exploitabilityScore();    
-    virtual XploitabilityRank               rank();
-
-    virtual ExploitabilityRating    CheckPlatformExploitability();
 
 private:
+    ExploitabilityRating            processExploitabilityRating();
     ExploitabilityRating            rating_;
 
 };

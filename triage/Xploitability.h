@@ -8,6 +8,7 @@
 #include "google_breakpad/common/breakpad_types.h"
 #include "google_breakpad/processor/exploitability.h"
 #include "google_breakpad/processor/process_state.h"
+#include "processor/disassembler_x86.h"
 
 
 using namespace google_breakpad;
@@ -33,6 +34,8 @@ enum class XploitabilityRank {
 class XploitabilityResult {
 public:
     XploitabilityRank       rank;
+
+    friend ostream& operator<<( ostream& os, XploitabilityResult& result );
 };
 
 
@@ -40,19 +43,21 @@ class Xploitability : public Exploitability {
 
 public:
 
-    Xploitability( Minidump* dmp, ProcessState* state );
+    Xploitability( Minidump* dmp, ProcessState* state, string name );
+    ~Xploitability( );
     
-    //virtual double                  exploitabilityScore() = 0;
-    virtual XploitabilityRank               rank() = 0;
+    virtual XploitabilityResult             process() = 0;
 
     bool isExceptionAddressInUser();
     bool isExceptionAddressNearNull();
 
+    string name() { return name_; }
 
 
 protected:
-    virtual ExploitabilityRating    CheckPlatformExploitability() = 0;
+    
 
+    virtual ExploitabilityRating            CheckPlatformExploitability() final;
     XploitabilityRank               rank_;
     const MDRawExceptionStream*     rawException_;
     const MinidumpContext*          context_;
@@ -61,6 +66,9 @@ protected:
     uint32_t                        exceptionCode_      = 0;
     bool                            memoryAvailable_    = true;
     MinidumpMemoryList*             memoryList_;
+    string                          name_;
+    DisassemblerX86*                disassembler_       = nullptr;
+
 };
 
 

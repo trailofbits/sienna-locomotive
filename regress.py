@@ -76,15 +76,13 @@ class TestWizard(unittest.TestCase):
         minidumpsdir = "breakpad/src/processor/testdata"
         pattern = "%s/*.dmp" % minidumpsdir
         i = 0
-        for file in glob.glob(  pattern ):            
-            cmd = r'build\triage\Debug\triager.exe ' + file
-            print("cmd", cmd)
-            out = runAndCaptureOutput(cmd)
-            print(out)
-            #self.assertTrue( 'Calculated exploitability weigh' in out )
-            #self.assertTrue( 'INFO: Processed ' in out )
-            # if i > 10:
-            #     return
+        paths = [ _ for _ in glob.glob(  pattern ) ]
+        paths = " ".join(paths)
+        cmd = r'build\triage\Debug\triager.exe ' + paths
+        print("cmd", cmd)
+        
+        out = runAndCaptureOutput(cmd)
+        print(out)
 
 def main():
     support.run_unittest(TestWizard)

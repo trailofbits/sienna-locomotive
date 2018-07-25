@@ -78,19 +78,22 @@ StatusCode Triage::process() {
 
     // Calculate score from breakpad
     
-    cout << "!x: -----------------------------------------------" << endl;
-    cout << "!x: " << path_ << endl;
+    cout << "-----------------------------------------------" << endl;
+    cout << path_ << endl;
 
-    Xploitability* xploitability = new XploitabilitySL2( &dump_, &state_);    
-    auto rank = xploitability->rank();
-    //cout << "SL2: " << rank << endl;
-    ranks_.push_back( rank );
-    delete xploitability;
 
-    cout << "!exploitable" << endl;
-    xploitability = new XploitabilityBangExploitable( &dump_, &state_);    
-    ranks_.push_back( xploitability->rank()  );
-    delete xploitability;
+
+    vector<Xploitability*> modules = { 
+        new XploitabilitySL2( &dump_, &state_),
+        new XploitabilityBangExploitable( &dump_, &state_)
+    };
+
+    for( auto& mod : modules ) {
+        auto result = mod->process();
+        ranks_.push_back( result.rank );
+        cout << mod->name() << "\t" << result << endl;
+        delete mod;
+    }
     
     return StatusCode::GOOD;
 }
@@ -169,6 +172,13 @@ const string Triage::exploitability() {
     // XXX TODO FIX
     return "test";
 }
+
+
+vector<XploitabilityRank>   Triage::ranks() {
+    return ranks_;
+}
+
+
 
 ////////////////////////////////////////////////////////////////////////////
 // <<()
