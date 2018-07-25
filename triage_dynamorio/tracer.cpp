@@ -1397,7 +1397,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
             sl2_conn_request_replay(&sl2_conn, mutate_count, nNumberOfBytesToRead, lpBuffer);
         }
         else {
-            SL2_DR_DEBUG("user requested replay WITHOUT mutation!\n");
+            sl2_conn_request_replay(&sl2_conn, mutate_count, nNumberOfBytesToRead, lpBuffer);
         }
 
         mutate_count++;
