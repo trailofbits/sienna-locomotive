@@ -12,11 +12,21 @@ from csv import DictWriter
 
 from . import config
 
+
 def esc_quote(raw):
     if " " not in raw or '\"' in raw:
         return raw
     else:
         return "\"{}\"".format(raw)
+
+
+def create_invokation_statement(config_dict):
+    program_arr = [config_dict['drrun_path'], '-pidfile', 'pidfile'] + config_dict['drrun_args'] + \
+          ['-c', config_dict['client_path']] + config_dict['client_args'] + \
+          ['--', config_dict['target_application_path'].strip('\"')] + config_dict['target_args']
+
+    return program_arr, stringify_program_array(program_arr[0], program_arr[1:])
+
 
 # TODO(ww): Use shlex or something similar here.
 def stringify_program_array(target_application_path, target_args_array):
@@ -137,7 +147,9 @@ def parse_triage_output(run_id):
             formatted += ("\n\t0x{location:02x}: {instruction}".format(**results))
             return formatted, results
     except FileNotFoundError:
-        return "Triage run %s exited improperly, but no crash file could be found)" % run_id, None
+        message = "The triage tool exited improperly during run {}, but no crash file could be found. \
+                   It may have timed out. To retry it manually, run `python harness.py -v -e TRIAGE [-p <PROFILE>]`"
+        return message.format(run_id), None
 
 
 def export_crash_data_to_csv(crashes, csv_filename):

@@ -1,11 +1,11 @@
 import sys
 
-from PyQt5.QtWidgets import QFileDialog
+from PyQt5.QtWidgets import QFileDialog, QMenu, QAction
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt, QSize, QSortFilterProxyModel
+from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QFontDatabase, QMovie, QStandardItem
 
-from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem, CheckboxTreeModel
+from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem, CheckboxTreeModel, CheckboxTreeSortFilterProxyModel
 from gui.QtHelpers import QIntVariable, QFloatVariable, QTextAdapter
 
 from harness import config
@@ -47,10 +47,10 @@ class MainWindow(QtWidgets.QMainWindow):
         # Set up underlying model for exposing function data
         self.target_data = get_target(config.config)
         self.model = CheckboxTreeModel()
-        self.func_proxy_model = QSortFilterProxyModel()
+        self.func_proxy_model = CheckboxTreeSortFilterProxyModel()
         self.func_proxy_model.setSourceModel(self.model)
         self.func_proxy_model.setFilterKeyColumn(0)
-        self.file_proxy_model = QSortFilterProxyModel()
+        self.file_proxy_model = CheckboxTreeSortFilterProxyModel()
         self.file_proxy_model.setSourceModel(self.func_proxy_model)
         self.file_proxy_model.setFilterKeyColumn(1)
         self.build_func_tree()
@@ -63,6 +63,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self._func_tree.resizeColumnToContents(2)
         self._func_tree.resizeColumnToContents(3)
 
+        # Create menu items for the context menu
+        self.expand_action = QAction("Expand All")
+        self.collapse_action = QAction("Collapse All")
+
         # Build layout for function filter text boxes
         self.filter_layout = QtWidgets.QHBoxLayout()
         self.filter_layout.addWidget(QtWidgets.QLabel("Filter Function: "))
@@ -72,13 +76,33 @@ class MainWindow(QtWidgets.QMainWindow):
         self.file_filter_box = QtWidgets.QLineEdit()
         self.filter_layout.addWidget(self.file_filter_box)
 
-        self._layout.addLayout(self.filter_layout)
-
         # Set up fuzzer button and thread
         self.fuzzer_button = QtWidgets.QPushButton("Fuzz selected targets")
-        self._layout.addWidget(self.fuzzer_button)
-
         self.fuzzer_thread = FuzzerThread(config.config, self.target_data.filename)
+
+        # Create checkboxes for continuous mode
+        self.continuous_mode_cbox = QtWidgets.QCheckBox("Continuous")
+        self.pause_mode_cbox = QtWidgets.QCheckBox("Pause on crash")
+        if config.config['continuous']:
+            self.continuous_mode_cbox.setChecked(True)
+        if config.config['exit_early']:
+            self.pause_mode_cbox.setChecked(True)
+
+        # Create layouts for fuzzing controls
+        self.fuzz_controls_outer_layout = QtWidgets.QHBoxLayout()
+        self.fuzz_controls_inner_left = QtWidgets.QVBoxLayout()
+        self.fuzz_controls_inner_right = QtWidgets.QVBoxLayout()
+
+        # Add widgets to left and right layouts
+        self.fuzz_controls_inner_left.addLayout(self.filter_layout)
+        self.fuzz_controls_inner_left.addWidget(self.fuzzer_button)
+        self.fuzz_controls_inner_right.addWidget(self.continuous_mode_cbox)
+        self.fuzz_controls_inner_right.addWidget(self.pause_mode_cbox)
+
+        # Compose layouts
+        self.fuzz_controls_outer_layout.addLayout(self.fuzz_controls_inner_left)
+        self.fuzz_controls_outer_layout.addLayout(self.fuzz_controls_inner_right)
+        self._layout.addLayout(self.fuzz_controls_outer_layout)
 
         # Set up text window displaying triage output
         self.triage_output = QtWidgets.QTextBrowser()
@@ -143,11 +167,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.fuzzer_thread.started.connect(self.busy_label.show)
         self.fuzzer_thread.finished.connect(self.busy_label.hide)
 
+        self.continuous_mode_cbox.stateChanged.connect(self.fuzzer_thread.continuous_state_changed)
+        self.pause_mode_cbox.stateChanged.connect(self.fuzzer_thread.pause_state_changed)
+
         # Start the wizard when we click the button and update the tree when we're done
         self.wizard_button.clicked.connect(self.wizard_thread.start)
         self.wizard_thread.started.connect(partial(self.setCursor, Qt.WaitCursor))
         self.wizard_thread.finished.connect(self.unsetCursor)
         self.wizard_thread.resultReady.connect(self.wizard_finished)
+
+        # Connect the context menu buttons
+        self.expand_action.triggered.connect(self._func_tree.expandAll)
+        self.collapse_action.triggered.connect(self._func_tree.collapseAll)
 
         # Filter the list of functions displayed when we type things into the boxes
         self.func_filter_box.textChanged.connect(self.func_proxy_model.setFilterFixedString)
@@ -226,6 +257,12 @@ class MainWindow(QtWidgets.QMainWindow):
         """ Handle when an item in the function tree is checked """
         self.target_data.update(widget.index, selected=is_checked)
 
+    def contextMenuEvent(self, QContextMenuEvent):
+        menu = QMenu(self)
+        menu.addAction(self.expand_action)
+        menu.addAction(self.collapse_action)
+        menu.exec(QContextMenuEvent.globalPos())
+
     def wizard_finished(self, wizard_output):
         """ Dump the results of a wizard run to the target file and rebuild the tree """
         self.target_data.set_target_list(wizard_output)
@@ -236,8 +273,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.crashes.append(crash)
 
     def save_crashes(self):
-        saveFile = QFileDialog.getSaveFileName(self, filter="*.csv")
-        export_crash_data_to_csv(self.crashes, saveFile[0])
+        savefile = QFileDialog.getSaveFileName(self, filter="*.csv")
+        if savefile[1]:
+            export_crash_data_to_csv(self.crashes, savefile[0])
 
     def get_config(self):
         """ Selects the configuration dict from config.py """
