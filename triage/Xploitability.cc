@@ -6,7 +6,7 @@ using namespace std;
 namespace sl2 {
 
 
-string operator~( XploitabilityRank& self ) {
+const string& operator~( const XploitabilityRank& self ) {
     switch(self) {
         case XploitabilityRank::XPLOITABILITY_HIGH:
             return "High";
@@ -24,21 +24,16 @@ string operator~( XploitabilityRank& self ) {
 }
 
 
-ostream& operator<<( ostream& os, XploitabilityRank& self ) {
+ostream& operator<<( ostream& os, const XploitabilityRank& self ) {
     return os << ~self;
 }
 
-ostream& operator<<( ostream& os, XploitabilityResult& result ) {
+ostream& operator<<( ostream& os, const XploitabilityResult& result ) {
     return os << result.rank;
 }
 
 
-Xploitability::~Xploitability( ) {
-    if( disassembler_!=nullptr )
-        delete disassembler_;
-}
-
-Xploitability::Xploitability( Minidump* dmp, ProcessState* state, string moduleName )
+Xploitability::Xploitability( Minidump* dmp, ProcessState* state, const string& moduleName )
         : Exploitability(dmp, state), name_(moduleName) {
 
 
@@ -76,7 +71,7 @@ Xploitability::Xploitability( Minidump* dmp, ProcessState* state, string moduleN
 
     if(!memoryAvailable_)
         return;
-        
+
     size_t bufsz = 15;
     MinidumpMemoryRegion* instrRegion =
         memoryList_->GetMemoryRegionForAddress(instructionPtr_);
@@ -85,7 +80,8 @@ Xploitability::Xploitability( Minidump* dmp, ProcessState* state, string moduleN
     const uint8_t *rawMem = instrRegion->GetMemory() + bufsz;
     if(!rawMem)
         return;
-    disassembler_ = new DisassemblerX86(rawMem, bufsz,  instructionPtr_);
+    disassembler_ = make_unique<DisassemblerX86>(rawMem, bufsz,  instructionPtr_);
+
     
 }
 
@@ -100,13 +96,13 @@ ExploitabilityRating Xploitability::CheckPlatformExploitability() {
 
 
 
-bool Xploitability::isExceptionAddressInUser() {
+bool Xploitability::isExceptionAddressInUser() const {
     // Assuming 64bit
     return process_state_->crash_address() <= 0x7fffffffffffffff;    
 }
 
 
-bool Xploitability::isExceptionAddressNearNull() {
+bool Xploitability::isExceptionAddressNearNull() const {
     return process_state_->crash_address() <= 64*0x400;
 }
 

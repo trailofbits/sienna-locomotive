@@ -245,7 +245,7 @@ ExploitabilityRating XploitabilitySL2::processExploitabilityRating() {
 ////////////////////////////////////////////////////////////////////////////
 // <<()
 //      Converts a google breakpad rating to an sl2 result with a ranking
-XploitabilityResult& operator<<( XploitabilityResult& result, ExploitabilityRating& rating ) {
+XploitabilityResult& operator<<( XploitabilityResult& result, const ExploitabilityRating& rating ) {
     switch(rating) {
         case EXPLOITABILITY_HIGH:
             result.rank = XploitabilityRank::XPLOITABILITY_HIGH;

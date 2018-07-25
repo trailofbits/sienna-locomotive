@@ -1,8 +1,9 @@
 #include <string>
 #include "triage.h"
 
-int main(int argc, char* argv[] ) {
 
+
+int main(int argc, char* argv[] ) {
 
     uint32_t parity = 0;
     int i=1;

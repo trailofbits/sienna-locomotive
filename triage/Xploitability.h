@@ -35,7 +35,7 @@ class XploitabilityResult {
 public:
     XploitabilityRank       rank;
 
-    friend ostream& operator<<( ostream& os, XploitabilityResult& result );
+    friend ostream& operator<<( ostream& os, const XploitabilityResult& result );
 };
 
 
@@ -43,31 +43,30 @@ class Xploitability : public Exploitability {
 
 public:
 
-    Xploitability( Minidump* dmp, ProcessState* state, string name );
-    ~Xploitability( );
+    Xploitability( Minidump* dmp, ProcessState* state, const string& name );
     
     virtual XploitabilityResult             process() = 0;
 
-    bool isExceptionAddressInUser();
-    bool isExceptionAddressNearNull();
+    bool isExceptionAddressInUser() const;
+    bool isExceptionAddressNearNull() const;
 
-    string name() { return name_; }
+    const string& name() const { return name_; } 
 
 
 protected:
-    
 
-    virtual ExploitabilityRating            CheckPlatformExploitability() final;
+    virtual ExploitabilityRating    CheckPlatformExploitability() final;
+
+    MinidumpMemoryList*             memoryList_;
     XploitabilityRank               rank_;
+    bool                            memoryAvailable_    = true;
     const MDRawExceptionStream*     rawException_;
     const MinidumpContext*          context_;
-    uint64_t                        stackPtr_           = 0;
-    uint64_t                        instructionPtr_     = 0;
+    const string&                   name_;
     uint32_t                        exceptionCode_      = 0;
-    bool                            memoryAvailable_    = true;
-    MinidumpMemoryList*             memoryList_;
-    string                          name_;
-    DisassemblerX86*                disassembler_       = nullptr;
+    uint64_t                        instructionPtr_     = 0;
+    uint64_t                        stackPtr_           = 0;
+    unique_ptr<DisassemblerX86>     disassembler_       = nullptr;
 
 };
 

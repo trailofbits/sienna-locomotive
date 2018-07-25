@@ -11,7 +11,7 @@ public:
     virtual XploitabilityResult              process();
     
     
-    friend XploitabilityResult& operator<<( XploitabilityResult& result, ExploitabilityRating& rating );
+    friend XploitabilityResult& operator<<( XploitabilityResult& result, const ExploitabilityRating& rating );
 
 
 private:
