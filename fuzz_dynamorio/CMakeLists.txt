@@ -15,5 +15,6 @@ target_link_libraries(fuzzer slcommon)
 configure_DynamoRIO_client(fuzzer)
 
 use_DynamoRIO_extension(fuzzer drmgr)
+use_DynamoRIO_extension(fuzzer drreg)
 use_DynamoRIO_extension(fuzzer drwrap)
 use_DynamoRIO_extension(fuzzer droption)

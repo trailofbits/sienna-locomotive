@@ -24,6 +24,7 @@ static HANDLE hProcessMutex = INVALID_HANDLE_VALUE;
 static HANDLE hLog = INVALID_HANDLE_VALUE;
 
 static wchar_t FUZZ_WORKING_PATH[MAX_PATH] = L"";
+static wchar_t FUZZ_ARENAS_PATH[MAX_PATH] = L"";
 static wchar_t FUZZ_LOG[MAX_PATH] = L"";
 
 /*
@@ -46,9 +47,9 @@ static void server_cleanup()
 }
 
 // Initialize the global variable (FUZZ_LOG) containing the path to the logging file.
-// NOTE(ww): We separate this from initWorkingDir so that we can log any errors that
-// happen to occur in initWorkingDir.
-void initLoggingFile() {
+// NOTE(ww): We separate this from initWorkingDirs so that we can log any errors that
+// happen to occur in initWorkingDirs.
+static void initLoggingFile() {
     wchar_t *roamingPath;
     SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roamingPath);
 
@@ -63,23 +64,148 @@ void initLoggingFile() {
 // Initialize the global variables containins the paths to the working directory,
 // as well as the subdirectories and files we expect individual runs to produce.
 // NOTE(ww): This should be kept up-to-date with fuzzer_config.py.
-void initWorkingDir() {
+static void initWorkingDirs() {
     wchar_t *roamingPath;
     SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roamingPath);
-    wchar_t workingLocalPath[MAX_PATH] = L"Trail of Bits\\fuzzkit\\working";
+    wchar_t runsLocalPath[MAX_PATH] = L"Trail of Bits\\fuzzkit\\runs";
 
-    if (PathCchCombine(FUZZ_WORKING_PATH, MAX_PATH, roamingPath, workingLocalPath) != S_OK) {
-        LOG_F(ERROR, "initWorkingDir: failed to combine working dir path (0x%x)", GetLastError());
+    if (PathCchCombine(FUZZ_WORKING_PATH, MAX_PATH, roamingPath, runsLocalPath) != S_OK) {
+        LOG_F(ERROR, "initWorkingDirs: failed to combine working dir path (0x%x)", GetLastError());
         exit(1);
+    }
+
+    wchar_t arenasLocalPath[MAX_PATH] = L"Trail of Bits\\fuzzkit\\arenas";
+
+    if (PathCchCombine(FUZZ_ARENAS_PATH, MAX_PATH, roamingPath, arenasLocalPath) != S_OK) {
+        LOG_F(ERROR, "initWorkingDirs: failed to combine arenas dir path (0x%x)", GetLastError());
     }
 
     CoTaskMemFree(roamingPath);
 }
 
+/* Writes the fkt file in the event we found a crash. Stores information about the mutation that caused it */
+static void writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, wchar_t *filePath, size_t position, size_t size, uint8_t* buf)
+{
+    DWORD dwBytesWritten = 0;
+
+    if (!WriteFile(hFile, "FKT\0", 4, &dwBytesWritten, NULL)) {
+        LOG_F(ERROR, "writeFKT: failed to write FKT header (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    // only one type for right now, files
+    if (!WriteFile(hFile, &type, sizeof(type), &dwBytesWritten, NULL)) {
+        LOG_F(ERROR, "writeFKT: failed to write type (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    if (!WriteFile(hFile, &pathSize, sizeof(pathSize), &dwBytesWritten, NULL)) {
+        LOG_F(ERROR, "writeFKT: failed to write path size (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    if (!WriteFile(hFile, filePath, pathSize * sizeof(wchar_t), &dwBytesWritten, NULL)) {
+        LOG_F(ERROR, "writeFKT: failed to write path (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    if (!WriteFile(hFile, &position, sizeof(position), &dwBytesWritten, NULL)) {
+        LOG_F(ERROR, "writeFKT: failed to write offset (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    if (!WriteFile(hFile, &size, sizeof(size_t), &dwBytesWritten, NULL)) {
+        LOG_F(ERROR, "writeFKT: failed to write buffer size (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    if (!WriteFile(hFile, buf, (DWORD)size, &dwBytesWritten, NULL)) {
+        LOG_F(ERROR, "writeFKT: failed to write buffer (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    if (!CloseHandle(hFile)) {
+        LOG_F(ERROR, "writeFKT: failed to close FKT (0x%x)", GetLastError());
+        exit(1);
+    }
+}
+
+/* Gets the mutated bytes stored in the FKT file for mutation replay */
+static void getBytesFKT(HANDLE hFile, uint8_t *buf, size_t size)
+{
+    DWORD dwBytesRead = 0;
+    size_t buf_size = 0;
+
+    SetFilePointer(hFile, 0x14, NULL, FILE_BEGIN);
+    if (!ReadFile(hFile, &buf_size, 4, &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "getBytesFKT: failed to read replay buffer size from FKT (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    if (buf_size < size) {
+        size = buf_size;
+    }
+
+    SetFilePointer(hFile, -(LONG)size, NULL, FILE_END);
+
+    if (!ReadFile(hFile, buf, size, &dwBytesRead, NULL)) {
+        LOG_F(ERROR, "getBytesFKT: failed to read replay buffer from FKT (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    LOG_F(INFO, "getBytesFKT: read in %02x %02x %02x %02x %02x %02x %02x %02x\n", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
+}
+
+static void dump_arena(wchar_t *arena_path, sl2_arena *arena)
+{
+    DWORD txsize;
+    HANDLE file = CreateFile(arena_path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+    if (file == INVALID_HANDLE_VALUE) {
+        LOG_F(ERROR, "dump_arena: failed to open %S", arena_path);
+        exit(1);
+    }
+
+    if (!WriteFile(file, arena->map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
+        LOG_F(ERROR, "dump_arena: failed to write arena to disk!");
+        exit(1);
+    }
+
+    if (txsize != FUZZ_ARENA_SIZE) {
+        LOG_F(ERROR, "dump_arena: %lu != %lu, truncated write?", txsize, FUZZ_ARENA_SIZE);
+        exit(1);
+    }
+
+    CloseHandle(file);
+}
+
+static void load_arena(wchar_t *arena_path, sl2_arena *arena)
+{
+    DWORD txsize;
+    HANDLE file = CreateFile(arena_path, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+    if (file == INVALID_HANDLE_VALUE) {
+        LOG_F(ERROR, "load_arena: failed to open %S", arena_path);
+        exit(1);
+    }
+
+    if (!ReadFile(file, arena->map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
+        LOG_F(ERROR, "load_arena: failed to read arena from disk!");
+        exit(1);
+    }
+
+    if (txsize != FUZZ_ARENA_SIZE) {
+        LOG_F(ERROR, "load_arena: %lu != %lu, truncated read?", txsize, FUZZ_ARENA_SIZE);
+        exit(1);
+    }
+
+    CloseHandle(file);
+}
+
 /* Generates a new run UUID, writes relevant run metadata files into the corresponding run metadata dir
     This, like many things in the server, is pretty overzealous about exiting after any errors, often without an
     explanation of what happened. TODO - fix this */
-DWORD handleGenerateRunId(HANDLE hPipe) {
+void handleGenerateRunId(HANDLE hPipe) {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
     UUID runId;
@@ -126,7 +252,7 @@ DWORD handleGenerateRunId(HANDLE hPipe) {
 
     wchar_t targetFile[MAX_PATH + 1] = { 0 };
     PathCchCombine(targetFile, MAX_PATH, targetDir, FUZZ_RUN_PROGRAM_TXT);
-    HANDLE hFile = CreateFileW(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
+    HANDLE hFile = CreateFile(targetFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
     if (hFile == INVALID_HANDLE_VALUE) {
         LOG_F(ERROR, "handleGenerateRunId: failed to open program.txt: %S (0x%x)", targetFile, GetLastError());
@@ -184,60 +310,9 @@ DWORD handleGenerateRunId(HANDLE hPipe) {
     RpcStringFree((RPC_WSTR *)&runId_s);
 
     LOG_F(INFO, "handleGenerateRunId: finished");
-
-    return 0;
 }
 
-/* Writes the fkt file in the event we found a crash. Stores information about the mutation that caused it */
-DWORD writeFKT(HANDLE hFile, DWORD type, DWORD pathSize, wchar_t *filePath, size_t position, size_t size, uint8_t* buf)
-{
-    DWORD dwBytesWritten = 0;
-
-    if (!WriteFile(hFile, "FKT\0", 4, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "writeFKT: failed to write FKT header (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    // only one type for right now, files
-    if (!WriteFile(hFile, &type, sizeof(type), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "writeFKT: failed to write type (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    if (!WriteFile(hFile, &pathSize, sizeof(pathSize), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "writeFKT: failed to write path size (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    if (!WriteFile(hFile, filePath, pathSize * sizeof(wchar_t), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "writeFKT: failed to write path (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    if (!WriteFile(hFile, &position, sizeof(position), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "writeFKT: failed to write offset (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    if (!WriteFile(hFile, &size, sizeof(size_t), &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "writeFKT: failed to write buffer size (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    if (!WriteFile(hFile, buf, (DWORD)size, &dwBytesWritten, NULL)) {
-        LOG_F(ERROR, "writeFKT: failed to write buffer (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    if (!CloseHandle(hFile)) {
-        LOG_F(ERROR, "writeFKT: failed to close FKT (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    return 0;
-}
-
-DWORD handleRegisterMutation(HANDLE pipe)
+void handleRegisterMutation(HANDLE pipe)
 {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
@@ -253,13 +328,13 @@ DWORD handleRegisterMutation(HANDLE pipe)
 
     UuidToString(&run_id, (RPC_WSTR *)&run_id_s);
 
-    DWORD type = 0;
+    uint32_t type = 0;
     if (!ReadFile(pipe, &type, sizeof(type), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleRegisterMutation: failed to read function type (0x%x)", GetLastError());
         exit(1);
     }
 
-    DWORD mutate_count = 0;
+    uint32_t mutate_count = 0;
     wchar_t mutate_fname[MAX_PATH + 1] = {0};
     if (!ReadFile(pipe, &mutate_count, sizeof(mutate_count), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleRegisterMutation: failed to read mutation count (0x%x)", GetLastError());
@@ -346,47 +421,17 @@ DWORD handleRegisterMutation(HANDLE pipe)
     writeFKT(file, type, resource_size, resource_path, position, size, buf);
 
     RpcStringFree((RPC_WSTR *)&run_id_s);
-
-    return 0;
-}
-
-/* Gets the mutated bytes stored in the FKT file for mutation replay */
-DWORD getBytesFKT(HANDLE hFile, uint8_t *buf, size_t size)
-{
-    DWORD dwBytesRead = 0;
-    size_t buf_size = 0;
-
-    SetFilePointer(hFile, 0x14, NULL, FILE_BEGIN);
-    if (!ReadFile(hFile, &buf_size, 4, &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "getBytesFKT: failed to read replay buffer size from FKT (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    if (buf_size < size) {
-        size = buf_size;
-    }
-
-    SetFilePointer(hFile, -(LONG)size, NULL, FILE_END);
-
-    if (!ReadFile(hFile, buf, size, &dwBytesRead, NULL)) {
-        LOG_F(ERROR, "getBytesFKT: failed to read replay buffer from FKT (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    LOG_F(INFO, "getBytesFKT: read in %02x %02x %02x %02x %02x %02x %02x %02x\n", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
-
-    return 0;
 }
 
 /* Handles requests over the named pipe from the triage client for replays of mutated bytes */
-DWORD handleReplay(HANDLE hPipe)
+void handleReplay(HANDLE hPipe)
 {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
     UUID runId;
     wchar_t *runId_s;
 
-    if (!ReadFile(hPipe, &runId, sizeof(UUID), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &runId, sizeof(runId), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleReplay: failed to read run ID (0x%x)", GetLastError());
         exit(1);
     }
@@ -395,9 +440,9 @@ DWORD handleReplay(HANDLE hPipe)
 
     LOG_F(INFO, "Replaying for run id %S", runId_s);
 
-    DWORD mutate_count = 0;
+    uint32_t mutate_count = 0;
     wchar_t mutate_fname[MAX_PATH + 1] = {0};
-    if (!ReadFile(hPipe, &mutate_count, sizeof(DWORD), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &mutate_count, sizeof(mutate_count), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleReplay: failed to read mutate count (0x%x)", GetLastError());
         exit(1);
     }
@@ -405,7 +450,7 @@ DWORD handleReplay(HANDLE hPipe)
     StringCchPrintfW(mutate_fname, MAX_PATH, FUZZ_RUN_FKT_FMT, mutate_count);
 
     size_t size = 0;
-    if (!ReadFile(hPipe, &size, sizeof(size_t), &dwBytesRead, NULL)) {
+    if (!ReadFile(hPipe, &size, sizeof(size), &dwBytesRead, NULL)) {
         LOG_F(ERROR, "handleReplay: failed to read size of replay buffer (0x%x)", GetLastError());
         exit(1);
     }
@@ -449,12 +494,10 @@ DWORD handleReplay(HANDLE hPipe)
     }
 
     RpcStringFree((RPC_WSTR *)&runId_s);
-
-    return 0;
 }
 
 /* Deletes the run files to free up a Run ID if the last run didn't find a crash */
-DWORD handleFinalizeRun(HANDLE hPipe)
+void handleFinalizeRun(HANDLE hPipe)
 {
     DWORD dwBytesRead = 0;
     UUID runId;
@@ -510,11 +553,86 @@ DWORD handleFinalizeRun(HANDLE hPipe)
     }
 
     RpcStringFree((RPC_WSTR *)&runId_s);
-
-    return 0;
 }
 
-DWORD handleCrashPaths(HANDLE hPipe)
+void handleGetArena(HANDLE hPipe)
+{
+    DWORD txsize;
+    size_t size = 0;
+    sl2_arena arena = {0};
+
+    if (!ReadFile(hPipe, &size, sizeof(size), &txsize, NULL)) {
+        LOG_F(ERROR, "handleGetArena: failed to read arena ID size (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    if (size != SL2_HASH_LEN * sizeof(wchar_t)) {
+        LOG_F(ERROR, "handleGetArena: wrong arena ID size %lu != %lu", size, SL2_HASH_LEN * sizeof(wchar_t));
+        exit(1);
+    }
+
+    if (!ReadFile(hPipe, arena.id, (DWORD) size, &txsize, NULL)) {
+        LOG_F(ERROR, "handleGetArena: failed to read arena ID (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    LOG_F(INFO, "handleGetArena: got arena ID: %S", arena.id);
+
+    wchar_t arena_path[MAX_PATH + 1] = {0};
+
+    PathCchCombine(arena_path, MAX_PATH, FUZZ_ARENAS_PATH, arena.id);
+
+    DWORD attrs = GetFileAttributes(arena_path);
+
+    if (attrs == INVALID_FILE_ATTRIBUTES) {
+        LOG_F(INFO, "handleGetArena: no arena found, creating one");
+        dump_arena(arena_path, &arena);
+    }
+    else {
+        LOG_F(INFO, "handleGetArena: arena found, loading from disk");
+        load_arena(arena_path, &arena);
+    }
+
+    if (!WriteFile(hPipe, arena.map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
+        LOG_F(ERROR, "handleGetArena: failed to write arena (0x%x)", GetLastError());
+    }
+}
+
+void handleSetArena(HANDLE hPipe)
+{
+    DWORD txsize;
+    size_t size = 0;
+    sl2_arena arena = {0};
+
+    if (!ReadFile(hPipe, &size, sizeof(size), &txsize, NULL)) {
+        LOG_F(ERROR, "handleSetArena: failed to read arena ID size (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    if (size != SL2_HASH_LEN * sizeof(wchar_t)) {
+        LOG_F(ERROR, "handleSetArena: wrong arena ID size %lu != %lu", size, SL2_HASH_LEN * sizeof(wchar_t));
+        exit(1);
+    }
+
+    if (!ReadFile(hPipe, arena.id, (DWORD) size, &txsize, NULL)) {
+        LOG_F(ERROR, "handleSetArena: failed to read arena ID (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    LOG_F(INFO, "handleSetArena: got arena ID: %S", arena.id);
+
+    wchar_t arena_path[MAX_PATH + 1] = {0};
+
+    PathCchCombine(arena_path, MAX_PATH, FUZZ_ARENAS_PATH, arena.id);
+
+    if (!ReadFile(hPipe, arena.map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
+        LOG_F(ERROR, "handleSetArena: failed to read arena (0x%x)", GetLastError());
+    }
+
+    dump_arena(arena_path, &arena);
+}
+
+void handleCrashPaths(HANDLE hPipe)
 {
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
@@ -577,8 +695,6 @@ DWORD handleCrashPaths(HANDLE hPipe)
     }
 
     RpcStringFree((RPC_WSTR *)&runId_s);
-
-    return 0;
 }
 
 /* Handles incoming connections from clients */
@@ -600,7 +716,7 @@ DWORD WINAPI threadHandler(void *lpvPipe)
     // is in scare quotes because each session is essentially anonymous -- the server
     // only sees when they end, not which runs or events they correspond to.
     do {
-        if (!ReadFile(hPipe, &event, sizeof(uint8_t), &dwBytesRead, NULL)) {
+        if (!ReadFile(hPipe, &event, sizeof(event), &dwBytesRead, NULL)) {
             if (GetLastError() != ERROR_BROKEN_PIPE){
                 LOG_F(ERROR, "threadHandler: failed to read event (0x%x)", GetLastError());
                 exit(1);
@@ -631,18 +747,24 @@ DWORD WINAPI threadHandler(void *lpvPipe)
             case EVT_RUN_COMPLETE:
                 handleFinalizeRun(hPipe);
                 break;
+            case EVT_GET_ARENA:
+                handleGetArena(hPipe);
+                break;
+            case EVT_SET_ARENA:
+                handleSetArena(hPipe);
+                break;
             case EVT_SESSION_TEARDOWN:
-                LOG_F(INFO, "Ending a client's session with the server.");
+                LOG_F(INFO, "threadHandler: ending a client's session with the server.");
                 break;
             case EVT_MUTATION:
             case EVT_RUN_INFO:
             case EVT_CRASH_PATH:
             case EVT_MEM_DMP_PATH:
-                LOG_F(WARNING, "threadHandler: deprecated event requested: EVT_MUTATION");
+                LOG_F(WARNING, "threadHandler: deprecated event requested.");
                 event = EVT_INVALID;
                 break;
             default:
-                LOG_F(ERROR, "Unknown or invalid event %d", event);
+                LOG_F(ERROR, "threadHandler: unknown or invalid event %d", event);
                 break;
         }
     } while (event != EVT_SESSION_TEARDOWN && event != EVT_INVALID);
@@ -668,7 +790,7 @@ DWORD WINAPI threadHandler(void *lpvPipe)
 /* concurrency protection */
 void lockProcess()
 {
-    hProcessMutex = CreateMutex(NULL, FALSE, L"fuzz_server_mutex");
+    hProcessMutex = CreateMutex(NULL, false, L"fuzz_server_mutex");
     if (!hProcessMutex || hProcessMutex == INVALID_HANDLE_VALUE) {
         LOG_F(ERROR, "lockProcess: could not get process lock (handle)");
         exit(1);
@@ -693,7 +815,7 @@ int main(int mArgc, char **mArgv)
 
     std::atexit(server_cleanup);
 
-    initWorkingDir();
+    initWorkingDirs();
 
     LOG_F(INFO, "main: server started!");
 
@@ -719,7 +841,7 @@ int main(int mArgc, char **mArgv)
         }
 
         bool connected = ConnectNamedPipe(hPipe, NULL) ?
-            TRUE : (GetLastError() == ERROR_PIPE_CONNECTED);
+            true : (GetLastError() == ERROR_PIPE_CONNECTED);
 
         if (connected) {
             DWORD threadID;

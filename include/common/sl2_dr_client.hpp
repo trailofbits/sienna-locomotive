@@ -127,6 +127,8 @@ public:
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Methods
     bool        isFunctionTargeted(Function function,  client_read_info* info);
+    bool        areTargetsArenaCompatible();
+    void        generateArenaId(wchar_t *id);
     void        loadJson(string json);
     uint64_t    incrementCallCountForFunction(Function function);
 

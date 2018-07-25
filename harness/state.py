@@ -111,7 +111,7 @@ def get_all_targets():
 def get_runs():
     """ Returns a dict mapping run ID's to the contents of the argument file """
     runs = {}
-    for _dir in glob.glob(os.path.join(config.sl2_working_dir, '*')):
+    for _dir in glob.glob(os.path.join(config.sl2_runs_dir, '*')):
         with open(os.path.join(_dir, 'arguments.txt'), 'rb') as program_string_file:
             runs[_dir] = unstringify_program_array(program_string_file.read().decode('utf-16').strip())
     return runs
@@ -119,11 +119,11 @@ def get_runs():
 
 def get_path_to_run_file(run_id, filename):
     """ Helper function for easily getting the full path to a file in the current run's directory """
-    return os.path.join(config.sl2_dir, 'working', str(run_id), filename)
+    return os.path.join(config.sl2_runs_dir, str(run_id), filename)
 
 
 def write_output_files(proc, run_id, stage_name):
-    """ Writes the stdout and stderr buffers for a run into the working directory """
+    """ Writes the stdout and stderr buffers for a run into the runs directory """
     try:
         if proc.stdout is not None:
             with open(get_path_to_run_file(run_id, '{}.stdout'.format(stage_name)), 'wb') as stdoutfile:
@@ -166,7 +166,7 @@ def finalize(run_id, crashed):
     """ Manually closes out a fuzzing run. Only necessary if we killed the target binary before DynamoRIO could
     close out the run """
     f = open(config.sl2_server_pipe_path, 'w+b', buffering=0)
-    f.write(struct.pack('B', 0x4))  # Write the event ID (4)
+    f.write(struct.pack('B', 0x4))  # EVT_RUN_COMPLETE
     f.seek(0)
     f.write(run_id.bytes)  # Write the run ID
     f.seek(0)
@@ -174,4 +174,5 @@ def finalize(run_id, crashed):
     f.write(struct.pack('?', 1 if crashed else 0))
     # Write a bool indicating whether to preserve run files (without a crash)
     f.write(struct.pack('?', 1 if True else 0))
+    f.write(struct.pack('B', 0x6)) # EVT_SESSION_TEARDOWN
     f.close()
