@@ -652,7 +652,7 @@ propagate_taint(app_pc pc)
 /* Called upon basic block insertion with each individual instruction as an argument.
     Inserts a clean call to propagate_taint before every instruction */
 static dr_emit_flags_t
-event_app_instruction(
+on_bb_instrument(
     void *drcontext,
     void *tag,
     instrlist_t *bb,
@@ -674,29 +674,29 @@ event_app_instruction(
 }
 
 static void
-event_thread_init(void *drcontext)
+on_thread_init(void *drcontext)
 {
 
 }
 
 static void
-event_thread_exit(void *drcontext)
+on_thread_exit(void *drcontext)
 {
 
 }
 
 /* Clean up registered callbacks before exiting */
 static void
-event_exit(void)
+on_dr_exit(void)
 {
     if (!op_no_taint.get_value()) {
-        if (!drmgr_unregister_bb_insertion_event(event_app_instruction)) {
+        if (!drmgr_unregister_bb_insertion_event(on_bb_instrument)) {
             DR_ASSERT(false);
         }
     }
 
-    if (!drmgr_unregister_thread_init_event(event_thread_init) ||
-        !drmgr_unregister_thread_exit_event(event_thread_exit) ||
+    if (!drmgr_unregister_thread_init_event(on_thread_init) ||
+        !drmgr_unregister_thread_exit_event(on_thread_exit) ||
         drreg_exit() != DRREG_SUCCESS)
     {
         DR_ASSERT(false);
@@ -984,7 +984,7 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
 
 /* Scoring function. Checks exception code, then checks taint state in order to calculate the severity score */
 static bool
-onexception(void *drcontext, dr_exception_t *excpt)
+on_exception(void *drcontext, dr_exception_t *excpt)
 {
     DWORD exception_code = excpt->record->ExceptionCode;
 
@@ -1405,7 +1405,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 
 /* Register function pre/post callbacks in each module */
 static void
-module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
+on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 {
     if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))) {
       baseAddr = (size_t) mod->start;
@@ -1537,24 +1537,24 @@ void tracer(client_id_t id, int argc, const char *argv[])
     sl2_conn_assign_run_id(&sl2_conn, run_id);
 
     mutatex = dr_mutex_create();
-    dr_register_exit_event(event_exit);
+    dr_register_exit_event(on_dr_exit);
 
     // If taint tracing is enabled, register the propagate_taint callback
     if (!op_no_taint.get_value()) {
         // http://dynamorio.org/docs/group__drmgr.html#ga83a5fc96944e10bd7356e0c492c93966
         if (!drmgr_register_bb_instrumentation_event(
                                                 NULL,
-                                                event_app_instruction,
+                                                on_bb_instrument,
                                                 NULL))
         {
             DR_ASSERT(false);
         }
     }
 
-    if (!drmgr_register_module_load_event(module_load_event) ||
-        !drmgr_register_thread_init_event(event_thread_init) ||
-        !drmgr_register_thread_exit_event(event_thread_exit) ||
-        !drmgr_register_exception_event(onexception))
+    if (!drmgr_register_module_load_event(on_module_load) ||
+        !drmgr_register_thread_init_event(on_thread_init) ||
+        !drmgr_register_thread_exit_event(on_thread_exit) ||
+        !drmgr_register_exception_event(on_exception))
     {
         DR_ASSERT(false);
     }

@@ -91,7 +91,7 @@ static void get_target_command_line(wchar_t **argv, size_t *len)
 }
 
 static dr_emit_flags_t
-on_bb(void *drcontext, void *tag, instrlist_t *bb, instr_t *inst, bool for_trace, bool translating, void *user_data)
+on_bb_instrument(void *drcontext, void *tag, instrlist_t *bb, instr_t *inst, bool for_trace, bool translating, void *user_data)
 {
     app_pc start_pc;
     uint16_t offset;
@@ -123,9 +123,9 @@ on_bb(void *drcontext, void *tag, instrlist_t *bb, instr_t *inst, bool for_trace
 
 /* Maps exception code to an exit status. Print it out, then exit. */
 static bool
-onexception(void *drcontext, dr_exception_t *excpt)
+on_exception(void *drcontext, dr_exception_t *excpt)
 {
-    dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#onexception: Exception occurred!\n");
+    dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#on_exception: Exception occurred!\n");
     crashed = true;
     DWORD exceptionCode = excpt->record->ExceptionCode;
 
@@ -213,7 +213,7 @@ onexception(void *drcontext, dr_exception_t *excpt)
 
 /* Runs after the target application has exited */
 static void
-event_exit(void)
+on_dr_exit(void)
 {
     SL2_DR_DEBUG("Dynamorio exiting (fuzzer)\n");
 
@@ -221,7 +221,7 @@ event_exit(void)
         wchar_t run_id_s[SL2_UUID_SIZE];
         sl2_uuid_to_wstring(sl2_conn.run_id, run_id_s);
         SL2_DR_DEBUG("<crash found for run id %S>\n", run_id_s);
-        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#event_exit: Crash found for run id %S!", run_id_s);
+        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#on_dr_exit: Crash found for run id %S!", run_id_s);
 
         sl2_crash_paths crash_paths = {0};
         sl2_conn_request_crash_paths(&sl2_conn, &crash_paths);
@@ -234,7 +234,7 @@ event_exit(void)
             NULL);
 
         if (hDumpFile == INVALID_HANDLE_VALUE) {
-            SL2_DR_DEBUG("fuzzer#event_exit: could not open the initial dump file (0x%x)\n", GetLastError());
+            SL2_DR_DEBUG("fuzzer#on_dr_exit: could not open the initial dump file (0x%x)\n", GetLastError());
         }
 
         EXCEPTION_POINTERS exception_pointers = {0};
@@ -276,7 +276,9 @@ event_exit(void)
     dr_free_module_data(target_mod);
 
     // Clean up DynamoRIO
-    dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#event_exit: Dynamorio Exiting\n");
+    // TODO(ww): Clean up individual event handlers as well? Since we're about to exit,
+    // do we really need to? The wizard and tracer do (for the most part).
+    dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#on_dr_exit: Dynamorio Exiting\n");
     drwrap_exit();
     drmgr_exit();
     drreg_exit();
@@ -700,7 +702,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 /* Runs when a new module (typically an exe or dll) is loaded. Tells DynamoRIO to hook all the interesting functions
     in that module. */
 static void
-module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
+on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 {
     if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))) {
         baseAddr = (uint64_t) mod->start;
@@ -885,13 +887,13 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         SL2_DR_DEBUG("dr_client_main: targets are arena compatible!\n");
         client.generateArenaId(arena.id);
         sl2_conn_request_arena(&sl2_conn, &arena);
-        drmgr_register_bb_instrumentation_event(NULL, on_bb, NULL);
+        drmgr_register_bb_instrumentation_event(NULL, on_bb_instrument, NULL);
     }
     else {
         SL2_DR_DEBUG("dr_client_main: targets are NOT arena compatible OR user has requested dumb fuzzing!\n");
     }
 
-    drmgr_register_exception_event(onexception);
-    dr_register_exit_event(event_exit);
-    drmgr_register_module_load_event(module_load_event);
+    drmgr_register_exception_event(on_exception);
+    dr_register_exit_event(on_dr_exit);
+    drmgr_register_module_load_event(on_module_load);
 }
