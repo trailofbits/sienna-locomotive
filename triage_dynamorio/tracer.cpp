@@ -37,6 +37,7 @@ static sl2_conn sl2_conn;
 static sl2_exception_ctx trace_exception_ctx;
 static void *mutatex;
 static bool replay;
+static bool no_mutate;
 static uint32_t mutate_count;
 
 static std::set<reg_id_t> tainted_regs;
@@ -76,6 +77,13 @@ static droption_t<std::string> op_replay(
     "",
     "replay",
     "The run id for a crash to replay.");
+
+static droption_t<bool> op_no_mutate(
+    DROPTION_SCOPE_CLIENT,
+    "nm",
+    false,
+    "no-mutate",
+    "Don't use the mutated buffer when replaying.");
 
 
 /* Currently unused as this runs on 64 bit applications */
@@ -1385,13 +1393,18 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     if (replay && targeted) {
         dr_mutex_lock(mutatex);
 
-        sl2_conn_request_replay(&sl2_conn, mutate_count, nNumberOfBytesToRead, lpBuffer);
+        if (no_mutate) {
+            sl2_conn_request_replay(&sl2_conn, mutate_count, nNumberOfBytesToRead, lpBuffer);
+        }
+        else {
+            SL2_DR_DEBUG("user requested replay WITHOUT mutation!\n");
+        }
+
         mutate_count++;
 
         dr_mutex_unlock(mutatex);
     }
 
-    // TODO(ww): Remove this hardcoded size.
     if (info->argHash) {
         dr_thread_free(drwrap_get_drcontext(wrapcxt), info->argHash, SL2_HASH_LEN + 1);
     }
@@ -1526,6 +1539,8 @@ void tracer(client_id_t id, int argc, const char *argv[])
     if (run_id_s.length() > 0) {
         replay = true;
     }
+
+    no_mutate = op_no_mutate.get_value();
 
     sl2_wstring_to_uuid(run_id_s.c_str(), &run_id);
     sl2_conn_assign_run_id(&sl2_conn, run_id);
