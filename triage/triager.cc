@@ -15,7 +15,7 @@ int main(int argc, char* argv[] ) {
             if(sc!=sl2::GOOD) {
                 continue;
             }
-            if( triage.ranks()[0]==triage.ranks()[1] ) {
+            if( triage.ranks().size()>=2 && triage.ranks()[0]==triage.ranks()[1] ) {
                 parity++;
             }
             cout << triage << endl;

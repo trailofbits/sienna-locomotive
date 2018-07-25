@@ -6,7 +6,7 @@ using namespace std;
 namespace sl2 {
 
 
-const string& operator~( const XploitabilityRank& self ) {
+const string operator~( const XploitabilityRank& self ) {
     switch(self) {
         case XploitabilityRank::XPLOITABILITY_HIGH:
             return "High";
@@ -33,9 +33,8 @@ ostream& operator<<( ostream& os, const XploitabilityResult& result ) {
 }
 
 
-Xploitability::Xploitability( Minidump* dmp, ProcessState* state, const string& moduleName )
+Xploitability::Xploitability( Minidump* dmp, ProcessState* state, const string moduleName )
         : Exploitability(dmp, state), name_(moduleName) {
-
 
     MinidumpException* exception = dump_->GetException();
     if (!exception) {
@@ -52,14 +51,14 @@ Xploitability::Xploitability( Minidump* dmp, ProcessState* state, const string& 
         throw "Can't get context";
     }
 
-    memoryList_ = dump_->GetMemoryList();
-    
+    memoryList_ = dump_->GetMemoryList();    
     if (!memoryList_) {        
         memoryAvailable_ = false;
     }
 
     exceptionCode_ = rawException_->exception_record.exception_code;
 
+    
     if (!context_->GetInstructionPointer(&instructionPtr_)) {
         throw "can't get pc";
     }
@@ -72,15 +71,18 @@ Xploitability::Xploitability( Minidump* dmp, ProcessState* state, const string& 
     if(!memoryAvailable_)
         return;
 
+    
     size_t bufsz = 15;
     MinidumpMemoryRegion* instrRegion =
         memoryList_->GetMemoryRegionForAddress(instructionPtr_);
     if(!instrRegion)
         return;
+
     const uint8_t *rawMem = instrRegion->GetMemory() + bufsz;
     if(!rawMem)
         return;
     disassembler_ = make_unique<DisassemblerX86>(rawMem, bufsz,  instructionPtr_);
+
 
     
 }

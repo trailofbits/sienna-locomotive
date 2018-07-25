@@ -81,8 +81,6 @@ StatusCode Triage::process() {
     cout << "-----------------------------------------------" << endl;
     cout << path_ << endl;
 
-
-
     vector<Xploitability*> modules = { 
         new XploitabilitySL2( &dump_, &state_),
         new XploitabilityBangExploitable( &dump_, &state_)

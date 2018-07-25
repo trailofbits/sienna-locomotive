@@ -43,14 +43,15 @@ class Xploitability : public Exploitability {
 
 public:
 
-    Xploitability( Minidump* dmp, ProcessState* state, const string& name );
+    Xploitability( Minidump* dmp, ProcessState* state, const string name );
+    ~Xploitability(  ){};
     
     virtual XploitabilityResult             process() = 0;
 
     bool isExceptionAddressInUser() const;
     bool isExceptionAddressNearNull() const;
 
-    const string& name() const { return name_; } 
+    const string name() const { return name_; } 
 
 
 protected:
@@ -62,7 +63,7 @@ protected:
     bool                            memoryAvailable_    = true;
     const MDRawExceptionStream*     rawException_;
     const MinidumpContext*          context_;
-    const string&                   name_;
+    const string                    name_;
     uint32_t                        exceptionCode_      = 0;
     uint64_t                        instructionPtr_     = 0;
     uint64_t                        stackPtr_           = 0;
