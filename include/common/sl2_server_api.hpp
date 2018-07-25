@@ -97,4 +97,10 @@ SL2Response sl2_conn_request_arena(sl2_conn *conn, sl2_arena *arena);
 __declspec(dllexport)
 SL2Response sl2_conn_register_arena(sl2_conn *conn, sl2_arena *arena);
 
+// Pings the SL2 server.
+// `ok` is a pointer to a `uint8_t` that the server's response will be placed in.
+__declspec(dllexport)
+SL2Response sl2_conn_ping(sl2_conn *conn, uint8_t *ok);
+
+
 #endif

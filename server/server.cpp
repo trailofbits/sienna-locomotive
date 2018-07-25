@@ -697,15 +697,44 @@ void handleCrashPaths(HANDLE hPipe)
     RpcStringFree((RPC_WSTR *)&runId_s);
 }
 
+void handlePing(HANDLE pipe)
+{
+    DWORD txsize;
+    uint8_t ok = 1;
+
+    LOG_F(INFO, "handlePing: ponging the client");
+
+    if (!WriteFile(pipe, &ok, sizeof(ok), &txsize, NULL)) {
+        LOG_F(ERROR, "handleCrashPath: failed to write pong status to pipe (0x%x)", GetLastError());
+        exit(1);
+    }
+}
+
+static void destroy_pipe(HANDLE pipe)
+{
+    if (!FlushFileBuffers(pipe)) {
+        LOG_F(ERROR, "threadHandler: failed to flush pipe (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    if (!DisconnectNamedPipe(pipe)) {
+        LOG_F(ERROR, "threadHandler: failed to disconnect pipe (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    if (!CloseHandle(pipe)) {
+        LOG_F(ERROR, "threadHandler: failed to close pipe (0x%x)", GetLastError());
+        exit(1);
+    }
+}
+
 /* Handles incoming connections from clients */
 DWORD WINAPI threadHandler(void *lpvPipe)
 {
     HANDLE hPipe = (HANDLE)lpvPipe;
-
     DWORD dwBytesRead = 0;
     DWORD dwBytesWritten = 0;
-
-    uint8_t event = EVT_INVALID;
+    uint8_t event;
 
     // NOTE(ww): This is a second event loop, inside of the infinite event loop that
     // creates each thread and calls threadHandler. We do this so that clients can
@@ -716,14 +745,20 @@ DWORD WINAPI threadHandler(void *lpvPipe)
     // is in scare quotes because each session is essentially anonymous -- the server
     // only sees when they end, not which runs or events they correspond to.
     do {
+        event = EVT_INVALID;
+
+        LOG_F(INFO, "threadHandler: waiting for the next event!");
+
         if (!ReadFile(hPipe, &event, sizeof(event), &dwBytesRead, NULL)) {
-            if (GetLastError() != ERROR_BROKEN_PIPE){
+            if (GetLastError() != ERROR_BROKEN_PIPE) {
                 LOG_F(ERROR, "threadHandler: failed to read event (0x%x)", GetLastError());
                 exit(1);
             }
-            else{
-                 // Pipe was broken when we tried to read it. Happens when the python client
-                 // checks if it exists.
+            else {
+                // Pipe was broken when we tried to read it. Happens when the python client
+                // checks if it exists.
+                LOG_F(ERROR, "threadHandler: broken pipe! ending session on event=%d", event);
+                destroy_pipe(hPipe);
                 return 0;
             }
         }
@@ -753,6 +788,9 @@ DWORD WINAPI threadHandler(void *lpvPipe)
             case EVT_SET_ARENA:
                 handleSetArena(hPipe);
                 break;
+            case EVT_PING:
+                handlePing(hPipe);
+                break;
             case EVT_SESSION_TEARDOWN:
                 LOG_F(INFO, "threadHandler: ending a client's session with the server.");
                 break;
@@ -769,20 +807,8 @@ DWORD WINAPI threadHandler(void *lpvPipe)
         }
     } while (event != EVT_SESSION_TEARDOWN && event != EVT_INVALID);
 
-    if (!FlushFileBuffers(hPipe)) {
-        LOG_F(ERROR, "threadHandler: failed to flush pipe (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    if (!DisconnectNamedPipe(hPipe)) {
-        LOG_F(ERROR, "threadHandler: failed to disconnect pipe (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    if (!CloseHandle(hPipe)) {
-        LOG_F(ERROR, "threadHandler: failed to close pipe (0x%x)", GetLastError());
-        exit(1);
-    }
+    LOG_F(INFO, "threadHandler: closing pipe after event=%d", event);
+    destroy_pipe(hPipe);
 
     return 0;
 }

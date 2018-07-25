@@ -272,6 +272,7 @@ event_exit(void)
 
 
     sl2_conn_finalize_run(&sl2_conn, crashed, false);
+
     sl2_conn_close(&sl2_conn);
 
     dr_free_module_data(target_mod);
@@ -323,6 +324,12 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
 
     // Tell the server about our mutation.
     sl2_conn_register_mutation(&sl2_conn, &mutation);
+
+    // TODO(ww): Figure out why this "fixes" the connection between
+    // the fuzzer and the server -- without it, about 10% of continuous
+    // runs eventually hang.
+    uint8_t ok;
+    sl2_conn_ping(&sl2_conn, &ok);
 
     return true;
 }

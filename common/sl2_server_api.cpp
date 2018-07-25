@@ -94,6 +94,7 @@ SL2Response sl2_conn_close(sl2_conn *conn)
 {
     sl2_conn_end_session(conn);
 
+    FlushFileBuffers(conn->pipe);
     CloseHandle(conn->pipe);
 
     // TODO(ww): error returns
@@ -283,6 +284,18 @@ SL2Response sl2_conn_register_arena(sl2_conn *conn, sl2_arena *arena)
 
     // Finally, write the arena data to the server.
     SL2_CONN_WRITE(arena->map, FUZZ_ARENA_SIZE);
+
+    return SL2Response::OK;
+}
+
+__declspec(dllexport)
+SL2Response sl2_conn_ping(sl2_conn *conn, uint8_t *ok)
+{
+    DWORD txsize;
+
+    SL2_CONN_EVT(EVT_PING);
+
+    SL2_CONN_READ(ok, sizeof(ok));
 
     return SL2Response::OK;
 }
