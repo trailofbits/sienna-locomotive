@@ -289,10 +289,9 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     info->source = (wchar_t *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(fStruct.fileName));
     memcpy(info->source, fStruct.fileName, sizeof(fStruct.fileName));
 
-    // NOTE(ww): SHA2 digests are 64 characters, so we allocate that + room for a NULL
-    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), 65);
-    memset(info->argHash, 0, 65);
-    memcpy(info->argHash, hash_str.c_str(), 64);
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    memset(info->argHash, 0, SL2_HASH_LEN + 1);
+    memcpy(info->argHash, hash_str.c_str(), SL2_HASH_LEN);
 }
 
 static void
@@ -384,7 +383,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
         dr_thread_free(drwrap_get_drcontext(wrapcxt), info->source, MAX_PATH + 1);
     }
     if (info->argHash) {
-        dr_thread_free(drwrap_get_drcontext(wrapcxt), info->argHash, 65);
+        dr_thread_free(drwrap_get_drcontext(wrapcxt), info->argHash, SL2_HASH_LEN + 1);
     }
 
     dr_thread_free(drwrap_get_drcontext(wrapcxt), info, sizeof(wizard_read_info));
