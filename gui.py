@@ -1,6 +1,6 @@
 import sys
 
-from PyQt5.QtWidgets import QFileDialog
+from PyQt5.QtWidgets import QFileDialog, QMenu, QAction
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QFontDatabase, QMovie, QStandardItem
@@ -62,6 +62,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self._func_tree.resizeColumnToContents(1)
         self._func_tree.resizeColumnToContents(2)
         self._func_tree.resizeColumnToContents(3)
+
+        # Create menu items for the context menu
+        self.expand_action = QAction("Expand All")
+        self.collapse_action = QAction("Collapse All")
 
         # Build layout for function filter text boxes
         self.filter_layout = QtWidgets.QHBoxLayout()
@@ -172,6 +176,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.wizard_thread.finished.connect(self.unsetCursor)
         self.wizard_thread.resultReady.connect(self.wizard_finished)
 
+        # Connect the context menu buttons
+        self.expand_action.triggered.connect(self._func_tree.expandAll)
+        self.collapse_action.triggered.connect(self._func_tree.collapseAll)
+
         # Filter the list of functions displayed when we type things into the boxes
         self.func_filter_box.textChanged.connect(self.func_proxy_model.setFilterFixedString)
         self.file_filter_box.textChanged.connect(self.file_proxy_model.setFilterFixedString)
@@ -248,6 +256,12 @@ class MainWindow(QtWidgets.QMainWindow):
     def tree_changed(self, widget, is_checked):
         """ Handle when an item in the function tree is checked """
         self.target_data.update(widget.index, selected=is_checked)
+
+    def contextMenuEvent(self, QContextMenuEvent):
+        menu = QMenu(self)
+        menu.addAction(self.expand_action)
+        menu.addAction(self.collapse_action)
+        menu.exec(QContextMenuEvent.globalPos())
 
     def wizard_finished(self, wizard_output):
         """ Dump the results of a wizard run to the target file and rebuild the tree """
