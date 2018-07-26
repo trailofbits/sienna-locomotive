@@ -678,8 +678,10 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     bool targeted = client.isFunctionTargeted(function, info);
     client.incrementCallCountForFunction(function);
 
-    if (info->lpNumberOfBytesRead) {
-        nNumberOfBytesToRead = *info->lpNumberOfBytesRead;
+    // NOTE(ww): We should never read more bytes than we request, so this is more
+    // of a sanity check than anything else.
+    if (info->lpNumberOfBytesRead && *(info->lpNumberOfBytesRead) < nNumberOfBytesToRead) {
+        nNumberOfBytesToRead = *(info->lpNumberOfBytesRead);
     }
 
     if (targeted) {
