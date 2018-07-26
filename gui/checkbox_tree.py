@@ -41,6 +41,7 @@ class CheckboxTreeWidget(QTreeView):
 class CheckboxTreeSortFilterProxyModel(QSortFilterProxyModel):
 
     def __init__(self, *args):
+        self.inverted = False
         super().__init__(*args)
 
     def lessThan(self, QModelIndex_l, QModelIndex_r):
@@ -59,4 +60,16 @@ class CheckboxTreeSortFilterProxyModel(QSortFilterProxyModel):
         accepts_parent = super().filterAcceptsRow(QModelIndex.row(), self.parent(QModelIndex))
         is_child = QModelIndex.row() != -1 and p_int == 0
 
+        if self.inverted:
+            super_accepts = not super_accepts
+            accepts_parent = not accepts_parent
+
         return super_accepts or (is_child and accepts_parent)
+
+    def setFilterFixedString(self, p_str):
+        if len(p_str) > 0 and p_str[0] == '!':
+            self.inverted = True
+            super().setFilterFixedString(p_str[1:])
+        else:
+            self.inverted = False
+            super().setFilterFixedString(p_str)
