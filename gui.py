@@ -207,12 +207,12 @@ class MainWindow(QtWidgets.QMainWindow):
         """ Build the function target display tree """
         self._func_tree.setSortingEnabled(False)
         self.model.clear()
-        self.model.setHorizontalHeaderLabels(["Function Name", "File", "File Offset", "Order Seen", "Binary Offset"])
+        self.model.setHorizontalHeaderLabels(["Function Name", "File", "File Offset", "Order Seen", "Calling Module"])
         self.model.horizontalHeaderItem(0).setToolTip("The name of a fuzzable function")
         self.model.horizontalHeaderItem(1).setToolTip("The name of the file (if any) the function tried to read")
         self.model.horizontalHeaderItem(2).setToolTip("The bytes in the file that the program tried to read (if available)")
         self.model.horizontalHeaderItem(3).setToolTip("The order in which the wizard encountered this function")
-        self.model.horizontalHeaderItem(4).setToolTip("How far (in memory) away from the start of the target program the call to this function occurred. Lower values are usually better targets.")
+        self.model.horizontalHeaderItem(4).setToolTip("Which part of the program called this function. .exe modules are generally the most promising")
 
         for index, option in enumerate(self.target_data):
             funcname_widget = CheckboxTreeWidgetItem(self._func_tree, index, "{func_name}".format(**option))
@@ -242,7 +242,7 @@ class MainWindow(QtWidgets.QMainWindow):
                                   filename_widget,
                                   offset_widget,
                                   QStandardItem(str(index)),
-                                  QStandardItem(str(option.get('retAddrOffset', None)))])
+                                  QStandardItem(str(option.get('called_from', None)))])
 
         self._func_tree.expandAll()
         self._func_tree.resizeColumnToContents(0)
