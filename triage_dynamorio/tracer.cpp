@@ -1394,7 +1394,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
         dr_mutex_lock(mutatex);
 
         if (no_mutate) {
-            sl2_conn_request_replay(&sl2_conn, mutate_count, nNumberOfBytesToRead, lpBuffer);
+            SL2_DR_DEBUG("user requested replay WITHOUT mutation!\n");
         }
         else {
             sl2_conn_request_replay(&sl2_conn, mutate_count, nNumberOfBytesToRead, lpBuffer);
