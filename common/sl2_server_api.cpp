@@ -63,9 +63,6 @@ SL2Response sl2_conn_open(sl2_conn *conn)
         return SL2Response::BadPipe;
     }
 
-    DWORD readMode = PIPE_READMODE_MESSAGE;
-    SetNamedPipeHandleState(pipe, &readMode, NULL, NULL);
-
     conn->pipe = pipe;
 
     // NOTE(ww): We zero the run_id out here so that using a connection

@@ -853,7 +853,7 @@ int main(int mArgc, char **mArgv)
         HANDLE hPipe = CreateNamedPipe(
             FUZZ_SERVER_PATH,
             PIPE_ACCESS_DUPLEX,
-            PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT | PIPE_ACCEPT_REMOTE_CLIENTS,
+            PIPE_WAIT | PIPE_ACCEPT_REMOTE_CLIENTS,
             PIPE_UNLIMITED_INSTANCES,
             BUFSIZ,
             BUFSIZ,
