@@ -277,12 +277,16 @@ class MainWindow(QtWidgets.QMainWindow):
             yield index
 
     def check_all(self):
+        self.target_data.pause()
         for index in self.get_visible_indices():
             self.model.itemFromIndex(index).setCheckState(Qt.Checked)
+        self.target_data.unpause()
 
     def uncheck_all(self):
+        self.target_data.pause()
         for index in self.get_visible_indices():
             self.model.itemFromIndex(index).setCheckState(Qt.Unchecked)
+        self.target_data.unpause()
 
     def contextMenuEvent(self, QContextMenuEvent):
         menu = QMenu(self)

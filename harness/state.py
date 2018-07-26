@@ -71,6 +71,7 @@ class TargetAdapter(object):
         super().__init__()
         self.target_list = target_list
         self.filename = filename
+        self.pause_saving = False
 
     def __iter__(self):
         return self.target_list.__iter__()
@@ -79,11 +80,20 @@ class TargetAdapter(object):
         for key in kwargs:
             self.target_list[index][key] = kwargs[key]
 
+        if not self.pause_saving:
+            self.save()
+
+    def pause(self):
+        self.pause_saving = True
+
+    def unpause(self):
+        self.pause_saving = False
         self.save()
 
     def set_target_list(self, new_targets):
         self.target_list = new_targets
-        self.save()
+        if not self.pause_saving:
+            self.save()
 
     def save(self):
         with open(self.filename, 'wb') as msgfile:
