@@ -2,7 +2,7 @@ import sys
 
 from PyQt5.QtWidgets import QFileDialog, QMenu, QAction
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtCore import Qt, QSize, QModelIndex
 from PyQt5.QtGui import QFontDatabase, QMovie, QStandardItem
 
 from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem, CheckboxTreeModel, CheckboxTreeSortFilterProxyModel
@@ -53,8 +53,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.file_proxy_model = CheckboxTreeSortFilterProxyModel()
         self.file_proxy_model.setSourceModel(self.func_proxy_model)
         self.file_proxy_model.setFilterKeyColumn(1)
+        self.module_proxy_model = CheckboxTreeSortFilterProxyModel()
+        self.module_proxy_model.setSourceModel(self.file_proxy_model)
+        self.module_proxy_model.setFilterKeyColumn(4)
         self.build_func_tree()
-        self._func_tree.setModel(self.file_proxy_model)
+        self._func_tree.setModel(self.module_proxy_model)
 
         # These need to happen after we set the model
         self._func_tree.expandAll()
@@ -66,6 +69,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # Create menu items for the context menu
         self.expand_action = QAction("Expand All")
         self.collapse_action = QAction("Collapse All")
+        self.check_action = QAction("Check All")
+        self.uncheck_action = QAction("Uncheck All")
 
         # Build layout for function filter text boxes
         self.filter_layout = QtWidgets.QHBoxLayout()
@@ -75,6 +80,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.filter_layout.addWidget(QtWidgets.QLabel("Filter Files: "))
         self.file_filter_box = QtWidgets.QLineEdit()
         self.filter_layout.addWidget(self.file_filter_box)
+        self.filter_layout.addWidget(QtWidgets.QLabel("Filter Modules: "))
+        self.module_filter_box = QtWidgets.QLineEdit()
+        self.filter_layout.addWidget(self.module_filter_box)
 
         # Set up fuzzer button and thread
         self.fuzzer_button = QtWidgets.QPushButton("Fuzz selected targets")
@@ -179,10 +187,13 @@ class MainWindow(QtWidgets.QMainWindow):
         # Connect the context menu buttons
         self.expand_action.triggered.connect(self._func_tree.expandAll)
         self.collapse_action.triggered.connect(self._func_tree.collapseAll)
+        self.check_action.triggered.connect(self.check_all)
+        self.uncheck_action.triggered.connect(self.uncheck_all)
 
         # Filter the list of functions displayed when we type things into the boxes
         self.func_filter_box.textChanged.connect(self.func_proxy_model.setFilterFixedString)
         self.file_filter_box.textChanged.connect(self.file_proxy_model.setFilterFixedString)
+        self.module_filter_box.textChanged.connect(self.module_proxy_model.setFilterFixedString)
 
         # Handle checks/unchecks in the target tree
         self._func_tree.itemCheckedStateChanged.connect(self.tree_changed)
@@ -207,12 +218,12 @@ class MainWindow(QtWidgets.QMainWindow):
         """ Build the function target display tree """
         self._func_tree.setSortingEnabled(False)
         self.model.clear()
-        self.model.setHorizontalHeaderLabels(["Function Name", "File", "File Offset", "Order Seen", "Binary Offset"])
+        self.model.setHorizontalHeaderLabels(["Function Name", "File", "File Offset", "Order Seen", "Calling Module"])
         self.model.horizontalHeaderItem(0).setToolTip("The name of a fuzzable function")
         self.model.horizontalHeaderItem(1).setToolTip("The name of the file (if any) the function tried to read")
         self.model.horizontalHeaderItem(2).setToolTip("The bytes in the file that the program tried to read (if available)")
         self.model.horizontalHeaderItem(3).setToolTip("The order in which the wizard encountered this function")
-        self.model.horizontalHeaderItem(4).setToolTip("How far (in memory) away from the start of the target program the call to this function occurred. Lower values are usually better targets.")
+        self.model.horizontalHeaderItem(4).setToolTip("Which part of the program called this function. .exe modules are generally the most promising")
 
         for index, option in enumerate(self.target_data):
             funcname_widget = CheckboxTreeWidgetItem(self._func_tree, index, "{func_name}".format(**option))
@@ -242,7 +253,7 @@ class MainWindow(QtWidgets.QMainWindow):
                                   filename_widget,
                                   offset_widget,
                                   QStandardItem(str(index)),
-                                  QStandardItem(str(option.get('retAddrOffset', None)))])
+                                  QStandardItem(str(option.get('called_from', None)))])
 
         self._func_tree.expandAll()
         self._func_tree.resizeColumnToContents(0)
@@ -257,10 +268,32 @@ class MainWindow(QtWidgets.QMainWindow):
         """ Handle when an item in the function tree is checked """
         self.target_data.update(widget.index, selected=is_checked)
 
+    def get_visible_indices(self):
+        for row in range(self.module_proxy_model.rowCount()):
+            index = self.func_proxy_model.mapToSource(
+                        self.file_proxy_model.mapToSource(
+                            self.module_proxy_model.mapToSource(
+                                self.module_proxy_model.index(row, 0))))
+            yield index
+
+    def check_all(self):
+        self.target_data.pause()
+        for index in self.get_visible_indices():
+            self.model.itemFromIndex(index).setCheckState(Qt.Checked)
+        self.target_data.unpause()
+
+    def uncheck_all(self):
+        self.target_data.pause()
+        for index in self.get_visible_indices():
+            self.model.itemFromIndex(index).setCheckState(Qt.Unchecked)
+        self.target_data.unpause()
+
     def contextMenuEvent(self, QContextMenuEvent):
         menu = QMenu(self)
         menu.addAction(self.expand_action)
         menu.addAction(self.collapse_action)
+        menu.addAction(self.check_action)
+        menu.addAction(self.uncheck_action)
         menu.exec(QContextMenuEvent.globalPos())
 
     def wizard_finished(self, wizard_output):

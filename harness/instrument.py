@@ -120,6 +120,8 @@ def wizard_run(config_dict):
                                verbose=config_dict['verbose'])
     wizard_output = completed_process.stderr.decode('utf-8')
     wizard_findings = []
+    mem_map = {}
+    base_addr = None
 
     for line in wizard_output.splitlines():
         try:
@@ -130,9 +132,18 @@ def wizard_run(config_dict):
             elif "in" == obj["type"]:
                 # TODO do something here later
                 pass
+            elif "map" == obj["type"]:
+                mem_map[(obj["start"], obj["end"])] = obj["mod_name"]
+                if ".exe" in obj["mod_name"]:
+                    base_addr = obj["start"]
             elif "id" == obj["type"]:
                 obj['mode'] = Mode.MATCH_INDEX
                 obj['selected'] = False
+                ret_addr = obj["retAddrOffset"] + base_addr
+                for addrs in mem_map.keys():
+                    if ret_addr in range(*addrs):
+                        obj['called_from'] = mem_map[addrs]
+
                 wizard_findings.append(obj)
         except Exception:
             pass
