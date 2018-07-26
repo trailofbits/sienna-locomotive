@@ -2,7 +2,7 @@ import sys
 
 from PyQt5.QtWidgets import QFileDialog, QMenu, QAction
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtCore import Qt, QSize, QModelIndex
 from PyQt5.QtGui import QFontDatabase, QMovie, QStandardItem
 
 from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem, CheckboxTreeModel, CheckboxTreeSortFilterProxyModel
@@ -69,6 +69,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # Create menu items for the context menu
         self.expand_action = QAction("Expand All")
         self.collapse_action = QAction("Collapse All")
+        self.check_action = QAction("Check All")
+        self.uncheck_action = QAction("Uncheck All")
 
         # Build layout for function filter text boxes
         self.filter_layout = QtWidgets.QHBoxLayout()
@@ -185,6 +187,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # Connect the context menu buttons
         self.expand_action.triggered.connect(self._func_tree.expandAll)
         self.collapse_action.triggered.connect(self._func_tree.collapseAll)
+        self.check_action.triggered.connect(self.check_all)
+        self.uncheck_action.triggered.connect(self.uncheck_all)
 
         # Filter the list of functions displayed when we type things into the boxes
         self.func_filter_box.textChanged.connect(self.func_proxy_model.setFilterFixedString)
@@ -264,10 +268,28 @@ class MainWindow(QtWidgets.QMainWindow):
         """ Handle when an item in the function tree is checked """
         self.target_data.update(widget.index, selected=is_checked)
 
+    def get_visible_indices(self):
+        for row in range(self.module_proxy_model.rowCount()):
+            index = self.func_proxy_model.mapToSource(
+                        self.file_proxy_model.mapToSource(
+                            self.module_proxy_model.mapToSource(
+                                self.module_proxy_model.index(row, 0))))
+            yield index
+
+    def check_all(self):
+        for index in self.get_visible_indices():
+            self.model.itemFromIndex(index).setCheckState(Qt.Checked)
+
+    def uncheck_all(self):
+        for index in self.get_visible_indices():
+            self.model.itemFromIndex(index).setCheckState(Qt.Unchecked)
+
     def contextMenuEvent(self, QContextMenuEvent):
         menu = QMenu(self)
         menu.addAction(self.expand_action)
         menu.addAction(self.collapse_action)
+        menu.addAction(self.check_action)
+        menu.addAction(self.uncheck_action)
         menu.exec(QContextMenuEvent.globalPos())
 
     def wizard_finished(self, wizard_output):
