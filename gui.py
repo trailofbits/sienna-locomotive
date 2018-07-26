@@ -205,8 +205,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Connect the stop button to the thread so we can pause it
         self.stop_button.clicked.connect(self.fuzzer_thread.pause)
-        if config.config['continuous']:
-            self.fuzzer_thread.started.connect(self.stop_button.show)
+        self.fuzzer_thread.started.connect(self.stop_button.show)
         self.fuzzer_thread.finished.connect(self.stop_button.hide)
         self.fuzzer_thread.paused.connect(self.stop_button.hide)
 
