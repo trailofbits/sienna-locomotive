@@ -26,6 +26,7 @@ using namespace std;
 
 #define JSON_VAR (j##__COUNTER__)
 
+// TODO - we can probably delete this block, but we'll leave it for a few more commits
 #define JSON_WRAP_PRE_LOG() do { \
     json JSON_VAR; \
     JSON_VAR["type"] = "in"; \
@@ -403,6 +404,13 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
       baseAddr = (size_t) mod->start;
     }
 
+    json j;
+    j["type"]               = "map";
+    j["start"]              = (size_t) mod->start;
+    j["end"]                = (size_t) mod->end;
+    j["mod_name"]           = dr_module_preferred_name(mod);
+    SL2_LOG_JSONL(j);
+
     std::map<char *, SL2_PRE_PROTO> toHookPre;
     SL2_PRE_HOOK1(toHookPre, ReadFile);
     SL2_PRE_HOOK1(toHookPre, InternetReadFile);
@@ -481,7 +489,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
                 j["msg"] = s.str();
             }
 
-            SL2_LOG_JSONL(j);
+            SL2_LOG_JSONL(j); // TODO - we can probably delete this as well
         }
     }
 }
