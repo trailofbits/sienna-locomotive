@@ -157,8 +157,7 @@ def parse_triage_output(run_id):
             formatted += ("\n\t0x{location:02x}: {instruction}".format(**results))
             return formatted, results
     except FileNotFoundError:
-        message = "The triage tool exited improperly during run {}, but no crash file could be found. \
-                   It may have timed out. To retry it manually, run `python harness.py -v -e TRIAGE [-p <PROFILE>]`"
+        message = "The triage tool exited improperly during run {}, but no crash file could be found. It may have timed out. To retry it manually, run `python harness.py -v -e TRIAGE [-p <PROFILE>]`"
         return message.format(run_id), None
 
 
