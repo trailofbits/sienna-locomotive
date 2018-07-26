@@ -265,7 +265,7 @@ static void handleGenerateRunId(HANDLE pipe)
     }
 
     if (size > 8191) {
-        LOG_F(ERROR, "handleGenerateRunId: program name length > 8191");
+        LOG_F(ERROR, "handleGenerateRunId: program name length %lu > 8191", size);
         exit(1);
     }
 
@@ -410,7 +410,7 @@ static void handleRegisterMutation(HANDLE pipe)
     uint8_t *buf = (uint8_t *) malloc(size);
 
     if (buf == NULL) {
-        LOG_F(ERROR, "handleRegisterMutation: failed to allocate mutation buffer (0x%x)", GetLastError());
+        LOG_F(ERROR, "handleRegisterMutation: failed to allocate mutation buffer (size=%lu) (0x%x)", size, GetLastError());
         exit(1);
     }
 
