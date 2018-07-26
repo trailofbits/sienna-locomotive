@@ -1,4 +1,4 @@
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtCore import QThread, pyqtSignal, Qt
 import time
 from .instrument import wizard_run, fuzzer_run, triage_run, start_server
 
@@ -61,3 +61,10 @@ class FuzzerThread(QThread):
 
             if not self.config_dict['continuous']:
                 break
+
+    def continuous_state_changed(self, new_state):
+        self.config_dict['continuous'] = (new_state == Qt.Checked)
+
+    def pause_state_changed(self, new_state):
+        self.config_dict['exit_early'] = (new_state == Qt.Checked)
+

@@ -16,9 +16,8 @@ import traceback
 import sys
 from enum import IntEnum
 
-from .state import parse_triage_output, finalize, write_output_files, stringify_program_array, check_fuzz_line_for_crash, check_fuzz_line_for_run_id
+from .state import parse_triage_output, finalize, write_output_files, create_invokation_statement,  check_fuzz_line_for_crash, check_fuzz_line_for_run_id
 from . import config
-
 
 print_lock = threading.Lock()
 can_fuzz = True
@@ -47,14 +46,12 @@ def start_server():
         time.sleep(1)
 
 
-def run_dr(config_dict, save_stderr=False, verbose=False, timeout=None):
+def run_dr(config_dict, verbose=False, timeout=None):
     """ Runs dynamorio with the given config. Clobbers console output if save_stderr/stdout are true """
-    program_arr = [config_dict['drrun_path'], '-pidfile', 'pidfile'] + config_dict['drrun_args'] + \
-        ['-c', config_dict['client_path']] + config_dict['client_args'] + \
-        ['--', config_dict['target_application_path']] + config_dict['target_args']
+    program_arr, program_str = create_invokation_statement(config_dict)
 
     if verbose:
-        print_l("Executing drrun: %s" % stringify_program_array(program_arr[0], program_arr[1:]))
+        print_l("Executing drrun: %s" % program_str)
 
     # Run client on target application
     started = time.time()
@@ -89,7 +86,10 @@ def run_dr(config_dict, save_stderr=False, verbose=False, timeout=None):
             pid = pidfile.read().strip()
             if verbose:
                 print_l("Killing child process:", pid)
-            os.kill(int(pid), signal.SIGTERM)
+            try:
+                os.kill(int(pid), signal.SIGTERM)
+            except PermissionError:
+                print_l("WARNING: Couldn't kill child process")
 
         # Try to get the output again
         try:
@@ -119,11 +119,12 @@ def wizard_run(config_dict):
                                 'client_args': [],
                                 'target_application_path': config_dict['target_application_path'],
                                 'target_args': config_dict['target_args'],
-                                'inline_stdout': config_dict['inline_stdout'] },
-                                save_stderr=True,
-                                verbose=config_dict['verbose'])
+                                'inline_stdout': config_dict['inline_stdout']},
+                               verbose=config_dict['verbose'])
     wizard_output = completed_process.stderr.decode('utf-8')
     wizard_findings = []
+    mem_map = {}
+    base_addr = None
 
     for line in wizard_output.splitlines():
         try:
@@ -134,9 +135,18 @@ def wizard_run(config_dict):
             elif "in" == obj["type"]:
                 # TODO do something here later
                 pass
+            elif "map" == obj["type"]:
+                mem_map[(obj["start"], obj["end"])] = obj["mod_name"]
+                if ".exe" in obj["mod_name"]:
+                    base_addr = obj["start"]
             elif "id" == obj["type"]:
                 obj['mode'] = Mode.MATCH_INDEX
                 obj['selected'] = False
+                ret_addr = obj["retAddrOffset"] + base_addr
+                for addrs in mem_map.keys():
+                    if ret_addr in range(*addrs):
+                        obj['called_from'] = mem_map[addrs]
+
                 wizard_findings.append(obj)
         except Exception:
             pass
@@ -146,8 +156,7 @@ def wizard_run(config_dict):
 
 def fuzzer_run(config_dict):
     """ Runs the fuzzer """
-    completed_process = run_dr(config_dict, True,
-                               verbose=config_dict['verbose'], timeout=config_dict.get('fuzz_timeout', None))
+    completed_process = run_dr(config_dict, verbose=config_dict['verbose'], timeout=config_dict.get('fuzz_timeout', None))
 
     # Parse run ID from fuzzer output
     run_id = None
@@ -181,10 +190,7 @@ def fuzzer_run(config_dict):
 
     # Handle orphaned pipes after a timeout
     if completed_process.timed_out:
-        if crashed:
-            finalize(run_id, True)
-        else:
-            finalize(run_id, False)
+        finalize(run_id, crashed)
 
     return crashed, run_id
 
@@ -198,7 +204,6 @@ def triage_run(config_dict, run_id):
                                 'target_application_path': config_dict['target_application_path'],
                                 'target_args': config_dict['target_args'],
                                 'inline_stdout': config_dict['inline_stdout']},
-                               True,
                                config_dict['verbose'],
                                config_dict.get('triage_timeout', None))
 

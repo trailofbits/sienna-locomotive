@@ -22,6 +22,14 @@ def esc_quote(raw):
         return "\"{}\"".format(raw)
 
 
+def create_invokation_statement(config_dict):
+    program_arr = [config_dict['drrun_path'], '-pidfile', 'pidfile'] + config_dict['drrun_args'] + \
+          ['-c', config_dict['client_path']] + config_dict['client_args'] + \
+          ['--', config_dict['target_application_path'].strip('\"')] + config_dict['target_args']
+
+    return program_arr, stringify_program_array(program_arr[0], program_arr[1:])
+
+
 # TODO(ww): Use shlex or something similar here.
 def stringify_program_array(target_application_path, target_args_array):
     """ Escape paths with spaces in them by surrounding them with quotes """
@@ -65,6 +73,7 @@ class TargetAdapter(object):
         super().__init__()
         self.target_list = target_list
         self.filename = filename
+        self.pause_saving = False
 
     def __iter__(self):
         return self.target_list.__iter__()
@@ -73,11 +82,20 @@ class TargetAdapter(object):
         for key in kwargs:
             self.target_list[index][key] = kwargs[key]
 
+        if not self.pause_saving:
+            self.save()
+
+    def pause(self):
+        self.pause_saving = True
+
+    def unpause(self):
+        self.pause_saving = False
         self.save()
 
     def set_target_list(self, new_targets):
         self.target_list = new_targets
-        self.save()
+        if not self.pause_saving:
+            self.save()
 
     def save(self):
         with open(self.filename, 'wb') as msgfile:
@@ -141,7 +159,8 @@ def parse_triage_output(run_id):
             formatted += ("\n\t0x{location:02x}: {instruction}".format(**results))
             return formatted, results
     except FileNotFoundError:
-        return "Triage run %s exited improperly, but no crash file could be found)" % run_id, None
+        message = "The triage tool exited improperly during run {}, but no crash file could be found. It may have timed out. To retry it manually, run `python harness.py -v -e TRIAGE [-p <PROFILE>]`"
+        return message.format(run_id), None
 
 
 def export_crash_data_to_csv(crashes, csv_filename):
@@ -164,7 +183,7 @@ def finalize(run_id, crashed):
     # Write a bool indicating a crash
     f.write(struct.pack('?', 1 if crashed else 0))
     # Write a bool indicating whether to preserve run files (without a crash)
-    f.write(struct.pack('?', 1 if True else 0))
+    f.write(struct.pack('?', 1 if crashed else 0))
     f.write(struct.pack('B', 0x6)) # EVT_SESSION_TEARDOWN
     f.close()
 

@@ -11,6 +11,8 @@
 //   History:
 //------------------------------------------------
 
+typedef unsigned int64 size_t;
+
 struct FKT {
     char magic[4];
     uint type;
