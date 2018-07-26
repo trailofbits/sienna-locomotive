@@ -382,7 +382,7 @@ static void handleRegisterMutation(HANDLE pipe)
     // and no read at all -- both the client and the server have to do either one or the
     // other, and failing to do either on one side causes a truncated read or write.
     if (resource_size > 0) {
-        if (!ReadFile(pipe, &resource_path, (DWORD) (resource_size * sizeof(wchar_t)), &txsize, NULL)) {
+        if (!ReadFile(pipe, &resource_path, (DWORD) resource_size, &txsize, NULL)) {
             LOG_F(ERROR, "handleRegisterMutation: failed to read mutation filepath (0x%x)", GetLastError());
             exit(1);
         }
