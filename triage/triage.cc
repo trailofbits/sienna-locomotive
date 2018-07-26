@@ -12,7 +12,7 @@
 #include "google_breakpad/processor/process_state.h"
 
 #include "Xploitability.h"
-#include "XploitabilitySL2.h"
+#include "XploitabilityBreakpad.h"
 #include "XploitabilityBangExploitable.h"
 
 #include <algorithm>
@@ -82,7 +82,7 @@ StatusCode Triage::process() {
     cout << path_ << endl;
 
     vector<Xploitability*> modules = { 
-        new XploitabilitySL2( &dump_, &state_),
+        new XploitabilityBreakpad( &dump_, &state_),
         new XploitabilityBangExploitable( &dump_, &state_)
     };
 

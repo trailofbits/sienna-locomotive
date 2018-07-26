@@ -1,25 +1,17 @@
-#ifndef EXPLOITABILITY_SL2_H
-#define EXPLOITABILITY_SL2_H
-
 #include "Xploitability.h"
 
+
 namespace sl2 {
-class XploitabilitySL2 : public Xploitability {
+
+class XploitabilitySL2 : Xploitability {
 public:
-    
-    XploitabilitySL2( Minidump* dmp, ProcessState* state );
-    virtual XploitabilityResult              process();
-    
-    
-    friend XploitabilityResult& operator<<( XploitabilityResult& result, const ExploitabilityRating& rating );
+    XploitabilitySL2::XploitabilitySL2(Minidump *dump,
+                                     ProcessState *process_state);    
 
 
-private:
-    ExploitabilityRating            processExploitabilityRating();
-    ExploitabilityRating            rating_;
+    virtual XploitabilityResult             process();
 
 };
 
-} // namespace
 
-#endif
+}
