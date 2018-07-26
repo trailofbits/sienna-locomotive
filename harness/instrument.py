@@ -151,18 +151,26 @@ def fuzzer_run(config_dict):
 
     # Parse run ID from fuzzer output
     run_id = 'ERR'
-    proc_stderr = completed_process.stderr.decode('utf-8')
+    crashed = False
 
-    for line in str.splitlines(proc_stderr):
-        if 'Beginning fuzzing run' in line:
-            uuid_s = line.replace('Beginning fuzzing run ', '').strip()
-            run_id = uuid.UUID(uuid_s)
+    for line in completed_process.stderr.split(b'\n'):
+        try:
+            line = line.decode('utf-8')
+            # Extract the run id from the run
+            if 'Beginning fuzzing run' in line:
+                uuid_s = line.replace('Beginning fuzzing run ', '').strip()
+                run_id = uuid.UUID(uuid_s)
+
+            # Identify whether the fuzzing run resulted in a crash
+            if 'EXCEPTION_' in line:
+                crashed = True
+        except UnicodeDecodeError:
+            print_l("[!] Not UTF-8: %s", repr(line))
+
     if run_id == 'ERR':
         print_l("Error: No run ID could be parsed from the server output")
         return False, -1
 
-    # Identify whether the fuzzing run resulted in a crash
-    crashed = 'EXCEPTION_' in proc_stderr
     if crashed:
         print_l('Fuzzing run %s returned %s' % (run_id, completed_process.returncode))
         # Write stdout and stderr to files
