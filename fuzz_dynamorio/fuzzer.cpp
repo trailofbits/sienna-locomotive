@@ -50,8 +50,7 @@ struct fuzzer_read_info {
 };
 
 /* Read the PEB of the target application and get the full command line */
-static LPTSTR
-get_target_command_line()
+static wchar_t *get_target_command_line(size_t *len)
 {
     // see: https://github.com/DynamoRIO/dynamorio/issues/2662
     // alternatively: https://wj32.org/wp/2009/01/24/howto-get-the-command-line-of-processes/
@@ -66,7 +65,8 @@ get_target_command_line()
     }
 
     // Allocate space for the command line
-    wchar_t* commandLineContents = (wchar_t *) dr_global_alloc(parameterBlock.CommandLine.Length);
+    wchar_t* commandLineContents = (wchar_t *) dr_global_alloc(parameterBlock.CommandLine.Length + 1);
+    memset(commandLineContents, 0, parameterBlock.CommandLine.Length + 1);
 
     // Read the command line from the parameter block
     if (!dr_safe_read(parameterBlock.CommandLine.Buffer, parameterBlock.CommandLine.Length, commandLineContents, &byte_counter)) {
@@ -74,6 +74,7 @@ get_target_command_line()
         dr_exit_process(1);
     }
 
+    *len = parameterBlock.CommandLine.Length + 1;
     return commandLineContents;
 }
 
@@ -703,15 +704,12 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         char *functionName = it->first;
         bool hook = false;
 
-        // Look for function matching the target specified on the command line
-        std::string strFunctionName(functionName);
-
         for (targetFunction t : client.parsedJson) {
-            if (t.selected && t.functionName == strFunctionName){
+            if (t.selected && STREQ(t.functionName.c_str(), functionName)){
                 hook = true;
             }
-            else if (t.selected && (strFunctionName == "RegQueryValueExW" || strFunctionName == "RegQueryValueExA")) {
-                if (t.functionName != "RegQueryValueEx") {
+            else if (t.selected && (STREQ(functionName, "RegQueryValueExW") || STREQ(functionName, "RegQueryValueExA"))) {
+                if (!STREQ(t.functionName.c_str(), "RegQueryValueEx")) {
                   hook = false;
                 }
             }
@@ -725,6 +723,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         void(__cdecl *hookFunctionPost)(void *, void *);
         hookFunctionPost = NULL;
 
+        // TODO(ww): Why do we do this, instead of just assigning above?
         if (toHookPost.find(functionName) != toHookPost.end()) {
             hookFunctionPost = toHookPost[functionName];
         }
@@ -733,22 +732,21 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
         const char *mod_name = dr_module_preferred_name(mod);
 
-        if (strFunctionName == "ReadFile") {
-            if (_stricmp(mod_name, "KERNELBASE.dll") != 0) {
+        // TODO(ww): Consolidate this between the wizard, fuzzer, and tracer.
+        if (STREQ(functionName, "ReadFile")) {
+            if (!STREQI(mod_name, "KERNELBASE.dll")) {
                 continue;
             }
         }
 
-        // Only hook registry queries in the kernel
-        if (strFunctionName == "RegQueryValueExA" || strFunctionName == "RegQueryValueExW") {
-            if (_stricmp(mod_name, "KERNELBASE.dll") != 0) {
+        if (STREQ(functionName, "RegQueryValueExA") || STREQ(functionName, "RegQueryValueExW")) {
+            if (!STREQI(mod_name, "KERNELBASE.dll")) {
                 continue;
             }
         }
 
-        // Only hook fread(_s) calls from the C runtime
-        if (strFunctionName == "fread" || strFunctionName == "fread_s") {
-            if (_stricmp(mod_name, "UCRTBASE.DLL") != 0) {
+        if (STREQ(functionName, "fread") || STREQ(functionName, "fread_s")) {
+            if (!STREQI(mod_name, "UCRTBASE.DLL")) {
                 continue;
             }
         }
@@ -822,7 +820,10 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_abort();
     }
 
-    sl2_conn_request_run_id(&sl2_conn, wcsAppName, get_target_command_line());
+    size_t target_argv_size;
+    wchar_t *target_argv = get_target_command_line(&target_argv_size);
+    sl2_conn_request_run_id(&sl2_conn, wcsAppName, target_argv);
+    dr_global_free(target_argv, target_argv_size);
 
     wchar_t run_id_s[SL2_UUID_SIZE];
     sl2_uuid_to_wstring(sl2_conn.run_id, run_id_s);
