@@ -6,17 +6,21 @@ import os
 import glob
 import re
 import struct
-import json, msgpack
+import json
+import msgpack
+import uuid
 from hashlib import sha1
 from csv import DictWriter
 
 from . import config
+
 
 def esc_quote(raw):
     if " " not in raw or '\"' in raw:
         return raw
     else:
         return "\"{}\"".format(raw)
+
 
 # TODO(ww): Use shlex or something similar here.
 def stringify_program_array(target_application_path, target_args_array):
@@ -149,7 +153,6 @@ def export_crash_data_to_csv(crashes, csv_filename):
         writer.writerows(crashes)
 
 
-
 def finalize(run_id, crashed):
     """ Manually closes out a fuzzing run. Only necessary if we killed the target binary before DynamoRIO could
     close out the run """
@@ -164,3 +167,23 @@ def finalize(run_id, crashed):
     f.write(struct.pack('?', 1 if True else 0))
     f.write(struct.pack('B', 0x6)) # EVT_SESSION_TEARDOWN
     f.close()
+
+
+def check_fuzz_line_for_crash(line):
+    try:
+        obj = json.loads(line)
+        if obj["exception"]:
+            return True, obj["exception"]
+    except Exception:
+        pass
+    return False, None
+
+
+def check_fuzz_line_for_run_id(line):
+    try:
+        obj = json.loads(line)
+        if obj["run_id"]:
+            return uuid.UUID(obj["run_id"])
+    except Exception:
+        pass
+    return None

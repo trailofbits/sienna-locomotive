@@ -137,70 +137,75 @@ onexception(void *drcontext, dr_exception_t *excpt)
     // Make our own copy of the exception record.
     memcpy(&(fuzz_exception_ctx.record), excpt->record, sizeof(EXCEPTION_RECORD));
 
+    json j;
+
     switch (exceptionCode) {
         case EXCEPTION_ACCESS_VIOLATION:
-            SL2_DR_DEBUG("EXCEPTION_ACCESS_VIOLATION\n");
+            j["exception"] = "EXCEPTION_ACCESS_VIOLATION";
             break;
         case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
-            SL2_DR_DEBUG("EXCEPTION_ARRAY_BOUNDS_EXCEEDED\n");
+            j["exception"] = "EXCEPTION_ARRAY_BOUNDS_EXCEEDED";
             break;
         case EXCEPTION_BREAKPOINT:
-            SL2_DR_DEBUG("EXCEPTION_BREAKPOINT\n");
+            j["exception"] = "EXCEPTION_BREAKPOINT";
             break;
         case EXCEPTION_DATATYPE_MISALIGNMENT:
-            SL2_DR_DEBUG("EXCEPTION_DATATYPE_MISALIGNMENT\n");
+            j["exception"] = "EXCEPTION_DATATYPE_MISALIGNMENT";
             break;
         case EXCEPTION_FLT_DENORMAL_OPERAND:
-            SL2_DR_DEBUG("EXCEPTION_FLT_DENORMAL_OPERAND\n");
+            j["exception"] = "EXCEPTION_FLT_DENORMAL_OPERAND";
             break;
         case EXCEPTION_FLT_DIVIDE_BY_ZERO:
-            SL2_DR_DEBUG("EXCEPTION_FLT_DIVIDE_BY_ZERO\n");
+            j["exception"] = "EXCEPTION_FLT_DIVIDE_BY_ZERO";
             break;
         case EXCEPTION_FLT_INEXACT_RESULT:
-            SL2_DR_DEBUG("EXCEPTION_FLT_INEXACT_RESULT\n");
+            j["exception"] = "EXCEPTION_FLT_INEXACT_RESULT";
             break;
         case EXCEPTION_FLT_INVALID_OPERATION:
-            SL2_DR_DEBUG("EXCEPTION_FLT_INVALID_OPERATION\n");
+            j["exception"] = "EXCEPTION_FLT_INVALID_OPERATION";
             break;
         case EXCEPTION_FLT_OVERFLOW:
-            SL2_DR_DEBUG("EXCEPTION_FLT_OVERFLOW\n");
+            j["exception"] = "EXCEPTION_FLT_OVERFLOW";
             break;
         case EXCEPTION_FLT_STACK_CHECK:
-            SL2_DR_DEBUG("EXCEPTION_FLT_STACK_CHECK\n");
+            j["exception"] = "EXCEPTION_FLT_STACK_CHECK";
             break;
         case EXCEPTION_FLT_UNDERFLOW:
-            SL2_DR_DEBUG("EXCEPTION_FLT_UNDERFLOW\n");
+            j["exception"] = "EXCEPTION_FLT_UNDERFLOW";
             break;
         case EXCEPTION_ILLEGAL_INSTRUCTION:
-            SL2_DR_DEBUG("EXCEPTION_ILLEGAL_INSTRUCTION\n");
+            j["exception"] = "EXCEPTION_ILLEGAL_INSTRUCTION";
             break;
         case EXCEPTION_IN_PAGE_ERROR:
-            SL2_DR_DEBUG("EXCEPTION_IN_PAGE_ERROR\n");
+            j["exception"] = "EXCEPTION_IN_PAGE_ERROR";
             break;
         case EXCEPTION_INT_DIVIDE_BY_ZERO:
-            SL2_DR_DEBUG("EXCEPTION_INT_DIVIDE_BY_ZERO\n");
+            j["exception"] = "EXCEPTION_INT_DIVIDE_BY_ZERO";
             break;
         case EXCEPTION_INT_OVERFLOW:
-            SL2_DR_DEBUG("EXCEPTION_INT_OVERFLOW\n");
+            j["exception"] = "EXCEPTION_INT_OVERFLOW";
             break;
         case EXCEPTION_INVALID_DISPOSITION:
-            SL2_DR_DEBUG("EXCEPTION_INVALID_DISPOSITION\n");
+            j["exception"] = "EXCEPTION_INVALID_DISPOSITION";
             break;
         case EXCEPTION_NONCONTINUABLE_EXCEPTION:
-            SL2_DR_DEBUG("EXCEPTION_NONCONTINUABLE_EXCEPTION\n");
+            j["exception"] = "EXCEPTION_NONCONTINUABLE_EXCEPTION";
             break;
         case EXCEPTION_PRIV_INSTRUCTION:
-            SL2_DR_DEBUG("EXCEPTION_PRIV_INSTRUCTION\n");
+            j["exception"] = "EXCEPTION_PRIV_INSTRUCTION";
             break;
         case EXCEPTION_SINGLE_STEP:
-            SL2_DR_DEBUG("EXCEPTION_SINGLE_STEP\n");
+            j["exception"] = "EXCEPTION_SINGLE_STEP";
             break;
         case EXCEPTION_STACK_OVERFLOW:
-            SL2_DR_DEBUG("EXCEPTION_STACK_OVERFLOW\n");
+            j["exception"] = "EXCEPTION_STACK_OVERFLOW";
             break;
         default:
+            j["exception"] = "EXCEPTION_SL2_UNKNOWN";
             break;
     }
+
+    SL2_LOG_JSONL(j);
 
     dr_exit_process(1);
     return true;
@@ -314,6 +319,8 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
     else {
         mutate_buffer(mutation.buffer, mutation.bufsize);
     }
+
+    SL2_DR_DEBUG("mutate: %.*s\n", mutation.bufsize, mutation.buffer);
 
     // Tell the server about our mutation.
     sl2_conn_register_mutation(&sl2_conn, &mutation);
@@ -852,13 +859,19 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     sl2_conn_request_run_id(&sl2_conn, target_app_name, target_argv);
     dr_global_free(target_argv, target_argv_size);
 
-    wchar_t run_id_s[SL2_UUID_SIZE];
-    sl2_uuid_to_wstring(sl2_conn.run_id, run_id_s);
-    SL2_DR_DEBUG("Beginning fuzzing run %S\n\n", run_id_s);
+    wchar_t run_id_ws[SL2_UUID_SIZE];
+    char run_id_s[SL2_UUID_SIZE] = {0};
+    sl2_uuid_to_wstring(sl2_conn.run_id, run_id_ws);
+    wcstombs_s(NULL, run_id_s, SL2_UUID_SIZE, run_id_ws, SL2_UUID_SIZE);
+
+    json j;
+    j["run_id"] = run_id_s;
+    SL2_LOG_JSONL(j);
 
     drmgr_init();
     drwrap_init();
 
+    // TODO(ww): Do we need to fill these in, or is zeroing them out enough?
     drreg_options_t reg_opts = {0};
     reg_opts.struct_size = sizeof(drreg_options_t);
     drreg_init(&reg_opts);

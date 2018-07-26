@@ -1542,7 +1542,7 @@ void tracer(client_id_t id, int argc, const char *argv[])
 
     no_mutate = op_no_mutate.get_value();
 
-    sl2_wstring_to_uuid(run_id_s.c_str(), &run_id);
+    sl2_string_to_uuid(run_id_s.c_str(), &run_id);
     sl2_conn_assign_run_id(&sl2_conn, run_id);
 
     mutatex = dr_mutex_create();
