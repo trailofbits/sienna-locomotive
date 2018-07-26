@@ -69,32 +69,25 @@ static bool coverage_guided = false;
 static module_data_t *target_mod;
 
 /* Read the PEB of the target application and get the full command line */
-static wchar_t *get_target_command_line(size_t *len)
+static void get_target_command_line(wchar_t **argv, size_t *len)
 {
     // see: https://github.com/DynamoRIO/dynamorio/issues/2662
     // alternatively: https://wj32.org/wp/2009/01/24/howto-get-the-command-line-of-processes/
-    _PEB * clientPEB = (_PEB *) dr_get_app_PEB();
-    _RTL_USER_PROCESS_PARAMETERS parameterBlock;
+    PEB * clientPEB = (PEB *) dr_get_app_PEB();
+    RTL_USER_PROCESS_PARAMETERS parameterBlock;
     size_t byte_counter;
 
     // Read process parameter block from PEB
-    if (!dr_safe_read(clientPEB->ProcessParameters, sizeof(_RTL_USER_PROCESS_PARAMETERS), &parameterBlock, &byte_counter)) {
-        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#get_target_command_line: Could not read process parameter block");
-        dr_exit_process(1);
-    }
+    memcpy(&parameterBlock, clientPEB->ProcessParameters, sizeof(RTL_USER_PROCESS_PARAMETERS));
 
     // Allocate space for the command line
-    wchar_t* commandLineContents = (wchar_t *) dr_global_alloc(parameterBlock.CommandLine.Length + 1);
-    memset(commandLineContents, 0, parameterBlock.CommandLine.Length + 1);
+    *argv = (wchar_t *) dr_global_alloc(parameterBlock.CommandLine.Length + 1);
+    memset(*argv, 0, parameterBlock.CommandLine.Length + 1);
 
     // Read the command line from the parameter block
-    if (!dr_safe_read(parameterBlock.CommandLine.Buffer, parameterBlock.CommandLine.Length, commandLineContents, &byte_counter)) {
-        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#get_target_command_line: Could not read command line buffer");
-        dr_exit_process(1);
-    }
+    memcpy(*argv, parameterBlock.CommandLine.Buffer, parameterBlock.CommandLine.Length);
 
     *len = parameterBlock.CommandLine.Length + 1;
-    return commandLineContents;
 }
 
 static dr_emit_flags_t
@@ -852,8 +845,10 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_abort();
     }
 
+    wchar_t *target_argv;
     size_t target_argv_size;
-    wchar_t *target_argv = get_target_command_line(&target_argv_size);
+    get_target_command_line(&target_argv, &target_argv_size);
+
     sl2_conn_request_run_id(&sl2_conn, target_app_name, target_argv);
     dr_global_free(target_argv, target_argv_size);
 
