@@ -53,8 +53,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.file_proxy_model = CheckboxTreeSortFilterProxyModel()
         self.file_proxy_model.setSourceModel(self.func_proxy_model)
         self.file_proxy_model.setFilterKeyColumn(1)
+        self.module_proxy_model = CheckboxTreeSortFilterProxyModel()
+        self.module_proxy_model.setSourceModel(self.file_proxy_model)
+        self.module_proxy_model.setFilterKeyColumn(4)
         self.build_func_tree()
-        self._func_tree.setModel(self.file_proxy_model)
+        self._func_tree.setModel(self.module_proxy_model)
 
         # These need to happen after we set the model
         self._func_tree.expandAll()
@@ -75,6 +78,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.filter_layout.addWidget(QtWidgets.QLabel("Filter Files: "))
         self.file_filter_box = QtWidgets.QLineEdit()
         self.filter_layout.addWidget(self.file_filter_box)
+        self.filter_layout.addWidget(QtWidgets.QLabel("Filter Modules: "))
+        self.module_filter_box = QtWidgets.QLineEdit()
+        self.filter_layout.addWidget(self.module_filter_box)
 
         # Set up fuzzer button and thread
         self.fuzzer_button = QtWidgets.QPushButton("Fuzz selected targets")
@@ -183,6 +189,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Filter the list of functions displayed when we type things into the boxes
         self.func_filter_box.textChanged.connect(self.func_proxy_model.setFilterFixedString)
         self.file_filter_box.textChanged.connect(self.file_proxy_model.setFilterFixedString)
+        self.module_filter_box.textChanged.connect(self.module_proxy_model.setFilterFixedString)
 
         # Handle checks/unchecks in the target tree
         self._func_tree.itemCheckedStateChanged.connect(self.tree_changed)
