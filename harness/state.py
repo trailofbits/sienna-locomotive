@@ -170,6 +170,11 @@ def finalize(run_id, crashed):
 
 
 def check_fuzz_line_for_crash(line):
+    """
+    Attempt to parse a line as JSON, returning a tuple of the crash state
+    and the exception code. If no crash can be detected in the line, return
+    False, None.
+    """
     try:
         obj = json.loads(line)
         if obj["exception"]:
@@ -180,6 +185,10 @@ def check_fuzz_line_for_crash(line):
 
 
 def check_fuzz_line_for_run_id(line):
+    """
+    Attempt to parse a line as JSON, returning a UUID object
+    if the JSON object contains one. Otherwise, return None.
+    """
     try:
         obj = json.loads(line)
         if obj["run_id"]:
