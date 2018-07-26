@@ -170,7 +170,6 @@ def export_crash_data_to_csv(crashes, csv_filename):
         writer.writerows(crashes)
 
 
-
 def finalize(run_id, crashed):
     """ Manually closes out a fuzzing run. Only necessary if we killed the target binary before DynamoRIO could
     close out the run """
@@ -182,6 +181,6 @@ def finalize(run_id, crashed):
     # Write a bool indicating a crash
     f.write(struct.pack('?', 1 if crashed else 0))
     # Write a bool indicating whether to preserve run files (without a crash)
-    f.write(struct.pack('?', 1 if True else 0))
+    f.write(struct.pack('?', 1 if crashed else 0))
     f.write(struct.pack('B', 0x6)) # EVT_SESSION_TEARDOWN
     f.close()

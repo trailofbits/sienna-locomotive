@@ -86,7 +86,10 @@ def run_dr(config_dict, verbose=False, timeout=None):
             pid = pidfile.read().strip()
             if verbose:
                 print_l("Killing child process:", pid)
-            os.kill(int(pid), signal.SIGTERM)
+            try:
+                os.kill(int(pid), signal.SIGTERM)
+            except PermissionError:
+                print_l("WARNING: Couldn't kill child process")
 
         # Try to get the output again
         try:
@@ -179,10 +182,7 @@ def fuzzer_run(config_dict):
 
     # Handle orphaned pipes after a timeout
     if completed_process.timed_out:
-        if crashed:
-            finalize(run_id, True)
-        else:
-            finalize(run_id, False)
+        finalize(run_id, crashed)
 
     return crashed, run_id
 
