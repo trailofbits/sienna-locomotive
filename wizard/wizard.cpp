@@ -347,8 +347,8 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 
     wstring_convert<std::codecvt_utf8<wchar_t>> utf8Converter;
 
-    wizard_read_info *info = ((wizard_read_info *)user_data);
-    char *functionName     = get_function_name(info->function);
+    wizard_read_info *info   = ((wizard_read_info *)user_data);
+    const char *functionName = get_function_name(info->function);
 
     json j;
     j["type"]               = "id";
