@@ -111,7 +111,7 @@ def run_dr(config_dict, verbose=False, timeout=None):
 
             # Fix types again (expects bytes)
             popen_obj.stdout = "ERROR".encode('utf-8')
-            popen_obj.stderr = "EXCEPTION_SL2_TIMEOUT".encode('utf-8')
+            popen_obj.stderr = json.dumps({"exception": "EXCEPTION_SL2_TIMEOUT"}).encode('utf-8')
 
         popen_obj.timed_out = True
 
