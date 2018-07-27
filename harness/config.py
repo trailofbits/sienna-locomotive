@@ -71,10 +71,7 @@ config = {}  # This is what gets exported
 
 def set_profile(new_profile):
     global config
-    config = {}  # This is what gets exported
-    for key in _config[new_profile]:
-        config[key] = _config[new_profile].get(key)
-
+    config = dict(_config[new_profile])
     update_config_from_args()
 
 

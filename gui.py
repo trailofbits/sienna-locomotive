@@ -13,6 +13,7 @@ from harness.state import get_target, export_crash_data_to_csv
 from harness.threads import WizardThread, FuzzerThread
 from functools import partial
 
+from config_window import ConfigWindow
 
 class MainWindow(QtWidgets.QMainWindow):
 
@@ -21,7 +22,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.crashes = []
 
         # Select config profile before starting
-        self.get_config()
+        self.cfg = ConfigWindow()
+        self.cfg.exec()
+        exit(0)
 
         # Set up basic window
         self.setWindowTitle("Sienna Locomotive 2")
@@ -308,18 +311,6 @@ class MainWindow(QtWidgets.QMainWindow):
         savefile, not_canceled = QFileDialog.getSaveFileName(self, filter="*.csv")
         if not_canceled:
             export_crash_data_to_csv(self.crashes, savefile)
-
-    def get_config(self):
-        """ Selects the configuration dict from config.py """
-        profile, cont = QtWidgets.QInputDialog.getItem(self,
-                                                       "Select Configuration Profile",
-                                                       "Select Configuration Profile",
-                                                       config._config.keys(),
-                                                       0, False)
-        if cont:
-            config.set_profile(profile)
-        else:
-            exit(0)
 
 
 if __name__ == '__main__':
