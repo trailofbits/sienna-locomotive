@@ -73,7 +73,7 @@ enum {
 // The struct filled with function information for hashing.
 // See `MATCH_ARG_HASH`.
 struct fileArgHash {
-  WCHAR fileName[MAX_PATH + 1];
+  wchar_t fileName[MAX_PATH + 1];
   size_t position;
   size_t readSize;
 };
@@ -95,12 +95,14 @@ struct client_read_info {
     uint64_t    retAddrOffset;
     Function    function;
     HANDLE      hFile;
-    LPDWORD     lpNumberOfBytesRead;
-    LPVOID      lpBuffer;
-    char*       argHash;
+    DWORD       *lpNumberOfBytesRead;
+    void        *lpBuffer;
+    char        *argHash;
     size_t      nNumberOfBytesToRead;
 };
 
+// The struct filled with exception information for registering
+// within a minidump.
 struct sl2_exception_ctx {
     DWORD thread_id;
     EXCEPTION_RECORD record;
@@ -129,7 +131,7 @@ public:
     bool        isFunctionTargeted(Function function,  client_read_info* info);
     bool        areTargetsArenaCompatible();
     void        generateArenaId(wchar_t *id);
-    void        loadJson(string json);
+    bool        loadJson(string json);
     uint64_t    incrementCallCountForFunction(Function function);
 
 };

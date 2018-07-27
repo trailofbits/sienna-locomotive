@@ -1,9 +1,3 @@
-// TODO(ww): Figure out if we still need these.
-#define EVENT_APP event_app_bb
-// #define EVENT_APP event_app_instruction
-#define EVENT_THREAD_EXIT event_thread_exit_cov
-// #define EVENT_THREAD_EXIT event_thread_exit
-
 #include <stdio.h>
 #include <map>
 #include <set>
@@ -560,18 +554,14 @@ handle_specific(void *drcontext, instr_t *instr)
     }
 
     switch (opcode) {
-        // push
-        case 18:
-        // pop
-        case 20:
+        case OP_push:
+        case OP_pop:
             handle_push_pop(drcontext, instr);
             return true;
-        // xor
-        case 12:
+        case OP_xor:
             result = handle_xor(drcontext, instr);
             return result;
-        // xchg
-        case 62:
+        case OP_xchg:
             result = handle_xchg(drcontext, instr);
             return result;
         default:
@@ -676,6 +666,7 @@ event_app_instruction(
 
     /* Clean call propagate taint on each instruction. Should be side-effect free
         http://dynamorio.org/docs/dr__ir__utils_8h.html#ae7b7bd1e750b8a24ebf401fb6a6d6d5e */
+    // TODO(ww): Replace this with instruction injection for performance?
     dr_insert_clean_call(drcontext, bb, instr, propagate_taint, false, 1,
                 OPND_CREATE_INTPTR(instr_get_app_pc(instr)));
 
@@ -907,12 +898,12 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
     j["tainted_addrs"] = json::array();
     if (tainted_mems.size() > 0) {
         std::set<app_pc>::iterator mit = tainted_mems.begin();
-        UINT64 start = (UINT64)*mit;
-        UINT64 size = 1;
+        uint64_t start = (uint64_t) *mit;
+        uint64_t size = 1;
 
         mit++;
         for (; mit != tainted_mems.end(); mit++) {
-            UINT64 curr = (UINT64)*mit;
+            uint64_t curr = (uint64_t) *mit;
             if (curr > (start + size)) {
               json addr = {{"start", start}, {"size", size}};
               j["tainted_addrs"].push_back(addr);
@@ -947,8 +938,8 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
             exit(1);
         }
 
-        DWORD bytesWritten;
-        if (!WriteFile(hCrashFile, crash_json.c_str(), crash_json.length(), &bytesWritten, NULL)) {
+        DWORD txsize;
+        if (!WriteFile(hCrashFile, crash_json.c_str(), (DWORD) crash_json.length(), &txsize, NULL)) {
             SL2_DR_DEBUG("tracer#dump_crash: could not write to the crash file (%x)\n", GetLastError());
             exit(1);
         }
@@ -1394,7 +1385,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
         dr_mutex_lock(mutatex);
 
         if (no_mutate) {
-            sl2_conn_request_replay(&sl2_conn, mutate_count, nNumberOfBytesToRead, lpBuffer);
+            SL2_DR_DEBUG("user requested replay WITHOUT mutation!\n");
         }
         else {
             sl2_conn_request_replay(&sl2_conn, mutate_count, nNumberOfBytesToRead, lpBuffer);
@@ -1542,7 +1533,7 @@ void tracer(client_id_t id, int argc, const char *argv[])
 
     no_mutate = op_no_mutate.get_value();
 
-    sl2_wstring_to_uuid(run_id_s.c_str(), &run_id);
+    sl2_string_to_uuid(run_id_s.c_str(), &run_id);
     sl2_conn_assign_run_id(&sl2_conn, run_id);
 
     mutatex = dr_mutex_create();
@@ -1589,18 +1580,18 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_abort();
     }
 
-    try {
-        client.loadJson(target);
-    } catch (const char* msg) {
-        SL2_DR_DEBUG(msg);
+    if (!client.loadJson(target)) {
+        SL2_DR_DEBUG("Failed to load targets!\n");
         dr_abort();
     }
 
     // NOTE(ww): We open the client's connection to the server here,
     // but the client isn't ready to use until it's been given a run ID.
     // See inside of `tracer` for that.
-    // TODO(ww): Check the response code here.
-    sl2_conn_open(&sl2_conn);
+    if (sl2_conn_open(&sl2_conn) != SL2Response::OK) {
+        SL2_DR_DEBUG("ERROR: Couldn't open a connection to the server!\n");
+        dr_abort();
+    }
 
     tracer(id, argc, argv);
 }

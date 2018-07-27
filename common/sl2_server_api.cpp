@@ -11,7 +11,7 @@
 #define SL2_CONN_READ(thing, size) (ReadFile(conn->pipe, thing, size, &txsize, NULL))
 
 #define SL2_CONN_EVT(event) do {       \
-    uint8_t evt = event;                     \
+    uint8_t evt = event;               \
     SL2_CONN_WRITE(&evt, sizeof(evt)); \
 } while(0)
 
@@ -63,9 +63,6 @@ SL2Response sl2_conn_open(sl2_conn *conn)
         return SL2Response::BadPipe;
     }
 
-    DWORD readMode = PIPE_READMODE_MESSAGE;
-    SetNamedPipeHandleState(pipe, &readMode, NULL, NULL);
-
     conn->pipe = pipe;
 
     // NOTE(ww): We zero the run_id out here so that using a connection
@@ -94,6 +91,7 @@ SL2Response sl2_conn_close(sl2_conn *conn)
 {
     sl2_conn_end_session(conn);
 
+    FlushFileBuffers(conn->pipe);
     CloseHandle(conn->pipe);
 
     // TODO(ww): error returns
@@ -283,6 +281,18 @@ SL2Response sl2_conn_register_arena(sl2_conn *conn, sl2_arena *arena)
 
     // Finally, write the arena data to the server.
     SL2_CONN_WRITE(arena->map, FUZZ_ARENA_SIZE);
+
+    return SL2Response::OK;
+}
+
+__declspec(dllexport)
+SL2Response sl2_conn_ping(sl2_conn *conn, uint8_t *ok)
+{
+    DWORD txsize;
+
+    SL2_CONN_EVT(EVT_PING);
+
+    SL2_CONN_READ(ok, sizeof(ok));
 
     return SL2Response::OK;
 }

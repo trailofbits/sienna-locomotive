@@ -16,7 +16,7 @@ import traceback
 import sys
 from enum import IntEnum
 
-from .state import parse_triage_output, finalize, write_output_files, create_invokation_statement
+from .state import parse_triage_output, finalize, write_output_files, create_invokation_statement,  check_fuzz_line_for_crash, check_fuzz_line_for_run_id
 from . import config
 
 print_lock = threading.Lock()
@@ -159,21 +159,29 @@ def fuzzer_run(config_dict):
     completed_process = run_dr(config_dict, verbose=config_dict['verbose'], timeout=config_dict.get('fuzz_timeout', None))
 
     # Parse run ID from fuzzer output
-    run_id = 'ERR'
-    proc_stderr = completed_process.stderr.decode('utf-8')
+    run_id = None
+    crashed = False
 
-    for line in str.splitlines(proc_stderr):
-        if 'Beginning fuzzing run' in line:
-            uuid_s = line.replace('Beginning fuzzing run ', '').strip()
-            run_id = uuid.UUID(uuid_s)
-    if run_id == 'ERR':
+    for line in completed_process.stderr.split(b'\n'):
+        try:
+            line = line.decode('utf-8')
+            # Extract the run id from the run
+            if not run_id:
+                run_id = check_fuzz_line_for_run_id(line)
+
+            # Identify whether the fuzzing run resulted in a crash
+            if not crashed:
+                crashed, exception = check_fuzz_line_for_crash(line)
+        except UnicodeDecodeError:
+            if config_dict['verbose']:
+                print_l("[!] Not UTF-8: %s", repr(line))
+
+    if not run_id:
         print_l("Error: No run ID could be parsed from the server output")
         return False, -1
 
-    # Identify whether the fuzzing run resulted in a crash
-    crashed = 'EXCEPTION_' in proc_stderr
     if crashed:
-        print_l('Fuzzing run %s returned %s' % (run_id, completed_process.returncode))
+        print_l('Fuzzing run %s returned %s after raising %s' % (run_id, completed_process.returncode, exception))
         # Write stdout and stderr to files
         # TODO fix issue #40
         write_output_files(completed_process, run_id, 'fuzz')

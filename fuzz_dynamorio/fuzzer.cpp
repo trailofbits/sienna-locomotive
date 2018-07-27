@@ -69,32 +69,25 @@ static bool coverage_guided = false;
 static module_data_t *target_mod;
 
 /* Read the PEB of the target application and get the full command line */
-static wchar_t *get_target_command_line(size_t *len)
+static void get_target_command_line(wchar_t **argv, size_t *len)
 {
     // see: https://github.com/DynamoRIO/dynamorio/issues/2662
     // alternatively: https://wj32.org/wp/2009/01/24/howto-get-the-command-line-of-processes/
-    _PEB * clientPEB = (_PEB *) dr_get_app_PEB();
-    _RTL_USER_PROCESS_PARAMETERS parameterBlock;
+    PEB * clientPEB = (PEB *) dr_get_app_PEB();
+    RTL_USER_PROCESS_PARAMETERS parameterBlock;
     size_t byte_counter;
 
     // Read process parameter block from PEB
-    if (!dr_safe_read(clientPEB->ProcessParameters, sizeof(_RTL_USER_PROCESS_PARAMETERS), &parameterBlock, &byte_counter)) {
-        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#get_target_command_line: Could not read process parameter block");
-        dr_exit_process(1);
-    }
+    memcpy(&parameterBlock, clientPEB->ProcessParameters, sizeof(RTL_USER_PROCESS_PARAMETERS));
 
     // Allocate space for the command line
-    wchar_t* commandLineContents = (wchar_t *) dr_global_alloc(parameterBlock.CommandLine.Length + 1);
-    memset(commandLineContents, 0, parameterBlock.CommandLine.Length + 1);
+    *argv = (wchar_t *) dr_global_alloc(parameterBlock.CommandLine.Length + 1);
+    memset(*argv, 0, parameterBlock.CommandLine.Length + 1);
 
     // Read the command line from the parameter block
-    if (!dr_safe_read(parameterBlock.CommandLine.Buffer, parameterBlock.CommandLine.Length, commandLineContents, &byte_counter)) {
-        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#get_target_command_line: Could not read command line buffer");
-        dr_exit_process(1);
-    }
+    memcpy(*argv, parameterBlock.CommandLine.Buffer, parameterBlock.CommandLine.Length);
 
     *len = parameterBlock.CommandLine.Length + 1;
-    return commandLineContents;
 }
 
 static dr_emit_flags_t
@@ -144,70 +137,75 @@ onexception(void *drcontext, dr_exception_t *excpt)
     // Make our own copy of the exception record.
     memcpy(&(fuzz_exception_ctx.record), excpt->record, sizeof(EXCEPTION_RECORD));
 
+    json j;
+
     switch (exceptionCode) {
         case EXCEPTION_ACCESS_VIOLATION:
-            SL2_DR_DEBUG("EXCEPTION_ACCESS_VIOLATION\n");
+            j["exception"] = "EXCEPTION_ACCESS_VIOLATION";
             break;
         case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
-            SL2_DR_DEBUG("EXCEPTION_ARRAY_BOUNDS_EXCEEDED\n");
+            j["exception"] = "EXCEPTION_ARRAY_BOUNDS_EXCEEDED";
             break;
         case EXCEPTION_BREAKPOINT:
-            SL2_DR_DEBUG("EXCEPTION_BREAKPOINT\n");
+            j["exception"] = "EXCEPTION_BREAKPOINT";
             break;
         case EXCEPTION_DATATYPE_MISALIGNMENT:
-            SL2_DR_DEBUG("EXCEPTION_DATATYPE_MISALIGNMENT\n");
+            j["exception"] = "EXCEPTION_DATATYPE_MISALIGNMENT";
             break;
         case EXCEPTION_FLT_DENORMAL_OPERAND:
-            SL2_DR_DEBUG("EXCEPTION_FLT_DENORMAL_OPERAND\n");
+            j["exception"] = "EXCEPTION_FLT_DENORMAL_OPERAND";
             break;
         case EXCEPTION_FLT_DIVIDE_BY_ZERO:
-            SL2_DR_DEBUG("EXCEPTION_FLT_DIVIDE_BY_ZERO\n");
+            j["exception"] = "EXCEPTION_FLT_DIVIDE_BY_ZERO";
             break;
         case EXCEPTION_FLT_INEXACT_RESULT:
-            SL2_DR_DEBUG("EXCEPTION_FLT_INEXACT_RESULT\n");
+            j["exception"] = "EXCEPTION_FLT_INEXACT_RESULT";
             break;
         case EXCEPTION_FLT_INVALID_OPERATION:
-            SL2_DR_DEBUG("EXCEPTION_FLT_INVALID_OPERATION\n");
+            j["exception"] = "EXCEPTION_FLT_INVALID_OPERATION";
             break;
         case EXCEPTION_FLT_OVERFLOW:
-            SL2_DR_DEBUG("EXCEPTION_FLT_OVERFLOW\n");
+            j["exception"] = "EXCEPTION_FLT_OVERFLOW";
             break;
         case EXCEPTION_FLT_STACK_CHECK:
-            SL2_DR_DEBUG("EXCEPTION_FLT_STACK_CHECK\n");
+            j["exception"] = "EXCEPTION_FLT_STACK_CHECK";
             break;
         case EXCEPTION_FLT_UNDERFLOW:
-            SL2_DR_DEBUG("EXCEPTION_FLT_UNDERFLOW\n");
+            j["exception"] = "EXCEPTION_FLT_UNDERFLOW";
             break;
         case EXCEPTION_ILLEGAL_INSTRUCTION:
-            SL2_DR_DEBUG("EXCEPTION_ILLEGAL_INSTRUCTION\n");
+            j["exception"] = "EXCEPTION_ILLEGAL_INSTRUCTION";
             break;
         case EXCEPTION_IN_PAGE_ERROR:
-            SL2_DR_DEBUG("EXCEPTION_IN_PAGE_ERROR\n");
+            j["exception"] = "EXCEPTION_IN_PAGE_ERROR";
             break;
         case EXCEPTION_INT_DIVIDE_BY_ZERO:
-            SL2_DR_DEBUG("EXCEPTION_INT_DIVIDE_BY_ZERO\n");
+            j["exception"] = "EXCEPTION_INT_DIVIDE_BY_ZERO";
             break;
         case EXCEPTION_INT_OVERFLOW:
-            SL2_DR_DEBUG("EXCEPTION_INT_OVERFLOW\n");
+            j["exception"] = "EXCEPTION_INT_OVERFLOW";
             break;
         case EXCEPTION_INVALID_DISPOSITION:
-            SL2_DR_DEBUG("EXCEPTION_INVALID_DISPOSITION\n");
+            j["exception"] = "EXCEPTION_INVALID_DISPOSITION";
             break;
         case EXCEPTION_NONCONTINUABLE_EXCEPTION:
-            SL2_DR_DEBUG("EXCEPTION_NONCONTINUABLE_EXCEPTION\n");
+            j["exception"] = "EXCEPTION_NONCONTINUABLE_EXCEPTION";
             break;
         case EXCEPTION_PRIV_INSTRUCTION:
-            SL2_DR_DEBUG("EXCEPTION_PRIV_INSTRUCTION\n");
+            j["exception"] = "EXCEPTION_PRIV_INSTRUCTION";
             break;
         case EXCEPTION_SINGLE_STEP:
-            SL2_DR_DEBUG("EXCEPTION_SINGLE_STEP\n");
+            j["exception"] = "EXCEPTION_SINGLE_STEP";
             break;
         case EXCEPTION_STACK_OVERFLOW:
-            SL2_DR_DEBUG("EXCEPTION_STACK_OVERFLOW\n");
+            j["exception"] = "EXCEPTION_STACK_OVERFLOW";
             break;
         default:
+            j["exception"] = "EXCEPTION_SL2_UNKNOWN";
             break;
     }
+
+    SL2_LOG_JSONL(j);
 
     dr_exit_process(1);
     return true;
@@ -272,6 +270,7 @@ event_exit(void)
 
 
     sl2_conn_finalize_run(&sl2_conn, crashed, false);
+
     sl2_conn_close(&sl2_conn);
 
     dr_free_module_data(target_mod);
@@ -320,6 +319,8 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
     else {
         mutate_buffer(mutation.buffer, mutation.bufsize);
     }
+
+    SL2_DR_DEBUG("mutate: %.*s\n", mutation.bufsize, mutation.buffer);
 
     // Tell the server about our mutation.
     sl2_conn_register_mutation(&sl2_conn, &mutation);
@@ -677,8 +678,10 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     bool targeted = client.isFunctionTargeted(function, info);
     client.incrementCallCountForFunction(function);
 
-    if (info->lpNumberOfBytesRead) {
-        nNumberOfBytesToRead = *info->lpNumberOfBytesRead;
+    // NOTE(ww): We should never read more bytes than we request, so this is more
+    // of a sanity check than anything else.
+    if (info->lpNumberOfBytesRead && *(info->lpNumberOfBytesRead) < nNumberOfBytesToRead) {
+        nNumberOfBytesToRead = *(info->lpNumberOfBytesRead);
     }
 
     if (targeted) {
@@ -819,16 +822,14 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
 
     std::string target = op_target.get_value();
     if (target == "") {
-        SL2_DR_DEBUG("ERROR: arg -t (target file) required");
+        SL2_DR_DEBUG("ERROR: arg -t (target file) required\n");
         dr_abort();
     }
 
     bool no_coverage = op_no_coverage.get_value();
 
-    try {
-        client.loadJson(target);
-    } catch (const char* msg) {
-        SL2_DR_DEBUG(msg);
+    if (!client.loadJson(target)) {
+        SL2_DR_DEBUG("Failed to load targets!\n");
         dr_abort();
     }
 
@@ -851,18 +852,24 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_abort();
     }
 
+    wchar_t *target_argv;
     size_t target_argv_size;
-    wchar_t *target_argv = get_target_command_line(&target_argv_size);
+    get_target_command_line(&target_argv, &target_argv_size);
+
     sl2_conn_request_run_id(&sl2_conn, target_app_name, target_argv);
     dr_global_free(target_argv, target_argv_size);
 
-    wchar_t run_id_s[SL2_UUID_SIZE];
-    sl2_uuid_to_wstring(sl2_conn.run_id, run_id_s);
-    SL2_DR_DEBUG("Beginning fuzzing run %S\n\n", run_id_s);
+    char run_id_s[SL2_UUID_SIZE] = {0};
+    sl2_uuid_to_string(sl2_conn.run_id, run_id_s);
+
+    json j;
+    j["run_id"] = run_id_s;
+    SL2_LOG_JSONL(j);
 
     drmgr_init();
     drwrap_init();
 
+    // TODO(ww): Do we need to fill these in, or is zeroing them out enough?
     drreg_options_t reg_opts = {0};
     reg_opts.struct_size = sizeof(drreg_options_t);
     drreg_init(&reg_opts);

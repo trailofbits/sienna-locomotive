@@ -6,7 +6,9 @@ import os
 import glob
 import re
 import struct
-import json, msgpack
+import json
+import msgpack
+import uuid
 from hashlib import sha1
 from csv import DictWriter
 
@@ -184,3 +186,32 @@ def finalize(run_id, crashed):
     f.write(struct.pack('?', 1 if crashed else 0))
     f.write(struct.pack('B', 0x6)) # EVT_SESSION_TEARDOWN
     f.close()
+
+
+def check_fuzz_line_for_crash(line):
+    """
+    Attempt to parse a line as JSON, returning a tuple of the crash state
+    and the exception code. If no crash can be detected in the line, return
+    False, None.
+    """
+    try:
+        obj = json.loads(line)
+        if obj["exception"]:
+            return True, obj["exception"]
+    except Exception:
+        pass
+    return False, None
+
+
+def check_fuzz_line_for_run_id(line):
+    """
+    Attempt to parse a line as JSON, returning a UUID object
+    if the JSON object contains one. Otherwise, return None.
+    """
+    try:
+        obj = json.loads(line)
+        if obj["run_id"]:
+            return uuid.UUID(obj["run_id"])
+    except Exception:
+        pass
+    return None

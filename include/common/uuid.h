@@ -12,6 +12,7 @@
 #define SL2_UUID_FMT_A ("%08x-%04hx-%04hx-%02hhx%02hhx-%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx")
 
 __declspec(dllexport) void sl2_uuid_to_wstring(UUID uuid, wchar_t dst[SL2_UUID_SIZE]);
-__declspec(dllexport) void sl2_wstring_to_uuid(const char *uuid, UUID *dst);
+__declspec(dllexport) void sl2_uuid_to_string(UUID uuid, char dst[SL2_UUID_SIZE]);
+__declspec(dllexport) void sl2_string_to_uuid(const char *uuid, UUID *dst);
 
 #endif
