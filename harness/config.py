@@ -5,7 +5,9 @@ Handles argument and config file parsing for the fuzzer
 2: If the config file exists, read in the contents
 3: If the user has provided any arguments that overwrite the values in the config file, use those instead
 """
+
 import os
+import sys
 import argparse
 import configparser
 
@@ -72,8 +74,12 @@ config = {}  # This is what gets exported
 def set_profile(new_profile):
     global config
     config = {}  # This is what gets exported
-    for key in _config[new_profile]:
-        config[key] = _config[new_profile].get(key)
+    try:
+        for key in _config[new_profile]:
+            config[key] = _config[new_profile].get(key)
+    except Exception as e:
+        print("ERROR: No such profile:", new_profile)
+        sys.exit()
 
     update_config_from_args()
 
