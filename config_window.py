@@ -57,7 +57,7 @@ class ConfigWindow(QtWidgets.QDialog):
 
         self.profile_name.setPlaceholderText("Profile Name")
         self.drrun_path.setPlaceholderText("Path to drrun.exe")
-        self.build_dir.setPlaceholderText("Path to build directory")
+        self.build_dir.setPlaceholderText("Path to SL2 build directory")
         self.target_path.setPlaceholderText("Path to target application")
         self.target_args.setPlaceholderText("Target arguments (comma separated)")
 
@@ -97,7 +97,6 @@ class ConfigWindow(QtWidgets.QDialog):
         self.build_dir_button.clicked.connect(self.get_build_dir)
         self.target_path_button.clicked.connect(self.get_target_path)
 
-
         self.show()
 
     def add_config(self, *_args):
@@ -116,7 +115,7 @@ class ConfigWindow(QtWidgets.QDialog):
         super().done(*args)
 
     def get_drrun_path(self):
-        path, good = QFileDialog.getOpenFileName(filter="*.exe")
+        path, good = QFileDialog.getOpenFileName(filter="*.exe", directory=config._config['DEFAULT']['drrun_path'])
         if good:
             self.drrun_path.setText(path)
 
@@ -126,7 +125,7 @@ class ConfigWindow(QtWidgets.QDialog):
             self.target_path.setText(path)
 
     def get_build_dir(self):
-        path = QFileDialog.getExistingDirectory()
+        path = QFileDialog.getExistingDirectory(directory='build')
         if len(path) > 0:
             self.build_dir.setText(path)
 
