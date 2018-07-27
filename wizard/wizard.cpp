@@ -348,13 +348,13 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     wstring_convert<std::codecvt_utf8<wchar_t>> utf8Converter;
 
     wizard_read_info *info   = ((wizard_read_info *)user_data);
-    const char *functionName = get_function_name(info->function);
+    const char *func_name = function_to_string(info->function);
 
     json j;
     j["type"]               = "id";
     j["callCount"]          = call_counts[info->function];
     j["retAddrOffset"]      = (UINT64) info->retAddrOffset;
-    j["func_name"]          = functionName;
+    j["func_name"]          = func_name;
 
     call_counts[info->function]++;
 

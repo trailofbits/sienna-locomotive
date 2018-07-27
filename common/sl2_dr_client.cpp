@@ -38,12 +38,12 @@ SL2Client::SL2Client() {
 //
 // Returns true if the current function should be targeted.
 bool SL2Client::
-isFunctionTargeted(Function function, client_read_info* info) {
-
-    std::string strFunctionName(get_function_name(function));
+isFunctionTargeted(Function function, client_read_info* info)
+{
+    const char *func_name = function_to_string(function);
 
     for (targetFunction t : parsedJson){
-        if (t.selected && t.functionName == strFunctionName) {
+        if (t.selected && STREQ(t.functionName.c_str(), func_name)) {
             if (t.mode & MATCH_INDEX && call_counts[function] == t.index) {
                 return true;
             }
@@ -161,9 +161,21 @@ loadJson(string path)
     return parsedJson.is_array();
 }
 
+// TODO(ww): Document the fallback values here.
+__declspec(dllexport)
+void from_json(const json& j, targetFunction& t)
+{
+    t.selected      = j.value("selected", false);
+    t.index         = j.value("callCount", -1);
+    t.mode          = j.value("mode", MATCH_INDEX);
+    t.retAddrOffset = j.value("retAddrOffset", -1);
+    t.functionName  = j.value("func_name", "");
+    t.argHash       = j.value("argHash", "");
+    t.buffer        = j["buffer"].get<vector<uint8_t>>();
+}
 
 __declspec(dllexport)
-const char *get_function_name(Function function)
+const char *function_to_string(Function function)
 {
     switch(function) {
         case Function::ReadFile:
@@ -187,19 +199,6 @@ const char *get_function_name(Function function)
     }
 
     return "unknown";
-}
-
-// TODO(ww): Document the fallback values here.
-__declspec(dllexport)
-void from_json(const json& j, targetFunction& t)
-{
-    t.selected      = j.value("selected", false);
-    t.index         = j.value("callCount", -1);
-    t.mode          = j.value("mode", MATCH_INDEX);
-    t.retAddrOffset = j.value("retAddrOffset", -1);
-    t.functionName  = j.value("func_name", "");
-    t.argHash       = j.value("argHash", "");
-    t.buffer        = j["buffer"].get<vector<uint8_t>>();
 }
 
 __declspec(dllexport)
