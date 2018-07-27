@@ -16,7 +16,7 @@ class ConfigWindow(QtWidgets.QDialog):
 
         # Set up basic window
         self.setWindowTitle("Configure SL2")
-        self.setMinimumSize(QSize(800, 600))
+        self.setMinimumSize(QSize(800, 200))
 
         self._layout = QtWidgets.QVBoxLayout()
         self.setLayout(self._layout)
@@ -37,7 +37,10 @@ class ConfigWindow(QtWidgets.QDialog):
         self._layout.addLayout(cbox_layout)
 
         expansion_layout = QtWidgets.QHBoxLayout()
-        expansion_layout.addWidget(QtWidgets.QLabel("Add Profile "))
+        expansion_layout.setAlignment(Qt.AlignLeft)
+        add_label = QtWidgets.QLabel("Add Profile ")
+        # add_label.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Preferred)
+        expansion_layout.addWidget(add_label)
         self.expand_button = QtWidgets.QToolButton()
         self.expand_button.setArrowType(Qt.RightArrow)
         expansion_layout.addWidget(self.expand_button)
@@ -86,15 +89,14 @@ class ConfigWindow(QtWidgets.QDialog):
 
         self.extension_widget.setLayout(self.extension_layout)
         self._layout.addWidget(self.extension_widget)
-
         self.extension_widget.hide()
 
-
         self.expand_button.clicked.connect(self.toggle_expansion)
+        self.add_button.clicked.connect(self.add_config)
 
         self.show()
 
-    def add_config(self):
+    def add_config(self, *_args):
         name = self.profile_name.text()
         config.create_new_profile(name, self.drrun_path.text(), self.build_dir.text(),
                                   self.target_path.text(), self.target_args.text())
@@ -103,7 +105,7 @@ class ConfigWindow(QtWidgets.QDialog):
         profile_names = list(config._config.keys())
         self.profiles.addItems(profile_names)
         self.profiles.setCurrentIndex(profile_names.index(name))
-        self.extension_widget.hide()
+        self.expand_button.click()
 
     def done(self, *args):
         config.set_profile(self.profiles.currentText())
@@ -125,6 +127,8 @@ class ConfigWindow(QtWidgets.QDialog):
         if not self.extension_widget.isVisible():
             self.extension_widget.show()
             self.expand_button.setArrowType(Qt.DownArrow)
+            self.adjustSize()
         else:
             self.extension_widget.hide()
             self.expand_button.setArrowType(Qt.RightArrow)
+            self.adjustSize()
