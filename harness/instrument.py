@@ -9,14 +9,21 @@ import subprocess
 import time
 import signal
 import threading
-import uuid
 import os
 import json
 import traceback
 import sys
 from enum import IntEnum
 
-from .state import parse_triage_output, finalize, write_output_files, create_invokation_statement,  check_fuzz_line_for_crash, check_fuzz_line_for_run_id
+from .state import (
+    parse_triage_output,
+    finalize,
+    write_output_files,
+    create_invokation_statement,
+    check_fuzz_line_for_crash,
+    check_fuzz_line_for_run_id
+)
+
 from . import config
 
 print_lock = threading.Lock()
