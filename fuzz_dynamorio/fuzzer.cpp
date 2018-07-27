@@ -127,7 +127,7 @@ on_exception(void *drcontext, dr_exception_t *excpt)
 {
     dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#on_exception: Exception occurred!\n");
     crashed = true;
-    DWORD exceptionCode = excpt->record->ExceptionCode;
+    DWORD exception_code = excpt->record->ExceptionCode;
 
     dr_switch_to_app_state(drcontext);
     fuzz_exception_ctx.thread_id = GetCurrentThreadId();
@@ -138,76 +138,7 @@ on_exception(void *drcontext, dr_exception_t *excpt)
     memcpy(&(fuzz_exception_ctx.record), excpt->record, sizeof(EXCEPTION_RECORD));
 
     json j;
-
-    switch (exceptionCode) {
-        case EXCEPTION_ACCESS_VIOLATION:
-            j["exception"] = "EXCEPTION_ACCESS_VIOLATION";
-            break;
-        case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
-            j["exception"] = "EXCEPTION_ARRAY_BOUNDS_EXCEEDED";
-            break;
-        case EXCEPTION_BREAKPOINT:
-            j["exception"] = "EXCEPTION_BREAKPOINT";
-            break;
-        case EXCEPTION_DATATYPE_MISALIGNMENT:
-            j["exception"] = "EXCEPTION_DATATYPE_MISALIGNMENT";
-            break;
-        case EXCEPTION_FLT_DENORMAL_OPERAND:
-            j["exception"] = "EXCEPTION_FLT_DENORMAL_OPERAND";
-            break;
-        case EXCEPTION_FLT_DIVIDE_BY_ZERO:
-            j["exception"] = "EXCEPTION_FLT_DIVIDE_BY_ZERO";
-            break;
-        case EXCEPTION_FLT_INEXACT_RESULT:
-            j["exception"] = "EXCEPTION_FLT_INEXACT_RESULT";
-            break;
-        case EXCEPTION_FLT_INVALID_OPERATION:
-            j["exception"] = "EXCEPTION_FLT_INVALID_OPERATION";
-            break;
-        case EXCEPTION_FLT_OVERFLOW:
-            j["exception"] = "EXCEPTION_FLT_OVERFLOW";
-            break;
-        case EXCEPTION_FLT_STACK_CHECK:
-            j["exception"] = "EXCEPTION_FLT_STACK_CHECK";
-            break;
-        case EXCEPTION_FLT_UNDERFLOW:
-            j["exception"] = "EXCEPTION_FLT_UNDERFLOW";
-            break;
-        case EXCEPTION_ILLEGAL_INSTRUCTION:
-            j["exception"] = "EXCEPTION_ILLEGAL_INSTRUCTION";
-            break;
-        case EXCEPTION_IN_PAGE_ERROR:
-            j["exception"] = "EXCEPTION_IN_PAGE_ERROR";
-            break;
-        case EXCEPTION_INT_DIVIDE_BY_ZERO:
-            j["exception"] = "EXCEPTION_INT_DIVIDE_BY_ZERO";
-            break;
-        case EXCEPTION_INT_OVERFLOW:
-            j["exception"] = "EXCEPTION_INT_OVERFLOW";
-            break;
-        case EXCEPTION_INVALID_DISPOSITION:
-            j["exception"] = "EXCEPTION_INVALID_DISPOSITION";
-            break;
-        case EXCEPTION_NONCONTINUABLE_EXCEPTION:
-            j["exception"] = "EXCEPTION_NONCONTINUABLE_EXCEPTION";
-            break;
-        case EXCEPTION_PRIV_INSTRUCTION:
-            j["exception"] = "EXCEPTION_PRIV_INSTRUCTION";
-            break;
-        case EXCEPTION_SINGLE_STEP:
-            j["exception"] = "EXCEPTION_SINGLE_STEP";
-            break;
-        case EXCEPTION_STACK_OVERFLOW:
-            j["exception"] = "EXCEPTION_STACK_OVERFLOW";
-            break;
-        case STATUS_HEAP_CORRUPTION:
-            j["exception"] = "STATUS_HEAP_CORRUPTION";
-            break;
-        default:
-            j["exception"] = "EXCEPTION_SL2_UNKNOWN";
-            break;
-    }
-
+    j["exception"] = exception_to_string(exception_code);
     SL2_LOG_JSONL(j);
 
     dr_exit_process(1);
