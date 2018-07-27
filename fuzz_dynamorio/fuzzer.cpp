@@ -828,6 +828,8 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
 
     bool no_coverage = op_no_coverage.get_value();
 
+    // NOTE(ww): Is it safe to do C++ exception handling within a DR client?
+    // See: https://github.com/DynamoRIO/dynamorio/issues/1717
     try {
         client.loadJson(target);
     } catch (const char* msg) {

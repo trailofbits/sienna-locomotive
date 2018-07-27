@@ -1589,6 +1589,8 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_abort();
     }
 
+    // NOTE(ww): Is it safe to do C++ exception handling within a DR client?
+    // See: https://github.com/DynamoRIO/dynamorio/issues/1717
     try {
         client.loadJson(target);
     } catch (const char* msg) {
