@@ -267,7 +267,7 @@ XploitabilityResult& operator<<( XploitabilityResult& result, const Exploitabili
 }
     
 XploitabilityResult XploitabilityBreakpad::process() {
-    XploitabilityResult result;
+    XploitabilityResult result(name());
     ExploitabilityRating rating = processExploitabilityRating();
 
     result << rating;

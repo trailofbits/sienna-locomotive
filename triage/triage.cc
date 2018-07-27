@@ -6,7 +6,6 @@
 #include "triage.h"
 
 
-#include <iostream>
 #include "google_breakpad/processor/minidump.h"
 #include "google_breakpad/processor/minidump_processor.h"
 #include "google_breakpad/processor/process_state.h"
@@ -17,18 +16,16 @@
 #include "XploitabilityTracer.h"
 
 #include <algorithm>
+#include <fstream>
+#include <iostream>
+#include <iterator>
 #include <numeric>
-#include <filesystem>
 #include <regex>
 #include <string>
-#include <iterator>
 
-
-// #include "cfi_frame_info.h"
 
 using namespace std;
 using namespace google_breakpad;
-namespace fs = std::experimental::filesystem;
 
 using google_breakpad::MinidumpProcessor;
 using google_breakpad::ProcessState;
@@ -84,29 +81,30 @@ StatusCode Triage::process() {
     cout << "-----------------------------------------------" << endl;
     cout << path_ << endl;
 
-    fs::path mdumpPath;
-    mdumpPath.append(path_);
-    mdumpPath = mdumpPath.parent_path();
-    mdumpPath.append("crash.jon");
+    dirPath_ = fs::path(path_);
+    dirPath_ = dirPath_.parent_path();
 
-    string jsonPath(mdumpPath.string());
-    cout << "json file" << jsonPath << endl;
+    fs::path jsonPath(dirPath_.string());
+    jsonPath.append("crash.json");
+
     
-    Xploitability* x =nullptr;
+    // There is a bug in Visual Studio that doesn't let you do this the sane way...
+    vector< unique_ptr<Xploitability> > modules;
+    modules.push_back( make_unique<XploitabilityBreakpad>( &dump_, &state_) );
+    modules.push_back( make_unique<XploitabilityBangExploitable>( &dump_, &state_) );    
 
-    vector<Xploitability*> modules = { 
-        new XploitabilityBreakpad( &dump_, &state_),
-        new XploitabilityBangExploitable( &dump_, &state_),
-        new XploitabilityTracer( &dump_, &state_, jsonPath )
-
-    };
-
-
-    for( auto& mod : modules ) {
-        auto result = mod->process();
-        ranks_.push_back( result.rank );
-        delete mod;
+    for( const auto& mod : modules ) {
+        const auto result   = mod->process();
+        results_.push_back( result );
     }
+
+    tracer_  = make_unique<XploitabilityTracer>( &dump_, &state_, jsonPath.string());
+    const auto result   = tracer_->process();
+    results_.push_back( result );
+
+    fs::path outpath(dirPath_.string());
+    outpath.append("triage.json");
+    persist(outpath.string());
     
     return StatusCode::GOOD;
 }
@@ -137,7 +135,7 @@ const string Triage::triagePath() {
 
 ////////////////////////////////////////////////////////////////////////////
 // crashReason()
-const string Triage::crashReason() {
+const string Triage::crashReason()  const {
     string ret;
     regex regexFilter { "[^a-zA-Z0-9_]+" };
 
@@ -151,14 +149,18 @@ const string Triage::crashReason() {
     return ret;
 }
 
+const uint64_t Triage::crashAddress() const { 
+    return state_.crash_address();
+}
+
 ////////////////////////////////////////////////////////////////////////////
 // exploitability()
 //      returns value from 0.0 to 1.0 for exploitabilty
-XploitabilityRank Triage::exploitabilityRank() {
+XploitabilityRank Triage::exploitabilityRank() const {
     
     XploitabilityRank rank = XploitabilityRank::XPLOITABILITY_NONE;
 
-    for( auto arank : ranks_ ) {
+    for( auto arank : ranks() ) {
         if( arank > rank ) {
             rank = arank;
         }
@@ -168,26 +170,57 @@ XploitabilityRank Triage::exploitabilityRank() {
 
 }
 
-const string Triage::exploitability() {
+const string Triage::exploitability() const {
     //return Xploitability::rankToString( exploitabilityRank() );
-    const XploitabilityRank rank = exploitabilityRank();
+    XploitabilityRank rank = exploitabilityRank();
     
     return ~rank;
 }
 
 
-vector<XploitabilityRank>   Triage::ranks() {
-    return ranks_;
+vector<XploitabilityRank>   Triage::ranks() const {
+    vector<XploitabilityRank> ret;
+    for( auto result : results_ ) {
+        ret.push_back(result.rank);
+    }
+    return ret;
 }
 
 const string Triage::ranksString() const {
     ostringstream ss;
-    for( auto& rank : ranks_ ) {
+    for( auto& rank : ranks() ) {
         ss << rank << " ";
     }
     return ss.str();
 }
 
+
+const string Triage::path() const {
+    return path_;
+}
+
+
+
+json Triage::toJson() const {
+    return json{
+        { "crashReason",        crashReason() },
+        { "crashAddress",       crashAddress() },
+        { "exploitability",     exploitability() },
+        { "minidumpPath",       path() },
+        { "ranks",              ranks() },
+        { "rank",               exploitabilityRank() },
+        { "instructionPointer", instructionPtr_, },
+        { "stackPointer",       stackPtr_, },
+        { "tracer",             tracer_->toJson() }
+    };
+}
+
+void Triage::persist(const string path)  const {
+    ofstream ofs(path);
+    json j = toJson();
+    ofs << j << endl;
+    ofs.close();
+}
 
 
 ////////////////////////////////////////////////////////////////////////////

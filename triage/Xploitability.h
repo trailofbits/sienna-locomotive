@@ -37,8 +37,11 @@ const string operator~( const XploitabilityRank& self );
 class XploitabilityResult {
 public:
     XploitabilityRank       rank;
+    const string            moduleName;
+    
 
-    XploitabilityResult() {
+    XploitabilityResult( const string modName ):
+        moduleName(modName) {
         rank = XploitabilityRank::XPLOITABILITY_NONE;
     };
 
@@ -55,10 +58,12 @@ public:
     
     virtual XploitabilityResult             process() = 0;
 
-    bool isExceptionAddressInUser() const;
-    bool isExceptionAddressNearNull() const;
+    bool            isExceptionAddressInUser() const;
+    bool            isExceptionAddressNearNull() const;
 
-    const string name() const { return name_; } 
+    const string    name() const                { return name_; };
+    const uint64_t  instructionPointer() const  { return instructionPtr_; };
+    const uint64_t  stackPointer() const        { return stackPtr_; };
 
 
 protected:

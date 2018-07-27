@@ -13,29 +13,38 @@ XploitabilityTracer::XploitabilityTracer(
         Minidump *dump,
         ProcessState *process_state,
         const string crashJson )
-    :   Xploitability(dump, process_state, "sl2")  {
+    :   Xploitability(dump, process_state, "sl2"),
+        crashJsonPath_(crashJson)  {
 
-    cout << "opening " << crashJson << endl;
-    ifstream ifs (crashJson);
-    json_ << ifs;
+
 }
 
 
+ json XploitabilityTracer::toJson() const { 
+     return json_;
+ }
+
+
 XploitabilityResult XploitabilityTracer::process() { 
-    
+    XploitabilityResult ret(name());
 
-    XploitabilityResult ret;
-    cout << "XXX: " << json_ << endl;
-    
-    uint32_t score = json_["score"];    
+    // If we can't open the crash.json file, we return XPLOITABILITY_NONE
+    uint32_t score  = 0;
+    try {
+        ifstream ifs (crashJsonPath_);
+        json_ << ifs;
+        score = json_["score"];
+    } catch(...) {
+        return ret;
+    }
 
-    if(         100     >= score ) {
+    if(         score >= 100 ) {
         ret.rank = XploitabilityRank::XPLOITABILITY_HIGH;
-    } else if(  75      >= score ) {
+    } else if(  score >= 75 ) {
         ret.rank = XploitabilityRank::XPLOITABILITY_MEDIUM;
-    } else if(  50      >= score ) {
+    } else if(  score >= 50 ) {
         ret.rank = XploitabilityRank::XPLOITABILITY_LOW;
-    } else if(  25      >= score ) { 
+    } else if(  score >= 25 ) { 
         ret.rank = XploitabilityRank::XPLOITABILITY_UNKNOWN;
     } else {
         ret.rank = XploitabilityRank::XPLOITABILITY_NONE;

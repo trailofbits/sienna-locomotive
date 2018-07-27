@@ -1,9 +1,10 @@
 #include <string>
 #include "triage.h"
-
+#include <iostream>
+#include <fstream>
 
 #include "statz.h"
-
+using namespace std;
 
 
 int main(int argc, char* argv[] ) {
@@ -20,17 +21,12 @@ int main(int argc, char* argv[] ) {
                 continue;
             }
 
-            // if( triage.ranks().size()>=2 && triage.ranks()[0]==triage.ranks()[1] ) {
-            //     parity++;
-            // }
             cout << triage << endl;
         } catch (...) {
-            cout << "error" << endl;
+            cerr << "error on processing "<< argv[i] << endl;
         }
     }
 
-    cout << "Parity: " << parity << " of " << i <<  endl;
-    //cout << "Stats: " << stdevs.mean() << endl;
 
     return 0;
 

@@ -36,25 +36,25 @@ ostream& operator<<( ostream& os, const XploitabilityResult& result ) {
 Xploitability::Xploitability( Minidump* dmp, ProcessState* state, const string moduleName )
         : Exploitability(dmp, state), name_(moduleName) {
 
-    cout << "MinidumpException" << endl;
+    
     MinidumpException* exception = dump_->GetException();
     if (!exception) {
         cout << " no exc rec" << endl;
         throw "No Exception record";
     }
 
-    cout << "rawException_" << endl;
+    
     rawException_ = exception->exception();
     if  (!rawException_) {
         throw "Can't get raw exception";
     }
-    cout << "GetContext" << endl;
+    
 
     context_ = exception->GetContext();
     if (!context_) {
         throw "Can't get context";
     }
-    cout << "GetMemoryList" << endl;
+    
     memoryList_ = dump_->GetMemoryList();    
     if (!memoryList_) {        
         memoryAvailable_ = false;
@@ -62,30 +62,30 @@ Xploitability::Xploitability( Minidump* dmp, ProcessState* state, const string m
 
     exceptionCode_ = rawException_->exception_record.exception_code;
 
-    cout << "GetInstructionPointer" << endl;
+    
 
     if (!context_->GetInstructionPointer(&instructionPtr_)) {
         throw "can't get pc";
     }
-    cout << "GetStackPointer" << endl;
+    
 
     // Getting the stack pointer.
     if (!context_->GetStackPointer(&stackPtr_)) {
         throw "Can't get stack pointer.";
     }
-    cout << "memoryAvailable_" << endl;
+    
 
     if(!memoryAvailable_)
         return;
 
-    cout << "GetMemoryRegionForAddress" << endl;
+    
 
     size_t bufsz = 15;
     MinidumpMemoryRegion* instrRegion =
         memoryList_->GetMemoryRegionForAddress(instructionPtr_);
     if(!instrRegion)
         return;
-    cout << "GetMemory" << endl;
+    
 
     const uint8_t *rawMem = instrRegion->GetMemory() + bufsz;
     if(!rawMem)

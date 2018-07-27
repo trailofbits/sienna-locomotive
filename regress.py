@@ -88,7 +88,7 @@ class  TestMinidumpOnly(unittest.TestCase):
 
 class  TestTriage(unittest.TestCase):
     def test_triage(self):
-        workingdir = os.path.join( os.environ['APPDATA'],  "Trail of Bits", "fuzzkit", "working" )        
+        workingdir = os.path.join( os.environ['APPDATA'],  "Trail of Bits", "fuzzkit", "runs" )        
         pattern = "%s/*/*.dmp" % workingdir
         print("pattern", pattern)
         for path in glob.glob(  pattern ):

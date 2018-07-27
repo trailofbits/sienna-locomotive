@@ -18,6 +18,7 @@ public:
 
 
     virtual XploitabilityResult             process();
+    json                                    toJson() const;
 
 
 
@@ -25,7 +26,7 @@ protected:
     void                                    loadJson();
     json                                    json_;
 
-    const string                            crashJson_;
+    const string                            crashJsonPath_;
 
 };
 
