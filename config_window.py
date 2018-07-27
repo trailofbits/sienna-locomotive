@@ -93,6 +93,10 @@ class ConfigWindow(QtWidgets.QDialog):
 
         self.expand_button.clicked.connect(self.toggle_expansion)
         self.add_button.clicked.connect(self.add_config)
+        self.drrun_path_button.clicked.connect(self.get_drrun_path)
+        self.build_dir_button.clicked.connect(self.get_build_dir)
+        self.target_path_button.clicked.connect(self.get_target_path)
+
 
         self.show()
 
@@ -112,16 +116,19 @@ class ConfigWindow(QtWidgets.QDialog):
         super().done(*args)
 
     def get_drrun_path(self):
-        path = ""
-        self.drrun_path.setText(path)
+        path, good = QFileDialog.getOpenFileName(filter="*.exe")
+        if good:
+            self.drrun_path.setText(path)
 
     def get_target_path(self):
-        path = ""
-        self.target_path.setText(path)
+        path, good = QFileDialog.getOpenFileName(filter="*.exe")
+        if good:
+            self.target_path.setText(path)
 
     def get_build_dir(self):
-        path = ""
-        self.build_dir.setText(path)
+        path = QFileDialog.getExistingDirectory()
+        if len(path) > 0:
+            self.build_dir.setText(path)
 
     def toggle_expansion(self):
         if not self.extension_widget.isVisible():
