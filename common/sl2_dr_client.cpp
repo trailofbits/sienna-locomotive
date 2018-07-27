@@ -160,7 +160,8 @@ loadJson(string path)
 }
 
 
-__declspec(dllexport) char *get_function_name(Function function)
+__declspec(dllexport)
+const char *get_function_name(Function function)
 {
     switch(function) {
         case Function::ReadFile:
@@ -187,7 +188,8 @@ __declspec(dllexport) char *get_function_name(Function function)
 }
 
 // TODO(ww): Document the fallback values here.
-__declspec(dllexport) void from_json(const json& j, targetFunction& t)
+__declspec(dllexport)
+void from_json(const json& j, targetFunction& t)
 {
     t.selected      = j.value("selected", false);
     t.index         = j.value("callCount", -1);
@@ -198,7 +200,8 @@ __declspec(dllexport) void from_json(const json& j, targetFunction& t)
     t.buffer        = j["buffer"].get<vector<uint8_t>>();
 }
 
-__declspec(dllexport) const char *exception_to_string(DWORD exception_code)
+__declspec(dllexport)
+const char *exception_to_string(DWORD exception_code)
 {
     char *exception_str;
 
