@@ -162,7 +162,7 @@ loadJson(string path)
 }
 
 // TODO(ww): Document the fallback values here.
-__declspec(dllexport)
+SL2_EXPORT
 void from_json(const json& j, targetFunction& t)
 {
     t.selected      = j.value("selected", false);
@@ -174,7 +174,7 @@ void from_json(const json& j, targetFunction& t)
     t.buffer        = j["buffer"].get<vector<uint8_t>>();
 }
 
-__declspec(dllexport)
+SL2_EXPORT
 const char *function_to_string(Function function)
 {
     switch(function) {
@@ -201,7 +201,7 @@ const char *function_to_string(Function function)
     return "unknown";
 }
 
-__declspec(dllexport)
+SL2_EXPORT
 const char *exception_to_string(DWORD exception_code)
 {
     char *exception_str;
@@ -278,7 +278,7 @@ const char *exception_to_string(DWORD exception_code)
     return exception_str;
 }
 
-__declspec(dllexport)
+SL2_EXPORT
 bool function_is_in_expected_module(const char *func, const char *mod)
 {
     for (int i = 0; i < SL2_FUNCMOD_TABLE_SIZE; i++) {

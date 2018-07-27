@@ -3,6 +3,8 @@
 
 #include <string.h>
 
+#define SL2_EXPORT __declspec(dllexport)
+
 // The size of a SHA256 hash.
 #define SL2_HASH_LEN 64
 

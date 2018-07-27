@@ -149,22 +149,22 @@ public:
 };
 
 // Converts a JSON object into a `targetFunction`.
-__declspec(dllexport)
+SL2_EXPORT
 void from_json(const json& j, targetFunction& t);
 
 // Returns a C-string corresponding to the requested `function`.
-__declspec(dllexport)
+SL2_EXPORT
 const char *function_to_string(Function function);
 
 // Returns a C-string corresponding to the given `exception_code`.
-__declspec(dllexport)
+SL2_EXPORT
 const char *exception_to_string(DWORD exception_code);
 
 // Returns a boolean, indicating whether or not the given function is in
 // the module we expected (for hooking).
 // Returns false if the module isn't the one we expect *or* if the function isn't
 // one we care about.
-__declspec(dllexport)
+SL2_EXPORT
 bool function_is_in_expected_module(const char *func, const char *mod);
 
 #endif
