@@ -131,30 +131,32 @@ incrementCallCountForFunction(Function function) {
 // loadJson()
 //
 // Loads json blob into client
-void SL2Client::
-loadJson(string target) {
+// TODO(ww): Rename to loadTargets, to reflect the fact that we're not using JSON anymore?
+bool SL2Client::
+loadJson(string path)
+{
+    file_t targets = dr_open_file(path.c_str(), DR_FILE_READ);
+    size_t targets_size;
+    size_t txsize;
 
-    std::ifstream msgStream(target, std::ios::binary); // TODO ifstream can sometimes cause performance issues
-    std::streampos fileSize;
+    dr_file_size(targets, &targets_size);
+    uint8_t *buffer = (uint8_t *) dr_global_alloc(targets_size);
 
-    // Read size of file
-    msgStream.seekg(0, std::ios::end);
-    fileSize = msgStream.tellg();
-    msgStream.seekg(0, std::ios::beg);
+    txsize = dr_read_file(targets, buffer, targets_size);
+    dr_close_file(targets);
 
-    char * fileBuf = (char *) dr_global_alloc(fileSize);
-    msgStream.read(fileBuf, fileSize);
-    msgStream.close();
+    if (txsize != targets_size) {
+        dr_global_free(buffer, targets_size);
+        return false;
+    }
 
-    std::vector<std::uint8_t> msg(fileBuf, fileBuf + fileSize);
+    std::vector<std::uint8_t> msg(buffer, buffer + targets_size);
 
     parsedJson = json::from_msgpack(msg);
 
-    dr_global_free(fileBuf, fileSize);
-    if (!parsedJson.is_array()) {
-      throw("Document root is not an array\n");
-    }
+    dr_global_free(buffer, targets_size);
 
+    return parsedJson.is_array();
 }
 
 

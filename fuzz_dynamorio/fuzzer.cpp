@@ -822,18 +822,14 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
 
     std::string target = op_target.get_value();
     if (target == "") {
-        SL2_DR_DEBUG("ERROR: arg -t (target file) required");
+        SL2_DR_DEBUG("ERROR: arg -t (target file) required\n");
         dr_abort();
     }
 
     bool no_coverage = op_no_coverage.get_value();
 
-    // NOTE(ww): Is it safe to do C++ exception handling within a DR client?
-    // See: https://github.com/DynamoRIO/dynamorio/issues/1717
-    try {
-        client.loadJson(target);
-    } catch (const char* msg) {
-        SL2_DR_DEBUG(msg);
+    if (!client.loadJson(target)) {
+        SL2_DR_DEBUG("Failed to load targets!\n");
         dr_abort();
     }
 
