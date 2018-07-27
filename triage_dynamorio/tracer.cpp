@@ -1150,6 +1150,72 @@ on_exception(void *drcontext, dr_exception_t *excpt)
 }
 
 /*
+    The next three functions are used to intercept __fastfail, which Windows
+    provides to allow processes to request immediate termination.
+
+    To get around this, we tell the target that __fastfail isn't avaiable
+    by intercepting IsProcessorFeaturePresent (which we hope they check).
+
+    We then hope that they craft an exception record instead and send it
+    to UnhandledException, where we intercept it and forward it to our
+    exception handler.
+
+    If the target decides to do neither of these, we still miss the exception.
+
+    This trick was cribbed from WinAFL:
+    https://github.com/ivanfratric/winafl/blob/73c7b41/winafl.c#L600
+
+    NOTE(ww): These functions are duplicated across the fuzzer and the tracer.
+    Keep them synced!
+*/
+
+void wrap_pre_IsProcessorFeaturePresent(void *wrapcxt, OUT void **user_data)
+{
+    DWORD feature = (DWORD) drwrap_get_arg(wrapcxt, 0);
+    *user_data = (void *) feature;
+}
+
+void wrap_post_IsProcessorFeaturePresent(void *wrapcxt, void *user_data)
+{
+    DWORD feature = (DWORD) user_data;
+
+    if (feature == PF_FASTFAIL_AVAILABLE) {
+        SL2_DR_DEBUG("wrap_post_IsProcessorFeaturePresent: got PF_FASTFAIL_AVAILABLE request, masking\n");
+        drwrap_set_retval(wrapcxt, (void *) 0);
+    }
+}
+
+void wrap_pre_UnhandledExceptionFilter(void *wrapcxt, OUT void **user_data)
+{
+    SL2_DR_DEBUG("wrap_pre_UnhandledExceptionFilter: stealing unhandled exception\n");
+
+    EXCEPTION_POINTERS *exception = (EXCEPTION_POINTERS *) drwrap_get_arg(wrapcxt, 0);
+    dr_exception_t excpt = {0};
+
+    excpt.record = exception->ExceptionRecord;
+    on_exception(drwrap_get_drcontext(wrapcxt), &excpt);
+}
+
+/*
+    We also intercept VerifierStopMessage and VerifierStopMessageEx,
+    which are supplied by Application Verifier for the purpose of catching
+    heap corruptions.
+*/
+
+static void wrap_pre_VerifierStopMessage(void *wrapcxt, OUT void **user_data)
+{
+    SL2_DR_DEBUG("wrap_pre_VerifierStopMessage: stealing unhandled exception\n");
+
+    EXCEPTION_RECORD record = {0};
+    record.ExceptionCode = STATUS_HEAP_CORRUPTION;
+
+    dr_exception_t excpt = {0};
+    excpt.record = &record;
+
+    on_exception(drwrap_get_drcontext(wrapcxt), &excpt);
+}
+
+/*
 *
   Large block of pre-function callbacks that collect metadata about the target call
 *
@@ -1411,6 +1477,9 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
       baseAddr = (size_t) mod->start;
     }
 
+    const char *mod_name = dr_module_preferred_name(mod);
+    app_pc towrap;
+
     std::map<char *, SL2_PRE_PROTO> toHookPre;
     SL2_PRE_HOOK1(toHookPre, ReadFile);
     SL2_PRE_HOOK1(toHookPre, InternetReadFile);
@@ -1435,7 +1504,36 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_POST_HOOK2(toHookPost, fread_s, Generic);
     SL2_POST_HOOK2(toHookPost, fread, Generic);
 
-    const char *mod_name = dr_module_preferred_name(mod);
+    // Wrap IsProcessorFeaturePresent and UnhandledExceptionFilter to prevent
+    // __fastfail from circumventing our exception tracking. See the comment
+    // above wrap_pre_IsProcessorFeaturePresent for more information.
+    if (STREQI(mod_name, "KERNELBASE.DLL")) {
+        SL2_DR_DEBUG("loading __fastfail mitigations\n");
+
+        towrap = (app_pc) dr_get_proc_address(mod->handle, "IsProcessorFeaturePresent");
+        drwrap_wrap(towrap, wrap_pre_IsProcessorFeaturePresent, wrap_post_IsProcessorFeaturePresent);
+
+        towrap = (app_pc) dr_get_proc_address(mod->handle, "UnhandledExceptionFilter");
+        drwrap_wrap(towrap, wrap_pre_UnhandledExceptionFilter, NULL);
+    }
+
+    // Wrap VerifierStopMessage and VerifierStopMessageEx, which are apparently
+    // used in AppVerifier to register heap corruptions.
+    //
+    // NOTE(ww): I haven't seen these in the wild, but WinAFL wraps
+    // VerifierStopMessage and VerifierStopMessageEx is probably
+    // just a newer version of the former.
+    if (STREQ(mod_name, "VERIFIER.DLL"))
+    {
+        SL2_DR_DEBUG("loading Application Verifier mitigations\n");
+
+        towrap = (app_pc) dr_get_proc_address(mod->handle, "VerifierStopMessage");
+        drwrap_wrap(towrap, wrap_pre_VerifierStopMessage, NULL);
+
+        towrap = (app_pc) dr_get_proc_address(mod->handle, "VerifierStopMessageEx");
+        drwrap_wrap(towrap, wrap_pre_VerifierStopMessage, NULL);
+    }
+
     /* assume our target executable is an exe */
     if (strstr(mod_name, ".exe") != NULL) {
         module_start = mod->start; // TODO evaluate us of dr_get_application_name above
@@ -1475,7 +1573,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
         }
 
         // find target function in module
-        app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
+        towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
 
         // TODO(ww): Consolidate this between the wizard, fuzzer, and tracer.
         if (STREQ(functionName, "ReadFile")) {
