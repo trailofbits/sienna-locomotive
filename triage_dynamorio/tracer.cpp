@@ -938,8 +938,8 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
             exit(1);
         }
 
-        DWORD bytesWritten;
-        if (!WriteFile(hCrashFile, crash_json.c_str(), crash_json.length(), &bytesWritten, NULL)) {
+        DWORD txsize;
+        if (!WriteFile(hCrashFile, crash_json.c_str(), (DWORD) crash_json.length(), &txsize, NULL)) {
             SL2_DR_DEBUG("tracer#dump_crash: could not write to the crash file (%x)\n", GetLastError());
             exit(1);
         }
