@@ -554,18 +554,14 @@ handle_specific(void *drcontext, instr_t *instr)
     }
 
     switch (opcode) {
-        // push
-        case 18:
-        // pop
-        case 20:
+        case OP_push:
+        case OP_pop:
             handle_push_pop(drcontext, instr);
             return true;
-        // xor
-        case 12:
+        case OP_xor:
             result = handle_xor(drcontext, instr);
             return result;
-        // xchg
-        case 62:
+        case OP_xchg:
             result = handle_xchg(drcontext, instr);
             return result;
         default:
