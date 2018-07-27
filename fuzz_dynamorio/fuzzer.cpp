@@ -127,7 +127,7 @@ on_exception(void *drcontext, dr_exception_t *excpt)
 {
     dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#on_exception: Exception occurred!\n");
     crashed = true;
-    DWORD exceptionCode = excpt->record->ExceptionCode;
+    DWORD exception_code = excpt->record->ExceptionCode;
 
     dr_switch_to_app_state(drcontext);
     fuzz_exception_ctx.thread_id = GetCurrentThreadId();
@@ -138,73 +138,7 @@ on_exception(void *drcontext, dr_exception_t *excpt)
     memcpy(&(fuzz_exception_ctx.record), excpt->record, sizeof(EXCEPTION_RECORD));
 
     json j;
-
-    switch (exceptionCode) {
-        case EXCEPTION_ACCESS_VIOLATION:
-            j["exception"] = "EXCEPTION_ACCESS_VIOLATION";
-            break;
-        case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
-            j["exception"] = "EXCEPTION_ARRAY_BOUNDS_EXCEEDED";
-            break;
-        case EXCEPTION_BREAKPOINT:
-            j["exception"] = "EXCEPTION_BREAKPOINT";
-            break;
-        case EXCEPTION_DATATYPE_MISALIGNMENT:
-            j["exception"] = "EXCEPTION_DATATYPE_MISALIGNMENT";
-            break;
-        case EXCEPTION_FLT_DENORMAL_OPERAND:
-            j["exception"] = "EXCEPTION_FLT_DENORMAL_OPERAND";
-            break;
-        case EXCEPTION_FLT_DIVIDE_BY_ZERO:
-            j["exception"] = "EXCEPTION_FLT_DIVIDE_BY_ZERO";
-            break;
-        case EXCEPTION_FLT_INEXACT_RESULT:
-            j["exception"] = "EXCEPTION_FLT_INEXACT_RESULT";
-            break;
-        case EXCEPTION_FLT_INVALID_OPERATION:
-            j["exception"] = "EXCEPTION_FLT_INVALID_OPERATION";
-            break;
-        case EXCEPTION_FLT_OVERFLOW:
-            j["exception"] = "EXCEPTION_FLT_OVERFLOW";
-            break;
-        case EXCEPTION_FLT_STACK_CHECK:
-            j["exception"] = "EXCEPTION_FLT_STACK_CHECK";
-            break;
-        case EXCEPTION_FLT_UNDERFLOW:
-            j["exception"] = "EXCEPTION_FLT_UNDERFLOW";
-            break;
-        case EXCEPTION_ILLEGAL_INSTRUCTION:
-            j["exception"] = "EXCEPTION_ILLEGAL_INSTRUCTION";
-            break;
-        case EXCEPTION_IN_PAGE_ERROR:
-            j["exception"] = "EXCEPTION_IN_PAGE_ERROR";
-            break;
-        case EXCEPTION_INT_DIVIDE_BY_ZERO:
-            j["exception"] = "EXCEPTION_INT_DIVIDE_BY_ZERO";
-            break;
-        case EXCEPTION_INT_OVERFLOW:
-            j["exception"] = "EXCEPTION_INT_OVERFLOW";
-            break;
-        case EXCEPTION_INVALID_DISPOSITION:
-            j["exception"] = "EXCEPTION_INVALID_DISPOSITION";
-            break;
-        case EXCEPTION_NONCONTINUABLE_EXCEPTION:
-            j["exception"] = "EXCEPTION_NONCONTINUABLE_EXCEPTION";
-            break;
-        case EXCEPTION_PRIV_INSTRUCTION:
-            j["exception"] = "EXCEPTION_PRIV_INSTRUCTION";
-            break;
-        case EXCEPTION_SINGLE_STEP:
-            j["exception"] = "EXCEPTION_SINGLE_STEP";
-            break;
-        case EXCEPTION_STACK_OVERFLOW:
-            j["exception"] = "EXCEPTION_STACK_OVERFLOW";
-            break;
-        default:
-            j["exception"] = "EXCEPTION_SL2_UNKNOWN";
-            break;
-    }
-
+    j["exception"] = exception_to_string(exception_code);
     SL2_LOG_JSONL(j);
 
     dr_exit_process(1);
@@ -328,6 +262,69 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
     sl2_conn_register_mutation(&sl2_conn, &mutation);
 
     return true;
+}
+
+/*
+    The next three functions are used to intercept __fastfail, which Windows
+    provides to allow processes to request immediate termination.
+
+    To get around this, we tell the target that __fastfail isn't avaiable.
+    We then hope that they craft an exception record instead and send it
+    to UnhandledException, where we intercept it and forward it to our
+    exception handler. If the target decides to do neither of these, we
+    still miss the exception.
+
+    This trick was cribbed from WinAFL:
+    https://github.com/ivanfratric/winafl/blob/73c7b41/winafl.c#L600
+
+    NOTE(ww): These functions are duplicated across the fuzzer and the tracer.
+    Keep them synced!
+*/
+
+static void wrap_pre_IsProcessorFeaturePresent(void *wrapcxt, OUT void **user_data)
+{
+    DWORD feature = (DWORD) drwrap_get_arg(wrapcxt, 0);
+    *user_data = (void *) feature;
+}
+
+static void wrap_post_IsProcessorFeaturePresent(void *wrapcxt, void *user_data)
+{
+    DWORD feature = (DWORD) user_data;
+
+    if (feature == PF_FASTFAIL_AVAILABLE) {
+        SL2_DR_DEBUG("wrap_post_IsProcessorFeaturePresent: got PF_FASTFAIL_AVAILABLE request, masking\n");
+        drwrap_set_retval(wrapcxt, (void *) 0);
+    }
+}
+
+static void wrap_pre_UnhandledExceptionFilter(void *wrapcxt, OUT void **user_data)
+{
+    SL2_DR_DEBUG("wrap_pre_UnhandledExceptionFilter: stealing unhandled exception\n");
+
+    EXCEPTION_POINTERS *exception = (EXCEPTION_POINTERS *) drwrap_get_arg(wrapcxt, 0);
+    dr_exception_t excpt = {0};
+
+    excpt.record = exception->ExceptionRecord;
+    on_exception(drwrap_get_drcontext(wrapcxt), &excpt);
+}
+
+/*
+    We also intercept VerifierStopMessage and VerifierStopMessageEx,
+    which are supplied by Application Verifier for the purpose of catching
+    heap corruptions.
+*/
+
+static void wrap_pre_VerifierStopMessage(void *wrapcxt, OUT void **user_data)
+{
+    SL2_DR_DEBUG("wrap_pre_VerifierStopMessage: stealing unhandled exception\n");
+
+    EXCEPTION_RECORD record = {0};
+    record.ExceptionCode = STATUS_HEAP_CORRUPTION;
+
+    dr_exception_t excpt = {0};
+    excpt.record = &record;
+
+    on_exception(drwrap_get_drcontext(wrapcxt), &excpt);
 }
 
 /*
@@ -708,6 +705,9 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
         baseAddr = (uint64_t) mod->start;
     }
 
+    const char *mod_name = dr_module_preferred_name(mod);
+    app_pc towrap;
+
     // Build list of pre-function hooks
     std::map<char *, SL2_PRE_PROTO> toHookPre;
     SL2_PRE_HOOK1(toHookPre, ReadFile);
@@ -733,6 +733,36 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_POST_HOOK2(toHookPost, recv, Generic);
     SL2_POST_HOOK2(toHookPost, fread_s, Generic);
     SL2_POST_HOOK2(toHookPost, fread, Generic);
+
+    // Wrap IsProcessorFeaturePresent and UnhandledExceptionFilter to prevent
+    // __fastfail from circumventing our exception tracking. See the comment
+    // above wrap_pre_IsProcessorFeaturePresent for more information.
+    if (STREQI(mod_name, "KERNELBASE.DLL")) {
+        SL2_DR_DEBUG("loading __fastfail mitigations\n");
+
+        towrap = (app_pc) dr_get_proc_address(mod->handle, "IsProcessorFeaturePresent");
+        drwrap_wrap(towrap, wrap_pre_IsProcessorFeaturePresent, wrap_post_IsProcessorFeaturePresent);
+
+        towrap = (app_pc) dr_get_proc_address(mod->handle, "UnhandledExceptionFilter");
+        drwrap_wrap(towrap, wrap_pre_UnhandledExceptionFilter, NULL);
+    }
+
+    // Wrap VerifierStopMessage and VerifierStopMessageEx, which are apparently
+    // used in AppVerifier to register heap corruptions.
+    //
+    // NOTE(ww): I haven't seen these in the wild, but WinAFL wraps
+    // VerifierStopMessage and VerifierStopMessageEx is probably
+    // just a newer version of the former.
+    if (STREQ(mod_name, "VERIFIER.DLL"))
+    {
+        SL2_DR_DEBUG("loading Application Verifier mitigations\n");
+
+        towrap = (app_pc) dr_get_proc_address(mod->handle, "VerifierStopMessage");
+        drwrap_wrap(towrap, wrap_pre_VerifierStopMessage, NULL);
+
+        towrap = (app_pc) dr_get_proc_address(mod->handle, "VerifierStopMessageEx");
+        drwrap_wrap(towrap, wrap_pre_VerifierStopMessage, NULL);
+    }
 
     // Iterate over list of hooks and register them with DynamoRIO
     std::map<char *, SL2_PRE_PROTO>::iterator it;
@@ -765,8 +795,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
         }
 
         // Only hook ReadFile calls from the kernel (TODO - investigate fuzzgoat results)
-        app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
-        const char *mod_name = dr_module_preferred_name(mod);
+        towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
 
         // TODO(ww): Consolidate this between the wizard, fuzzer, and tracer.
         if (STREQ(functionName, "ReadFile")) {

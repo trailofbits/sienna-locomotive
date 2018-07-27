@@ -160,7 +160,8 @@ loadJson(string path)
 }
 
 
-__declspec(dllexport) char *get_function_name(Function function)
+__declspec(dllexport)
+const char *get_function_name(Function function)
 {
     switch(function) {
         case Function::ReadFile:
@@ -187,7 +188,8 @@ __declspec(dllexport) char *get_function_name(Function function)
 }
 
 // TODO(ww): Document the fallback values here.
-__declspec(dllexport) void from_json(const json& j, targetFunction& t)
+__declspec(dllexport)
+void from_json(const json& j, targetFunction& t)
 {
     t.selected      = j.value("selected", false);
     t.index         = j.value("callCount", -1);
@@ -196,4 +198,81 @@ __declspec(dllexport) void from_json(const json& j, targetFunction& t)
     t.functionName  = j.value("func_name", "");
     t.argHash       = j.value("argHash", "");
     t.buffer        = j["buffer"].get<vector<uint8_t>>();
+}
+
+__declspec(dllexport)
+const char *exception_to_string(DWORD exception_code)
+{
+    char *exception_str;
+
+    switch (exception_code) {
+        case EXCEPTION_ACCESS_VIOLATION:
+            exception_str = "EXCEPTION_ACCESS_VIOLATION";
+            break;
+        case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+            exception_str = "EXCEPTION_ARRAY_BOUNDS_EXCEEDED";
+            break;
+        case EXCEPTION_BREAKPOINT:
+            exception_str = "EXCEPTION_BREAKPOINT";
+            break;
+        case EXCEPTION_DATATYPE_MISALIGNMENT:
+            exception_str = "EXCEPTION_DATATYPE_MISALIGNMENT";
+            break;
+        case EXCEPTION_FLT_DENORMAL_OPERAND:
+            exception_str = "EXCEPTION_FLT_DENORMAL_OPERAND";
+            break;
+        case EXCEPTION_FLT_DIVIDE_BY_ZERO:
+            exception_str = "EXCEPTION_FLT_DIVIDE_BY_ZERO";
+            break;
+        case EXCEPTION_FLT_INEXACT_RESULT:
+            exception_str = "EXCEPTION_FLT_INEXACT_RESULT";
+            break;
+        case EXCEPTION_FLT_INVALID_OPERATION:
+            exception_str = "EXCEPTION_FLT_INVALID_OPERATION";
+            break;
+        case EXCEPTION_FLT_OVERFLOW:
+            exception_str = "EXCEPTION_FLT_OVERFLOW";
+            break;
+        case EXCEPTION_FLT_STACK_CHECK:
+            exception_str = "EXCEPTION_FLT_STACK_CHECK";
+            break;
+        case EXCEPTION_FLT_UNDERFLOW:
+            exception_str = "EXCEPTION_FLT_UNDERFLOW";
+            break;
+        case EXCEPTION_ILLEGAL_INSTRUCTION:
+            exception_str = "EXCEPTION_ILLEGAL_INSTRUCTION";
+            break;
+        case EXCEPTION_IN_PAGE_ERROR:
+            exception_str = "EXCEPTION_IN_PAGE_ERROR";
+            break;
+        case EXCEPTION_INT_DIVIDE_BY_ZERO:
+            exception_str = "EXCEPTION_INT_DIVIDE_BY_ZERO";
+            break;
+        case EXCEPTION_INT_OVERFLOW:
+            exception_str = "EXCEPTION_INT_OVERFLOW";
+            break;
+        case EXCEPTION_INVALID_DISPOSITION:
+            exception_str = "EXCEPTION_INVALID_DISPOSITION";
+            break;
+        case EXCEPTION_NONCONTINUABLE_EXCEPTION:
+            exception_str = "EXCEPTION_NONCONTINUABLE_EXCEPTION";
+            break;
+        case EXCEPTION_PRIV_INSTRUCTION:
+            exception_str = "EXCEPTION_PRIV_INSTRUCTION";
+            break;
+        case EXCEPTION_SINGLE_STEP:
+            exception_str = "EXCEPTION_SINGLE_STEP";
+            break;
+        case EXCEPTION_STACK_OVERFLOW:
+            exception_str = "EXCEPTION_STACK_OVERFLOW";
+            break;
+        case STATUS_HEAP_CORRUPTION:
+            exception_str = "STATUS_HEAP_CORRUPTION";
+            break;
+        default:
+            exception_str = "EXCEPTION_SL2_UNKNOWN";
+            break;
+    }
+
+    return exception_str;
 }

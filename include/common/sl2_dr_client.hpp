@@ -137,9 +137,15 @@ public:
 };
 
 // Returns a C-string corresponding to the requested `function`.
-__declspec(dllexport) char *get_function_name(Function function);
+__declspec(dllexport)
+const char *get_function_name(Function function);
 
 // Converts a JSON object into a `targetFunction`.
-__declspec(dllexport) void from_json(const json& j, targetFunction& t);
+__declspec(dllexport)
+void from_json(const json& j, targetFunction& t);
+
+// Returns a C-string corresponding to the given `exception_code`.
+__declspec(dllexport)
+const char *exception_to_string(DWORD exception_code);
 
 #endif
