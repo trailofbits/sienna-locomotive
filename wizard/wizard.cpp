@@ -414,7 +414,8 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     std::map<char *, SL2_PRE_PROTO> toHookPre;
     SL2_PRE_HOOK1(toHookPre, ReadFile);
     SL2_PRE_HOOK1(toHookPre, InternetReadFile);
-    SL2_PRE_HOOK1(toHookPre, ReadEventLog);
+    SL2_PRE_HOOK2(toHookPre, ReadEventLogA, ReadEventLog);
+    SL2_PRE_HOOK2(toHookPre, ReadEventLogW, ReadEventLog);
     SL2_PRE_HOOK2(toHookPre, RegQueryValueExW, RegQueryValueEx);
     SL2_PRE_HOOK2(toHookPre, RegQueryValueExA, RegQueryValueEx);
     SL2_PRE_HOOK1(toHookPre, WinHttpWebSocketReceive);
@@ -426,7 +427,8 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     std::map<char *, SL2_POST_PROTO> toHookPost;
     SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
-    SL2_POST_HOOK2(toHookPost, ReadEventLog, Generic);
+    SL2_POST_HOOK2(toHookPost, ReadEventLogA, Generic);
+    SL2_POST_HOOK2(toHookPost, ReadEventLogW, Generic);
     SL2_POST_HOOK2(toHookPost, RegQueryValueExW, Generic);
     SL2_POST_HOOK2(toHookPost, RegQueryValueExA, Generic);
     SL2_POST_HOOK2(toHookPost, WinHttpWebSocketReceive, Generic);
@@ -452,23 +454,8 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
         const char *mod_name = dr_module_preferred_name(mod);
 
-        // TODO(ww): Consolidate this between the wizard, fuzzer, and tracer.
-        if (STREQ(functionName, "ReadFile")) {
-            if (!STREQI(mod_name, "KERNELBASE.dll")) {
-                continue;
-            }
-        }
-
-        if (STREQ(functionName, "RegQueryValueExA") || STREQ(functionName, "RegQueryValueExW")) {
-            if (!STREQI(mod_name, "KERNELBASE.dll")) {
-                continue;
-            }
-        }
-
-        if (STREQ(functionName, "fread") || STREQ(functionName, "fread_s")) {
-            if (!STREQI(mod_name, "UCRTBASE.DLL")) {
-                continue;
-            }
+        if (!function_is_in_expected_module(functionName, mod_name)) {
+            continue;
         }
 
         if (towrap != NULL) {

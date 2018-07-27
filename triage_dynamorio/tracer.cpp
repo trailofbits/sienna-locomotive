@@ -1411,7 +1411,8 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     std::map<char *, SL2_PRE_PROTO> toHookPre;
     SL2_PRE_HOOK1(toHookPre, ReadFile);
     SL2_PRE_HOOK1(toHookPre, InternetReadFile);
-    SL2_PRE_HOOK1(toHookPre, ReadEventLog);
+    SL2_PRE_HOOK2(toHookPre, ReadEventLogA, ReadEventLog);
+    SL2_PRE_HOOK2(toHookPre, ReadEventLogW, ReadEventLog);
     SL2_PRE_HOOK2(toHookPre, RegQueryValueExW, RegQueryValueEx);
     SL2_PRE_HOOK2(toHookPre, RegQueryValueExA, RegQueryValueEx);
     SL2_PRE_HOOK1(toHookPre, WinHttpWebSocketReceive);
@@ -1423,7 +1424,8 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     std::map<char *, SL2_POST_PROTO> toHookPost;
     SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
-    SL2_POST_HOOK2(toHookPost, ReadEventLog, Generic);
+    SL2_POST_HOOK2(toHookPost, ReadEventLogA, Generic);
+    SL2_POST_HOOK2(toHookPost, ReadEventLogW, Generic);
     SL2_POST_HOOK2(toHookPost, RegQueryValueExW, Generic);
     SL2_POST_HOOK2(toHookPost, RegQueryValueExA, Generic);
     SL2_POST_HOOK2(toHookPost, WinHttpWebSocketReceive, Generic);
@@ -1474,6 +1476,10 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
         char *functionName = it->first;
         bool hook = false;
 
+        if (!function_is_in_expected_module(functionName, mod_name)) {
+            continue;
+        }
+
         // Look for function matching the target specified on the command line
         for (targetFunction t : client.parsedJson) {
             if (t.selected && STREQ(t.functionName.c_str(), functionName)){
@@ -1481,13 +1487,14 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
             }
             else if (t.selected && (STREQ(functionName, "RegQueryValueExW") || STREQ(functionName, "RegQueryValueExA"))) {
                 if (!STREQ(t.functionName.c_str(), "RegQueryValueEx")) {
-                  hook = false;
+                    hook = false;
                 }
             }
         }
 
-        if (!hook)
-          continue;
+        if (!hook) {
+            continue;
+        }
 
         void(__cdecl *hookFunctionPre)(void *, void **);
         hookFunctionPre = it->second;
@@ -1502,25 +1509,6 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 
         // find target function in module
         towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
-
-        // TODO(ww): Consolidate this between the wizard, fuzzer, and tracer.
-        if (STREQ(functionName, "ReadFile")) {
-            if (!STREQI(mod_name, "KERNELBASE.dll") != 0) {
-                continue;
-            }
-        }
-
-        if (STREQ(functionName, "RegQueryValueExA") || STREQ(functionName, "RegQueryValueExW")) {
-            if (!STREQI(mod_name, "KERNELBASE.dll") != 0) {
-                continue;
-            }
-        }
-
-        if (STREQ(functionName, "fread") || STREQ(functionName, "fread_s")) {
-            if (!STREQI(mod_name, "UCRTBASE.DLL")) {
-                continue;
-            }
-        }
 
         // if the function was found, wrap it
         if (towrap != NULL) {

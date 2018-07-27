@@ -7,11 +7,13 @@
 using json = nlohmann::json;
 using namespace std;
 
-
 extern "C" {
     #include "util.h"
     #include "uuid.h"
 }
+
+// Used for iterating over the function-module pair table.
+#define SL2_FUNCMOD_TABLE_SIZE (sizeof(SL2_FUNCMOD_TABLE) / sizeof(SL2_FUNCMOD_TABLE[0]))
 
 // Used for debugging prints.
 #define SL2_DR_DEBUG(...) (dr_fprintf(STDERR, __VA_ARGS__))
@@ -109,6 +111,16 @@ struct sl2_exception_ctx {
     CONTEXT thread_ctx;
 };
 
+// Represents a tuple of a function and its expected module.
+struct sl2_funcmod
+{
+    char *func;
+    char *mod;
+};
+
+// Declared in sl2_dr_client.cpp; contains pairs of functions and their expected modules.
+extern sl2_funcmod SL2_FUNCMOD_TABLE[];
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // SL2Client
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -147,5 +159,12 @@ void from_json(const json& j, targetFunction& t);
 // Returns a C-string corresponding to the given `exception_code`.
 __declspec(dllexport)
 const char *exception_to_string(DWORD exception_code);
+
+// Returns a boolean, indicating whether or not the given function is in
+// the module we expected (for hooking).
+// Returns false if the module isn't the one we expect *or* if the function isn't
+// one we care about.
+__declspec(dllexport)
+bool function_is_in_expected_module(const char *func, const char *mod);
 
 #endif

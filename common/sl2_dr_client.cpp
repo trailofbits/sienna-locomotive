@@ -5,6 +5,23 @@
 
 using namespace std;
 
+// NOTE(ww): As of Windows 10, both KERNEL32.dll and ADVAPI32.dll
+// get forwarded to KERNELBASE.DLL, apparently.
+// TODO(ww): Since we iterate over these, order them by likelihood of occurrence?
+sl2_funcmod SL2_FUNCMOD_TABLE[] = {
+    {"ReadFile", "KERNELBASE.DLL"},
+    {"recv", "WS2_32.DLL"},                     // TODO(ww): Is this right?
+    {"WinHttpReadData", "WINHTTP.DLL"},         // TODO(ww): Is this right?
+    {"InternetReadFile", "WININET.DLL"},        // TODO(ww): Is this right?
+    {"WinHttpWebSocketReceive", "WINHTTP.DLL"}, // TODO(ww): Is this right?
+    {"RegQueryValueExA", "KERNELBASE.DLL"},
+    {"RegQueryValueExW", "KERNELBASE.DLL"},
+    {"ReadEventLogA", "KERNELBASE.DLL"},
+    {"ReadEventLogW", "KERNELBASE.DLL"},
+    {"fread", "UCRTBASE.DLL"},
+    {"fread_s", "UCRTBASE.DLL"},
+};
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // SL2Client
 //
@@ -101,21 +118,6 @@ generateArenaId(wchar_t *id)
     mbstowcs_s(NULL, id, SL2_HASH_LEN + 1, stdcheese.c_str(), SL2_HASH_LEN);
     id[SL2_HASH_LEN] = '\0';
 }
-
-// TODO(ww): Use this instead of duplicating code across all three clients.
-// bool SL2Client::functionIsInUnexpectedModule(char *function, char *module)
-// {
-//     #define FUNC_AND_MOD(exp_f, exp_m) ((STREQ(exp_f, function) && STREQI(exp_m, module)))
-
-//     return (FUNC_AND_MOD("ReadFile", "KERNELBASE.DLL")
-//             || FUNC_AND_MOD("RegQueryValueExA", "KERNELBASE.DLL")
-//             || FUNC_AND_MOD("RegQueryValueExW", "KERNELBASE.DLL")
-//             || FUNC_AND_MOD("fread", "UCRTBASE.DLL")
-//             || FUNC_AND_MOD("fread_s", "UCRTBASE.DLL"))
-
-//     #undef FUNC_AND_MOD
-// }
-
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // incrementCallCountForFunction()
@@ -275,4 +277,16 @@ const char *exception_to_string(DWORD exception_code)
     }
 
     return exception_str;
+}
+
+__declspec(dllexport)
+bool function_is_in_expected_module(const char *func, const char *mod)
+{
+    for (int i = 0; i < SL2_FUNCMOD_TABLE_SIZE; i++) {
+        if (STREQ(func, SL2_FUNCMOD_TABLE[i].func)) {
+            return STREQI(mod, SL2_FUNCMOD_TABLE[i].mod);
+        }
+    }
+
+    return false;
 }
