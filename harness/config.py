@@ -35,7 +35,7 @@ if not os.path.exists(sl2_config_path):
                                  'wizard_path': 'build\\wizard\\Debug\\wizard.dll',
                                  'triage_path': 'build\\triage_dynamorio\\Debug\\tracer.dll',
                                  'target_application_path': 'build\\corpus\\test_application\\Debug\\test_application.exe',
-                                 'target_args': '0 -f',
+                                 'target_args': '0,-f',
                                  'runs': 1,
                                  'simultaneous': 1,
                                  'inline_stdout': False
@@ -78,12 +78,32 @@ def set_profile(new_profile):
     update_config_from_args()
 
 
+def create_new_profile(name, dynamorio_exe, build_dir, target_path, target_args):
+    global _config
+    _config[name] = {'drrun_path': dynamorio_exe,
+                     'drrun_args': '',
+                     'client_path': os.path.join(build_dir, 'fuzz_dynamorio\\Debug\\fuzzer.dll'),
+                     'client_args': '',
+                     'server_path': os.path.join(build_dir, 'server\\Debug\\server.exe'),
+                     'wizard_path': os.path.join(build_dir, 'wizard\\Debug\\wizard.dll'),
+                     'triage_path': os.path.join(build_dir, 'triage_dynamorio\\Debug\\tracer.dll'),
+                     'target_application_path': target_path,
+                     'target_args': target_args,
+                     'runs': 1,
+                     'simultaneous': 1,
+                     'inline_stdout': False}
+
+    with open(sl2_config_path, 'w') as configfile:
+        _config.write(configfile)
+
+
 def update_config_from_args():
     global config
     # Convert numeric arguments into ints. Need to update this list manually if adding anything.
-    int_options = ['runs', 'simultaneous']
+    int_options = ['runs', 'simultaneous', 'fuzz_timeout', 'triage_timeout']
     for opt in int_options:
-        config[opt] = int(config[opt])
+        if opt in config:
+            config[opt] = int(config[opt])
 
     # Convert comma-separated arguments into lists
     list_options = ['drrun_args', 'client_args', 'target_args']

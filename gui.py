@@ -305,9 +305,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.crashes.append(crash)
 
     def save_crashes(self):
-        savefile = QFileDialog.getSaveFileName(self, filter="*.csv")
-        if savefile[1]:
-            export_crash_data_to_csv(self.crashes, savefile[0])
+        savefile, not_canceled = QFileDialog.getSaveFileName(self, filter="*.csv")
+        if not_canceled:
+            export_crash_data_to_csv(self.crashes, savefile)
 
     def get_config(self):
         """ Selects the configuration dict from config.py """
