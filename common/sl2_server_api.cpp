@@ -11,7 +11,7 @@
 #define SL2_CONN_READ(thing, size) (ReadFile(conn->pipe, thing, size, &txsize, NULL))
 
 #define SL2_CONN_EVT(event) do {       \
-    uint8_t evt = event;                     \
+    uint8_t evt = event;               \
     SL2_CONN_WRITE(&evt, sizeof(evt)); \
 } while(0)
 
