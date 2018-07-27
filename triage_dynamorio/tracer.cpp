@@ -902,12 +902,12 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
     j["tainted_addrs"] = json::array();
     if (tainted_mems.size() > 0) {
         std::set<app_pc>::iterator mit = tainted_mems.begin();
-        UINT64 start = (UINT64)*mit;
-        UINT64 size = 1;
+        uint64_t start = (uint64_t) *mit;
+        uint64_t size = 1;
 
         mit++;
         for (; mit != tainted_mems.end(); mit++) {
-            UINT64 curr = (UINT64)*mit;
+            uint64_t curr = (uint64_t) *mit;
             if (curr > (start + size)) {
               json addr = {{"start", start}, {"size", size}};
               j["tainted_addrs"].push_back(addr);
