@@ -1,9 +1,3 @@
-// TODO(ww): Figure out if we still need these.
-#define EVENT_APP event_app_bb
-// #define EVENT_APP event_app_instruction
-#define EVENT_THREAD_EXIT event_thread_exit_cov
-// #define EVENT_THREAD_EXIT event_thread_exit
-
 #include <stdio.h>
 #include <map>
 #include <set>
@@ -676,6 +670,7 @@ event_app_instruction(
 
     /* Clean call propagate taint on each instruction. Should be side-effect free
         http://dynamorio.org/docs/dr__ir__utils_8h.html#ae7b7bd1e750b8a24ebf401fb6a6d6d5e */
+    // TODO(ww): Replace this with instruction injection for performance?
     dr_insert_clean_call(drcontext, bb, instr, propagate_taint, false, 1,
                 OPND_CREATE_INTPTR(instr_get_app_pc(instr)));
 
