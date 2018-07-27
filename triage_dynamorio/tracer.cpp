@@ -825,6 +825,9 @@ exception_to_string(DWORD exception_code)
         case EXCEPTION_STACK_OVERFLOW:
             exception_str = "EXCEPTION_STACK_OVERFLOW";
             break;
+        case STATUS_HEAP_CORRUPTION:
+            exception_str = "STATUS_HEAP_CORRUPTION";
+            break;
         default:
             break;
     }

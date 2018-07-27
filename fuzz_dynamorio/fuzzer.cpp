@@ -200,6 +200,9 @@ on_exception(void *drcontext, dr_exception_t *excpt)
         case EXCEPTION_STACK_OVERFLOW:
             j["exception"] = "EXCEPTION_STACK_OVERFLOW";
             break;
+        case STATUS_HEAP_CORRUPTION:
+            j["exception"] = "STATUS_HEAP_CORRUPTION";
+            break;
         default:
             j["exception"] = "EXCEPTION_SL2_UNKNOWN";
             break;
