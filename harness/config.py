@@ -46,8 +46,13 @@ if not os.path.exists(sl2_config_path):
         default_config.write(configfile)
 
 # Read the config file
-_config = configparser.ConfigParser()
-_config.read(sl2_config_path)
+try:
+    _config = configparser.ConfigParser()
+    _config.read(sl2_config_path)
+except configparser.Error as e:
+    print("ERROR: Failed to load configuration:", e)
+    sys.exit()
+
 
 # Set up argument parser
 parser = argparse.ArgumentParser(description='Run the DynamoRIO fuzzing harness. You can pass arguments to the command line to override the defaults in config.ini')
@@ -72,6 +77,9 @@ config = {}  # This is what gets exported
 
 
 def set_profile(new_profile):
+    """
+    Updates the global configuration to match the supplied profile.
+    """
     global config
     config = {}  # This is what gets exported
     try:
@@ -85,6 +93,10 @@ def set_profile(new_profile):
 
 
 def update_config_from_args():
+    """
+    Supplements the global configuration with command-line arguments
+    passed by the user.
+    """
     global config
     # Convert numeric arguments into ints. Need to update this list manually if adding anything.
     int_options = ['runs', 'simultaneous']
@@ -123,7 +135,6 @@ def update_config_from_args():
 
 
 set_profile(args.profile)
-
 
 if __name__ == '__main__':
     from pprint import pprint
