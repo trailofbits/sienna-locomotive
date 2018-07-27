@@ -13,15 +13,16 @@ import configparser
 # NOTE(ww): Keep these up-to-data with include/server.hpp!
 sl2_server_pipe_path = "\\\\.\\pipe\\fuzz_server"
 sl2_dir = os.path.join(os.getenv('APPDATA', default="."), 'Trail of Bits', 'fuzzkit')
-sl2_working_dir = os.path.join(sl2_dir, 'working')
+sl2_runs_dir = os.path.join(sl2_dir, 'runs')
+sl2_arenas_dir = os.path.join(sl2_dir, 'arenas')
 sl2_log_dir = os.path.join(sl2_dir, 'log')
 sl2_targets_dir = os.path.join(sl2_dir, 'targets')
 sl2_config_path = os.path.join(sl2_dir, 'config.ini')
 
-if not os.path.isdir(sl2_dir):
-    os.makedirs(sl2_working_dir)
-    os.mkdir(sl2_log_dir)
-    os.mkdir(sl2_targets_dir)
+os.makedirs(sl2_runs_dir, exist_ok=True)
+os.makedirs(sl2_arenas_dir, exist_ok=True)
+os.makedirs(sl2_log_dir, exist_ok=True)
+os.makedirs(sl2_targets_dir, exist_ok=True)
 
 # Create a default config file if one doesn't exist
 if not os.path.exists(sl2_config_path):

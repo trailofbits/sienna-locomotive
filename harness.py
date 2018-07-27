@@ -7,7 +7,7 @@ Imports harness/instrument.py for running DynamoRIO instrumentation clients.
 
 import os
 import concurrent.futures
-import json
+import json, msgpack
 import atexit
 import harness.config
 import harness.statz
@@ -53,8 +53,8 @@ def select_and_dump_wizard_findings(wizard_findings, target_file):
     index = select_from_range(len(wizard_findings), "Choose a function to fuzz> ")
     wizard_findings[index]['selected'] = True
 
-    with open(target_file, 'w') as json_file:
-        json.dump(wizard_findings, json_file)
+    with open(target_file, 'wb') as msg_file:
+        msgpack.dump(wizard_findings, msg_file)
 
     return wizard_findings
 
@@ -75,7 +75,7 @@ def main():
 
     start_server()
 
-    target_file = os.path.join(get_target_dir(config), 'targets.json')
+    target_file = os.path.join(get_target_dir(config), 'targets.msg')
 
     # If the user selected a single stage, do that instead of running anything else
     if 'stage' in config:
@@ -95,7 +95,7 @@ def main():
             target_id = mapping[select_from_range(len(mapping), "Select a target to fuzz> ")]
             config['target_application_path'], config['target_args'] = targets[target_id]
             config['client_args'].append('-t')
-            config['client_args'].append(os.path.join(target_id, 'targets.json'))
+            config['client_args'].append(os.path.join(target_id, 'targets.msg'))
             fuzzer_run(config)
 
         # Parse the list of run ID's and select one to triage
@@ -111,7 +111,7 @@ def main():
             config['target_application_path'], config['target_args'] = runs[run_id]
             config['client_args'].append('-t')
             config['client_args'].append(target_file)
-            print(triage_run(config, run_id[-36:]))
+            print(triage_run(config, run_id[-36:])[0])
 
     else:
         # Run the wizard to select a target function if we don't have one saved

@@ -34,9 +34,11 @@ extern "C" {
 
 static SL2Client   client;
 static sl2_conn sl2_conn;
+static sl2_exception_ctx trace_exception_ctx;
 static void *mutatex;
 static bool replay;
-static DWORD mutate_count;
+static bool no_mutate;
+static uint32_t mutate_count;
 
 static std::set<reg_id_t> tainted_regs;
 static std::set<app_pc> tainted_mems;
@@ -60,8 +62,6 @@ static droption_t<std::string> op_target(
     "target",
     "Specific call to target.");
 
-
-
 /* Mostly used to debug if taint tracking is too slow */
 static droption_t<unsigned int> op_no_taint(
     DROPTION_SCOPE_CLIENT,
@@ -77,6 +77,13 @@ static droption_t<std::string> op_replay(
     "",
     "replay",
     "The run id for a crash to replay.");
+
+static droption_t<bool> op_no_mutate(
+    DROPTION_SCOPE_CLIENT,
+    "nm",
+    false,
+    "no-mutate",
+    "Don't use the mutated buffer when replaying.");
 
 
 /* Currently unused as this runs on 64 bit applications */
@@ -934,30 +941,51 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
         sl2_conn_request_crash_paths(&sl2_conn, &crash_paths);
 
         HANDLE hCrashFile = CreateFile(crash_paths.crash_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
         if (hCrashFile == INVALID_HANDLE_VALUE) {
-            SL2_DR_DEBUG("tracer#dump_crash: could not open the crash file (%x)", GetLastError());
+            SL2_DR_DEBUG("tracer#dump_crash: could not open the crash file (%x)\n", GetLastError());
             exit(1);
         }
 
         DWORD bytesWritten;
         if (!WriteFile(hCrashFile, crash_json.c_str(), crash_json.length(), &bytesWritten, NULL)) {
-            SL2_DR_DEBUG("tracer#dump_crash: could not write to the crash file (%x)", GetLastError());
+            SL2_DR_DEBUG("tracer#dump_crash: could not write to the crash file (%x)\n", GetLastError());
             exit(1);
         }
 
-        HANDLE hDumpFile = CreateFile(crash_paths.dump_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        CloseHandle(hCrashFile);
+
+        HANDLE hDumpFile = CreateFile(crash_paths.mem_dump_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
         if (hDumpFile == INVALID_HANDLE_VALUE) {
-            SL2_DR_DEBUG("tracer#dump_crash: could not open the dump file (%x)", GetLastError());
+            SL2_DR_DEBUG("tracer#dump_crash: could not open the dump file (%x)\n", GetLastError());
         }
+
+        EXCEPTION_POINTERS exception_pointers = {0};
+        MINIDUMP_EXCEPTION_INFORMATION mdump_info = {0};
+
+        exception_pointers.ExceptionRecord = &(trace_exception_ctx.record);
+        exception_pointers.ContextRecord = &(trace_exception_ctx.thread_ctx);
+
+        mdump_info.ThreadId = trace_exception_ctx.thread_id;
+        mdump_info.ExceptionPointers = &exception_pointers;
+        mdump_info.ClientPointers = true;
 
         // NOTE(ww): Switching back to the application's state is necessary, as we don't want
         // parts of the instrumentation showing up in our memory dump.
         dr_switch_to_app_state(drcontext);
 
-        MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hDumpFile, MiniDumpWithFullMemory, NULL, NULL, NULL);
+        MiniDumpWriteDump(
+            GetCurrentProcess(),
+            GetCurrentProcessId(),
+            hDumpFile,
+            MiniDumpWithFullMemory,
+            &mdump_info,
+            NULL, NULL);
 
         dr_switch_to_dr_state(drcontext);
+
+        CloseHandle(hDumpFile);
     }
 
     dr_exit_process(1);
@@ -968,6 +996,14 @@ static bool
 onexception(void *drcontext, dr_exception_t *excpt)
 {
     DWORD exception_code = excpt->record->ExceptionCode;
+
+    dr_switch_to_app_state(drcontext);
+    trace_exception_ctx.thread_id = GetCurrentThreadId();
+    dr_mcontext_to_context(&(trace_exception_ctx.thread_ctx), excpt->mcontext);
+    dr_switch_to_dr_state(drcontext);
+
+    // Make our own copy of the exception record.
+    memcpy(&(trace_exception_ctx.record), excpt->record, sizeof(EXCEPTION_RECORD));
 
     reg_id_t reg_pc = reg_to_full_width64(DR_REG_NULL);
     reg_id_t reg_stack = reg_to_full_width64(DR_REG_ESP);
@@ -1285,10 +1321,9 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     info->function             = Function::ReadFile;
     info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
-    // NOTE(ww): SHA2 digests are 64 characters, so we allocate that + room for a NULL
-    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), 65);
-    memset(info->argHash, 0, 65);
-    memcpy(info->argHash, hash_str.c_str(), 64);
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    memset(info->argHash, 0, SL2_HASH_LEN + 1);
+    memcpy(info->argHash, hash_str.c_str(), SL2_HASH_LEN);
 }
 
 static void
@@ -1358,15 +1393,20 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     if (replay && targeted) {
         dr_mutex_lock(mutatex);
 
-        sl2_conn_request_replay(&sl2_conn, mutate_count, nNumberOfBytesToRead, lpBuffer);
+        if (no_mutate) {
+            sl2_conn_request_replay(&sl2_conn, mutate_count, nNumberOfBytesToRead, lpBuffer);
+        }
+        else {
+            sl2_conn_request_replay(&sl2_conn, mutate_count, nNumberOfBytesToRead, lpBuffer);
+        }
+
         mutate_count++;
 
         dr_mutex_unlock(mutatex);
     }
 
-    // TODO(ww): Remove this hardcoded size.
     if (info->argHash) {
-        dr_thread_free(drwrap_get_drcontext(wrapcxt), info->argHash, 65);
+        dr_thread_free(drwrap_get_drcontext(wrapcxt), info->argHash, SL2_HASH_LEN + 1);
     }
 
     dr_thread_free(drwrap_get_drcontext(wrapcxt), info, sizeof(client_read_info));
@@ -1499,6 +1539,8 @@ void tracer(client_id_t id, int argc, const char *argv[])
     if (run_id_s.length() > 0) {
         replay = true;
     }
+
+    no_mutate = op_no_mutate.get_value();
 
     sl2_wstring_to_uuid(run_id_s.c_str(), &run_id);
     sl2_conn_assign_run_id(&sl2_conn, run_id);

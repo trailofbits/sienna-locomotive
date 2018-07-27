@@ -1,4 +1,4 @@
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtCore import QThread, pyqtSignal, Qt
 import time
 from .instrument import wizard_run, fuzzer_run, triage_run, start_server
 
@@ -18,7 +18,7 @@ class WizardThread(QThread):
 
 
 class FuzzerThread(QThread):
-    foundCrash = pyqtSignal(str)
+    foundCrash = pyqtSignal(str, object)
     runComplete = pyqtSignal(float)
     paused = pyqtSignal()
 
@@ -51,8 +51,8 @@ class FuzzerThread(QThread):
             crashed, run_id = fuzzer_run(self.config_dict)
 
             if crashed:
-                formatted = triage_run(self.config_dict, run_id)
-                self.foundCrash.emit(formatted)
+                formatted, raw = triage_run(self.config_dict, run_id)
+                self.foundCrash.emit(formatted, raw)
 
                 if self.config_dict['exit_early']:
                     self.should_fuzz = False
@@ -61,3 +61,10 @@ class FuzzerThread(QThread):
 
             if not self.config_dict['continuous']:
                 break
+
+    def continuous_state_changed(self, new_state):
+        self.config_dict['continuous'] = (new_state == Qt.Checked)
+
+    def pause_state_changed(self, new_state):
+        self.config_dict['exit_early'] = (new_state == Qt.Checked)
+

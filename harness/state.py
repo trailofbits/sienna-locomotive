@@ -6,18 +6,33 @@ import os
 import glob
 import re
 import struct
-import json
+import json, msgpack
 from hashlib import sha1
+from csv import DictWriter
 
 from . import config
+
+
+def esc_quote(raw):
+    if " " not in raw or '\"' in raw:
+        return raw
+    else:
+        return "\"{}\"".format(raw)
+
+
+def create_invokation_statement(config_dict):
+    program_arr = [config_dict['drrun_path'], '-pidfile', 'pidfile'] + config_dict['drrun_args'] + \
+          ['-c', config_dict['client_path']] + config_dict['client_args'] + \
+          ['--', config_dict['target_application_path'].strip('\"')] + config_dict['target_args']
+
+    return program_arr, stringify_program_array(program_arr[0], program_arr[1:])
 
 
 # TODO(ww): Use shlex or something similar here.
 def stringify_program_array(target_application_path, target_args_array):
     """ Escape paths with spaces in them by surrounding them with quotes """
-    return "{} {}\n".format(target_application_path if " " not in target_application_path
-                                                    else "\"{}\"".format(target_application_path),
-                            ' '.join((k if " " not in k else "\"{}\"".format(k))for k in target_args_array))
+    out = "{} {}\n".format(esc_quote(target_application_path), ' '.join(esc_quote(k) for k in target_args_array))
+    return out
 
 
 # TODO: Use shlex or something similar here.
@@ -27,13 +42,12 @@ def unstringify_program_array(stringified):
     invoke = []
     split = re.split('(\".*?\")', stringified)  # TODO use this for config file parsing
     for token in split:
-        if len(token) > 0:
-            if "\"" in token:
-                invoke.append(token)
-            else:
-                for inner_token in token.split(' '):
-                    invoke.append(inner_token)
-
+        if "\"" in token:
+            invoke.append(token)
+        else:
+            for inner_token in token.split(' '):
+                invoke.append(inner_token)
+    invoke = list(filter(lambda b: len(b) > 0, invoke))
     return invoke[0], invoke[1:]
 
 
@@ -72,17 +86,18 @@ class TargetAdapter(object):
         self.save()
 
     def save(self):
-        with open(self.filename, 'w') as jsonfile:
-            json.dump(self.target_list, jsonfile)
+        with open(self.filename, 'wb') as msgfile:
+            msgpack.dump(self.target_list, msgfile)
 
 
 def get_target(_config):
-    target_file = os.path.join(get_target_dir(_config), 'targets.json')
+    target_file = os.path.join(get_target_dir(_config), 'targets.msg')
     try:
-        with open(target_file) as target_json:
-            return TargetAdapter(json.load(target_json), target_file)
+        with open(target_file, 'rb') as target_msg:
+            return TargetAdapter(msgpack.load(target_msg, encoding='utf-8'), target_file)
     except FileNotFoundError:
         return TargetAdapter([], target_file)
+
 
 def get_all_targets():
     """ Returns a dict mapping target directories to the contents of the argument file """
@@ -96,7 +111,7 @@ def get_all_targets():
 def get_runs():
     """ Returns a dict mapping run ID's to the contents of the argument file """
     runs = {}
-    for _dir in glob.glob(os.path.join(config.sl2_working_dir, '*')):
+    for _dir in glob.glob(os.path.join(config.sl2_runs_dir, '*')):
         with open(os.path.join(_dir, 'arguments.txt'), 'rb') as program_string_file:
             runs[_dir] = unstringify_program_array(program_string_file.read().decode('utf-16').strip())
     return runs
@@ -104,11 +119,11 @@ def get_runs():
 
 def get_path_to_run_file(run_id, filename):
     """ Helper function for easily getting the full path to a file in the current run's directory """
-    return os.path.join(config.sl2_dir, 'working', str(run_id), filename)
+    return os.path.join(config.sl2_runs_dir, str(run_id), filename)
 
 
 def write_output_files(proc, run_id, stage_name):
-    """ Writes the stdout and stderr buffers for a run into the working directory """
+    """ Writes the stdout and stderr buffers for a run into the runs directory """
     try:
         if proc.stdout is not None:
             with open(get_path_to_run_file(run_id, '{}.stdout'.format(stage_name)), 'wb') as stdoutfile:
@@ -123,21 +138,35 @@ def write_output_files(proc, run_id, stage_name):
 def parse_triage_output(run_id):
     # Parse triage results and print them
     try:
-        with open(get_path_to_run_file(run_id, 'crash.json'), 'r') as crash_json:
+        crash_file = get_path_to_run_file(run_id, 'crash.json')
+        with open(crash_file, 'r') as crash_json:
             results = json.loads(crash_json.read())
             results['run_id'] = run_id
+            results['crash_file'] = crash_file
             formatted = "Triage ({score}): {reason} in run {run_id} caused {exception}".format(**results)
             formatted += ("\n\t0x{location:02x}: {instruction}".format(**results))
             return formatted, results
     except FileNotFoundError:
-        return "Triage run %s exited improperly, but no crash file could be found)" % run_id, None
+        message = "The triage tool exited improperly during run {}, but no crash file could be found. \
+                   It may have timed out. To retry it manually, run `python harness.py -v -e TRIAGE [-p <PROFILE>]`"
+        return message.format(run_id), None
+
+
+def export_crash_data_to_csv(crashes, csv_filename):
+    with open(csv_filename, 'w') as csvfile:
+        writer = DictWriter(csvfile, ['score', 'run_id', 'exception', 'reason', 'instruction', 'location', 'crash_file'],
+                            extrasaction='ignore')
+
+        writer.writeheader()
+        writer.writerows(crashes)
+
 
 
 def finalize(run_id, crashed):
     """ Manually closes out a fuzzing run. Only necessary if we killed the target binary before DynamoRIO could
     close out the run """
     f = open(config.sl2_server_pipe_path, 'w+b', buffering=0)
-    f.write(struct.pack('B', 0x4))  # Write the event ID (4)
+    f.write(struct.pack('B', 0x4))  # EVT_RUN_COMPLETE
     f.seek(0)
     f.write(run_id.bytes)  # Write the run ID
     f.seek(0)
@@ -145,4 +174,5 @@ def finalize(run_id, crashed):
     f.write(struct.pack('?', 1 if crashed else 0))
     # Write a bool indicating whether to preserve run files (without a crash)
     f.write(struct.pack('?', 1 if True else 0))
+    f.write(struct.pack('B', 0x6)) # EVT_SESSION_TEARDOWN
     f.close()

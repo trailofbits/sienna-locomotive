@@ -1,15 +1,8 @@
 #ifndef SL2_DR_CLIENT_H
 #define SL2_DR_CLIENT_H
 
-// NOTE(ww): You might wonder why we don't include dr_api.h or other
-// DynamoRIO headers in this file. The short reason is that the DynamoRIO
-// headers rely on a bunch of macros that only get defined if you
-// declare your (CMake) target as a DynamoRIO client. Since slcommon
-// isn't a DynamoRIO client and defining all of those macros manually
-// would be fragile, we leave it up to the individual clients
-// to perform the includes.
-
 #include <string>
+#include <fstream>
 #include "vendor/json.hpp"
 using json = nlohmann::json;
 using namespace std;
@@ -108,7 +101,11 @@ struct client_read_info {
     size_t      nNumberOfBytesToRead;
 };
 
-
+struct sl2_exception_ctx {
+    DWORD thread_id;
+    EXCEPTION_RECORD record;
+    CONTEXT thread_ctx;
+};
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // SL2Client
@@ -130,6 +127,8 @@ public:
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Methods
     bool        isFunctionTargeted(Function function,  client_read_info* info);
+    bool        areTargetsArenaCompatible();
+    void        generateArenaId(wchar_t *id);
     void        loadJson(string json);
     uint64_t    incrementCallCountForFunction(Function function);
 

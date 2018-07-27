@@ -16,9 +16,8 @@ import traceback
 import sys
 from enum import IntEnum
 
-from .state import parse_triage_output, finalize, write_output_files
+from .state import parse_triage_output, finalize, write_output_files, create_invokation_statement
 from . import config
-
 
 print_lock = threading.Lock()
 can_fuzz = True
@@ -47,19 +46,17 @@ def start_server():
         time.sleep(1)
 
 
-def run_dr(config_dict, save_stderr=False, verbose=False, timeout=None):
+def run_dr(config_dict, verbose=False, timeout=None):
     """ Runs dynamorio with the given config. Clobbers console output if save_stderr/stdout are true """
-    program_arr = [config_dict['drrun_path'], '-pidfile', 'pidfile'] + config_dict['drrun_args'] + \
-        ['-c', config_dict['client_path']] + config_dict['client_args'] + \
-        ['--', config_dict['target_application_path']] + config_dict['target_args']
+    program_arr, program_str = create_invokation_statement(config_dict)
 
     if verbose:
-        print_l("Executing drrun: %s" % ' '.join((k if " " not in k else "\"{}\"".format(k)) for k in program_arr))
+        print_l("Executing drrun: %s" % program_str)
 
     # Run client on target application
     started = time.time()
 
-    stdout = sys.stdout if config_dict['inline_stdout']  else  subprocess.PIPE
+    stdout = sys.stdout if config_dict['inline_stdout'] else subprocess.PIPE
     stderr = subprocess.PIPE
     popen_obj = subprocess.Popen(program_arr,
                                  stdout=stdout,
@@ -119,9 +116,8 @@ def wizard_run(config_dict):
                                 'client_args': [],
                                 'target_application_path': config_dict['target_application_path'],
                                 'target_args': config_dict['target_args'],
-                                'inline_stdout': config_dict['inline_stdout'] },
-                                save_stderr=True,
-                                verbose=config_dict['verbose'])
+                                'inline_stdout': config_dict['inline_stdout']},
+                               verbose=config_dict['verbose'])
     wizard_output = completed_process.stderr.decode('utf-8')
     wizard_findings = []
 
@@ -146,8 +142,7 @@ def wizard_run(config_dict):
 
 def fuzzer_run(config_dict):
     """ Runs the fuzzer """
-    completed_process = run_dr(config_dict, True,
-                               verbose=config_dict['verbose'], timeout=config_dict.get('fuzz_timeout', None))
+    completed_process = run_dr(config_dict, verbose=config_dict['verbose'], timeout=config_dict.get('fuzz_timeout', None))
 
     # Parse run ID from fuzzer output
     run_id = 'ERR'
@@ -190,15 +185,14 @@ def triage_run(config_dict, run_id):
                                 'target_application_path': config_dict['target_application_path'],
                                 'target_args': config_dict['target_args'],
                                 'inline_stdout': config_dict['inline_stdout']},
-                               True,
                                config_dict['verbose'],
                                config_dict.get('triage_timeout', None))
 
     # Write stdout and stderr to files
     write_output_files(completed_process, run_id, 'triage')
 
-    formatted, _ = parse_triage_output(run_id)
-    return formatted
+    formatted, raw = parse_triage_output(run_id)
+    return formatted, raw
 
 
 def fuzz_and_triage(config_dict):
@@ -209,7 +203,7 @@ def fuzz_and_triage(config_dict):
         while can_fuzz:
             crashed, run_id = fuzzer_run(config_dict)
             if crashed:
-                formatted = triage_run(config_dict, run_id)
+                formatted, _ = triage_run(config_dict, run_id)
                 print_l(formatted)
 
                 if config_dict['exit_early']:
