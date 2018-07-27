@@ -22,7 +22,6 @@ class Triage {
 
 public:
     Triage( const string& path );
-    ~Triage( );
 
 
     StatusCode                  process();
@@ -34,6 +33,7 @@ public:
     int                         signalType();
     static double               normalize(double x);
     vector<XploitabilityRank>   ranks();
+    const string                ranksString() const;
 
 private:
     const string                path_;

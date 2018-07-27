@@ -24,6 +24,9 @@ enum class XploitabilityRank {
     XPLOITABILITY_NONE      = 0
 
 };
+ostream& operator<<( ostream& os, const XploitabilityRank& self );
+const string operator~( const XploitabilityRank& self );
+
 
 
 
@@ -34,6 +37,10 @@ enum class XploitabilityRank {
 class XploitabilityResult {
 public:
     XploitabilityRank       rank;
+
+    XploitabilityResult() {
+        rank = XploitabilityRank::XPLOITABILITY_NONE;
+    };
 
     friend ostream& operator<<( ostream& os, const XploitabilityResult& result );
 };

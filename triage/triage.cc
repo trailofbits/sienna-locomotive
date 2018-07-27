@@ -2,7 +2,7 @@
 // Trail of Bits
 // July 2018
 ////////////////////////////////////////////////////////////////////////////
-#include <string>
+
 #include "triage.h"
 
 
@@ -14,11 +14,14 @@
 #include "Xploitability.h"
 #include "XploitabilityBreakpad.h"
 #include "XploitabilityBangExploitable.h"
+#include "XploitabilityTracer.h"
 
 #include <algorithm>
 #include <numeric>
 #include <filesystem>
 #include <regex>
+#include <string>
+#include <iterator>
 
 
 // #include "cfi_frame_info.h"
@@ -49,11 +52,11 @@ Triage::Triage( const string& path )
         symbolSupplier_(path),
         proc_(&symbolSupplier_, &resolver_, true),
         dump_ (path) {
-    
+
 }
 
-Triage::~Triage( )  {
-}
+
+
 
 ////////////////////////////////////////////////////////////////////////////
 // process()
@@ -81,15 +84,27 @@ StatusCode Triage::process() {
     cout << "-----------------------------------------------" << endl;
     cout << path_ << endl;
 
+    fs::path mdumpPath;
+    mdumpPath.append(path_);
+    mdumpPath = mdumpPath.parent_path();
+    mdumpPath.append("crash.jon");
+
+    string jsonPath(mdumpPath.string());
+    cout << "json file" << jsonPath << endl;
+    
+    Xploitability* x =nullptr;
+
     vector<Xploitability*> modules = { 
         new XploitabilityBreakpad( &dump_, &state_),
-        new XploitabilityBangExploitable( &dump_, &state_)
+        new XploitabilityBangExploitable( &dump_, &state_),
+        new XploitabilityTracer( &dump_, &state_, jsonPath )
+
     };
+
 
     for( auto& mod : modules ) {
         auto result = mod->process();
         ranks_.push_back( result.rank );
-        cout << mod->name() << "\t" << result << endl;
         delete mod;
     }
     
@@ -149,31 +164,28 @@ XploitabilityRank Triage::exploitabilityRank() {
         }
     }
 
-
     return rank;
 
-    // for( auto score : ranks_  ) {
-    //     score  = Triage::normalize(score);
-    //     ret += (score*score);
-    // }
-    // ret =  ret / ranks_.size();
-    // ret = sqrt(ret);
-    // ret = Triage::normalize(ret);
-
-
-    
 }
 
 const string Triage::exploitability() {
     //return Xploitability::rankToString( exploitabilityRank() );
-    XploitabilityRank rank = exploitabilityRank();
-    // XXX TODO FIX
-    return "test";
+    const XploitabilityRank rank = exploitabilityRank();
+    
+    return ~rank;
 }
 
 
 vector<XploitabilityRank>   Triage::ranks() {
     return ranks_;
+}
+
+const string Triage::ranksString() const {
+    ostringstream ss;
+    for( auto& rank : ranks_ ) {
+        ss << rank << " ";
+    }
+    return ss.str();
 }
 
 
@@ -183,9 +195,9 @@ vector<XploitabilityRank>   Triage::ranks() {
 ostream& operator<<(ostream& os, Triage& self) {
 
     os << "Exploitability: "        << self.exploitability()        << endl;
-    //os << "Exploitability Rank: "   << self.exploitabilityRank()    << endl;
-    os << "Crash Reason: "          << self.crashReason()           << endl;
-    os << "Tag: "                   << self.triagePath()            << endl;
+    os << "Ranks         : "        << self.ranksString()           << endl;
+    os << "Crash Reason  : "        << self.crashReason()           << endl;
+    os << "Tag           : "        << self.triagePath()            << endl;
     return os;  
 }  
   
