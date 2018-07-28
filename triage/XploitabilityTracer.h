@@ -1,3 +1,7 @@
+// XXX_INCLUDE_TOB_COPYRIGHT_HERE
+
+// Xploitability implementation for using sl2 tracer.cpp.  This scores based on taint information 
+
 #ifndef XploitabilityTracer_H
 #define XploitabilityTracer_H
 
@@ -16,17 +20,13 @@ public:
                 ProcessState* process_state,
                 const string crashJson );
 
-
-    virtual XploitabilityResult             process();
     json                                    toJson() const;
-
-
-
+    virtual XploitabilityResult             process();
+    
 protected:
-    void                                    loadJson();
-    json                                    json_;
-
     const string                            crashJsonPath_;
+    json                                    json_;
+    void                                    loadJson();
 
 };
 

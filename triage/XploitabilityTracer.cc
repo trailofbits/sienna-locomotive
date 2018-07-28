@@ -1,14 +1,19 @@
+// XXX_INCLUDE_TOB_COPYRIGHT_HERE
+
+// Xploitability implementation for using sl2 tracer.cpp.  This scores based on taint information 
+
 #include "XploitabilityTracer.h"
 
 #include <string>
 #include <fstream>
 
-
-
 using namespace std;
 
 namespace sl2 {
 
+////////////////////////////////////////////////////////////////////////////
+// XploitabilityTracer()
+//      tracer.cpp for Xploitability
 XploitabilityTracer::XploitabilityTracer(  
         Minidump *dump,
         ProcessState *process_state,
@@ -16,15 +21,19 @@ XploitabilityTracer::XploitabilityTracer(
     :   Xploitability(dump, process_state, "sl2"),
         crashJsonPath_(crashJson)  {
 
-
 }
 
-
+////////////////////////////////////////////////////////////////////////////
+// toJson()
+//      Copies the tracer.cpp json into triage.json for extra information
  json XploitabilityTracer::toJson() const { 
      return json_;
  }
 
-
+////////////////////////////////////////////////////////////////////////////
+// process()
+//      Reads the crash.json file from tracer.cpp. There is potential to
+// include information from the minidump processing here.
 XploitabilityResult XploitabilityTracer::process() { 
     XploitabilityResult ret(name());
 
@@ -38,6 +47,8 @@ XploitabilityResult XploitabilityTracer::process() {
         return ret;
     }
 
+    // Convert the 0-100 ranking to our 0-4 . No information is lost
+    // since tracer only has 5 possible values
     if(         score >= 100 ) {
         ret.rank = XploitabilityRank::XPLOITABILITY_HIGH;
     } else if(  score >= 75 ) {
@@ -51,7 +62,6 @@ XploitabilityResult XploitabilityTracer::process() {
     }
     return ret;
 }
-
 
 
 } // namespace

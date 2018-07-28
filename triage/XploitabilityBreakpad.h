@@ -1,3 +1,4 @@
+// XXX_INCLUDE_TOB_COPYRIGHT_HERE
 #ifndef XploitabilityBreakpad_H
 #define XploitabilityBreakpad_H
 
@@ -8,10 +9,9 @@ class XploitabilityBreakpad : public Xploitability {
 public:
     
     XploitabilityBreakpad( Minidump* dmp, ProcessState* state );
+
     virtual XploitabilityResult              process();
-    
-    
-    friend XploitabilityResult& operator<<( XploitabilityResult& result, const ExploitabilityRating& rating );
+    friend XploitabilityResult&             operator<<( XploitabilityResult& result, const ExploitabilityRating& rating );
 
 
 private:

@@ -1,11 +1,17 @@
+// XXX_INCLUDE_TOB_COPYRIGHT_HERE
+
+
 #include "Xploitability.h"
+
 #include <string>
 
 using namespace std;
 
 namespace sl2 {
 
-
+////////////////////////////////////////////////////////////////////////////
+// operator~()
+//      Just converts to a string
 const string operator~( const XploitabilityRank& self ) {
     switch(self) {
         case XploitabilityRank::XPLOITABILITY_HIGH:
@@ -23,16 +29,22 @@ const string operator~( const XploitabilityRank& self ) {
     }
 }
 
-
+////////////////////////////////////////////////////////////////////////////
+// operator<<()
+//      strings for streams
 ostream& operator<<( ostream& os, const XploitabilityRank& self ) {
     return os << ~self;
 }
 
+////////////////////////////////////////////////////////////////////////////
+//      strings for streams
 ostream& operator<<( ostream& os, const XploitabilityResult& result ) {
     return os << result.rank;
 }
 
-
+////////////////////////////////////////////////////////////////////////////
+// Xploitability()
+//      Main container for things 
 Xploitability::Xploitability( Minidump* dmp, ProcessState* state, const string moduleName )
         : Exploitability(dmp, state), name_(moduleName) {
 
@@ -106,13 +118,13 @@ ExploitabilityRating Xploitability::CheckPlatformExploitability() {
 }
 
 
-
+////////////////////////////////////////////////////////////////////////////
 bool Xploitability::isExceptionAddressInUser() const {
     // Assuming 64bit
     return process_state_->crash_address() <= 0x7fffffffffffffff;    
 }
 
-
+////////////////////////////////////////////////////////////////////////////
 bool Xploitability::isExceptionAddressNearNull() const {
     return process_state_->crash_address() <= 64*0x400;
 }
