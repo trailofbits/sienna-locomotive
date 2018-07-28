@@ -110,8 +110,13 @@ def run_dr(config_dict, verbose=False, timeout=None):
         return popen_obj
 
 
-def triagerRun( config, runId ):
-    dmpfile = os.path.join( runId, "mem.dmp" )
+def triagerRun(  runId ):
+    dmpfile = os.path.join( os.environ['AppData'], 
+                'Trail of Bits', 
+                'fuzzkit',
+                'runs',
+                str(runId),
+                "mem.dmp" )
     cmd =  [ r'.\build\triage\Debug\triager.exe',  dmpfile ] 
     out = subprocess.getoutput(cmd)
 
@@ -199,7 +204,7 @@ def triage_run(config_dict, run_id):
     write_output_files(completed_process, run_id, 'triage')
 
     formatted, raw = parse_triage_output(run_id)
-
+    triagerRun( run_id )
     return formatted, raw
 
 
