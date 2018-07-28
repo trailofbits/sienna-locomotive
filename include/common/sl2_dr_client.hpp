@@ -7,11 +7,13 @@
 using json = nlohmann::json;
 using namespace std;
 
-
 extern "C" {
     #include "util.h"
     #include "uuid.h"
 }
+
+// Used for iterating over the function-module pair table.
+#define SL2_FUNCMOD_TABLE_SIZE (sizeof(SL2_FUNCMOD_TABLE) / sizeof(SL2_FUNCMOD_TABLE[0]))
 
 // Used for debugging prints.
 #define SL2_DR_DEBUG(...) (dr_fprintf(STDERR, __VA_ARGS__))
@@ -73,7 +75,7 @@ enum {
 // The struct filled with function information for hashing.
 // See `MATCH_ARG_HASH`.
 struct fileArgHash {
-  WCHAR fileName[MAX_PATH + 1];
+  wchar_t fileName[MAX_PATH + 1];
   size_t position;
   size_t readSize;
 };
@@ -95,17 +97,29 @@ struct client_read_info {
     uint64_t    retAddrOffset;
     Function    function;
     HANDLE      hFile;
-    LPDWORD     lpNumberOfBytesRead;
-    LPVOID      lpBuffer;
-    char*       argHash;
+    DWORD       *lpNumberOfBytesRead;
+    void        *lpBuffer;
+    char        *argHash;
     size_t      nNumberOfBytesToRead;
 };
 
+// The struct filled with exception information for registering
+// within a minidump.
 struct sl2_exception_ctx {
     DWORD thread_id;
     EXCEPTION_RECORD record;
     CONTEXT thread_ctx;
 };
+
+// Represents a tuple of a function and its expected module.
+struct sl2_funcmod
+{
+    char *func;
+    char *mod;
+};
+
+// Declared in sl2_dr_client.cpp; contains pairs of functions and their expected modules.
+extern sl2_funcmod SL2_FUNCMOD_TABLE[];
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // SL2Client
@@ -129,15 +143,28 @@ public:
     bool        isFunctionTargeted(Function function,  client_read_info* info);
     bool        areTargetsArenaCompatible();
     void        generateArenaId(wchar_t *id);
-    void        loadJson(string json);
+    bool        loadJson(string json);
     uint64_t    incrementCallCountForFunction(Function function);
 
 };
 
-// Returns a C-string corresponding to the requested `function`.
-__declspec(dllexport) char *get_function_name(Function function);
-
 // Converts a JSON object into a `targetFunction`.
-__declspec(dllexport) void from_json(const json& j, targetFunction& t);
+SL2_EXPORT
+void from_json(const json& j, targetFunction& t);
+
+// Returns a C-string corresponding to the requested `function`.
+SL2_EXPORT
+const char *function_to_string(Function function);
+
+// Returns a C-string corresponding to the given `exception_code`.
+SL2_EXPORT
+const char *exception_to_string(DWORD exception_code);
+
+// Returns a boolean, indicating whether or not the given function is in
+// the module we expected (for hooking).
+// Returns false if the module isn't the one we expect *or* if the function isn't
+// one we care about.
+SL2_EXPORT
+bool function_is_in_expected_module(const char *func, const char *mod);
 
 #endif

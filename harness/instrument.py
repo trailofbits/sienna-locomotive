@@ -9,14 +9,21 @@ import subprocess
 import time
 import signal
 import threading
-import uuid
 import os
 import json
 import traceback
 import sys
 from enum import IntEnum
 
-from .state import parse_triage_output, finalize, write_output_files, create_invokation_statement
+from .state import (
+    parse_triage_output,
+    finalize,
+    write_output_files,
+    create_invokation_statement,
+    check_fuzz_line_for_crash,
+    check_fuzz_line_for_run_id
+)
+
 from . import config
 
 print_lock = threading.Lock()
@@ -88,7 +95,10 @@ def run_dr(config_dict, verbose=False, timeout=None):
             pid = pidfile.read().strip()
             if verbose:
                 print_l("Killing child process:", pid)
-            os.kill(int(pid), signal.SIGTERM)
+            try:
+                os.kill(int(pid), signal.SIGTERM)
+            except PermissionError:
+                print_l("WARNING: Couldn't kill child process")
 
         # Try to get the output again
         try:
@@ -103,7 +113,7 @@ def run_dr(config_dict, verbose=False, timeout=None):
 
             # Fix types again (expects bytes)
             popen_obj.stdout = "ERROR".encode('utf-8')
-            popen_obj.stderr = "EXCEPTION_SL2_TIMEOUT".encode('utf-8')
+            popen_obj.stderr = json.dumps({"exception": "EXCEPTION_SL2_TIMEOUT"}).encode('utf-8')
 
         popen_obj.timed_out = True
 
@@ -127,6 +137,8 @@ def wizard_run(config_dict):
                                verbose=config_dict['verbose'])
     wizard_output = completed_process.stderr.decode('utf-8')
     wizard_findings = []
+    mem_map = {}
+    base_addr = None
 
     for line in wizard_output.splitlines():
         try:
@@ -137,9 +149,18 @@ def wizard_run(config_dict):
             elif "in" == obj["type"]:
                 # TODO do something here later
                 pass
+            elif "map" == obj["type"]:
+                mem_map[(obj["start"], obj["end"])] = obj["mod_name"]
+                if ".exe" in obj["mod_name"]:
+                    base_addr = obj["start"]
             elif "id" == obj["type"]:
                 obj['mode'] = Mode.MATCH_INDEX
                 obj['selected'] = False
+                ret_addr = obj["retAddrOffset"] + base_addr
+                for addrs in mem_map.keys():
+                    if ret_addr in range(*addrs):
+                        obj['called_from'] = mem_map[addrs]
+
                 wizard_findings.append(obj)
         except Exception:
             pass
@@ -152,21 +173,29 @@ def fuzzer_run(config_dict):
     completed_process = run_dr(config_dict, verbose=config_dict['verbose'], timeout=config_dict.get('fuzz_timeout', None))
 
     # Parse run ID from fuzzer output
-    run_id = 'ERR'
-    proc_stderr = completed_process.stderr.decode('utf-8')
+    run_id = None
+    crashed = False
 
-    for line in str.splitlines(proc_stderr):
-        if 'Beginning fuzzing run' in line:
-            uuid_s = line.replace('Beginning fuzzing run ', '').strip()
-            run_id = uuid.UUID(uuid_s)
-    if run_id == 'ERR':
+    for line in completed_process.stderr.split(b'\n'):
+        try:
+            line = line.decode('utf-8')
+            # Extract the run id from the run
+            if not run_id:
+                run_id = check_fuzz_line_for_run_id(line)
+
+            # Identify whether the fuzzing run resulted in a crash
+            if not crashed:
+                crashed, exception = check_fuzz_line_for_crash(line)
+        except UnicodeDecodeError:
+            if config_dict['verbose']:
+                print_l("[!] Not UTF-8: %s", repr(line))
+
+    if not run_id:
         print_l("Error: No run ID could be parsed from the server output")
         return False, -1
 
-    # Identify whether the fuzzing run resulted in a crash
-    crashed = 'EXCEPTION_' in proc_stderr
     if crashed:
-        print_l('Fuzzing run %s returned %s' % (run_id, completed_process.returncode))
+        print_l('Fuzzing run %s returned %s after raising %s' % (run_id, completed_process.returncode, exception))
         # Write stdout and stderr to files
         # TODO fix issue #40
         write_output_files(completed_process, run_id, 'fuzz')
@@ -175,10 +204,7 @@ def fuzzer_run(config_dict):
 
     # Handle orphaned pipes after a timeout
     if completed_process.timed_out:
-        if crashed:
-            finalize(run_id, True)
-        else:
-            finalize(run_id, False)
+        finalize(run_id, crashed)
 
     return crashed, run_id
 

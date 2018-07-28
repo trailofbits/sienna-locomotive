@@ -62,6 +62,8 @@ enum Event {
     EVT_GET_ARENA,          // 10
     // Register the (modified) coverage arena for a given run.
     EVT_SET_ARENA,          // 11
+    // Ping the server. Debugging only.
+    EVT_PING,               // 12
     // Use this as a default value when handling multiple events.
     // NOTE(ww): The server will complain and may die if you send this.
     EVT_INVALID = 255,
