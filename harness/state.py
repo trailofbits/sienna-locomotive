@@ -6,7 +6,9 @@ import os
 import glob
 import re
 import struct
-import json, msgpack
+import json
+import msgpack
+import uuid
 from hashlib import sha1
 from csv import DictWriter
 
@@ -71,6 +73,7 @@ class TargetAdapter(object):
         super().__init__()
         self.target_list = target_list
         self.filename = filename
+        self.pause_saving = False
 
     def __iter__(self):
         return self.target_list.__iter__()
@@ -79,11 +82,20 @@ class TargetAdapter(object):
         for key in kwargs:
             self.target_list[index][key] = kwargs[key]
 
+        if not self.pause_saving:
+            self.save()
+
+    def pause(self):
+        self.pause_saving = True
+
+    def unpause(self):
+        self.pause_saving = False
         self.save()
 
     def set_target_list(self, new_targets):
         self.target_list = new_targets
-        self.save()
+        if not self.pause_saving:
+            self.save()
 
     def save(self):
         with open(self.filename, 'wb') as msgfile:
@@ -147,8 +159,7 @@ def parse_triage_output(run_id):
             formatted += ("\n\t0x{location:02x}: {instruction}".format(**results))
             return formatted, results
     except FileNotFoundError:
-        message = "The triage tool exited improperly during run {}, but no crash file could be found. \
-                   It may have timed out. To retry it manually, run `python harness.py -v -e TRIAGE [-p <PROFILE>]`"
+        message = "The triage tool exited improperly during run {}, but no crash file could be found. It may have timed out. To retry it manually, run `python harness.py -v -e TRIAGE [-p <PROFILE>]`"
         return message.format(run_id), None
 
 
@@ -159,7 +170,6 @@ def export_crash_data_to_csv(crashes, csv_filename):
 
         writer.writeheader()
         writer.writerows(crashes)
-
 
 
 def finalize(run_id, crashed):
@@ -173,6 +183,35 @@ def finalize(run_id, crashed):
     # Write a bool indicating a crash
     f.write(struct.pack('?', 1 if crashed else 0))
     # Write a bool indicating whether to preserve run files (without a crash)
-    f.write(struct.pack('?', 1 if True else 0))
+    f.write(struct.pack('?', 1 if crashed else 0))
     f.write(struct.pack('B', 0x6)) # EVT_SESSION_TEARDOWN
     f.close()
+
+
+def check_fuzz_line_for_crash(line):
+    """
+    Attempt to parse a line as JSON, returning a tuple of the crash state
+    and the exception code. If no crash can be detected in the line, return
+    False, None.
+    """
+    try:
+        obj = json.loads(line)
+        if obj["exception"]:
+            return True, obj["exception"]
+    except Exception:
+        pass
+    return False, None
+
+
+def check_fuzz_line_for_run_id(line):
+    """
+    Attempt to parse a line as JSON, returning a UUID object
+    if the JSON object contains one. Otherwise, return None.
+    """
+    try:
+        obj = json.loads(line)
+        if obj["run_id"]:
+            return uuid.UUID(obj["run_id"])
+    except Exception:
+        pass
+    return None
