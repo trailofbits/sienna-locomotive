@@ -23,6 +23,8 @@ print_lock = threading.Lock()
 can_fuzz = True
 
 
+
+
 class Mode(IntEnum):
     """ Function selection modes. KEEP THIS UP-TO-DATE with common/enums.h """
     MATCH_INDEX = 1 << 0
@@ -108,6 +110,11 @@ def run_dr(config_dict, verbose=False, timeout=None):
         return popen_obj
 
 
+def triagerRun( config, runId ):
+    dmpfile = os.path.join( runId, "mem.dmp" )
+    cmd =  [ r'.\build\triage\Debug\triager.exe',  dmpfile ] 
+    out = subprocess.getoutput(cmd)
+
 def wizard_run(config_dict):
     """ Runs the wizard and lets the user select a target function """
     completed_process = run_dr({'drrun_path': config_dict['drrun_path'],
@@ -192,6 +199,7 @@ def triage_run(config_dict, run_id):
     write_output_files(completed_process, run_id, 'triage')
 
     formatted, raw = parse_triage_output(run_id)
+
     return formatted, raw
 
 

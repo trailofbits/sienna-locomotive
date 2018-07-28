@@ -12,7 +12,7 @@ import atexit
 import harness.config
 import harness.statz
 from harness.state import get_target_dir, get_all_targets, get_runs, stringify_program_array
-from harness.instrument import print_l, wizard_run, fuzzer_run, triage_run, start_server, fuzz_and_triage, kill
+from harness.instrument import print_l, wizard_run, fuzzer_run, triage_run, start_server, fuzz_and_triage, kill, triagerRun
 
 
 
@@ -111,7 +111,9 @@ def main():
             config['target_application_path'], config['target_args'] = runs[run_id]
             config['client_args'].append('-t')
             config['client_args'].append(target_file)
-            print(triage_run(config, run_id[-36:])[0])
+            triageResults = triage_run(config, run_id[-36:])[0]
+            triagerRun( config, run_id )
+            print( triageResults )
 
     else:
         # Run the wizard to select a target function if we don't have one saved
