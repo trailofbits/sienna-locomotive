@@ -22,6 +22,8 @@
 #include "google_breakpad/processor/minidump.h"
 #include "google_breakpad/processor/minidump_processor.h"
 #include "google_breakpad/processor/process_state.h"
+#include "google_breakpad/processor/call_stack.h"
+#include "google_breakpad/processor/stack_frame.h"
 
 
 using namespace std;
@@ -121,14 +123,54 @@ int Triage::signalType() {
 
 
 ////////////////////////////////////////////////////////////////////////////
+// callStack()
+const vector<uint64_t> Triage::callStack() const {
+    int threadid = state_.requesting_thread();
+    const CallStack* stack = state_.threads()->at(threadid);
+
+    uint32_t    stackhash = 0;
+    uint8_t     i = 0;
+    
+    vector<uint64_t> ret;
+    for( StackFrame* frame : *stack->frames()  ) { 
+        ret.push_back(frame->ReturnAddress());
+    }
+    return ret;
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+// stackHash()
+//      Returns the hash of the callstack.  This should uniquely identifiy
+// a crash (even with ASLR) by using the last 3 nibbles of the offset for
+// each call in the callstack
+const string Triage::stackHash() const {
+    uint32_t    stackhash = 0;
+    uint8_t     i = 0;
+    
+    for( auto addr : callStack() ) { 
+        // We only want the 12 bits of the offset to ignore aslr
+        addr &= 0xFFF;
+        addr <<= (i%4)*12;
+        stackhash ^= addr;
+        i++;
+    }
+    ostringstream oss;
+    oss << setfill('0') << setw(32/4) << hex << stackhash;
+    return oss.str();
+}
+
+////////////////////////////////////////////////////////////////////////////
 // triageTag()
 //      A tag is basically a string that uniquely identifies the crash.  Its
 // includes exploitabilty, crash reason, and eventually a unique address
-const string Triage::triageTag() {
+const string Triage::triageTag() const {
     fs::path  tPath;
     tPath.append( exploitability() );
-    tPath.append( crashReason() );    
-    return tPath.generic_string();
+    tPath.append( crashReason() );
+    tPath.append(stackHash());
+    string ret =  tPath.generic_string();
+    return ret;
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -218,6 +260,9 @@ json Triage::toJson() const {
         { "crashReason",        crashReason() },
         { "crashAddress",       crashAddress() },
         { "exploitability",     exploitability() },
+        { "tag",                triageTag() },
+        { "callStack",          callStack() },
+        { "stackHash",          stackHash() },
         { "minidumpPath",       minidumpPath() },
         { "ranks",              ranks() },
         { "rank",               exploitabilityRank() },

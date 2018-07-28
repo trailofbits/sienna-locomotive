@@ -126,7 +126,7 @@ def triagerRun(  runId ):
                 'fuzzkit',
                 'runs',
                 str(runId),
-                "mem.dmp" )
+                "initial.dmp" )
     cmd =  [ r'.\build\triage\Debug\triager.exe',  dmpfile ] 
     out = subprocess.getoutput(cmd)
 
