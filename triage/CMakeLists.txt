@@ -1,10 +1,10 @@
 file(
-    GLOB SOURCES "*.cc"    
+    GLOB SOURCES "*.cc"
     GLOB SOURCES ${BREAKPAD_DIR}/third_party/libdisasm/*.c
 )
 
 
-add_compile_definitions( BPLOG_MINIMUM_SEVERITY=SEVERITY_CRITICAL )
+# add_compile_definitions( BPLOG_MINIMUM_SEVERITY=SEVERITY_CRITICAL )
 
 
 #GLOB SOURCES ${BREAKPAD_DIR}/processor/*.cc
@@ -29,7 +29,7 @@ add_compile_definitions( BPLOG_MINIMUM_SEVERITY=SEVERITY_CRITICAL )
 
 
 
-include_directories( 
+include_directories(
     ${BREAKPAD_DIR}
     ${BREAKPAD_DIR}/processor
 )
