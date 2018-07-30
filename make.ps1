@@ -70,6 +70,8 @@ Function SafeDelete {
 }
 
 Function Reconfig {
+    taskkill.exe /IM test_application.exe /F
+    taskkill.exe /IM server.exe /F
     SafeDelete "$env:APPDATA\Trail of Bits\fuzzkit"
 }
 
