@@ -433,20 +433,13 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
             bool ok = drwrap_wrap(towrap, hookFunctionPre, hookFunctionPost);
             json j;
 
-            if (ok) {
-                j["type"]      = "wrapped";
-                j["func_name"] = functionName;
-                j["toWrap"]    = (uint64_t)towrap;
-                j["modName"]   = mod_name;
-            }
-            else {
+            if (!ok) {
                 j["type"] = "error";
                 ostringstream s;
                 s << "FAILED to wrap " << functionName <<  " @ " << towrap << " already wrapped?";
                 j["msg"] = s.str();
+                SL2_LOG_JSONL(j);
             }
-
-            SL2_LOG_JSONL(j); // TODO - we can probably delete this as well
         }
     }
 }
