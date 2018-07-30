@@ -1,8 +1,8 @@
 
-from PyQt5.QtWidgets import QFileDialog, QMenu, QAction
+from PyQt5.QtWidgets import QFileDialog, QStyle
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt, QSize
-from functools import partial
+import os
 
 from harness import config
 
@@ -39,7 +39,6 @@ class ConfigWindow(QtWidgets.QDialog):
         expansion_layout = QtWidgets.QHBoxLayout()
         expansion_layout.setAlignment(Qt.AlignLeft)
         add_label = QtWidgets.QLabel("Add Profile ")
-        # add_label.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Preferred)
         expansion_layout.addWidget(add_label)
         self.expand_button = QtWidgets.QToolButton()
         self.expand_button.setArrowType(Qt.RightArrow)
@@ -65,6 +64,12 @@ class ConfigWindow(QtWidgets.QDialog):
         self.build_dir_button = QtWidgets.QPushButton("Choose Directory")
         self.target_path_button = QtWidgets.QPushButton("Choose Target")
 
+        icon = self.style().standardIcon(QStyle.SP_MessageBoxCritical)
+        self.bad_path_warning = QtWidgets.QLabel()
+        self.bad_path_warning.setPixmap(icon.pixmap(32, 32))
+        self.bad_path_warning.setToolTip("This build root is missing some expected child paths")
+        self.bad_path_warning.hide()
+
         drrun_path_layout = QtWidgets.QHBoxLayout()
         build_dir_layout = QtWidgets.QHBoxLayout()
         target_path_layout = QtWidgets.QHBoxLayout()
@@ -74,6 +79,7 @@ class ConfigWindow(QtWidgets.QDialog):
 
         build_dir_layout.addWidget(self.build_dir)
         build_dir_layout.addWidget(self.build_dir_button)
+        build_dir_layout.addWidget(self.bad_path_warning)
 
         target_path_layout.addWidget(self.target_path)
         target_path_layout.addWidget(self.target_path_button)
@@ -96,6 +102,7 @@ class ConfigWindow(QtWidgets.QDialog):
         self.drrun_path_button.clicked.connect(self.get_drrun_path)
         self.build_dir_button.clicked.connect(self.get_build_dir)
         self.target_path_button.clicked.connect(self.get_target_path)
+        self.build_dir.textChanged.connect(self.validate_build_path)
 
         self.show()
 
@@ -128,6 +135,21 @@ class ConfigWindow(QtWidgets.QDialog):
         path = QFileDialog.getExistingDirectory(directory='build')
         if len(path) > 0:
             self.build_dir.setText(path)
+
+    def validate_build_path(self, new_path):
+        paths = ['server\\Debug\\server.exe',
+                 'fuzz_dynamorio\\Debug\\fuzzer.dll',
+                 'wizard\\Debug\\wizard.dll',
+                 'triage_dynamorio\\Debug\\tracer.dll']
+        missing = []
+        for path in paths:
+            if not os.path.isfile(os.path.join(new_path, path)):
+                missing.append(path)
+        if len(missing) > 0:
+            self.bad_path_warning.show()
+            self.bad_path_warning.setToolTip("This build root is missing some expected child paths: " + '\n'.join(missing))
+        else:
+            self.bad_path_warning.hide()
 
     def toggle_expansion(self):
         if not self.extension_widget.isVisible():
