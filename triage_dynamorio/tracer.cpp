@@ -1322,7 +1322,7 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
 
-    info->function             = Function::fread;
+    info->function             = Function::fread_s;
     info->lpBuffer             = buffer;
     info->nNumberOfBytesToRead = size * count;
     info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;

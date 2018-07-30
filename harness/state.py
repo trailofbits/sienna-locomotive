@@ -9,6 +9,7 @@ import struct
 import json
 import msgpack
 import uuid
+import random
 from hashlib import sha1
 from csv import DictWriter
 
@@ -23,7 +24,7 @@ def esc_quote(raw):
 
 
 def create_invokation_statement(config_dict):
-    program_arr = [config_dict['drrun_path'], '-pidfile', 'pidfile'] + config_dict['drrun_args'] + \
+    program_arr = [config_dict['drrun_path'], '-pidfile', 'pidfile'] + config_dict['drrun_args'] + ['-prng_seed', str(random.getrandbits(64))] + \
           ['-c', config_dict['client_path']] + config_dict['client_args'] + \
           ['--', config_dict['target_application_path'].strip('\"')] + config_dict['target_args']
 
@@ -99,13 +100,15 @@ class TargetAdapter(object):
 
     def save(self):
         with open(self.filename, 'wb') as msgfile:
+            msgpack.dump(list(filter(lambda k: k['selected'], self.target_list)), msgfile)
+        with open(self.filename.replace("targets.msg", "all_targets.msg"), 'wb') as msgfile:
             msgpack.dump(self.target_list, msgfile)
 
 
 def get_target(_config):
     target_file = os.path.join(get_target_dir(_config), 'targets.msg')
     try:
-        with open(target_file, 'rb') as target_msg:
+        with open(target_file.replace("targets.msg", "all_targets.msg"), 'rb') as target_msg:
             return TargetAdapter(msgpack.load(target_msg, encoding='utf-8'), target_file)
     except FileNotFoundError:
         return TargetAdapter([], target_file)
