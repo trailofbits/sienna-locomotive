@@ -81,13 +81,13 @@ static void get_target_command_line(wchar_t **argv, size_t *len)
     memcpy(&parameterBlock, clientPEB->ProcessParameters, sizeof(RTL_USER_PROCESS_PARAMETERS));
 
     // Allocate space for the command line
-    *argv = (wchar_t *) dr_global_alloc(parameterBlock.CommandLine.Length + 1);
-    memset(*argv, 0, parameterBlock.CommandLine.Length + 1);
+    *argv = (wchar_t *) dr_global_alloc(parameterBlock.CommandLine.Length + 2);
+    memset(*argv, 0, parameterBlock.CommandLine.Length + 2);
 
     // Read the command line from the parameter block
     memcpy(*argv, parameterBlock.CommandLine.Buffer, parameterBlock.CommandLine.Length);
 
-    *len = parameterBlock.CommandLine.Length + 1;
+    *len = parameterBlock.CommandLine.Length + 2;
 }
 
 static dr_emit_flags_t
