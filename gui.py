@@ -24,7 +24,6 @@ class MainWindow(QtWidgets.QMainWindow):
         # Select config profile before starting
         self.cfg = ConfigWindow()
         self.cfg.exec()
-        exit(0)
 
         # Set up basic window
         self.setWindowTitle("Sienna Locomotive 2")

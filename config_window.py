@@ -64,11 +64,17 @@ class ConfigWindow(QtWidgets.QDialog):
         self.build_dir_button = QtWidgets.QPushButton("Choose Directory")
         self.target_path_button = QtWidgets.QPushButton("Choose Target")
 
+        icon = self.style().standardIcon(QStyle.SP_MessageBoxWarning)
+        self.bad_dr_path_warning = QtWidgets.QLabel()
+        self.bad_dr_path_warning.setPixmap(icon.pixmap(32, 32))
+        self.bad_dr_path_warning.setToolTip("This path doesn't look quite right. It might be invalid, or drrun.exe may have been moved?")
+        self.bad_dr_path_warning.hide()
+
         icon = self.style().standardIcon(QStyle.SP_MessageBoxCritical)
-        self.bad_path_warning = QtWidgets.QLabel()
-        self.bad_path_warning.setPixmap(icon.pixmap(32, 32))
-        self.bad_path_warning.setToolTip("This build root is missing some expected child paths")
-        self.bad_path_warning.hide()
+        self.bad_build_dir_warning = QtWidgets.QLabel()
+        self.bad_build_dir_warning.setPixmap(icon.pixmap(32, 32))
+        self.bad_build_dir_warning.setToolTip("This build root is missing some expected child paths")
+        self.bad_build_dir_warning.hide()
 
         drrun_path_layout = QtWidgets.QHBoxLayout()
         build_dir_layout = QtWidgets.QHBoxLayout()
@@ -76,10 +82,11 @@ class ConfigWindow(QtWidgets.QDialog):
 
         drrun_path_layout.addWidget(self.drrun_path)
         drrun_path_layout.addWidget(self.drrun_path_button)
+        drrun_path_layout.addWidget(self.bad_dr_path_warning)
 
         build_dir_layout.addWidget(self.build_dir)
         build_dir_layout.addWidget(self.build_dir_button)
-        build_dir_layout.addWidget(self.bad_path_warning)
+        build_dir_layout.addWidget(self.bad_build_dir_warning)
 
         target_path_layout.addWidget(self.target_path)
         target_path_layout.addWidget(self.target_path_button)
@@ -102,12 +109,25 @@ class ConfigWindow(QtWidgets.QDialog):
         self.drrun_path_button.clicked.connect(self.get_drrun_path)
         self.build_dir_button.clicked.connect(self.get_build_dir)
         self.target_path_button.clicked.connect(self.get_target_path)
+        self.drrun_path.textChanged.connect(self.validate_drrun_path)
         self.build_dir.textChanged.connect(self.validate_build_path)
 
         self.show()
 
     def add_config(self, *_args):
         name = self.profile_name.text()
+        if len(name) == 0:
+            QtWidgets.QMessageBox.critical(self, "Invalid Name", "Profile name cannot be empty")
+            return
+        if len(self.drrun_path.text()) == 0:
+            QtWidgets.QMessageBox.critical(self, "Invalid Path", "Path to drrun.exe cannot be empty")
+            return
+        if len(self.build_dir.text()) == 0:
+            QtWidgets.QMessageBox.critical(self, "Invalid Path", "Path to build directory cannot be empty")
+            return
+        if len(self.target_path.text()) == 0:
+            QtWidgets.QMessageBox.critical(self, "Invalid Path", "Target application path cannot be empty")
+            return
         config.create_new_profile(name, self.drrun_path.text(), self.build_dir.text(),
                                   self.target_path.text(), self.target_args.text())
 
@@ -136,6 +156,16 @@ class ConfigWindow(QtWidgets.QDialog):
         if len(path) > 0:
             self.build_dir.setText(path)
 
+    def validate_drrun_path(self, new_path):
+        good = 'drrun.exe' in new_path
+        good = good and ('bin32' in new_path or 'bin64' in new_path)
+        good = good and os.path.isfile(new_path)
+
+        if not good:
+            self.bad_dr_path_warning.show()
+        else:
+            self.bad_dr_path_warning.hide()
+
     def validate_build_path(self, new_path):
         paths = ['server\\Debug\\server.exe',
                  'fuzz_dynamorio\\Debug\\fuzzer.dll',
@@ -146,10 +176,11 @@ class ConfigWindow(QtWidgets.QDialog):
             if not os.path.isfile(os.path.join(new_path, path)):
                 missing.append(path)
         if len(missing) > 0:
-            self.bad_path_warning.show()
-            self.bad_path_warning.setToolTip("This build root is missing some expected child paths: " + '\n'.join(missing))
+            self.bad_build_dir_warning.show()
+            self.bad_build_dir_warning.setToolTip("This build root is missing some expected child paths: " + '\n'.join(missing))
         else:
-            self.bad_path_warning.hide()
+            self.bad_build_dir_warning.hide()
+
 
     def toggle_expansion(self):
         if not self.extension_widget.isVisible():
