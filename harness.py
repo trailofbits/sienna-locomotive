@@ -68,8 +68,10 @@ def select_and_dump_wizard_findings(wizard_findings, target_file):
     index = select_from_range(len(wizard_findings), "Choose a function to fuzz> ")
     wizard_findings[index]['selected'] = True
 
-    with open(target_file, 'wb') as msg_file:
+    with open(target_file.replace("targets.msg", "all_targets.msg"), 'wb') as msg_file:
         msgpack.dump(wizard_findings, msg_file)
+    with open(target_file, 'wb') as msg_file:
+        msgpack.dump(list(filter(lambda k: k['selected'], wizard_findings)), msg_file)
 
     return wizard_findings
 

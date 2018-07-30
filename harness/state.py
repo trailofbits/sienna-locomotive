@@ -100,13 +100,15 @@ class TargetAdapter(object):
 
     def save(self):
         with open(self.filename, 'wb') as msgfile:
+            msgpack.dump(list(filter(lambda k: k['selected'], self.target_list)), msgfile)
+        with open(self.filename.replace("targets.msg", "all_targets.msg"), 'wb') as msgfile:
             msgpack.dump(self.target_list, msgfile)
 
 
 def get_target(_config):
     target_file = os.path.join(get_target_dir(_config), 'targets.msg')
     try:
-        with open(target_file, 'rb') as target_msg:
+        with open(target_file.replace("targets.msg", "all_targets.msg"), 'rb') as target_msg:
             return TargetAdapter(msgpack.load(target_msg, encoding='utf-8'), target_file)
     except FileNotFoundError:
         return TargetAdapter([], target_file)
