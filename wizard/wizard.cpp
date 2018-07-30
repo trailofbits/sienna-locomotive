@@ -24,17 +24,6 @@ using namespace std;
 
 #include "common/sl2_dr_client.hpp"
 
-#define JSON_VAR (j##__COUNTER__)
-
-// TODO - we can probably delete this block, but we'll leave it for a few more commits
-#define JSON_WRAP_PRE_LOG() do { \
-    json JSON_VAR; \
-    JSON_VAR["type"] = "in"; \
-    JSON_VAR["function"] = __FUNCTION__; \
-    SL2_LOG_JSONL(JSON_VAR); \
-} while (0)
-
-
 // function metadata structure
 struct wizard_read_info {
     void *lpBuffer;
@@ -89,8 +78,6 @@ Below we have a number of functions that instrument metadata retreival for the i
 static void
 wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
 {
-    JSON_WRAP_PRE_LOG();
-
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
@@ -115,8 +102,6 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
 {
-    JSON_WRAP_PRE_LOG();
-
     HKEY hKey         = (HKEY)drwrap_get_arg(wrapcxt, 0);
     char *lpValueName = (char *)drwrap_get_arg(wrapcxt, 1);
     DWORD *lpReserved = (DWORD *)drwrap_get_arg(wrapcxt, 2);
@@ -146,8 +131,6 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
 {
-    JSON_WRAP_PRE_LOG();
-
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
@@ -172,8 +155,6 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
 {
-    JSON_WRAP_PRE_LOG();
-
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
@@ -197,8 +178,6 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
 {
-    JSON_WRAP_PRE_LOG();
-
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
@@ -222,8 +201,6 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_recv(void *wrapcxt, OUT void **user_data)
 {
-    JSON_WRAP_PRE_LOG();
-
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
@@ -256,8 +233,6 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
 {
-    JSON_WRAP_PRE_LOG();
-
     HANDLE hFile               = drwrap_get_arg(wrapcxt, 0);
     void *lpBuffer             = drwrap_get_arg(wrapcxt, 1);
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
@@ -298,8 +273,6 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_fread(void *wrapcxt, OUT void **user_data)
 {
-    JSON_WRAP_PRE_LOG();
-
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
@@ -319,8 +292,6 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
 {
-    JSON_WRAP_PRE_LOG();
-
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
