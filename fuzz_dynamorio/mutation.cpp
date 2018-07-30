@@ -24,10 +24,7 @@ static void strategyAAAA(uint8_t *buf, size_t size)
 static void strategyFlipBit(uint8_t *buf, size_t size)
 {
     size_t pos = dr_get_random_value(size);
-    uint8_t byte = buf[pos];
-
-    uint8_t mask = 1 << dr_get_random_value(8);
-    buf[pos] = byte ^ mask;
+    buf[pos] ^= (1 << dr_get_random_value(8));
 }
 
 // Repeat a random continuous span of bytes
@@ -95,7 +92,7 @@ static void strategyRandValues(uint8_t *buf, size_t size)
     size_t max = 0;
     while (max < 1) {
         // rand_size -> 1, 2, 4, 8
-        rand_size = (size_t) pow(2, dr_get_random_value(4));
+        rand_size = (size_t) 1 << dr_get_random_value(4);
         max = (size + 1);
         max -= rand_size;
     }
@@ -125,7 +122,7 @@ static void strategyKnownValues(uint8_t *buf, size_t size)
     size_t max = 0;
     while (max < 1) {
         // size -> 1, 2, 4, 8
-        rand_size = (size_t) pow(2, dr_get_random_value(4));
+        rand_size = (size_t) 1 << dr_get_random_value(4);
         max = (size + 1);
         max -= rand_size;
     }
@@ -179,7 +176,7 @@ static void strategyAddSubKnownValues(uint8_t *buf, size_t size)
     size_t max = 0;
     while (max < 1) {
         // size -> 1, 2, 4, 8
-        rand_size = (size_t) pow(2, dr_get_random_value(4));
+        rand_size = (size_t) 1 << dr_get_random_value(4);
         max = (size + 1) - rand_size;
     }
 
@@ -231,7 +228,7 @@ static void strategyEndianSwap(uint8_t *buf, size_t size)
     size_t max = 0;
     while (max < 1) {
         // size -> 1, 2, 4, 8
-        rand_size = (size_t) pow(2, dr_get_random_value(4));
+        rand_size = (size_t) 1 << dr_get_random_value(4);
         max = (size + 1) - rand_size;
     }
 
