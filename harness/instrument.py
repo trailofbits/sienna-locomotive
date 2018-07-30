@@ -128,21 +128,16 @@ def wizard_run(config_dict):
                                 'target_args': config_dict['target_args'],
                                 'inline_stdout': config_dict['inline_stdout']},
                                verbose=config_dict['verbose'])
-    wizard_output = completed_process.stderr.decode('utf-8')
     wizard_findings = []
     mem_map = {}
     base_addr = None
 
-    for line in wizard_output.splitlines():
+    for line in completed_process.stderr.split(b'\n'):
         try:
+            line = line.decode('utf-8')
             obj = json.loads(line)
-            if "wrapped" == obj["type"]:
-                # TODO do something here later
-                pass
-            elif "in" == obj["type"]:
-                # TODO do something here later
-                pass
-            elif "map" == obj["type"]:
+
+            if "map" == obj["type"]:
                 mem_map[(obj["start"], obj["end"])] = obj["mod_name"]
                 if ".exe" in obj["mod_name"]:
                     base_addr = obj["start"]
@@ -155,8 +150,13 @@ def wizard_run(config_dict):
                         obj['called_from'] = mem_map[addrs]
 
                 wizard_findings.append(obj)
-        except Exception:
+        except UnicodeDecodeError:
+            if config_dict["verbose"]:
+                print_l("[!] Not UTF-8:", repr(line))
+        except json.JSONDecodeError:
             pass
+        except Exception as e:
+            print_l("[!] Unexpected exception:", e)
 
     return wizard_findings
 
