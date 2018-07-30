@@ -6,12 +6,12 @@
 
 // NOTE(ww): The macros below assume the following state:
 // conn: an `sl2_conn *`
-// txsize: a `DWORD`
-#define SL2_CONN_WRITE(thing, size) (WriteFile(conn->pipe, thing, size, &txsize, NULL))
-#define SL2_CONN_READ(thing, size) (ReadFile(conn->pipe, thing, size, &txsize, NULL))
+// txsize: a `DWORD
+#define SL2_CONN_WRITE(thing, size) (WriteFile(conn->pipe, thing, (DWORD) size, &txsize, NULL))
+#define SL2_CONN_READ(thing, size) (ReadFile(conn->pipe, thing, (DWORD) size, &txsize, NULL))
 
 #define SL2_CONN_EVT(event) do {       \
-    uint8_t evt = event;                     \
+    uint8_t evt = event;               \
     SL2_CONN_WRITE(&evt, sizeof(evt)); \
 } while(0)
 
@@ -51,7 +51,7 @@ SL2Response sl2_conn_read_prefixed_string(sl2_conn *conn, wchar_t *message, size
     return SL2Response::OK;
 }
 
-__declspec(dllexport)
+SL2_EXPORT
 SL2Response sl2_conn_open(sl2_conn *conn)
 {
     HANDLE pipe;
@@ -63,9 +63,6 @@ SL2Response sl2_conn_open(sl2_conn *conn)
         return SL2Response::BadPipe;
     }
 
-    DWORD readMode = PIPE_READMODE_MESSAGE;
-    SetNamedPipeHandleState(pipe, &readMode, NULL, NULL);
-
     conn->pipe = pipe;
 
     // NOTE(ww): We zero the run_id out here so that using a connection
@@ -76,7 +73,7 @@ SL2Response sl2_conn_open(sl2_conn *conn)
     return SL2Response::OK;
 }
 
-__declspec(dllexport)
+SL2_EXPORT
 SL2Response sl2_conn_end_session(sl2_conn *conn)
 {
     DWORD txsize;
@@ -89,18 +86,19 @@ SL2Response sl2_conn_end_session(sl2_conn *conn)
     return SL2Response::OK;
 }
 
-__declspec(dllexport)
+SL2_EXPORT
 SL2Response sl2_conn_close(sl2_conn *conn)
 {
     sl2_conn_end_session(conn);
 
+    FlushFileBuffers(conn->pipe);
     CloseHandle(conn->pipe);
 
     // TODO(ww): error returns
     return SL2Response::OK;
 }
 
-__declspec(dllexport)
+SL2_EXPORT
 SL2Response sl2_conn_request_run_id(sl2_conn *conn, wchar_t *target_name, wchar_t *target_args)
 {
     UUID run_id;
@@ -121,7 +119,7 @@ SL2Response sl2_conn_request_run_id(sl2_conn *conn, wchar_t *target_name, wchar_
     return SL2Response::OK;
 }
 
-__declspec(dllexport)
+SL2_EXPORT
 SL2Response sl2_conn_assign_run_id(sl2_conn *conn, UUID run_id)
 {
     if (conn->has_run_id) {
@@ -134,7 +132,7 @@ SL2Response sl2_conn_assign_run_id(sl2_conn *conn, UUID run_id)
     return SL2Response::OK;
 }
 
-__declspec(dllexport)
+SL2_EXPORT
 SL2Response sl2_conn_register_mutation(sl2_conn *conn, sl2_mutation *mutation)
 {
     DWORD txsize;
@@ -161,7 +159,8 @@ SL2Response sl2_conn_register_mutation(sl2_conn *conn, sl2_mutation *mutation)
     return SL2Response::OK;
 }
 
-__declspec(dllexport) SL2Response sl2_conn_request_replay(
+SL2_EXPORT
+SL2Response sl2_conn_request_replay(
     sl2_conn *conn,
     uint32_t mut_count,
     size_t bufsize,
@@ -192,7 +191,7 @@ __declspec(dllexport) SL2Response sl2_conn_request_replay(
     return SL2Response::OK;
 }
 
-__declspec(dllexport)
+SL2_EXPORT
 SL2Response sl2_conn_finalize_run(sl2_conn *conn, bool crash, bool preserve)
 {
     DWORD txsize;
@@ -218,7 +217,7 @@ SL2Response sl2_conn_finalize_run(sl2_conn *conn, bool crash, bool preserve)
     return SL2Response::OK;
 }
 
-__declspec(dllexport)
+SL2_EXPORT
 SL2Response sl2_conn_request_crash_paths(sl2_conn *conn, sl2_crash_paths *paths)
 {
     DWORD txsize;
@@ -242,7 +241,7 @@ SL2Response sl2_conn_request_crash_paths(sl2_conn *conn, sl2_crash_paths *paths)
     return SL2Response::OK;
 }
 
-__declspec(dllexport)
+SL2_EXPORT
 SL2Response sl2_conn_request_arena(sl2_conn *conn, sl2_arena *arena)
 {
     DWORD txsize;
@@ -266,7 +265,7 @@ SL2Response sl2_conn_request_arena(sl2_conn *conn, sl2_arena *arena)
     return SL2Response::OK;
 }
 
-__declspec(dllexport)
+SL2_EXPORT
 SL2Response sl2_conn_register_arena(sl2_conn *conn, sl2_arena *arena)
 {
     DWORD txsize;
@@ -283,6 +282,18 @@ SL2Response sl2_conn_register_arena(sl2_conn *conn, sl2_arena *arena)
 
     // Finally, write the arena data to the server.
     SL2_CONN_WRITE(arena->map, FUZZ_ARENA_SIZE);
+
+    return SL2Response::OK;
+}
+
+SL2_EXPORT
+SL2Response sl2_conn_ping(sl2_conn *conn, uint8_t *ok)
+{
+    DWORD txsize;
+
+    SL2_CONN_EVT(EVT_PING);
+
+    SL2_CONN_READ(ok, sizeof(ok));
 
     return SL2Response::OK;
 }

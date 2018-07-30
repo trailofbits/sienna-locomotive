@@ -5,6 +5,23 @@
 
 using namespace std;
 
+// NOTE(ww): As of Windows 10, both KERNEL32.dll and ADVAPI32.dll
+// get forwarded to KERNELBASE.DLL, apparently.
+// TODO(ww): Since we iterate over these, order them by likelihood of occurrence?
+sl2_funcmod SL2_FUNCMOD_TABLE[] = {
+    {"ReadFile", "KERNELBASE.DLL"},
+    {"recv", "WS2_32.DLL"},                     // TODO(ww): Is this right?
+    {"WinHttpReadData", "WINHTTP.DLL"},         // TODO(ww): Is this right?
+    {"InternetReadFile", "WININET.DLL"},        // TODO(ww): Is this right?
+    {"WinHttpWebSocketReceive", "WINHTTP.DLL"}, // TODO(ww): Is this right?
+    {"RegQueryValueExA", "KERNELBASE.DLL"},
+    {"RegQueryValueExW", "KERNELBASE.DLL"},
+    {"ReadEventLogA", "KERNELBASE.DLL"},
+    {"ReadEventLogW", "KERNELBASE.DLL"},
+    {"fread", "UCRTBASE.DLL"},
+    {"fread_s", "UCRTBASE.DLL"},
+};
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // SL2Client
 //
@@ -21,12 +38,12 @@ SL2Client::SL2Client() {
 //
 // Returns true if the current function should be targeted.
 bool SL2Client::
-isFunctionTargeted(Function function, client_read_info* info) {
-
-    std::string strFunctionName(get_function_name(function));
+isFunctionTargeted(Function function, client_read_info* info)
+{
+    const char *func_name = function_to_string(function);
 
     for (targetFunction t : parsedJson){
-        if (t.selected && t.functionName == strFunctionName) {
+        if (t.selected && STREQ(t.functionName.c_str(), func_name)) {
             if (t.mode & MATCH_INDEX && call_counts[function] == t.index) {
                 return true;
             }
@@ -102,21 +119,6 @@ generateArenaId(wchar_t *id)
     id[SL2_HASH_LEN] = '\0';
 }
 
-// TODO(ww): Use this instead of duplicating code across all three clients.
-// bool SL2Client::functionIsInUnexpectedModule(char *function, char *module)
-// {
-//     #define FUNC_AND_MOD(exp_f, exp_m) ((STREQ(exp_f, function) && STREQI(exp_m, module)))
-
-//     return (FUNC_AND_MOD("ReadFile", "KERNELBASE.DLL")
-//             || FUNC_AND_MOD("RegQueryValueExA", "KERNELBASE.DLL")
-//             || FUNC_AND_MOD("RegQueryValueExW", "KERNELBASE.DLL")
-//             || FUNC_AND_MOD("fread", "UCRTBASE.DLL")
-//             || FUNC_AND_MOD("fread_s", "UCRTBASE.DLL"))
-
-//     #undef FUNC_AND_MOD
-// }
-
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // incrementCallCountForFunction()
 //
@@ -131,34 +133,49 @@ incrementCallCountForFunction(Function function) {
 // loadJson()
 //
 // Loads json blob into client
-void SL2Client::
-loadJson(string target) {
+// TODO(ww): Rename to loadTargets, to reflect the fact that we're not using JSON anymore?
+bool SL2Client::
+loadJson(string path)
+{
+    file_t targets = dr_open_file(path.c_str(), DR_FILE_READ);
+    size_t targets_size;
+    size_t txsize;
 
-    std::ifstream msgStream(target, std::ios::binary); // TODO ifstream can sometimes cause performance issues
-    std::streampos fileSize;
+    dr_file_size(targets, &targets_size);
+    uint8_t *buffer = (uint8_t *) dr_global_alloc(targets_size);
 
-    // Read size of file
-    msgStream.seekg(0, std::ios::end);
-    fileSize = msgStream.tellg();
-    msgStream.seekg(0, std::ios::beg);
+    txsize = dr_read_file(targets, buffer, targets_size);
+    dr_close_file(targets);
 
-    char * fileBuf = (char *) dr_global_alloc(fileSize);
-    msgStream.read(fileBuf, fileSize);
-    msgStream.close();
+    if (txsize != targets_size) {
+        dr_global_free(buffer, targets_size);
+        return false;
+    }
 
-    std::vector<std::uint8_t> msg(fileBuf, fileBuf + fileSize);
+    std::vector<std::uint8_t> msg(buffer, buffer + targets_size);
 
     parsedJson = json::from_msgpack(msg);
 
-    dr_global_free(fileBuf, fileSize);
-    if (!parsedJson.is_array()) {
-      throw("Document root is not an array\n");
-    }
+    dr_global_free(buffer, targets_size);
 
+    return parsedJson.is_array();
 }
 
+// TODO(ww): Document the fallback values here.
+SL2_EXPORT
+void from_json(const json& j, targetFunction& t)
+{
+    t.selected      = j.value("selected", false);
+    t.index         = j.value("callCount", -1);
+    t.mode          = j.value("mode", MATCH_INDEX);
+    t.retAddrOffset = j.value("retAddrOffset", -1);
+    t.functionName  = j.value("func_name", "");
+    t.argHash       = j.value("argHash", "");
+    t.buffer        = j["buffer"].get<vector<uint8_t>>();
+}
 
-__declspec(dllexport) char *get_function_name(Function function)
+SL2_EXPORT
+const char *function_to_string(Function function)
 {
     switch(function) {
         case Function::ReadFile:
@@ -184,14 +201,91 @@ __declspec(dllexport) char *get_function_name(Function function)
     return "unknown";
 }
 
-// TODO(ww): Document the fallback values here.
-__declspec(dllexport) void from_json(const json& j, targetFunction& t)
+SL2_EXPORT
+const char *exception_to_string(DWORD exception_code)
 {
-    t.selected      = j.value("selected", false);
-    t.index         = j.value("callCount", -1);
-    t.mode          = j.value("mode", MATCH_INDEX);
-    t.retAddrOffset = j.value("retAddrOffset", -1);
-    t.functionName  = j.value("func_name", "");
-    t.argHash       = j.value("argHash", "");
-    t.buffer        = j["buffer"].get<vector<uint8_t>>();
+    char *exception_str;
+
+    switch (exception_code) {
+        case EXCEPTION_ACCESS_VIOLATION:
+            exception_str = "EXCEPTION_ACCESS_VIOLATION";
+            break;
+        case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+            exception_str = "EXCEPTION_ARRAY_BOUNDS_EXCEEDED";
+            break;
+        case EXCEPTION_BREAKPOINT:
+            exception_str = "EXCEPTION_BREAKPOINT";
+            break;
+        case EXCEPTION_DATATYPE_MISALIGNMENT:
+            exception_str = "EXCEPTION_DATATYPE_MISALIGNMENT";
+            break;
+        case EXCEPTION_FLT_DENORMAL_OPERAND:
+            exception_str = "EXCEPTION_FLT_DENORMAL_OPERAND";
+            break;
+        case EXCEPTION_FLT_DIVIDE_BY_ZERO:
+            exception_str = "EXCEPTION_FLT_DIVIDE_BY_ZERO";
+            break;
+        case EXCEPTION_FLT_INEXACT_RESULT:
+            exception_str = "EXCEPTION_FLT_INEXACT_RESULT";
+            break;
+        case EXCEPTION_FLT_INVALID_OPERATION:
+            exception_str = "EXCEPTION_FLT_INVALID_OPERATION";
+            break;
+        case EXCEPTION_FLT_OVERFLOW:
+            exception_str = "EXCEPTION_FLT_OVERFLOW";
+            break;
+        case EXCEPTION_FLT_STACK_CHECK:
+            exception_str = "EXCEPTION_FLT_STACK_CHECK";
+            break;
+        case EXCEPTION_FLT_UNDERFLOW:
+            exception_str = "EXCEPTION_FLT_UNDERFLOW";
+            break;
+        case EXCEPTION_ILLEGAL_INSTRUCTION:
+            exception_str = "EXCEPTION_ILLEGAL_INSTRUCTION";
+            break;
+        case EXCEPTION_IN_PAGE_ERROR:
+            exception_str = "EXCEPTION_IN_PAGE_ERROR";
+            break;
+        case EXCEPTION_INT_DIVIDE_BY_ZERO:
+            exception_str = "EXCEPTION_INT_DIVIDE_BY_ZERO";
+            break;
+        case EXCEPTION_INT_OVERFLOW:
+            exception_str = "EXCEPTION_INT_OVERFLOW";
+            break;
+        case EXCEPTION_INVALID_DISPOSITION:
+            exception_str = "EXCEPTION_INVALID_DISPOSITION";
+            break;
+        case EXCEPTION_NONCONTINUABLE_EXCEPTION:
+            exception_str = "EXCEPTION_NONCONTINUABLE_EXCEPTION";
+            break;
+        case EXCEPTION_PRIV_INSTRUCTION:
+            exception_str = "EXCEPTION_PRIV_INSTRUCTION";
+            break;
+        case EXCEPTION_SINGLE_STEP:
+            exception_str = "EXCEPTION_SINGLE_STEP";
+            break;
+        case EXCEPTION_STACK_OVERFLOW:
+            exception_str = "EXCEPTION_STACK_OVERFLOW";
+            break;
+        case STATUS_HEAP_CORRUPTION:
+            exception_str = "STATUS_HEAP_CORRUPTION";
+            break;
+        default:
+            exception_str = "EXCEPTION_SL2_UNKNOWN";
+            break;
+    }
+
+    return exception_str;
+}
+
+SL2_EXPORT
+bool function_is_in_expected_module(const char *func, const char *mod)
+{
+    for (int i = 0; i < SL2_FUNCMOD_TABLE_SIZE; i++) {
+        if (STREQ(func, SL2_FUNCMOD_TABLE[i].func)) {
+            return STREQI(mod, SL2_FUNCMOD_TABLE[i].mod);
+        }
+    }
+
+    return false;
 }

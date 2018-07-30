@@ -69,36 +69,29 @@ static bool coverage_guided = false;
 static module_data_t *target_mod;
 
 /* Read the PEB of the target application and get the full command line */
-static wchar_t *get_target_command_line(size_t *len)
+static void get_target_command_line(wchar_t **argv, size_t *len)
 {
     // see: https://github.com/DynamoRIO/dynamorio/issues/2662
     // alternatively: https://wj32.org/wp/2009/01/24/howto-get-the-command-line-of-processes/
-    _PEB * clientPEB = (_PEB *) dr_get_app_PEB();
-    _RTL_USER_PROCESS_PARAMETERS parameterBlock;
+    PEB * clientPEB = (PEB *) dr_get_app_PEB();
+    RTL_USER_PROCESS_PARAMETERS parameterBlock;
     size_t byte_counter;
 
     // Read process parameter block from PEB
-    if (!dr_safe_read(clientPEB->ProcessParameters, sizeof(_RTL_USER_PROCESS_PARAMETERS), &parameterBlock, &byte_counter)) {
-        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#get_target_command_line: Could not read process parameter block");
-        dr_exit_process(1);
-    }
+    memcpy(&parameterBlock, clientPEB->ProcessParameters, sizeof(RTL_USER_PROCESS_PARAMETERS));
 
     // Allocate space for the command line
-    wchar_t* commandLineContents = (wchar_t *) dr_global_alloc(parameterBlock.CommandLine.Length + 1);
-    memset(commandLineContents, 0, parameterBlock.CommandLine.Length + 1);
+    *argv = (wchar_t *) dr_global_alloc(parameterBlock.CommandLine.Length + 2);
+    memset(*argv, 0, parameterBlock.CommandLine.Length + 2);
 
     // Read the command line from the parameter block
-    if (!dr_safe_read(parameterBlock.CommandLine.Buffer, parameterBlock.CommandLine.Length, commandLineContents, &byte_counter)) {
-        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#get_target_command_line: Could not read command line buffer");
-        dr_exit_process(1);
-    }
+    memcpy(*argv, parameterBlock.CommandLine.Buffer, parameterBlock.CommandLine.Length);
 
-    *len = parameterBlock.CommandLine.Length + 1;
-    return commandLineContents;
+    *len = parameterBlock.CommandLine.Length + 2;
 }
 
 static dr_emit_flags_t
-on_bb(void *drcontext, void *tag, instrlist_t *bb, instr_t *inst, bool for_trace, bool translating, void *user_data)
+on_bb_instrument(void *drcontext, void *tag, instrlist_t *bb, instr_t *inst, bool for_trace, bool translating, void *user_data)
 {
     app_pc start_pc;
     uint16_t offset;
@@ -130,11 +123,11 @@ on_bb(void *drcontext, void *tag, instrlist_t *bb, instr_t *inst, bool for_trace
 
 /* Maps exception code to an exit status. Print it out, then exit. */
 static bool
-onexception(void *drcontext, dr_exception_t *excpt)
+on_exception(void *drcontext, dr_exception_t *excpt)
 {
-    dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#onexception: Exception occurred!\n");
+    dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#on_exception: Exception occurred!\n");
     crashed = true;
-    DWORD exceptionCode = excpt->record->ExceptionCode;
+    DWORD exception_code = excpt->record->ExceptionCode;
 
     dr_switch_to_app_state(drcontext);
     fuzz_exception_ctx.thread_id = GetCurrentThreadId();
@@ -144,70 +137,9 @@ onexception(void *drcontext, dr_exception_t *excpt)
     // Make our own copy of the exception record.
     memcpy(&(fuzz_exception_ctx.record), excpt->record, sizeof(EXCEPTION_RECORD));
 
-    switch (exceptionCode) {
-        case EXCEPTION_ACCESS_VIOLATION:
-            SL2_DR_DEBUG("EXCEPTION_ACCESS_VIOLATION\n");
-            break;
-        case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
-            SL2_DR_DEBUG("EXCEPTION_ARRAY_BOUNDS_EXCEEDED\n");
-            break;
-        case EXCEPTION_BREAKPOINT:
-            SL2_DR_DEBUG("EXCEPTION_BREAKPOINT\n");
-            break;
-        case EXCEPTION_DATATYPE_MISALIGNMENT:
-            SL2_DR_DEBUG("EXCEPTION_DATATYPE_MISALIGNMENT\n");
-            break;
-        case EXCEPTION_FLT_DENORMAL_OPERAND:
-            SL2_DR_DEBUG("EXCEPTION_FLT_DENORMAL_OPERAND\n");
-            break;
-        case EXCEPTION_FLT_DIVIDE_BY_ZERO:
-            SL2_DR_DEBUG("EXCEPTION_FLT_DIVIDE_BY_ZERO\n");
-            break;
-        case EXCEPTION_FLT_INEXACT_RESULT:
-            SL2_DR_DEBUG("EXCEPTION_FLT_INEXACT_RESULT\n");
-            break;
-        case EXCEPTION_FLT_INVALID_OPERATION:
-            SL2_DR_DEBUG("EXCEPTION_FLT_INVALID_OPERATION\n");
-            break;
-        case EXCEPTION_FLT_OVERFLOW:
-            SL2_DR_DEBUG("EXCEPTION_FLT_OVERFLOW\n");
-            break;
-        case EXCEPTION_FLT_STACK_CHECK:
-            SL2_DR_DEBUG("EXCEPTION_FLT_STACK_CHECK\n");
-            break;
-        case EXCEPTION_FLT_UNDERFLOW:
-            SL2_DR_DEBUG("EXCEPTION_FLT_UNDERFLOW\n");
-            break;
-        case EXCEPTION_ILLEGAL_INSTRUCTION:
-            SL2_DR_DEBUG("EXCEPTION_ILLEGAL_INSTRUCTION\n");
-            break;
-        case EXCEPTION_IN_PAGE_ERROR:
-            SL2_DR_DEBUG("EXCEPTION_IN_PAGE_ERROR\n");
-            break;
-        case EXCEPTION_INT_DIVIDE_BY_ZERO:
-            SL2_DR_DEBUG("EXCEPTION_INT_DIVIDE_BY_ZERO\n");
-            break;
-        case EXCEPTION_INT_OVERFLOW:
-            SL2_DR_DEBUG("EXCEPTION_INT_OVERFLOW\n");
-            break;
-        case EXCEPTION_INVALID_DISPOSITION:
-            SL2_DR_DEBUG("EXCEPTION_INVALID_DISPOSITION\n");
-            break;
-        case EXCEPTION_NONCONTINUABLE_EXCEPTION:
-            SL2_DR_DEBUG("EXCEPTION_NONCONTINUABLE_EXCEPTION\n");
-            break;
-        case EXCEPTION_PRIV_INSTRUCTION:
-            SL2_DR_DEBUG("EXCEPTION_PRIV_INSTRUCTION\n");
-            break;
-        case EXCEPTION_SINGLE_STEP:
-            SL2_DR_DEBUG("EXCEPTION_SINGLE_STEP\n");
-            break;
-        case EXCEPTION_STACK_OVERFLOW:
-            SL2_DR_DEBUG("EXCEPTION_STACK_OVERFLOW\n");
-            break;
-        default:
-            break;
-    }
+    json j;
+    j["exception"] = exception_to_string(exception_code);
+    SL2_LOG_JSONL(j);
 
     dr_exit_process(1);
     return true;
@@ -215,7 +147,7 @@ onexception(void *drcontext, dr_exception_t *excpt)
 
 /* Runs after the target application has exited */
 static void
-event_exit(void)
+on_dr_exit(void)
 {
     SL2_DR_DEBUG("Dynamorio exiting (fuzzer)\n");
 
@@ -223,7 +155,7 @@ event_exit(void)
         wchar_t run_id_s[SL2_UUID_SIZE];
         sl2_uuid_to_wstring(sl2_conn.run_id, run_id_s);
         SL2_DR_DEBUG("<crash found for run id %S>\n", run_id_s);
-        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#event_exit: Crash found for run id %S!", run_id_s);
+        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#on_dr_exit: Crash found for run id %S!", run_id_s);
 
         sl2_crash_paths crash_paths = {0};
         sl2_conn_request_crash_paths(&sl2_conn, &crash_paths);
@@ -236,7 +168,7 @@ event_exit(void)
             NULL);
 
         if (hDumpFile == INVALID_HANDLE_VALUE) {
-            SL2_DR_DEBUG("fuzzer#event_exit: could not open the initial dump file (0x%x)\n", GetLastError());
+            SL2_DR_DEBUG("fuzzer#on_dr_exit: could not open the initial dump file (0x%x)\n", GetLastError());
         }
 
         EXCEPTION_POINTERS exception_pointers = {0};
@@ -272,12 +204,15 @@ event_exit(void)
 
 
     sl2_conn_finalize_run(&sl2_conn, crashed, false);
+
     sl2_conn_close(&sl2_conn);
 
     dr_free_module_data(target_mod);
 
     // Clean up DynamoRIO
-    dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#event_exit: Dynamorio Exiting\n");
+    // TODO(ww): Clean up individual event handlers as well? Since we're about to exit,
+    // do we really need to? The wizard and tracer do (for the most part).
+    dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#on_dr_exit: Dynamorio Exiting\n");
     drwrap_exit();
     drmgr_exit();
     drreg_exit();
@@ -321,10 +256,75 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
         mutate_buffer(mutation.buffer, mutation.bufsize);
     }
 
+    SL2_DR_DEBUG("mutate: %.*s\n", mutation.bufsize, mutation.buffer);
+
     // Tell the server about our mutation.
     sl2_conn_register_mutation(&sl2_conn, &mutation);
 
     return true;
+}
+
+/*
+    The next three functions are used to intercept __fastfail, which Windows
+    provides to allow processes to request immediate termination.
+
+    To get around this, we tell the target that __fastfail isn't avaiable.
+    We then hope that they craft an exception record instead and send it
+    to UnhandledException, where we intercept it and forward it to our
+    exception handler. If the target decides to do neither of these, we
+    still miss the exception.
+
+    This trick was cribbed from WinAFL:
+    https://github.com/ivanfratric/winafl/blob/73c7b41/winafl.c#L600
+
+    NOTE(ww): These functions are duplicated across the fuzzer and the tracer.
+    Keep them synced!
+*/
+
+static void wrap_pre_IsProcessorFeaturePresent(void *wrapcxt, OUT void **user_data)
+{
+    DWORD feature = (DWORD) drwrap_get_arg(wrapcxt, 0);
+    *user_data = (void *) feature;
+}
+
+static void wrap_post_IsProcessorFeaturePresent(void *wrapcxt, void *user_data)
+{
+    DWORD feature = (DWORD) user_data;
+
+    if (feature == PF_FASTFAIL_AVAILABLE) {
+        SL2_DR_DEBUG("wrap_post_IsProcessorFeaturePresent: got PF_FASTFAIL_AVAILABLE request, masking\n");
+        drwrap_set_retval(wrapcxt, (void *) 0);
+    }
+}
+
+static void wrap_pre_UnhandledExceptionFilter(void *wrapcxt, OUT void **user_data)
+{
+    SL2_DR_DEBUG("wrap_pre_UnhandledExceptionFilter: stealing unhandled exception\n");
+
+    EXCEPTION_POINTERS *exception = (EXCEPTION_POINTERS *) drwrap_get_arg(wrapcxt, 0);
+    dr_exception_t excpt = {0};
+
+    excpt.record = exception->ExceptionRecord;
+    on_exception(drwrap_get_drcontext(wrapcxt), &excpt);
+}
+
+/*
+    We also intercept VerifierStopMessage and VerifierStopMessageEx,
+    which are supplied by Application Verifier for the purpose of catching
+    heap corruptions.
+*/
+
+static void wrap_pre_VerifierStopMessage(void *wrapcxt, OUT void **user_data)
+{
+    SL2_DR_DEBUG("wrap_pre_VerifierStopMessage: stealing unhandled exception\n");
+
+    EXCEPTION_RECORD record = {0};
+    record.ExceptionCode = STATUS_HEAP_CORRUPTION;
+
+    dr_exception_t excpt = {0};
+    excpt.record = &record;
+
+    on_exception(drwrap_get_drcontext(wrapcxt), &excpt);
 }
 
 /*
@@ -677,8 +677,10 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     bool targeted = client.isFunctionTargeted(function, info);
     client.incrementCallCountForFunction(function);
 
-    if (info->lpNumberOfBytesRead) {
-        nNumberOfBytesToRead = *info->lpNumberOfBytesRead;
+    // NOTE(ww): We should never read more bytes than we request, so this is more
+    // of a sanity check than anything else.
+    if (info->lpNumberOfBytesRead && *(info->lpNumberOfBytesRead) < nNumberOfBytesToRead) {
+        nNumberOfBytesToRead = *(info->lpNumberOfBytesRead);
     }
 
     if (targeted) {
@@ -697,17 +699,20 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 /* Runs when a new module (typically an exe or dll) is loaded. Tells DynamoRIO to hook all the interesting functions
     in that module. */
 static void
-module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
+on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 {
     if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))) {
         baseAddr = (uint64_t) mod->start;
     }
 
-    // Build list of pre-function hooks
+    const char *mod_name = dr_module_preferred_name(mod);
+    app_pc towrap;
+
     std::map<char *, SL2_PRE_PROTO> toHookPre;
     SL2_PRE_HOOK1(toHookPre, ReadFile);
     SL2_PRE_HOOK1(toHookPre, InternetReadFile);
-    SL2_PRE_HOOK1(toHookPre, ReadEventLog);
+    SL2_PRE_HOOK2(toHookPre, ReadEventLogA, ReadEventLog);
+    SL2_PRE_HOOK2(toHookPre, ReadEventLogW, ReadEventLog);
     SL2_PRE_HOOK2(toHookPre, RegQueryValueExW, RegQueryValueEx);
     SL2_PRE_HOOK2(toHookPre, RegQueryValueExA, RegQueryValueEx);
     SL2_PRE_HOOK1(toHookPre, WinHttpWebSocketReceive);
@@ -716,11 +721,11 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_PRE_HOOK1(toHookPre, fread_s);
     SL2_PRE_HOOK1(toHookPre, fread);
 
-    // Build list of post-function hooks
     std::map<char *, SL2_POST_PROTO> toHookPost;
     SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
-    SL2_POST_HOOK2(toHookPost, ReadEventLog, Generic);
+    SL2_POST_HOOK2(toHookPost, ReadEventLogA, Generic);
+    SL2_POST_HOOK2(toHookPost, ReadEventLogW, Generic);
     SL2_POST_HOOK2(toHookPost, RegQueryValueExW, Generic);
     SL2_POST_HOOK2(toHookPost, RegQueryValueExA, Generic);
     SL2_POST_HOOK2(toHookPost, WinHttpWebSocketReceive, Generic);
@@ -729,11 +734,45 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_POST_HOOK2(toHookPost, fread_s, Generic);
     SL2_POST_HOOK2(toHookPost, fread, Generic);
 
+    // Wrap IsProcessorFeaturePresent and UnhandledExceptionFilter to prevent
+    // __fastfail from circumventing our exception tracking. See the comment
+    // above wrap_pre_IsProcessorFeaturePresent for more information.
+    if (STREQI(mod_name, "KERNELBASE.DLL")) {
+        SL2_DR_DEBUG("loading __fastfail mitigations\n");
+
+        towrap = (app_pc) dr_get_proc_address(mod->handle, "IsProcessorFeaturePresent");
+        drwrap_wrap(towrap, wrap_pre_IsProcessorFeaturePresent, wrap_post_IsProcessorFeaturePresent);
+
+        towrap = (app_pc) dr_get_proc_address(mod->handle, "UnhandledExceptionFilter");
+        drwrap_wrap(towrap, wrap_pre_UnhandledExceptionFilter, NULL);
+    }
+
+    // Wrap VerifierStopMessage and VerifierStopMessageEx, which are apparently
+    // used in AppVerifier to register heap corruptions.
+    //
+    // NOTE(ww): I haven't seen these in the wild, but WinAFL wraps
+    // VerifierStopMessage and VerifierStopMessageEx is probably
+    // just a newer version of the former.
+    if (STREQ(mod_name, "VERIFIER.DLL"))
+    {
+        SL2_DR_DEBUG("loading Application Verifier mitigations\n");
+
+        towrap = (app_pc) dr_get_proc_address(mod->handle, "VerifierStopMessage");
+        drwrap_wrap(towrap, wrap_pre_VerifierStopMessage, NULL);
+
+        towrap = (app_pc) dr_get_proc_address(mod->handle, "VerifierStopMessageEx");
+        drwrap_wrap(towrap, wrap_pre_VerifierStopMessage, NULL);
+    }
+
     // Iterate over list of hooks and register them with DynamoRIO
     std::map<char *, SL2_PRE_PROTO>::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
         bool hook = false;
+
+        if (!function_is_in_expected_module(functionName, mod_name)) {
+            continue;
+        }
 
         for (targetFunction t : client.parsedJson) {
             if (t.selected && STREQ(t.functionName.c_str(), functionName)){
@@ -741,13 +780,14 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
             }
             else if (t.selected && (STREQ(functionName, "RegQueryValueExW") || STREQ(functionName, "RegQueryValueExA"))) {
                 if (!STREQ(t.functionName.c_str(), "RegQueryValueEx")) {
-                  hook = false;
+                    hook = false;
                 }
             }
         }
 
-        if (!hook)
-          continue;
+        if (!hook) {
+            continue;
+        }
 
         void(__cdecl *hookFunctionPre)(void *, void **);
         hookFunctionPre = it->second;
@@ -760,27 +800,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         }
 
         // Only hook ReadFile calls from the kernel (TODO - investigate fuzzgoat results)
-        app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
-        const char *mod_name = dr_module_preferred_name(mod);
-
-        // TODO(ww): Consolidate this between the wizard, fuzzer, and tracer.
-        if (STREQ(functionName, "ReadFile")) {
-            if (!STREQI(mod_name, "KERNELBASE.dll")) {
-                continue;
-            }
-        }
-
-        if (STREQ(functionName, "RegQueryValueExA") || STREQ(functionName, "RegQueryValueExW")) {
-            if (!STREQI(mod_name, "KERNELBASE.dll")) {
-                continue;
-            }
-        }
-
-        if (STREQ(functionName, "fread") || STREQ(functionName, "fread_s")) {
-            if (!STREQI(mod_name, "UCRTBASE.DLL")) {
-                continue;
-            }
-        }
+        towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
 
         // If everything looks good and we've made it this far, wrap the function
         if (towrap != NULL) {
@@ -819,16 +839,14 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
 
     std::string target = op_target.get_value();
     if (target == "") {
-        SL2_DR_DEBUG("ERROR: arg -t (target file) required");
+        SL2_DR_DEBUG("ERROR: arg -t (target file) required\n");
         dr_abort();
     }
 
     bool no_coverage = op_no_coverage.get_value();
 
-    try {
-        client.loadJson(target);
-    } catch (const char* msg) {
-        SL2_DR_DEBUG(msg);
+    if (!client.loadJson(target)) {
+        SL2_DR_DEBUG("Failed to load targets!\n");
         dr_abort();
     }
 
@@ -851,18 +869,24 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_abort();
     }
 
+    wchar_t *target_argv;
     size_t target_argv_size;
-    wchar_t *target_argv = get_target_command_line(&target_argv_size);
+    get_target_command_line(&target_argv, &target_argv_size);
+
     sl2_conn_request_run_id(&sl2_conn, target_app_name, target_argv);
     dr_global_free(target_argv, target_argv_size);
 
-    wchar_t run_id_s[SL2_UUID_SIZE];
-    sl2_uuid_to_wstring(sl2_conn.run_id, run_id_s);
-    SL2_DR_DEBUG("Beginning fuzzing run %S\n\n", run_id_s);
+    char run_id_s[SL2_UUID_SIZE] = {0};
+    sl2_uuid_to_string(sl2_conn.run_id, run_id_s);
+
+    json j;
+    j["run_id"] = run_id_s;
+    SL2_LOG_JSONL(j);
 
     drmgr_init();
     drwrap_init();
 
+    // TODO(ww): Do we need to fill these in, or is zeroing them out enough?
     drreg_options_t reg_opts = {0};
     reg_opts.struct_size = sizeof(drreg_options_t);
     drreg_init(&reg_opts);
@@ -878,13 +902,13 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         SL2_DR_DEBUG("dr_client_main: targets are arena compatible!\n");
         client.generateArenaId(arena.id);
         sl2_conn_request_arena(&sl2_conn, &arena);
-        drmgr_register_bb_instrumentation_event(NULL, on_bb, NULL);
+        drmgr_register_bb_instrumentation_event(NULL, on_bb_instrument, NULL);
     }
     else {
         SL2_DR_DEBUG("dr_client_main: targets are NOT arena compatible OR user has requested dumb fuzzing!\n");
     }
 
-    drmgr_register_exception_event(onexception);
-    dr_register_exit_event(event_exit);
-    drmgr_register_module_load_event(module_load_event);
+    drmgr_register_exception_event(on_exception);
+    dr_register_exit_event(on_dr_exit);
+    drmgr_register_module_load_event(on_module_load);
 }

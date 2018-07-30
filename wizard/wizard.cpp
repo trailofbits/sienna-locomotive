@@ -52,25 +52,25 @@ static std::map<Function, UINT64> call_counts;
 
 /* Run whenever a thread inits/exits */
 static void
-event_thread_init(void *drcontext)
+on_thread_init(void *drcontext)
 {
-    SL2_DR_DEBUG("wizard#event_thread_init\n");
+    SL2_DR_DEBUG("wizard#on_thread_init\n");
 }
 
 static void
-event_thread_exit(void *drcontext)
+on_thread_exit(void *drcontext)
 {
-    SL2_DR_DEBUG("wizard#event_thread_exit\n");
+    SL2_DR_DEBUG("wizard#on_thread_exit\n");
 }
 
 /* Clean up after the target binary exits */
 static void
-event_exit_trace(void)
+on_dr_exit(void)
 {
-    SL2_DR_DEBUG("wizard#event_exit_trace\n");
+    SL2_DR_DEBUG("wizard#on_dr_exit\n");
 
-    if (!drmgr_unregister_thread_init_event(event_thread_init) ||
-        !drmgr_unregister_thread_exit_event(event_thread_exit) ||
+    if (!drmgr_unregister_thread_init_event(on_thread_init) ||
+        !drmgr_unregister_thread_exit_event(on_thread_exit) ||
         drreg_exit() != DRREG_SUCCESS)
     {
         DR_ASSERT(false);
@@ -347,14 +347,14 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 
     wstring_convert<std::codecvt_utf8<wchar_t>> utf8Converter;
 
-    wizard_read_info *info = ((wizard_read_info *)user_data);
-    char *functionName     = get_function_name(info->function);
+    wizard_read_info *info   = ((wizard_read_info *)user_data);
+    const char *func_name = function_to_string(info->function);
 
     json j;
     j["type"]               = "id";
     j["callCount"]          = call_counts[info->function];
     j["retAddrOffset"]      = (UINT64) info->retAddrOffset;
-    j["func_name"]          = functionName;
+    j["func_name"]          = func_name;
 
     call_counts[info->function]++;
 
@@ -392,7 +392,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 
 /* Runs every time we load a new module. Wraps functions we can target. See fuzzer.cpp for a more-detailed version */
 static void
-module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
+on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 {
     /*
         ReadFile is hooked twice, in kernel32 and kernelbase.
@@ -414,7 +414,8 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
     std::map<char *, SL2_PRE_PROTO> toHookPre;
     SL2_PRE_HOOK1(toHookPre, ReadFile);
     SL2_PRE_HOOK1(toHookPre, InternetReadFile);
-    SL2_PRE_HOOK1(toHookPre, ReadEventLog);
+    SL2_PRE_HOOK2(toHookPre, ReadEventLogA, ReadEventLog);
+    SL2_PRE_HOOK2(toHookPre, ReadEventLogW, ReadEventLog);
     SL2_PRE_HOOK2(toHookPre, RegQueryValueExW, RegQueryValueEx);
     SL2_PRE_HOOK2(toHookPre, RegQueryValueExA, RegQueryValueEx);
     SL2_PRE_HOOK1(toHookPre, WinHttpWebSocketReceive);
@@ -426,7 +427,8 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
     std::map<char *, SL2_POST_PROTO> toHookPost;
     SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
-    SL2_POST_HOOK2(toHookPost, ReadEventLog, Generic);
+    SL2_POST_HOOK2(toHookPost, ReadEventLogA, Generic);
+    SL2_POST_HOOK2(toHookPost, ReadEventLogW, Generic);
     SL2_POST_HOOK2(toHookPost, RegQueryValueExW, Generic);
     SL2_POST_HOOK2(toHookPost, RegQueryValueExA, Generic);
     SL2_POST_HOOK2(toHookPost, WinHttpWebSocketReceive, Generic);
@@ -452,23 +454,8 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
         const char *mod_name = dr_module_preferred_name(mod);
 
-        // TODO(ww): Consolidate this between the wizard, fuzzer, and tracer.
-        if (STREQ(functionName, "ReadFile")) {
-            if (!STREQI(mod_name, "KERNELBASE.dll")) {
-                continue;
-            }
-        }
-
-        if (STREQ(functionName, "RegQueryValueExA") || STREQ(functionName, "RegQueryValueExW")) {
-            if (!STREQI(mod_name, "KERNELBASE.dll")) {
-                continue;
-            }
-        }
-
-        if (STREQ(functionName, "fread") || STREQ(functionName, "fread_s")) {
-            if (!STREQI(mod_name, "UCRTBASE.DLL")) {
-                continue;
-            }
+        if (!function_is_in_expected_module(functionName, mod_name)) {
+            continue;
         }
 
         if (towrap != NULL) {
@@ -504,11 +491,11 @@ void wizard(client_id_t id, int argc, const char *argv[])
     if (!drmgr_init() || drreg_init(&ops) != DRREG_SUCCESS || !drwrap_init())
         DR_ASSERT(false);
 
-    dr_register_exit_event(event_exit_trace);
+    dr_register_exit_event(on_dr_exit);
 
-    if (!drmgr_register_module_load_event(module_load_event) ||
-        !drmgr_register_thread_init_event(event_thread_init) ||
-        !drmgr_register_thread_exit_event(event_thread_exit))
+    if (!drmgr_register_module_load_event(on_module_load) ||
+        !drmgr_register_thread_init_event(on_thread_init) ||
+        !drmgr_register_thread_exit_event(on_thread_exit))
     {
         DR_ASSERT(false);
     }

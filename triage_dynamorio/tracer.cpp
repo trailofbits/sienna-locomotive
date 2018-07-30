@@ -1,9 +1,3 @@
-// TODO(ww): Figure out if we still need these.
-#define EVENT_APP event_app_bb
-// #define EVENT_APP event_app_instruction
-#define EVENT_THREAD_EXIT event_thread_exit_cov
-// #define EVENT_THREAD_EXIT event_thread_exit
-
 #include <stdio.h>
 #include <map>
 #include <set>
@@ -560,18 +554,14 @@ handle_specific(void *drcontext, instr_t *instr)
     }
 
     switch (opcode) {
-        // push
-        case 18:
-        // pop
-        case 20:
+        case OP_push:
+        case OP_pop:
             handle_push_pop(drcontext, instr);
             return true;
-        // xor
-        case 12:
+        case OP_xor:
             result = handle_xor(drcontext, instr);
             return result;
-        // xchg
-        case 62:
+        case OP_xchg:
             result = handle_xchg(drcontext, instr);
             return result;
         default:
@@ -662,7 +652,7 @@ propagate_taint(app_pc pc)
 /* Called upon basic block insertion with each individual instruction as an argument.
     Inserts a clean call to propagate_taint before every instruction */
 static dr_emit_flags_t
-event_app_instruction(
+on_bb_instrument(
     void *drcontext,
     void *tag,
     instrlist_t *bb,
@@ -676,6 +666,7 @@ event_app_instruction(
 
     /* Clean call propagate taint on each instruction. Should be side-effect free
         http://dynamorio.org/docs/dr__ir__utils_8h.html#ae7b7bd1e750b8a24ebf401fb6a6d6d5e */
+    // TODO(ww): Replace this with instruction injection for performance?
     dr_insert_clean_call(drcontext, bb, instr, propagate_taint, false, 1,
                 OPND_CREATE_INTPTR(instr_get_app_pc(instr)));
 
@@ -683,29 +674,29 @@ event_app_instruction(
 }
 
 static void
-event_thread_init(void *drcontext)
+on_thread_init(void *drcontext)
 {
 
 }
 
 static void
-event_thread_exit(void *drcontext)
+on_thread_exit(void *drcontext)
 {
 
 }
 
 /* Clean up registered callbacks before exiting */
 static void
-event_exit(void)
+on_dr_exit(void)
 {
     if (!op_no_taint.get_value()) {
-        if (!drmgr_unregister_bb_insertion_event(event_app_instruction)) {
+        if (!drmgr_unregister_bb_insertion_event(on_bb_instrument)) {
             DR_ASSERT(false);
         }
     }
 
-    if (!drmgr_unregister_thread_init_event(event_thread_init) ||
-        !drmgr_unregister_thread_exit_event(event_thread_exit) ||
+    if (!drmgr_unregister_thread_init_event(on_thread_init) ||
+        !drmgr_unregister_thread_exit_event(on_thread_exit) ||
         drreg_exit() != DRREG_SUCCESS)
     {
         DR_ASSERT(false);
@@ -767,78 +758,6 @@ dump_regs(void *drcontext, app_pc exception_address) {
     else {
         // TODO(ww): Implement.
     }
-}
-
-std::string
-exception_to_string(DWORD exception_code)
-{
-    std::string exception_str = "UNKNOWN";
-    switch (exception_code) {
-        case EXCEPTION_ACCESS_VIOLATION:
-            exception_str = "EXCEPTION_ACCESS_VIOLATION";
-            break;
-        case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
-            exception_str = "EXCEPTION_ARRAY_BOUNDS_EXCEEDED";
-            break;
-        case EXCEPTION_BREAKPOINT:
-            exception_str = "EXCEPTION_BREAKPOINT";
-            break;
-        case EXCEPTION_DATATYPE_MISALIGNMENT:
-            exception_str = "EXCEPTION_DATATYPE_MISALIGNMENT";
-            break;
-        case EXCEPTION_FLT_DENORMAL_OPERAND:
-            exception_str = "EXCEPTION_FLT_DENORMAL_OPERAND";
-            break;
-        case EXCEPTION_FLT_DIVIDE_BY_ZERO:
-            exception_str = "EXCEPTION_FLT_DIVIDE_BY_ZERO";
-            break;
-        case EXCEPTION_FLT_INEXACT_RESULT:
-            exception_str = "EXCEPTION_FLT_INEXACT_RESULT";
-            break;
-        case EXCEPTION_FLT_INVALID_OPERATION:
-            exception_str = "EXCEPTION_FLT_INVALID_OPERATION";
-            break;
-        case EXCEPTION_FLT_OVERFLOW:
-            exception_str = "EXCEPTION_FLT_OVERFLOW";
-            break;
-        case EXCEPTION_FLT_STACK_CHECK:
-            exception_str = "EXCEPTION_FLT_STACK_CHECK";
-            break;
-        case EXCEPTION_FLT_UNDERFLOW:
-            exception_str = "EXCEPTION_FLT_UNDERFLOW";
-            break;
-        case EXCEPTION_ILLEGAL_INSTRUCTION:
-            exception_str = "EXCEPTION_ILLEGAL_INSTRUCTION";
-            break;
-        case EXCEPTION_IN_PAGE_ERROR:
-            exception_str = "EXCEPTION_IN_PAGE_ERROR";
-            break;
-        case EXCEPTION_INT_DIVIDE_BY_ZERO:
-            exception_str = "EXCEPTION_INT_DIVIDE_BY_ZERO";
-            break;
-        case EXCEPTION_INT_OVERFLOW:
-            exception_str = "EXCEPTION_INT_OVERFLOW";
-            break;
-        case EXCEPTION_INVALID_DISPOSITION:
-            exception_str = "EXCEPTION_INVALID_DISPOSITION";
-            break;
-        case EXCEPTION_NONCONTINUABLE_EXCEPTION:
-            exception_str = "EXCEPTION_NONCONTINUABLE_EXCEPTION";
-            break;
-        case EXCEPTION_PRIV_INSTRUCTION:
-            exception_str = "EXCEPTION_PRIV_INSTRUCTION";
-            break;
-        case EXCEPTION_SINGLE_STEP:
-            exception_str = "EXCEPTION_SINGLE_STEP";
-            break;
-        case EXCEPTION_STACK_OVERFLOW:
-            exception_str = "EXCEPTION_STACK_OVERFLOW";
-            break;
-        default:
-            break;
-    }
-
-    return exception_str;
 }
 
 /* Get crash info as JSON for dumping to stderr */
@@ -907,12 +826,12 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
     j["tainted_addrs"] = json::array();
     if (tainted_mems.size() > 0) {
         std::set<app_pc>::iterator mit = tainted_mems.begin();
-        UINT64 start = (UINT64)*mit;
-        UINT64 size = 1;
+        uint64_t start = (uint64_t) *mit;
+        uint64_t size = 1;
 
         mit++;
         for (; mit != tainted_mems.end(); mit++) {
-            UINT64 curr = (UINT64)*mit;
+            uint64_t curr = (uint64_t) *mit;
             if (curr > (start + size)) {
               json addr = {{"start", start}, {"size", size}};
               j["tainted_addrs"].push_back(addr);
@@ -947,8 +866,8 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
             exit(1);
         }
 
-        DWORD bytesWritten;
-        if (!WriteFile(hCrashFile, crash_json.c_str(), crash_json.length(), &bytesWritten, NULL)) {
+        DWORD txsize;
+        if (!WriteFile(hCrashFile, crash_json.c_str(), (DWORD) crash_json.length(), &txsize, NULL)) {
             SL2_DR_DEBUG("tracer#dump_crash: could not write to the crash file (%x)\n", GetLastError());
             exit(1);
         }
@@ -993,7 +912,7 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
 
 /* Scoring function. Checks exception code, then checks taint state in order to calculate the severity score */
 static bool
-onexception(void *drcontext, dr_exception_t *excpt)
+on_exception(void *drcontext, dr_exception_t *excpt)
 {
     DWORD exception_code = excpt->record->ExceptionCode;
 
@@ -1156,6 +1075,72 @@ onexception(void *drcontext, dr_exception_t *excpt)
     dump_crash(drcontext, excpt, reason, score, disassembly);
 
     return true;
+}
+
+/*
+    The next three functions are used to intercept __fastfail, which Windows
+    provides to allow processes to request immediate termination.
+
+    To get around this, we tell the target that __fastfail isn't avaiable
+    by intercepting IsProcessorFeaturePresent (which we hope they check).
+
+    We then hope that they craft an exception record instead and send it
+    to UnhandledException, where we intercept it and forward it to our
+    exception handler.
+
+    If the target decides to do neither of these, we still miss the exception.
+
+    This trick was cribbed from WinAFL:
+    https://github.com/ivanfratric/winafl/blob/73c7b41/winafl.c#L600
+
+    NOTE(ww): These functions are duplicated across the fuzzer and the tracer.
+    Keep them synced!
+*/
+
+void wrap_pre_IsProcessorFeaturePresent(void *wrapcxt, OUT void **user_data)
+{
+    DWORD feature = (DWORD) drwrap_get_arg(wrapcxt, 0);
+    *user_data = (void *) feature;
+}
+
+void wrap_post_IsProcessorFeaturePresent(void *wrapcxt, void *user_data)
+{
+    DWORD feature = (DWORD) user_data;
+
+    if (feature == PF_FASTFAIL_AVAILABLE) {
+        SL2_DR_DEBUG("wrap_post_IsProcessorFeaturePresent: got PF_FASTFAIL_AVAILABLE request, masking\n");
+        drwrap_set_retval(wrapcxt, (void *) 0);
+    }
+}
+
+void wrap_pre_UnhandledExceptionFilter(void *wrapcxt, OUT void **user_data)
+{
+    SL2_DR_DEBUG("wrap_pre_UnhandledExceptionFilter: stealing unhandled exception\n");
+
+    EXCEPTION_POINTERS *exception = (EXCEPTION_POINTERS *) drwrap_get_arg(wrapcxt, 0);
+    dr_exception_t excpt = {0};
+
+    excpt.record = exception->ExceptionRecord;
+    on_exception(drwrap_get_drcontext(wrapcxt), &excpt);
+}
+
+/*
+    We also intercept VerifierStopMessage and VerifierStopMessageEx,
+    which are supplied by Application Verifier for the purpose of catching
+    heap corruptions.
+*/
+
+static void wrap_pre_VerifierStopMessage(void *wrapcxt, OUT void **user_data)
+{
+    SL2_DR_DEBUG("wrap_pre_VerifierStopMessage: stealing unhandled exception\n");
+
+    EXCEPTION_RECORD record = {0};
+    record.ExceptionCode = STATUS_HEAP_CORRUPTION;
+
+    dr_exception_t excpt = {0};
+    excpt.record = &record;
+
+    on_exception(drwrap_get_drcontext(wrapcxt), &excpt);
 }
 
 /*
@@ -1394,7 +1379,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
         dr_mutex_lock(mutatex);
 
         if (no_mutate) {
-            sl2_conn_request_replay(&sl2_conn, mutate_count, nNumberOfBytesToRead, lpBuffer);
+            SL2_DR_DEBUG("user requested replay WITHOUT mutation!\n");
         }
         else {
             sl2_conn_request_replay(&sl2_conn, mutate_count, nNumberOfBytesToRead, lpBuffer);
@@ -1414,16 +1399,20 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 
 /* Register function pre/post callbacks in each module */
 static void
-module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
+on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 {
     if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))) {
       baseAddr = (size_t) mod->start;
     }
 
+    const char *mod_name = dr_module_preferred_name(mod);
+    app_pc towrap;
+
     std::map<char *, SL2_PRE_PROTO> toHookPre;
     SL2_PRE_HOOK1(toHookPre, ReadFile);
     SL2_PRE_HOOK1(toHookPre, InternetReadFile);
-    SL2_PRE_HOOK1(toHookPre, ReadEventLog);
+    SL2_PRE_HOOK2(toHookPre, ReadEventLogA, ReadEventLog);
+    SL2_PRE_HOOK2(toHookPre, ReadEventLogW, ReadEventLog);
     SL2_PRE_HOOK2(toHookPre, RegQueryValueExW, RegQueryValueEx);
     SL2_PRE_HOOK2(toHookPre, RegQueryValueExA, RegQueryValueEx);
     SL2_PRE_HOOK1(toHookPre, WinHttpWebSocketReceive);
@@ -1435,7 +1424,8 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
     std::map<char *, SL2_POST_PROTO> toHookPost;
     SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
-    SL2_POST_HOOK2(toHookPost, ReadEventLog, Generic);
+    SL2_POST_HOOK2(toHookPost, ReadEventLogA, Generic);
+    SL2_POST_HOOK2(toHookPost, ReadEventLogW, Generic);
     SL2_POST_HOOK2(toHookPost, RegQueryValueExW, Generic);
     SL2_POST_HOOK2(toHookPost, RegQueryValueExA, Generic);
     SL2_POST_HOOK2(toHookPost, WinHttpWebSocketReceive, Generic);
@@ -1444,7 +1434,36 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_POST_HOOK2(toHookPost, fread_s, Generic);
     SL2_POST_HOOK2(toHookPost, fread, Generic);
 
-    const char *mod_name = dr_module_preferred_name(mod);
+    // Wrap IsProcessorFeaturePresent and UnhandledExceptionFilter to prevent
+    // __fastfail from circumventing our exception tracking. See the comment
+    // above wrap_pre_IsProcessorFeaturePresent for more information.
+    if (STREQI(mod_name, "KERNELBASE.DLL")) {
+        SL2_DR_DEBUG("loading __fastfail mitigations\n");
+
+        towrap = (app_pc) dr_get_proc_address(mod->handle, "IsProcessorFeaturePresent");
+        drwrap_wrap(towrap, wrap_pre_IsProcessorFeaturePresent, wrap_post_IsProcessorFeaturePresent);
+
+        towrap = (app_pc) dr_get_proc_address(mod->handle, "UnhandledExceptionFilter");
+        drwrap_wrap(towrap, wrap_pre_UnhandledExceptionFilter, NULL);
+    }
+
+    // Wrap VerifierStopMessage and VerifierStopMessageEx, which are apparently
+    // used in AppVerifier to register heap corruptions.
+    //
+    // NOTE(ww): I haven't seen these in the wild, but WinAFL wraps
+    // VerifierStopMessage and VerifierStopMessageEx is probably
+    // just a newer version of the former.
+    if (STREQ(mod_name, "VERIFIER.DLL"))
+    {
+        SL2_DR_DEBUG("loading Application Verifier mitigations\n");
+
+        towrap = (app_pc) dr_get_proc_address(mod->handle, "VerifierStopMessage");
+        drwrap_wrap(towrap, wrap_pre_VerifierStopMessage, NULL);
+
+        towrap = (app_pc) dr_get_proc_address(mod->handle, "VerifierStopMessageEx");
+        drwrap_wrap(towrap, wrap_pre_VerifierStopMessage, NULL);
+    }
+
     /* assume our target executable is an exe */
     if (strstr(mod_name, ".exe") != NULL) {
         module_start = mod->start; // TODO evaluate us of dr_get_application_name above
@@ -1457,6 +1476,10 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         char *functionName = it->first;
         bool hook = false;
 
+        if (!function_is_in_expected_module(functionName, mod_name)) {
+            continue;
+        }
+
         // Look for function matching the target specified on the command line
         for (targetFunction t : client.parsedJson) {
             if (t.selected && STREQ(t.functionName.c_str(), functionName)){
@@ -1464,13 +1487,14 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
             }
             else if (t.selected && (STREQ(functionName, "RegQueryValueExW") || STREQ(functionName, "RegQueryValueExA"))) {
                 if (!STREQ(t.functionName.c_str(), "RegQueryValueEx")) {
-                  hook = false;
+                    hook = false;
                 }
             }
         }
 
-        if (!hook)
-          continue;
+        if (!hook) {
+            continue;
+        }
 
         void(__cdecl *hookFunctionPre)(void *, void **);
         hookFunctionPre = it->second;
@@ -1484,26 +1508,7 @@ module_load_event(void *drcontext, const module_data_t *mod, bool loaded)
         }
 
         // find target function in module
-        app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
-
-        // TODO(ww): Consolidate this between the wizard, fuzzer, and tracer.
-        if (STREQ(functionName, "ReadFile")) {
-            if (!STREQI(mod_name, "KERNELBASE.dll") != 0) {
-                continue;
-            }
-        }
-
-        if (STREQ(functionName, "RegQueryValueExA") || STREQ(functionName, "RegQueryValueExW")) {
-            if (!STREQI(mod_name, "KERNELBASE.dll") != 0) {
-                continue;
-            }
-        }
-
-        if (STREQ(functionName, "fread") || STREQ(functionName, "fread_s")) {
-            if (!STREQI(mod_name, "UCRTBASE.DLL")) {
-                continue;
-            }
-        }
+        towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
 
         // if the function was found, wrap it
         if (towrap != NULL) {
@@ -1542,28 +1547,28 @@ void tracer(client_id_t id, int argc, const char *argv[])
 
     no_mutate = op_no_mutate.get_value();
 
-    sl2_wstring_to_uuid(run_id_s.c_str(), &run_id);
+    sl2_string_to_uuid(run_id_s.c_str(), &run_id);
     sl2_conn_assign_run_id(&sl2_conn, run_id);
 
     mutatex = dr_mutex_create();
-    dr_register_exit_event(event_exit);
+    dr_register_exit_event(on_dr_exit);
 
     // If taint tracing is enabled, register the propagate_taint callback
     if (!op_no_taint.get_value()) {
         // http://dynamorio.org/docs/group__drmgr.html#ga83a5fc96944e10bd7356e0c492c93966
         if (!drmgr_register_bb_instrumentation_event(
                                                 NULL,
-                                                event_app_instruction,
+                                                on_bb_instrument,
                                                 NULL))
         {
             DR_ASSERT(false);
         }
     }
 
-    if (!drmgr_register_module_load_event(module_load_event) ||
-        !drmgr_register_thread_init_event(event_thread_init) ||
-        !drmgr_register_thread_exit_event(event_thread_exit) ||
-        !drmgr_register_exception_event(onexception))
+    if (!drmgr_register_module_load_event(on_module_load) ||
+        !drmgr_register_thread_init_event(on_thread_init) ||
+        !drmgr_register_thread_exit_event(on_thread_exit) ||
+        !drmgr_register_exception_event(on_exception))
     {
         DR_ASSERT(false);
     }
@@ -1589,18 +1594,18 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_abort();
     }
 
-    try {
-        client.loadJson(target);
-    } catch (const char* msg) {
-        SL2_DR_DEBUG(msg);
+    if (!client.loadJson(target)) {
+        SL2_DR_DEBUG("Failed to load targets!\n");
         dr_abort();
     }
 
     // NOTE(ww): We open the client's connection to the server here,
     // but the client isn't ready to use until it's been given a run ID.
     // See inside of `tracer` for that.
-    // TODO(ww): Check the response code here.
-    sl2_conn_open(&sl2_conn);
+    if (sl2_conn_open(&sl2_conn) != SL2Response::OK) {
+        SL2_DR_DEBUG("ERROR: Couldn't open a connection to the server!\n");
+        dr_abort();
+    }
 
     tracer(id, argc, argv);
 }

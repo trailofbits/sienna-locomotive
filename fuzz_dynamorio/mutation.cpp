@@ -251,7 +251,8 @@ static void strategyEndianSwap(uint8_t *buf, size_t size)
 }
 
 /* Selects a mutations strategy at random */
-__declspec(dllexport) DWORD mutate_buffer(uint8_t *buf, size_t size)
+SL2_EXPORT
+DWORD mutate_buffer(uint8_t *buf, size_t size)
 {
     // afl for inspiration
     if (size == 0) {
