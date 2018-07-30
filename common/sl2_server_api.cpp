@@ -6,9 +6,9 @@
 
 // NOTE(ww): The macros below assume the following state:
 // conn: an `sl2_conn *`
-// txsize: a `DWORD`
-#define SL2_CONN_WRITE(thing, size) (WriteFile(conn->pipe, thing, size, &txsize, NULL))
-#define SL2_CONN_READ(thing, size) (ReadFile(conn->pipe, thing, size, &txsize, NULL))
+// txsize: a `DWORD
+#define SL2_CONN_WRITE(thing, size) (WriteFile(conn->pipe, thing, (DWORD) size, &txsize, NULL))
+#define SL2_CONN_READ(thing, size) (ReadFile(conn->pipe, thing, (DWORD) size, &txsize, NULL))
 
 #define SL2_CONN_EVT(event) do {       \
     uint8_t evt = event;               \
