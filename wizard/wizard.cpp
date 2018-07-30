@@ -379,7 +379,6 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 
     SL2_LOG_JSONL(j);
 
-    // TODO(ww): Remove these hardcoded sizes.
     if (info->source) {
         dr_thread_free(drwrap_get_drcontext(wrapcxt), info->source, MAX_PATH + 1);
     }

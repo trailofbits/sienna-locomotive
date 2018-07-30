@@ -14,7 +14,11 @@
 #include <Strsafe.h>
 
 #define LOGURU_IMPLEMENTATION 1
+// NOTE(ww): Windows likes to be special. We macro strdup to _strdup
+// here because strdup is technically nonstandard.
+#define strdup _strdup
 #include "vendor/loguru.hpp"
+#undef strdup
 
 #include "server.hpp"
 
@@ -93,9 +97,15 @@ static void init_working_paths()
 }
 
 /* Writes the fkt file in the event we found a crash. Stores information about the mutation that caused it */
-static void writeFKT(HANDLE fkt, DWORD type, size_t pathSize, wchar_t *filePath, size_t position, size_t size, uint8_t* buf)
+static void writeFKT(wchar_t *target_file, DWORD type, size_t pathSize, wchar_t *filePath, size_t position, size_t size, uint8_t* buf)
 {
     DWORD txsize;
+    HANDLE fkt = CreateFile(target_file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
+
+    if (fkt == INVALID_HANDLE_VALUE) {
+        LOG_F(ERROR, "writeFKT: failed to create FTK: %S (0x%x)", target_file, GetLastError());
+        exit(1);
+    }
 
     if (!WriteFile(fkt, "FKT\0", 4, &txsize, NULL)) {
         LOG_F(ERROR, "writeFKT: failed to write FKT header (0x%x)", GetLastError());
@@ -140,10 +150,16 @@ static void writeFKT(HANDLE fkt, DWORD type, size_t pathSize, wchar_t *filePath,
 }
 
 /* Gets the mutated bytes stored in the FKT file for mutation replay */
-static void getBytesFKT(HANDLE fkt, uint8_t *buf, size_t size)
+static void getBytesFKT(wchar_t *target_file, uint8_t *buf, size_t size)
 {
     DWORD txsize;
     size_t buf_size = 0;
+    HANDLE fkt = CreateFile(target_file, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
+
+    if (fkt == INVALID_HANDLE_VALUE) {
+        LOG_F(ERROR, "handleReplay: failed to open FKT: %S (0x%x)", target_file, GetLastError());
+        exit(1);
+    }
 
     // TODO(ww): We shouldn't be hardcoding this offset.
     SetFilePointer(fkt, 0x18, NULL, FILE_BEGIN);
@@ -162,6 +178,11 @@ static void getBytesFKT(HANDLE fkt, uint8_t *buf, size_t size)
 
     if (!ReadFile(fkt, buf, (DWORD) size, &txsize, NULL)) {
         LOG_F(ERROR, "getBytesFKT: failed to read replay buffer from FKT (0x%x)", GetLastError());
+        exit(1);
+    }
+
+    if (!CloseHandle(fkt)) {
+        LOG_F(ERROR, "handleReplay: failed to close FKT (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -432,15 +453,7 @@ static void handleRegisterMutation(HANDLE pipe)
     PathCchCombine(run_dir, MAX_PATH, FUZZ_WORKING_PATH, run_id_s);
     PathCchCombine(target_file, MAX_PATH, run_dir, mutate_fname);
 
-    // TODO(ww): WriteFKT should take a filename, rather than an open file handle.
-    HANDLE file = CreateFile(target_file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
-
-    if (file == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "handleRegisterMutation: failed to create FTK: %S (0x%x)", target_file, GetLastError());
-        exit(1);
-    }
-
-    writeFKT(file, type, resource_size, resource_path, position, size, buf);
+    writeFKT(target_file, type, resource_size, resource_path, position, size, buf);
 
     RpcStringFree((RPC_WSTR *)&run_id_s);
 }
@@ -495,23 +508,10 @@ static void handleReplay(HANDLE pipe)
         exit(1);
     }
 
-    // TODO(ww): getBytesFKT should take a filename, rather an an open handle.
-    HANDLE hFile = CreateFile(target_file, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
-
-    if (hFile == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "handleReplay: failed to open FKT: %S (0x%x)", target_file, GetLastError());
-        exit(1);
-    }
-
-    getBytesFKT(hFile, buf, size);
+    getBytesFKT(target_file, buf, size);
 
     if (!WriteFile(pipe, buf, (DWORD) size, &txsize, NULL)) {
         LOG_F(ERROR, "handleReplay: failed to write replay buffer (0x%x)", GetLastError());
-        exit(1);
-    }
-
-    if (!CloseHandle(hFile)) {
-        LOG_F(ERROR, "handleReplay: failed to close FKT (0x%x)", GetLastError());
         exit(1);
     }
 
@@ -786,6 +786,9 @@ static DWORD WINAPI threadHandler(void *lpvPipe)
         LOG_F(INFO, "threadHandler: got event ID: %d", event);
 
         // Dispatch individual requests based on which event the client requested
+        // TODO(ww): Construct a sl2_conn here, and pass it to each event handler.
+        // Then, re-use our length-prefixed read and write utility functions
+        // in sl2_server_api.cpp to deduplicate some of the transaction code.
         switch (event) {
             case EVT_RUN_ID:
                 handleGenerateRunId(pipe);
