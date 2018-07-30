@@ -103,7 +103,7 @@ static void strategyRandValues(uint8_t *buf, size_t size)
     // pos that will fit into the buffer
     size_t pos = dr_get_random_value(max);
 
-    for (size_t i=0; i<rand_size; i++) {
+    for (size_t i = 0; i < rand_size; i++) {
         uint8_t mut = dr_get_random_value(UINT8_MAX + 1);
         buf[pos + i] = mut;
     }
@@ -186,13 +186,9 @@ static void strategyAddSubKnownValues(uint8_t *buf, size_t size)
     // pos that will fit into the buffer
     size_t pos = dr_get_random_value(max);
     bool endian = dr_get_random_value(2);
-
-    uint8_t sub = 1;
-    if (dr_get_random_value(2)) {
-        sub = -1;
-    }
-
+    uint8_t sub = dr_get_random_value(2) ? -1 : 1;
     size_t selection = 0;
+
     switch (rand_size) {
         case 1:
             selection = dr_get_random_value(sizeof(values1) / sizeof(values1[0]));
