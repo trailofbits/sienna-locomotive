@@ -9,6 +9,7 @@ import struct
 import json
 import msgpack
 import uuid
+import random
 from hashlib import sha1
 from csv import DictWriter
 
@@ -23,7 +24,7 @@ def esc_quote(raw):
 
 
 def create_invokation_statement(config_dict):
-    program_arr = [config_dict['drrun_path'], '-pidfile', 'pidfile'] + config_dict['drrun_args'] + \
+    program_arr = [config_dict['drrun_path'], '-pidfile', 'pidfile'] + config_dict['drrun_args'] + ['-prng_seed', str(random.getrandbits(64))] + \
           ['-c', config_dict['client_path']] + config_dict['client_args'] + \
           ['--', config_dict['target_application_path'].strip('\"')] + config_dict['target_args']
 
