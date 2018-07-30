@@ -1307,7 +1307,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    memset(info->argHash, 0, SL2_HASH_LEN + 1);
+    info->argHash[SL2_HASH_LEN] = 0;
     memcpy(info->argHash, hash_str.c_str(), SL2_HASH_LEN);
 }
 
