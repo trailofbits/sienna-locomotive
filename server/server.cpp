@@ -786,6 +786,9 @@ static DWORD WINAPI threadHandler(void *lpvPipe)
         LOG_F(INFO, "threadHandler: got event ID: %d", event);
 
         // Dispatch individual requests based on which event the client requested
+        // TODO(ww): Construct a sl2_conn here, and pass it to each event handler.
+        // Then, re-use our length-prefixed read and write utility functions
+        // in sl2_server_api.cpp to deduplicate some of the transaction code.
         switch (event) {
             case EVT_RUN_ID:
                 handleGenerateRunId(pipe);
