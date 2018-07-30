@@ -98,6 +98,30 @@ class MainWindow(QtWidgets.QMainWindow):
         if config.config['exit_early']:
             self.pause_mode_cbox.setChecked(True)
 
+        self.fuzz_timeout_box = QtWidgets.QSpinBox()
+        self.fuzz_timeout_box.setSuffix(" seconds")
+        self.fuzz_timeout_box.setMaximum(1200)
+        if 'fuzz_timeout' in config.config:
+            self.fuzz_timeout_box.setValue(config.config['fuzz_timeout'])
+        self.fuzz_timeout_box.setSpecialValueText("None")
+        self.triage_timeout_box = QtWidgets.QSpinBox()
+        self.triage_timeout_box.setSuffix(" seconds")
+        self.triage_timeout_box.setMaximum(2400)
+        if 'triage_timeout' in config.config:
+            self.triage_timeout_box.setValue(config.config['triage_timeout'])
+        self.triage_timeout_box.setSpecialValueText("None")
+        self.triage_timeout_box.setSingleStep(10)
+
+        self.thread_count = QtWidgets.QSpinBox()
+        self.thread_count.setSuffix(" threads")
+
+        self.expand_button = QtWidgets.QToolButton()
+        self.expand_button.setArrowType(Qt.DownArrow)
+
+        self.extension_widget = QtWidgets.QWidget()
+        self.extension_layout = QtWidgets.QGridLayout()
+        self.extension_widget.setLayout(self.extension_layout)
+
         # Create layouts for fuzzing controls
         self.fuzz_controls_outer_layout = QtWidgets.QHBoxLayout()
         self.fuzz_controls_inner_left = QtWidgets.QVBoxLayout()
@@ -105,9 +129,18 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Add widgets to left and right layouts
         self.fuzz_controls_inner_left.addLayout(self.filter_layout)
+        self.fuzz_controls_inner_left.addWidget(self.extension_widget)
+        self.extension_widget.hide()
         self.fuzz_controls_inner_left.addWidget(self.fuzzer_button)
-        self.fuzz_controls_inner_right.addWidget(self.continuous_mode_cbox)
-        self.fuzz_controls_inner_right.addWidget(self.pause_mode_cbox)
+        self.extension_layout.addWidget(self.continuous_mode_cbox, 0, 0)
+        self.extension_layout.addWidget(self.pause_mode_cbox, 1, 0)
+        self.extension_layout.addWidget(QtWidgets.QLabel("Fuzz timeout:"), 0, 1, 1, 1, Qt.AlignRight)
+        self.extension_layout.addWidget(self.fuzz_timeout_box, 0, 2, 1, 1, Qt.AlignLeft)
+        self.extension_layout.addWidget(QtWidgets.QLabel("Triage Timeout:"), 1, 1, 1, 1, Qt.AlignRight)
+        self.extension_layout.addWidget(self.triage_timeout_box, 1, 2, 1, 1, Qt.AlignLeft)
+        self.extension_layout.addWidget(QtWidgets.QLabel("Simultaneous fuzzing threads:"), 0, 3, 1, 1, Qt.AlignRight)
+        self.extension_layout.addWidget(self.thread_count, 0, 4, 1, 1, Qt.AlignLeft)
+        self.fuzz_controls_inner_right.addWidget(self.expand_button)
 
         # Compose layouts
         self.fuzz_controls_outer_layout.addLayout(self.fuzz_controls_inner_left)
@@ -211,6 +244,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.fuzzer_thread.finished.connect(self.stop_button.hide)
         self.fuzzer_thread.paused.connect(self.stop_button.hide)
 
+        self.expand_button.clicked.connect(self.toggle_expansion)
+
+
+        # TODO - delete this
+        self.expand_button.click()
+
     def calculate_throughput(self, total_time):
         """ Calculate our current runs/second. TODO: make this a lambda? """
         self.throughput.update(self.runs.value / total_time)
@@ -310,6 +349,16 @@ class MainWindow(QtWidgets.QMainWindow):
         savefile, not_canceled = QFileDialog.getSaveFileName(self, filter="*.csv")
         if not_canceled:
             export_crash_data_to_csv(self.crashes, savefile)
+
+    def toggle_expansion(self):
+        if not self.extension_widget.isVisible():
+            self.extension_widget.show()
+            self.expand_button.setArrowType(Qt.UpArrow)
+            self.adjustSize()
+        else:
+            self.extension_widget.hide()
+            self.expand_button.setArrowType(Qt.DownArrow)
+            self.adjustSize()
 
 
 if __name__ == '__main__':
