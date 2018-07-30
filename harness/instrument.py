@@ -181,7 +181,7 @@ def fuzzer_run(config_dict):
                 crashed, exception = check_fuzz_line_for_crash(line)
         except UnicodeDecodeError:
             if config_dict['verbose']:
-                print_l("[!] Not UTF-8: %s", repr(line))
+                print_l("[!] Not UTF-8:", repr(line))
 
     if not run_id:
         print_l("Error: No run ID could be parsed from the server output")
