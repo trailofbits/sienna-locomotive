@@ -6,6 +6,7 @@
 // details from the crash and minidump analysis are put in a triage.json file.
 
 #include "triage.h"
+#include "common/rc4x.hh"
 
 #include <algorithm>
 #include <fstream>
@@ -128,7 +129,6 @@ const vector<uint64_t> Triage::callStack() const {
     int threadid = state_.requesting_thread();
     const CallStack* stack = state_.threads()->at(threadid);
 
-    uint32_t    stackhash = 0;
     uint8_t     i = 0;
     
     vector<uint64_t> ret;
@@ -145,18 +145,22 @@ const vector<uint64_t> Triage::callStack() const {
 // a crash (even with ASLR) by using the last 3 nibbles of the offset for
 // each call in the callstack
 const string Triage::stackHash() const {
-    uint32_t    stackhash = 0;
-    uint8_t     i = 0;
+    uint64_t    stackhash = 0;
+    auto calls = callStack();
+    sort( calls.begin(), calls.end() );
+    auto last  = unique(calls.begin(), calls.end());
+    calls.erase(last, calls.end());
     
-    for( auto addr : callStack() ) { 
+    RC4x rc4(true);
+
+    for( uint64_t addr : calls ) { 
         // We only want the 12 bits of the offset to ignore aslr
         addr &= 0xFFF;
-        addr <<= (i%4)*12;
-        stackhash ^= addr;
-        i++;
+        rc4.encrypt( (uint8_t*)&addr, (uint8_t*)&stackhash,  (size_t)sizeof(stackhash) );
     }
+
     ostringstream oss;
-    oss << setfill('0') << setw(32/4) << hex << stackhash;
+    oss << setfill('0') << setw(sizeof(stackhash)/4) << hex << stackhash;    
     return oss.str();
 }
 

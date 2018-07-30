@@ -10,8 +10,9 @@ import os
 def runAndCaptureOutput( cmd ):
     if type(cmd) == type([]):
         cmd = " ".join(cmd)
-    out =  subprocess.getoutput(cmd)
     #print('cmd', cmd)
+    out =  subprocess.getoutput(cmd)    
+    #print("out", out )
     return out
 
 class TestWizard(unittest.TestCase):
