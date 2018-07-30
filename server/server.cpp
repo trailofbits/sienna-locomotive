@@ -254,9 +254,7 @@ static void handleGenerateRunId(HANDLE pipe)
     LOG_F(INFO, "handleGenerateRunId: generated ID %S", run_id_s);
 
     // get program name
-    // TODO(ww): 8192 is the correct buffer size for the Windows command line, but
-    // we should try to find a macro in the WINAPI for it here.
-    wchar_t command_line[8192] = {0};
+    wchar_t command_line[SL2_ARGV_LEN] = {0};
     size_t size = 0;
     if (!ReadFile(pipe, &size, sizeof(size), &txsize, NULL)) {
         LOG_F(ERROR, "handleGenerateRunId: failed to read size of program name (0x%x)", GetLastError());
@@ -264,8 +262,8 @@ static void handleGenerateRunId(HANDLE pipe)
         exit(1);
     }
 
-    if (size > 8191) {
-        LOG_F(ERROR, "handleGenerateRunId: program name length %lu > 8191", size);
+    if ((size / sizeof(wchar_t)) > SL2_ARGV_LEN - 1) {
+        LOG_F(ERROR, "handleGenerateRunId: program name length %lu > SL2_ARGV_LEN - 1", size);
         exit(1);
     }
 
@@ -274,7 +272,7 @@ static void handleGenerateRunId(HANDLE pipe)
         exit(1);
     }
 
-    wchar_t target_file[MAX_PATH + 1] = { 0 };
+    wchar_t target_file[MAX_PATH + 1] = {0};
     PathCchCombine(target_file, MAX_PATH, run_dir, FUZZ_RUN_PROGRAM_TXT);
     HANDLE file = CreateFile(target_file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
@@ -293,7 +291,7 @@ static void handleGenerateRunId(HANDLE pipe)
         exit(1);
     }
 
-    memset(command_line, 0, 8192 * sizeof(wchar_t));
+    memset(command_line, 0, SL2_ARGV_LEN * sizeof(wchar_t));
 
     // get program arguments
     size = 0;
@@ -302,8 +300,8 @@ static void handleGenerateRunId(HANDLE pipe)
         exit(1);
     }
 
-    if (size > 8191) {
-        LOG_F(ERROR, "handleGenerateRunId: program argument list length > 8191");
+    if ((size / sizeof(wchar_t)) > SL2_ARGV_LEN - 1) {
+        LOG_F(ERROR, "handleGenerateRunId: program argument list length > SL2_ARGV_LEN - 1");
         exit(1);
     }
 
