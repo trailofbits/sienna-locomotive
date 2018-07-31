@@ -150,6 +150,11 @@ def update_config_from_args():
         if 'path' in key:
             if not os.path.exists(config[key]):
                 print("WARNING: {key} = {dest}, which does not exist.".format(key=key, dest=config[key]))
+            else:
+                root, extension = os.path.splitdrive(config[key])
+                if len(root) > 0 and ':' not in root:  # UNC Path
+                    print("WARNING: Replacing UNC Path", config[key], "with", extension)
+                    config[key] = extension
 
 
 set_profile(args.profile)
