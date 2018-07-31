@@ -4,7 +4,9 @@ file(
 )
 
 
+# add_compile_definitions isn't added until cmake 3.12
 # add_compile_definitions( BPLOG_MINIMUM_SEVERITY=SEVERITY_CRITICAL )
+add_definitions( -DBPLOG_MINIMUM_SEVERITY=SEVERITY_CRITICAL )
 
 
 #GLOB SOURCES ${BREAKPAD_DIR}/processor/*.cc
