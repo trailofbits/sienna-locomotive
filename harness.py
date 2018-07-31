@@ -9,13 +9,10 @@ import os
 import concurrent.futures
 import msgpack
 import atexit
+import signal
 
 import harness.config
 import harness.statz
-
-from harness.state import get_target_dir, get_all_targets, get_runs, stringify_program_array
-from harness.instrument import print_l, wizard_run, fuzzer_run, triage_run, start_server, fuzz_and_triage, kill
-
 
 from harness.state import (
     get_target_dir,
@@ -41,6 +38,11 @@ def goodbye():
     # kill the harness, even when inside of the non-main thread.
     kill()
     os._exit(0)
+
+
+def interrupted(_signal, _frame):
+    print_l("[!] Harness interrupted by Ctrl-C. Exiting.")
+    goodbye()
 
 
 def select_from_range(max_range, message):
@@ -155,6 +157,8 @@ def main():
 
 
 if __name__ == '__main__':
+    signal.signal(signal.SIGINT, interrupted)
+
     try:
         main()
     except KeyboardInterrupt:

@@ -21,15 +21,14 @@ from .state import (
     write_output_files,
     create_invokation_statement,
     check_fuzz_line_for_crash,
-    check_fuzz_line_for_run_id
+    check_fuzz_line_for_run_id,
+    get_path_to_run_file,
 )
 
 from . import config
 
 print_lock = threading.Lock()
 can_fuzz = True
-
-
 
 
 class Mode(IntEnum):
@@ -120,16 +119,17 @@ def run_dr(config_dict, verbose=False, timeout=None):
         return popen_obj
 
 
-def triagerRun(  runId ):
-    dmpfile = os.path.join( os.environ['AppData'], 
-                'Trail of Bits', 
-                'fuzzkit',
-                'runs',
-                str(runId),
-                "initial.dmp" )
-    cmd =  [ r'.\build\triage\Debug\triager.exe',  dmpfile ] 
-    out = subprocess.getoutput(cmd)
-    return out
+def triager_run(run_id):
+    dmpfile = get_path_to_run_file(run_id, "initial.dmp")
+    if os.path.isfile(dmpfile):
+        cmd = [r'.\build\triage\Debug\triager.exe', dmpfile]
+        # TODO(ww): Unused variable.
+        out = subprocess.check_output(cmd, shell=False)
+        if config.config["debug"]:
+            print_l(repr(out))
+    else:
+        print_l("[!] No initial.dmp to triage!")
+
 
 def wizard_run(config_dict):
     """ Runs the wizard and lets the user select a target function """
@@ -231,7 +231,7 @@ def triage_run(config_dict, run_id):
     write_output_files(completed_process, run_id, 'triage')
 
     formatted, raw = parse_triage_output(run_id)
-    triagerRun( run_id )
+    triager_run(run_id)
     return formatted, raw
 
 
