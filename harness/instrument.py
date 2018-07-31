@@ -21,7 +21,8 @@ from .state import (
     write_output_files,
     create_invokation_statement,
     check_fuzz_line_for_crash,
-    check_fuzz_line_for_run_id
+    check_fuzz_line_for_run_id,
+    get_path_to_run_file,
 )
 
 from . import config
@@ -119,11 +120,15 @@ def run_dr(config_dict, verbose=False, timeout=None):
 
 
 def triager_run(run_id):
-    dmpfile = os.path.join(config.sl2_runs_dir,
-                           str(run_id),
-                           "initial.dmp")
-    cmd = [r'.\build\triage\Debug\triager.exe', dmpfile]
-    out = subprocess.getoutput(cmd)  # TODO(ww): Unused variable.
+    dmpfile = get_path_to_run_file(run_id, "initial.dmp")
+    if os.path.isfile(dmpfile):
+        cmd = [r'.\build\triage\Debug\triager.exe', dmpfile]
+        # TODO(ww): Unused variable.
+        out = subprocess.check_output(cmd, shell=False)
+        if config.config["debug"]:
+            print_l(repr(out))
+    else:
+        print_l("[!] No initial.dmp to triage!")
 
 
 def wizard_run(config_dict):
