@@ -115,7 +115,10 @@ def get_target(_config):
 
 
 def get_all_targets():
-    """ Returns a dict mapping target directories to the contents of the argument file """
+    """
+    Returns a dict mapping target directories to the contents of the
+    aargument file.
+    """
     targets = {}
     for _dir in glob.glob(os.path.join(config.sl2_targets_dir, '*')):
         with open(os.path.join(_dir, 'arguments.txt'), 'r') as program_string_file:
@@ -124,7 +127,9 @@ def get_all_targets():
 
 
 def get_runs():
-    """ Returns a dict mapping run ID's to the contents of the argument file """
+    """
+    Returns a dict mapping run ID's to the contents of the argument file.
+    """
     runs = {}
     for _dir in glob.glob(os.path.join(config.sl2_runs_dir, '*')):
         with open(os.path.join(_dir, 'arguments.txt'), 'rb') as program_string_file:
@@ -133,12 +138,18 @@ def get_runs():
 
 
 def get_path_to_run_file(run_id, filename):
-    """ Helper function for easily getting the full path to a file in the current run's directory """
+    """
+    Returns the full path to the given filename within
+    the given run's directory.
+    """
     return os.path.join(config.sl2_runs_dir, str(run_id), filename)
 
 
 def write_output_files(proc, run_id, stage_name):
-    """ Writes the stdout and stderr buffers for a run into the runs directory """
+    """
+    Writes the stdout and stderr buffers for a particular stage
+    into a run's directory.
+    """
     try:
         if proc.stdout is not None:
             with open(get_path_to_run_file(run_id, '{}.stdout'.format(stage_name)), 'wb') as stdoutfile:
@@ -151,7 +162,10 @@ def write_output_files(proc, run_id, stage_name):
 
 
 def parse_triage_output(run_id):
-    # Parse triage results and print them
+    """
+    Parses the results of a triage run and prints them in
+    human-readable form.
+    """
     try:
         crash_file = get_path_to_run_file(run_id, 'crash.json')
         with open(crash_file, 'r') as crash_json:
@@ -167,17 +181,31 @@ def parse_triage_output(run_id):
 
 
 def export_crash_data_to_csv(crashes, csv_filename):
-    with open(csv_filename, 'w') as csvfile:
-        writer = DictWriter(csvfile, ['score', 'run_id', 'exception', 'reason', 'instruction', 'location', 'crash_file'],
-                            extrasaction='ignore')
+    fields = [
+        'score',
+        'run_id',
+        'exception',
+        'reason',
+        'instruction',
+        'location',
+        'crash_file',
+    ]
 
+    with open(csv_filename, 'w') as csvfile:
+        writer = DictWriter(csvfile, fields, extrasaction='ignore')
         writer.writeheader()
         writer.writerows(crashes)
 
 
 def finalize(run_id, crashed):
-    """ Manually closes out a fuzzing run. Only necessary if we killed the target binary before DynamoRIO could
-    close out the run """
+    """
+    Manually closes out a fuzzing run.
+    Only necessary if we killed the target binary before DynamoRIO could
+    close out the run.
+
+    TODO(ww): Provide an interface for this, rather than manually
+    writing the relevant parts of the protocol to the pipe.
+    """
     f = open(config.sl2_server_pipe_path, 'w+b', buffering=0)
     f.write(struct.pack('B', 0x4))  # EVT_RUN_COMPLETE
     f.seek(0)
@@ -187,7 +215,7 @@ def finalize(run_id, crashed):
     f.write(struct.pack('?', 1 if crashed else 0))
     # Write a bool indicating whether to preserve run files (without a crash)
     f.write(struct.pack('?', 1 if crashed else 0))
-    f.write(struct.pack('B', 0x6)) # EVT_SESSION_TEARDOWN
+    f.write(struct.pack('B', 0x6))  # EVT_SESSION_TEARDOWN
     f.close()
 
 

@@ -21,7 +21,8 @@ from .state import (
     write_output_files,
     create_invokation_statement,
     check_fuzz_line_for_crash,
-    check_fuzz_line_for_run_id
+    check_fuzz_line_for_run_id,
+    get_path_to_run_file,
 )
 
 from . import config
@@ -118,15 +119,17 @@ def run_dr(config_dict, verbose=False, timeout=None):
         return popen_obj
 
 
-def triagerRun(  runId ):
-    dmpfile = os.path.join( os.environ['AppData'], 
-                'Trail of Bits', 
-                'fuzzkit',
-                'runs',
-                str(runId),
-                "initial.dmp" )
-    cmd =  [ r'.\build\triage\Debug\triager.exe',  dmpfile ] 
-    out = subprocess.getoutput(cmd)
+def triager_run(run_id):
+    dmpfile = get_path_to_run_file(run_id, "initial.dmp")
+    if os.path.isfile(dmpfile):
+        cmd = [r'.\build\triage\Debug\triager.exe', dmpfile]
+        # TODO(ww): Unused variable.
+        out = subprocess.check_output(cmd, shell=False)
+        if config.config["debug"]:
+            print_l(repr(out))
+    else:
+        print_l("[!] No initial.dmp to triage!")
+
 
 def wizard_run(config_dict):
     """ Runs the wizard and lets the user select a target function """
@@ -138,21 +141,16 @@ def wizard_run(config_dict):
                                 'target_args': config_dict['target_args'],
                                 'inline_stdout': config_dict['inline_stdout']},
                                verbose=config_dict['verbose'])
-    wizard_output = completed_process.stderr.decode('utf-8')
     wizard_findings = []
     mem_map = {}
     base_addr = None
 
-    for line in wizard_output.splitlines():
+    for line in completed_process.stderr.split(b'\n'):
         try:
+            line = line.decode('utf-8')
             obj = json.loads(line)
-            if "wrapped" == obj["type"]:
-                # TODO do something here later
-                pass
-            elif "in" == obj["type"]:
-                # TODO do something here later
-                pass
-            elif "map" == obj["type"]:
+
+            if "map" == obj["type"]:
                 mem_map[(obj["start"], obj["end"])] = obj["mod_name"]
                 if ".exe" in obj["mod_name"]:
                     base_addr = obj["start"]
@@ -165,8 +163,13 @@ def wizard_run(config_dict):
                         obj['called_from'] = mem_map[addrs]
 
                 wizard_findings.append(obj)
-        except Exception:
+        except UnicodeDecodeError:
+            if config_dict["verbose"]:
+                print_l("[!] Not UTF-8:", repr(line))
+        except json.JSONDecodeError:
             pass
+        except Exception as e:
+            print_l("[!] Unexpected exception:", e)
 
     return wizard_findings
 
@@ -228,7 +231,7 @@ def triage_run(config_dict, run_id):
     write_output_files(completed_process, run_id, 'triage')
 
     formatted, raw = parse_triage_output(run_id)
-    triagerRun( run_id )
+    triager_run(run_id)
     return formatted, raw
 
 

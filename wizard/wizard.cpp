@@ -24,17 +24,6 @@ using namespace std;
 
 #include "common/sl2_dr_client.hpp"
 
-#define JSON_VAR (j##__COUNTER__)
-
-// TODO - we can probably delete this block, but we'll leave it for a few more commits
-#define JSON_WRAP_PRE_LOG() do { \
-    json JSON_VAR; \
-    JSON_VAR["type"] = "in"; \
-    JSON_VAR["function"] = __FUNCTION__; \
-    SL2_LOG_JSONL(JSON_VAR); \
-} while (0)
-
-
 // function metadata structure
 struct wizard_read_info {
     void *lpBuffer;
@@ -89,18 +78,19 @@ Below we have a number of functions that instrument metadata retreival for the i
 static void
 wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
 {
-    JSON_WRAP_PRE_LOG();
-
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
-    HANDLE hEventLog                 = (HANDLE)drwrap_get_arg(wrapcxt, 0);
-    DWORD  dwReadFlags               = (DWORD)drwrap_get_arg(wrapcxt, 1);
-    DWORD  dwRecordOffset            = (DWORD)drwrap_get_arg(wrapcxt, 2);
-    void *lpBuffer                   = (void *)drwrap_get_arg(wrapcxt, 3);
-    size_t  nNumberOfBytesToRead     = (size_t)drwrap_get_arg(wrapcxt, 4);
-    DWORD  *pnBytesRead              = (DWORD *)drwrap_get_arg(wrapcxt, 5);
-    DWORD  *pnMinNumberOfBytesNeeded = (DWORD *)drwrap_get_arg(wrapcxt, 6);
+    HANDLE hEventLog                 = (HANDLE) drwrap_get_arg(wrapcxt, 0);
+    #pragma warning(suppress: 4311 4302)
+    DWORD  dwReadFlags               = (DWORD) drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
+    DWORD  dwRecordOffset            = (DWORD) drwrap_get_arg(wrapcxt, 2);
+    void *lpBuffer                   = drwrap_get_arg(wrapcxt, 3);
+    #pragma warning(suppress: 4311 4302)
+    size_t  nNumberOfBytesToRead     = (DWORD) drwrap_get_arg(wrapcxt, 4);
+    DWORD  *pnBytesRead              = (DWORD *) drwrap_get_arg(wrapcxt, 5);
+    DWORD  *pnMinNumberOfBytesNeeded = (DWORD *) drwrap_get_arg(wrapcxt, 6);
 
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
@@ -115,14 +105,12 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
 {
-    JSON_WRAP_PRE_LOG();
-
-    HKEY hKey         = (HKEY)drwrap_get_arg(wrapcxt, 0);
-    char *lpValueName = (char *)drwrap_get_arg(wrapcxt, 1);
-    DWORD *lpReserved = (DWORD *)drwrap_get_arg(wrapcxt, 2);
-    DWORD *lpType     = (DWORD *)drwrap_get_arg(wrapcxt, 3);
-    BYTE *lpData      = (BYTE *)drwrap_get_arg(wrapcxt, 4);
-    DWORD *lpcbData   = (DWORD *)drwrap_get_arg(wrapcxt, 5);
+    HKEY hKey         = (HKEY) drwrap_get_arg(wrapcxt, 0);
+    char *lpValueName = (char *) drwrap_get_arg(wrapcxt, 1);
+    DWORD *lpReserved = (DWORD *) drwrap_get_arg(wrapcxt, 2);
+    DWORD *lpType     = (DWORD *) drwrap_get_arg(wrapcxt, 3);
+    BYTE *lpData      = (BYTE *) drwrap_get_arg(wrapcxt, 4);
+    DWORD *lpcbData   = (DWORD *) drwrap_get_arg(wrapcxt, 5);
 
     // get registry key path (maybe hook open key?)
 
@@ -146,16 +134,16 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
 {
-    JSON_WRAP_PRE_LOG();
-
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
-    HINTERNET hRequest                          = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
+    HINTERNET hRequest                          = (HINTERNET) drwrap_get_arg(wrapcxt, 0);
     void *pvBuffer                              = drwrap_get_arg(wrapcxt, 1);
-    DWORD dwBufferLength                        = (DWORD)drwrap_get_arg(wrapcxt, 2);
-    DWORD *pdwBytesRead                         = (DWORD *)drwrap_get_arg(wrapcxt, 3);
-    WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE)(int)drwrap_get_arg(wrapcxt, 3);
+    #pragma warning(suppress: 4311 4302)
+    DWORD dwBufferLength                        = (DWORD) drwrap_get_arg(wrapcxt, 2);
+    DWORD *pdwBytesRead                         = (DWORD *) drwrap_get_arg(wrapcxt, 3);
+    #pragma warning(suppress: 4311 4302)
+    WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE) (int) drwrap_get_arg(wrapcxt, 3);
 
     // get url
     // InternetQueryOption
@@ -172,15 +160,14 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
 {
-    JSON_WRAP_PRE_LOG();
-
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
-    HINTERNET hFile             = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
+    HINTERNET hFile            = (HINTERNET) drwrap_get_arg(wrapcxt, 0);
     void *lpBuffer             = drwrap_get_arg(wrapcxt, 1);
-    DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
-    DWORD *lpNumberOfBytesRead = (DWORD *)drwrap_get_arg(wrapcxt, 3);
+    #pragma warning(suppress: 4311 4302)
+    DWORD nNumberOfBytesToRead = (DWORD) drwrap_get_arg(wrapcxt, 2);
+    DWORD *lpNumberOfBytesRead = (DWORD *) drwrap_get_arg(wrapcxt, 3);
 
     // get url
     // InternetQueryOption
@@ -197,13 +184,12 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
 {
-    JSON_WRAP_PRE_LOG();
-
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
     HINTERNET hRequest         = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     void *lpBuffer             = drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
     DWORD *lpNumberOfBytesRead = (DWORD*)drwrap_get_arg(wrapcxt, 3);
 
@@ -222,14 +208,14 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_recv(void *wrapcxt, OUT void **user_data)
 {
-    JSON_WRAP_PRE_LOG();
-
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
     SOCKET s  = (SOCKET)drwrap_get_arg(wrapcxt, 0);
     char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
     int len   = (int)drwrap_get_arg(wrapcxt, 2);
+    #pragma warning(suppress: 4311 4302)
     int flags = (int)drwrap_get_arg(wrapcxt, 3);
 
     // get ip address
@@ -256,10 +242,9 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
 {
-    JSON_WRAP_PRE_LOG();
-
     HANDLE hFile               = drwrap_get_arg(wrapcxt, 0);
     void *lpBuffer             = drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
     DWORD *lpNumberOfBytesRead = (DWORD *)drwrap_get_arg(wrapcxt, 3);
 
@@ -291,15 +276,13 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     memcpy(info->source, fStruct.fileName, sizeof(fStruct.fileName));
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    memset(info->argHash, 0, SL2_HASH_LEN + 1);
+    info->argHash[SL2_HASH_LEN] = 0;
     memcpy(info->argHash, hash_str.c_str(), SL2_HASH_LEN);
 }
 
 static void
 wrap_pre_fread(void *wrapcxt, OUT void **user_data)
 {
-    JSON_WRAP_PRE_LOG();
-
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
@@ -319,8 +302,6 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
 {
-    JSON_WRAP_PRE_LOG();
-
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
@@ -462,20 +443,13 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
             bool ok = drwrap_wrap(towrap, hookFunctionPre, hookFunctionPost);
             json j;
 
-            if (ok) {
-                j["type"]      = "wrapped";
-                j["func_name"] = functionName;
-                j["toWrap"]    = (uint64_t)towrap;
-                j["modName"]   = mod_name;
-            }
-            else {
+            if (!ok) {
                 j["type"] = "error";
                 ostringstream s;
                 s << "FAILED to wrap " << functionName <<  " @ " << towrap << " already wrapped?";
                 j["msg"] = s.str();
+                SL2_LOG_JSONL(j);
             }
-
-            SL2_LOG_JSONL(j); // TODO - we can probably delete this as well
         }
     }
 }

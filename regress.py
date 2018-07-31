@@ -7,12 +7,17 @@ import shlex
 import glob
 import os
 
+DEBUG=False
+
 def runAndCaptureOutput( cmd ):
     if type(cmd) == type([]):
         cmd = " ".join(cmd)
-    #print('cmd', cmd)
+
+    if DEBUG:
+        print('cmd', cmd)
     out =  subprocess.getoutput(cmd)    
-    #print("out", out )
+    if DEBUG:
+        print("out", out )
     return out
 
 class TestWizard(unittest.TestCase):

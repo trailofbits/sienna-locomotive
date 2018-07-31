@@ -13,22 +13,22 @@
 */
 
 // NOTE(ww): Keep this up-to-date with the number of strategy functions we implement.
-#define NUM_STRATEGIES 8
+#define NUM_STRATEGIES 9
 
 static void strategyAAAA(uint8_t *buf, size_t size)
 {
     memset(buf, 'A', size);
 }
 
+// Flip a random bit within a random byte in the input buffer.
 static void strategyFlipBit(uint8_t *buf, size_t size)
 {
     size_t pos = dr_get_random_value(size);
-    uint8_t byte = buf[pos];
-
-    uint8_t mask = 1 << dr_get_random_value(8);
-    buf[pos] = byte ^ mask;
+    buf[pos] ^= (1 << dr_get_random_value(8));
 }
 
+// Repeat a random continuous span of bytes
+// within the input buffer.
 static void strategyRepeatBytes(uint8_t *buf, size_t size)
 {
     // pos -> zero to second to last byte
@@ -54,7 +54,9 @@ static void strategyRepeatBytes(uint8_t *buf, size_t size)
     }
 }
 
-static void strategyRepeatBytesBackward(uint8_t *buf, size_t size)
+// Reverse the order of a random continuous span of bytes
+// within the input buffer.
+static void strategyRepeatBytesBackwards(uint8_t *buf, size_t size)
 {
     size_t start = dr_get_random_value(size - 1);
     size_t end = start + dr_get_random_value((size + 1) - start);
@@ -62,34 +64,35 @@ static void strategyRepeatBytesBackward(uint8_t *buf, size_t size)
     std::reverse(buf + start, buf + end);
 }
 
+// Delete (null out) a random continuous span of bytes
+// within the input buffer.
 static void strategyDeleteBytes(uint8_t *buf, size_t size)
 {
-    // pos -> zero to second to last byte
-    size_t pos = 0;
-    if (size > 1) {
-        pos = dr_get_random_value(size - 1);
-    }
+    size_t start = dr_get_random_value(size - 1);
+    size_t count = dr_get_random_value((size + 1) - start);
 
-    // delete_length -> 1 to (remaining_size - 1)
-    size_t size_m2 = size - 2;
-    size_t delete_length = 0;
-    if (size_m2 > pos) {
-        delete_length = dr_get_random_value(size_m2 - pos);
-    }
-    delete_length++;
-
-    for (size_t i=0; i<delete_length; i++) {
-        buf[pos+i] = 0;
-    }
+    memset(buf + start, 0, count);
 }
 
+// Delete (ASCII zero-out) a random continuous span of bytes
+// within the input buffer.
+static void strategyDeleteBytesAscii(uint8_t *buf, size_t size)
+{
+    size_t start = dr_get_random_value(size - 1);
+    size_t count = dr_get_random_value((size + 1) - start);
+
+    memset(buf + start, '0', count);
+}
+
+// Replace a random continuous span of bytes within the input
+// buffer with random values.
 static void strategyRandValues(uint8_t *buf, size_t size)
 {
     size_t rand_size = 0;
     size_t max = 0;
     while (max < 1) {
         // rand_size -> 1, 2, 4, 8
-        rand_size = (size_t) pow(2, dr_get_random_value(4));
+        rand_size = (size_t) 1 << dr_get_random_value(4);
         max = (size + 1);
         max -= rand_size;
     }
@@ -100,12 +103,14 @@ static void strategyRandValues(uint8_t *buf, size_t size)
     // pos that will fit into the buffer
     size_t pos = dr_get_random_value(max);
 
-    for (size_t i=0; i<rand_size; i++) {
-        uint8_t mut = dr_get_random_value(256);
+    for (size_t i = 0; i < rand_size; i++) {
+        uint8_t mut = dr_get_random_value(UINT8_MAX + 1);
         buf[pos + i] = mut;
     }
 }
 
+// Replace a random continuous span of bytes within the input
+// buffer with well-known values (maxes, overflows, etc).
 static void strategyKnownValues(uint8_t *buf, size_t size)
 {
     int8_t values1[] = { KNOWN_VALUES1 };
@@ -117,7 +122,7 @@ static void strategyKnownValues(uint8_t *buf, size_t size)
     size_t max = 0;
     while (max < 1) {
         // size -> 1, 2, 4, 8
-        rand_size = (size_t) pow(2, dr_get_random_value(4));
+        rand_size = (size_t) 1 << dr_get_random_value(4);
         max = (size + 1);
         max -= rand_size;
     }
@@ -158,6 +163,8 @@ static void strategyKnownValues(uint8_t *buf, size_t size)
     }
 }
 
+// Add or subtract a random well-known value from a random u8/u16/u32/u64.
+// Additionally, perform a random byteswap.
 static void strategyAddSubKnownValues(uint8_t *buf, size_t size)
 {
     int8_t values1[] = { KNOWN_VALUES1 };
@@ -169,7 +176,7 @@ static void strategyAddSubKnownValues(uint8_t *buf, size_t size)
     size_t max = 0;
     while (max < 1) {
         // size -> 1, 2, 4, 8
-        rand_size = (size_t) pow(2, dr_get_random_value(4));
+        rand_size = (size_t) 1 << dr_get_random_value(4);
         max = (size + 1) - rand_size;
     }
 
@@ -179,13 +186,9 @@ static void strategyAddSubKnownValues(uint8_t *buf, size_t size)
     // pos that will fit into the buffer
     size_t pos = dr_get_random_value(max);
     bool endian = dr_get_random_value(2);
-
-    uint8_t sub = 1;
-    if (dr_get_random_value(2)) {
-        sub = -1;
-    }
-
+    uint8_t sub = dr_get_random_value(2) ? -1 : 1;
     size_t selection = 0;
+
     switch (rand_size) {
         case 1:
             selection = dr_get_random_value(sizeof(values1) / sizeof(values1[0]));
@@ -214,13 +217,14 @@ static void strategyAddSubKnownValues(uint8_t *buf, size_t size)
     }
 }
 
+// Swap the endiannness of a random u8/u16/u32/u64.
 static void strategyEndianSwap(uint8_t *buf, size_t size)
 {
     size_t rand_size = 0;
     size_t max = 0;
     while (max < 1) {
         // size -> 1, 2, 4, 8
-        rand_size = (size_t) pow(2, dr_get_random_value(4));
+        rand_size = (size_t) 1 << dr_get_random_value(4);
         max = (size + 1) - rand_size;
     }
 
@@ -250,16 +254,13 @@ static void strategyEndianSwap(uint8_t *buf, size_t size)
     }
 }
 
-/* Selects a mutations strategy at random */
+// TODO(ww): Make `choice` an enum or something else that's friendlier.
 SL2_EXPORT
-DWORD mutate_buffer(uint8_t *buf, size_t size)
+bool mutate_buffer_choice(uint8_t *buf, size_t size, uint32_t choice)
 {
-    // afl for inspiration
-    if (size == 0) {
-        return 0;
+    if (size == 0 || choice > NUM_STRATEGIES - 1) {
+        return false;
     }
-
-    DWORD choice = dr_get_random_value(NUM_STRATEGIES);
 
     switch (choice) {
         case 0:
@@ -284,17 +285,40 @@ DWORD mutate_buffer(uint8_t *buf, size_t size)
             strategyDeleteBytes(buf, size);
             break;
         case 7:
-            strategyRepeatBytesBackward(buf, size);
+            strategyDeleteBytesAscii(buf, size);
+            break;
+        case 8:
+            strategyRepeatBytesBackwards(buf, size);
             break;
         default:
+            // NOTE(ww): We should never reach this, unless NUM_STRATEGIES gets out-of-sync.
             strategyAAAA(buf, size);
             break;
     }
+
 
     // TODO(ww): Additional strategies:
     // insert bytes
     // move bytes
     // add random bytes to space
 
-    return 0;
+    return true;
+}
+
+SL2_EXPORT
+bool mutate_buffer(uint8_t *buf, size_t size)
+{
+    return mutate_buffer_choice(buf, size, dr_get_random_value(NUM_STRATEGIES));
+}
+
+SL2_EXPORT
+bool mutate_buffer_custom(uint8_t *buf, size_t size, sl2_strategy_t strategy)
+{
+    if (size == 0) {
+        return false;
+    }
+
+    strategy(buf, size);
+
+    return true;
 }

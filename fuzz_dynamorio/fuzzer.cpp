@@ -75,7 +75,6 @@ static void get_target_command_line(wchar_t **argv, size_t *len)
     // alternatively: https://wj32.org/wp/2009/01/24/howto-get-the-command-line-of-processes/
     PEB * clientPEB = (PEB *) dr_get_app_PEB();
     RTL_USER_PROCESS_PARAMETERS parameterBlock;
-    size_t byte_counter;
 
     // Read process parameter block from PEB
     memcpy(&parameterBlock, clientPEB->ProcessParameters, sizeof(RTL_USER_PROCESS_PARAMETERS));
@@ -108,8 +107,7 @@ on_bb_instrument(void *drcontext, void *tag, instrlist_t *bb, instr_t *inst, boo
         return DR_EMIT_DEFAULT;
     }
 
-    offset = start_pc - target_mod->start;
-    offset &= FUZZ_ARENA_SIZE - 1;
+    offset = (start_pc - target_mod->start) & (FUZZ_ARENA_SIZE - 1);
 
     drreg_reserve_aflags(drcontext, bb, inst);
     // TODO(ww): Is it really necessary to inject an instruction here?
@@ -152,10 +150,10 @@ on_dr_exit(void)
     SL2_DR_DEBUG("Dynamorio exiting (fuzzer)\n");
 
     if (crashed) {
-        wchar_t run_id_s[SL2_UUID_SIZE];
-        sl2_uuid_to_wstring(sl2_conn.run_id, run_id_s);
-        SL2_DR_DEBUG("<crash found for run id %S>\n", run_id_s);
-        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#on_dr_exit: Crash found for run id %S!", run_id_s);
+        char run_id_s[SL2_UUID_SIZE];
+        sl2_uuid_to_string(sl2_conn.run_id, run_id_s);
+        SL2_DR_DEBUG("<crash found for run id %s>\n", run_id_s);
+        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#on_dr_exit: Crash found for run id %s!", run_id_s);
 
         sl2_crash_paths crash_paths = {0};
         sl2_conn_request_crash_paths(&sl2_conn, &crash_paths);
@@ -237,14 +235,14 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
         SL2_DR_DEBUG("mutate: resource: %S\n", resource);
     }
 
-    sl2_mutation mutation;
-
-    mutation.function = static_cast<uint32_t>(function);
-    mutation.mut_count = mut_count++;
-    mutation.resource = resource;
-    mutation.position = position;
-    mutation.bufsize = bufsize;
-    mutation.buffer = (uint8_t *) buffer;
+    sl2_mutation mutation = {
+        (uint32_t) function,
+        mut_count++,
+        resource,
+        position,
+        bufsize,
+        (uint8_t *) buffer,
+    };
 
     if (coverage_guided) {
         // sl2_mutation_advice advice;
@@ -283,12 +281,16 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
 
 static void wrap_pre_IsProcessorFeaturePresent(void *wrapcxt, OUT void **user_data)
 {
+    #pragma warning(suppress: 4311 4302)
     DWORD feature = (DWORD) drwrap_get_arg(wrapcxt, 0);
+
+    #pragma warning(suppress: 4312)
     *user_data = (void *) feature;
 }
 
 static void wrap_post_IsProcessorFeaturePresent(void *wrapcxt, void *user_data)
 {
+    #pragma warning(suppress: 4311 4302)
     DWORD feature = (DWORD) user_data;
 
     if (feature == PF_FASTFAIL_AVAILABLE) {
@@ -350,9 +352,12 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
 {
     SL2_DR_DEBUG("<in wrap_pre_ReadEventLog>\n");
     HANDLE hEventLog = (HANDLE)drwrap_get_arg(wrapcxt, 0);
+    #pragma warning(suppress: 4311 4302)
     DWORD  dwReadFlags = (DWORD)drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
     DWORD  dwRecordOffset = (DWORD)drwrap_get_arg(wrapcxt, 2);
     void *lpBuffer = (void *)drwrap_get_arg(wrapcxt, 3);
+    #pragma warning(suppress: 4311 4302)
     DWORD  nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 4);
     DWORD  *pnBytesRead = (DWORD *)drwrap_get_arg(wrapcxt, 5);
     DWORD  *pnMinNumberOfBytesNeeded = (DWORD *)drwrap_get_arg(wrapcxt, 6);
@@ -430,8 +435,10 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
     SL2_DR_DEBUG("<in wrap_pre_WinHttpWebSocketReceive>\n");
     HINTERNET hRequest = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     PVOID pvBuffer = drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
     DWORD dwBufferLength = (DWORD)drwrap_get_arg(wrapcxt, 2);
     PDWORD pdwBytesRead = (PDWORD)drwrap_get_arg(wrapcxt, 3);
+    #pragma warning(suppress: 4311 4302)
     WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE)(int)drwrap_get_arg(wrapcxt, 3);
 
     // TODO: put this in another file cause you can't import wininet and winhttp
@@ -468,6 +475,7 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
     SL2_DR_DEBUG("<in wrap_pre_InternetReadFile>\n");
     HINTERNET hFile = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     void *lpBuffer = drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
     LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
 
@@ -504,8 +512,9 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
     SL2_DR_DEBUG("<in wrap_pre_WinHttpReadData>\n");
     HINTERNET hRequest = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     void *lpBuffer = drwrap_get_arg(wrapcxt, 1);
-    DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
-    LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
+    #pragma warning(suppress: 4311 4302)
+    DWORD nNumberOfBytesToRead = (DWORD) drwrap_get_arg(wrapcxt, 2);
+    DWORD *lpNumberOfBytesRead = (DWORD *) drwrap_get_arg(wrapcxt, 3);
 
     // LONG positionHigh = 0;
     // DWORD positionLow = InternetSetFilePointer(hRequest, 0, &positionHigh, FILE_CURRENT);
@@ -541,7 +550,9 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data)
     SL2_DR_DEBUG("<in wrap_pre_recv>\n");
     SOCKET s  = (SOCKET)drwrap_get_arg(wrapcxt, 0);
     char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
     int len   = (int)drwrap_get_arg(wrapcxt, 2);
+    #pragma warning(suppress: 4311 4302)
     int flags = (int)drwrap_get_arg(wrapcxt, 3);
 
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
@@ -574,6 +585,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     SL2_DR_DEBUG("<in wrap_pre_ReadFile>\n");
     HANDLE hFile                = drwrap_get_arg(wrapcxt, 0);
     void *lpBuffer             = drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
     DWORD *lpNumberOfBytesRead = (DWORD*)drwrap_get_arg(wrapcxt, 3);
 
@@ -604,7 +616,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    memset(info->argHash, 0, SL2_HASH_LEN + 1);
+    info->argHash[SL2_HASH_LEN] = 0;
     memcpy(info->argHash, hash_str.c_str(), SL2_HASH_LEN);
 }
 
@@ -613,7 +625,9 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
 {
     SL2_DR_DEBUG("<in wrap_pre_fread_s>\n");
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
+    #pragma warning(suppress: 4311 4302)
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 2);
+    #pragma warning(suppress: 4311 4302)
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 3);
     FILE *file   = (FILE *)drwrap_get_arg(wrapcxt, 4);
 
@@ -637,7 +651,9 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data)
     SL2_DR_DEBUG("<in wrap_pre_fread>\n");
 
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
+    #pragma warning(suppress: 4311 4302)
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
     FILE *file   = (FILE *)drwrap_get_arg(wrapcxt, 3);
 
