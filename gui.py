@@ -30,11 +30,12 @@ class Triager:
     
 
     def __repr__(self):
-        return "%s exploitability, %s at pc 0x%x, memory address 0x%x." % (
+        return "%s exploitability, %s at pc 0x%x, memory address 0x%x, stack address 0x%x" % (
                 self.json['exploitability'],  
                 self.json['crashReason'], 
                 self.json['instructionPointer'], 
-                self.json['crashAddress'] )
+                self.json['crashAddress'],
+                self.json['stackPointer'] )
 
 class MainWindow(QtWidgets.QMainWindow):
 

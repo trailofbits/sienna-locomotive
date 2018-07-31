@@ -129,6 +129,7 @@ def triagerRun(  runId ):
                 "initial.dmp" )
     cmd =  [ r'.\build\triage\Debug\triager.exe',  dmpfile ] 
     out = subprocess.getoutput(cmd)
+    return out
 
 def wizard_run(config_dict):
     """ Runs the wizard and lets the user select a target function """
