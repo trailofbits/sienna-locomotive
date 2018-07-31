@@ -212,6 +212,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.continuous_mode_cbox.stateChanged.connect(self.fuzzer_thread.continuous_state_changed)
         self.pause_mode_cbox.stateChanged.connect(self.fuzzer_thread.pause_state_changed)
+        self.fuzz_timeout_box.valueChanged.connect(self.fuzzer_thread.fuzz_timeout_changed)
+        self.triage_timeout_box.valueChanged.connect(self.fuzzer_thread.triage_timeout_changed)
 
         # Start the wizard when we click the button and update the tree when we're done
         self.wizard_button.clicked.connect(self.wizard_thread.start)

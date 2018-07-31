@@ -68,3 +68,9 @@ class FuzzerThread(QThread):
     def pause_state_changed(self, new_state):
         self.config_dict['exit_early'] = (new_state == Qt.Checked)
 
+    def fuzz_timeout_changed(self, new_timeout):
+        self.config_dict['fuzz_timeout'] = None if int(new_timeout) == 0 else int(new_timeout)
+
+    def triage_timeout_changed(self, new_timeout):
+        self.config_dict['triage_timeout'] = None if int(new_timeout) == 0 else int(new_timeout)
+
