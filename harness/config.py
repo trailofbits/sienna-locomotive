@@ -12,16 +12,9 @@ import sys
 import argparse
 import configparser
 
-
 # NOTE(ww): Keep these up-to-data with include/server.hpp!
 sl2_server_pipe_path = "\\\\.\\pipe\\fuzz_server"
-
-sl2_dir = os.path.join(
-    os.getenv('APPDATA', default="."),
-    'Trail of Bits',
-    'fuzzkit'
-)
-
+sl2_dir = os.path.join(os.getenv('APPDATA', default="."), 'Trail of Bits', 'fuzzkit')
 sl2_runs_dir = os.path.join(sl2_dir, 'runs')
 sl2_arenas_dir = os.path.join(sl2_dir, 'arenas')
 sl2_log_dir = os.path.join(sl2_dir, 'log')
@@ -61,7 +54,6 @@ try:
 except configparser.Error as e:
     print("ERROR: Failed to load configuration:", e)
     sys.exit()
-
 
 # Set up argument parser
 parser = argparse.ArgumentParser(
