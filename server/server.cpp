@@ -22,6 +22,17 @@
 
 #include "server.hpp"
 
+// Convenience macros for logging.
+#define SL2_SERVER_LOG(level, fmt, ...) LOG_F(level, __FUNCTION__ ": " fmt, __VA_ARGS__)
+// NOTE(ww): The MS preprocessor is smart enough to remove the trailing comma in most
+// sitations, but not when __VA_ARGS__ is *not* the last argument. So we put
+// the GLE status at the beginning instead.
+#define SL2_SERVER_LOG_GLE(level, fmt, ...) SL2_SERVER_LOG(level, "(GLE=%lu) " fmt, GetLastError(), __VA_ARGS__)
+#define SL2_SERVER_LOG_INFO(fmt, ...) SL2_SERVER_LOG(INFO, fmt, __VA_ARGS__)
+#define SL2_SERVER_LOG_WARN(fmt, ...) SL2_SERVER_LOG_GLE(WARNING, fmt, __VA_ARGS__)
+#define SL2_SERVER_LOG_ERROR(fmt, ...) SL2_SERVER_LOG_GLE(ERROR, fmt, __VA_ARGS__)
+#define SL2_SERVER_LOG_FATAL(fmt, ...) SL2_SERVER_LOG_GLE(FATAL, fmt, __VA_ARGS__)
+
 static CRITICAL_SECTION run_lock;
 static HANDLE process_mutex = INVALID_HANDLE_VALUE;
 
@@ -34,21 +45,19 @@ static void lock_process()
 {
     process_mutex = CreateMutex(NULL, false, L"fuzz_server_mutex");
     if (!process_mutex || process_mutex == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "lock_process: could not get process lock (handle)");
-        exit(1);
+        SL2_SERVER_LOG_FATAL("could not get create process lock");
     }
 
     DWORD result = WaitForSingleObject(process_mutex, 0);
     if (result != WAIT_OBJECT_0) {
-        LOG_F(ERROR, "lock_process: could not get process lock (lock)");
-        exit(1);
+        SL2_SERVER_LOG_FATAL("could not obtain process lock");
     }
 }
 
 // Called on process termination (by atexit).
 static void server_cleanup()
 {
-    LOG_F(INFO, "server_cleanup: Called, cleaning things up");
+    SL2_SERVER_LOG_INFO("Called, cleaning things up");
 
     // NOTE(ww): We could probably check return codes here, but there's
     // no point -- the process is about to be destroyed anyways.
@@ -66,8 +75,7 @@ static void init_logging_path()
     SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roaming_path);
 
     if (PathCchCombine(FUZZ_LOG, MAX_PATH, roaming_path, L"Trail of Bits\\fuzzkit\\log\\server.log") != S_OK) {
-        LOG_F(ERROR, "init_logging_path: failed to combine logfile path (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to combine logfile path");
     }
 
     CoTaskMemFree(roaming_path);
@@ -83,110 +91,96 @@ static void init_working_paths()
     wchar_t runs_local_path[MAX_PATH] = L"Trail of Bits\\fuzzkit\\runs";
 
     if (PathCchCombine(FUZZ_WORKING_PATH, MAX_PATH, roaming_path, runs_local_path) != S_OK) {
-        LOG_F(ERROR, "init_working_paths: failed to combine working dir path (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to combine working dir path");
     }
 
     wchar_t arenas_local_path[MAX_PATH] = L"Trail of Bits\\fuzzkit\\arenas";
 
     if (PathCchCombine(FUZZ_ARENAS_PATH, MAX_PATH, roaming_path, arenas_local_path) != S_OK) {
-        LOG_F(ERROR, "init_working_paths: failed to combine arenas dir path (0x%x)", GetLastError());
+        SL2_SERVER_LOG_FATAL("failed to combine arenas dir path");
     }
 
     CoTaskMemFree(roaming_path);
 }
 
 /* Writes the fkt file in the event we found a crash. Stores information about the mutation that caused it */
-static void writeFKT(wchar_t *target_file, DWORD type, size_t pathSize, wchar_t *filePath, size_t position, size_t size, uint8_t* buf)
+static void write_fkt(wchar_t *target_file, uint32_t type, size_t resource_size, wchar_t *resource_path, size_t position, size_t size, uint8_t* buf)
 {
     DWORD txsize;
     HANDLE fkt = CreateFile(target_file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
     if (fkt == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "writeFKT: failed to create FTK: %S (0x%x)", target_file, GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("write_fkt: failed to create FTK: %S", target_file);
     }
 
     if (!WriteFile(fkt, "FKT\0", 4, &txsize, NULL)) {
-        LOG_F(ERROR, "writeFKT: failed to write FKT header (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("write_fkt: failed to write FKT header");
     }
 
     // only one type for right now, files
     if (!WriteFile(fkt, &type, sizeof(type), &txsize, NULL)) {
-        LOG_F(ERROR, "writeFKT: failed to write type (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("write_fkt: failed to write type");
     }
 
-    if (!WriteFile(fkt, &pathSize, sizeof(pathSize), &txsize, NULL)) {
-        LOG_F(ERROR, "writeFKT: failed to write path size (0x%x)", GetLastError());
-        exit(1);
+    if (!WriteFile(fkt, &resource_size, sizeof(resource_size), &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("write_fkt: failed to write path size");
     }
 
-    if (!WriteFile(fkt, filePath, (DWORD) (pathSize * sizeof(wchar_t)), &txsize, NULL)) {
-        LOG_F(ERROR, "writeFKT: failed to write path (0x%x)", GetLastError());
-        exit(1);
+    if (!WriteFile(fkt, resource_path, (DWORD) (resource_size * sizeof(wchar_t)), &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("write_fkt: failed to write path");
     }
 
     if (!WriteFile(fkt, &position, sizeof(position), &txsize, NULL)) {
-        LOG_F(ERROR, "writeFKT: failed to write offset (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("write_fkt: failed to write offset");
     }
 
     if (!WriteFile(fkt, &size, sizeof(size_t), &txsize, NULL)) {
-        LOG_F(ERROR, "writeFKT: failed to write buffer size (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("write_fkt: failed to write buffer size");
     }
 
     if (!WriteFile(fkt, buf, (DWORD)size, &txsize, NULL)) {
-        LOG_F(ERROR, "writeFKT: failed to write buffer (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("write_fkt: failed to write buffer");
     }
 
     if (!CloseHandle(fkt)) {
-        LOG_F(ERROR, "writeFKT: failed to close FKT (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("write_fkt: failed to close FKT");
     }
 }
 
 /* Gets the mutated bytes stored in the FKT file for mutation replay */
-static void getBytesFKT(wchar_t *target_file, uint8_t *buf, size_t size)
+static void get_bytes_fkt(wchar_t *target_file, uint8_t *buf, size_t size)
 {
     DWORD txsize;
     size_t buf_size = 0;
     HANDLE fkt = CreateFile(target_file, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 
     if (fkt == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "handleReplay: failed to open FKT: %S (0x%x)", target_file, GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to open FKT: %S", target_file);
     }
 
     // TODO(ww): We shouldn't be hardcoding this offset.
     SetFilePointer(fkt, 0x18, NULL, FILE_BEGIN);
     if (!ReadFile(fkt, &buf_size, 4, &txsize, NULL)) {
-        LOG_F(ERROR, "getBytesFKT: failed to read replay buffer size from FKT (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read replay buffer size from FKT");
     }
 
     if (buf_size < size) {
         size = buf_size;
     }
 
-    LOG_F(INFO, "getBytesFKT: size=%lu", size);
+    SL2_SERVER_LOG_INFO("buffer size=%lu", size);
 
     SetFilePointer(fkt, -(LONG)size, NULL, FILE_END);
 
     if (!ReadFile(fkt, buf, (DWORD) size, &txsize, NULL)) {
-        LOG_F(ERROR, "getBytesFKT: failed to read replay buffer from FKT (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read replay buffer from FKT");
     }
 
     if (!CloseHandle(fkt)) {
-        LOG_F(ERROR, "handleReplay: failed to close FKT (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to close FKT");
     }
 
-    LOG_F(INFO, "getBytesFKT: read in %02x %02x %02x %02x %02x %02x %02x %02x\n", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
+    SL2_SERVER_LOG_INFO("read in %02x %02x %02x %02x %02x %02x %02x %02x\n", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
 }
 
 static void dump_arena(wchar_t *arena_path, sl2_arena *arena)
@@ -201,18 +195,15 @@ static void dump_arena(wchar_t *arena_path, sl2_arena *arena)
         NULL);
 
     if (file == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "dump_arena: failed to open %S", arena_path);
-        exit(1);
+        SL2_SERVER_LOG_FATAL("dump_arena: failed to open %S", arena_path);
     }
 
     if (!WriteFile(file, arena->map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
-        LOG_F(ERROR, "dump_arena: failed to write arena to disk!");
-        exit(1);
+        SL2_SERVER_LOG_FATAL("dump_arena: failed to write arena to disk!");
     }
 
     if (txsize != FUZZ_ARENA_SIZE) {
-        LOG_F(ERROR, "dump_arena: %lu != %lu, truncated write?", txsize, FUZZ_ARENA_SIZE);
-        exit(1);
+        SL2_SERVER_LOG_FATAL("dump_arena: %lu != %lu, truncated write?", txsize, FUZZ_ARENA_SIZE);
     }
 
     CloseHandle(file);
@@ -230,18 +221,15 @@ static void load_arena(wchar_t *arena_path, sl2_arena *arena)
         NULL);
 
     if (file == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "load_arena: failed to open %S", arena_path);
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to open %S", arena_path);
     }
 
     if (!ReadFile(file, arena->map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
-        LOG_F(ERROR, "load_arena: failed to read arena from disk!");
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read arena from disk!");
     }
 
     if (txsize != FUZZ_ARENA_SIZE) {
-        LOG_F(ERROR, "load_arena: %lu != %lu, truncated read?", txsize, FUZZ_ARENA_SIZE);
-        exit(1);
+        SL2_SERVER_LOG_FATAL("%lu != %lu, truncated read?", txsize, FUZZ_ARENA_SIZE);
     }
 
     CloseHandle(file);
@@ -250,13 +238,13 @@ static void load_arena(wchar_t *arena_path, sl2_arena *arena)
 /* Generates a new run UUID, writes relevant run metadata files into the corresponding run metadata dir
     This, like many things in the server, is pretty overzealous about exiting after any errors, often without an
     explanation of what happened. TODO - fix this */
-static void handleGenerateRunId(HANDLE pipe)
+static void handle_generate_run_id(HANDLE pipe)
 {
     DWORD txsize;
     UUID run_id;
     wchar_t *run_id_s;
 
-    LOG_F(INFO, "handleGenerateRunId: received request");
+    SL2_SERVER_LOG_INFO("received request");
 
     // NOTE(ww): On recent versions of Windows, UuidCreate generates a v4 UUID that
     // is sufficiently diffuse for our purposes (avoiding conflicts between runs).
@@ -267,30 +255,25 @@ static void handleGenerateRunId(HANDLE pipe)
     wchar_t run_dir[MAX_PATH + 1] = {0};
     PathCchCombine(run_dir, MAX_PATH, FUZZ_WORKING_PATH, run_id_s);
     if (!CreateDirectory(run_dir, NULL)) {
-        LOG_F(ERROR, "handleGenerateRunId: couldn't create working directory (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("couldn't create working directory");
     }
 
     WriteFile(pipe, &run_id, sizeof(run_id), &txsize, NULL);
-    LOG_F(INFO, "handleGenerateRunId: generated ID %S", run_id_s);
+    SL2_SERVER_LOG_INFO("generated ID %S", run_id_s);
 
     // get program name
     wchar_t command_line[SL2_ARGV_LEN] = {0};
     size_t size = 0;
     if (!ReadFile(pipe, &size, sizeof(size), &txsize, NULL)) {
-        LOG_F(ERROR, "handleGenerateRunId: failed to read size of program name (0x%x)", GetLastError());
-        LOG_F(ERROR, "size: %d", size);
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read size of program name (size=%lu)", size);
     }
 
     if ((size / sizeof(wchar_t)) > SL2_ARGV_LEN - 1) {
-        LOG_F(ERROR, "handleGenerateRunId: program name length %lu > SL2_ARGV_LEN - 1", size);
-        exit(1);
+        SL2_SERVER_LOG_FATAL("program name length %lu > SL2_ARGV_LEN - 1", size);
     }
 
     if (!ReadFile(pipe, command_line, (DWORD) size, &txsize, NULL)) {
-        LOG_F(ERROR, "handleGenerateRunId: failed to read size of argument list (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read size of argument list");
     }
 
     wchar_t target_file[MAX_PATH + 1] = {0};
@@ -298,18 +281,15 @@ static void handleGenerateRunId(HANDLE pipe)
     HANDLE file = CreateFile(target_file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
     if (file == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "handleGenerateRunId: failed to open program.txt: %S (0x%x)", target_file, GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to open program.txt: %S", target_file);
     }
 
     if (!WriteFile(file, command_line, (DWORD) size, &txsize, NULL)) {
-        LOG_F(ERROR, "handleGenerateRunId: failed to write program name to program.txt (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to write program name to program.txt");
     }
 
     if (!CloseHandle(file)) {
-        LOG_F(ERROR, "handleGenerateRunId: failed to close program.txt (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to close program.txt");
     }
 
     memset(command_line, 0, SL2_ARGV_LEN * sizeof(wchar_t));
@@ -317,18 +297,15 @@ static void handleGenerateRunId(HANDLE pipe)
     // get program arguments
     size = 0;
     if (!ReadFile(pipe, &size, sizeof(size), &txsize, NULL)) {
-        LOG_F(ERROR, "handleGenerateRunId: failed to read program argument list length (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read program argument list length");
     }
 
     if ((size / sizeof(wchar_t)) > SL2_ARGV_LEN - 1) {
-        LOG_F(ERROR, "handleGenerateRunId: program argument list length > SL2_ARGV_LEN - 1");
-        exit(1);
+        SL2_SERVER_LOG_FATAL("program argument list length > SL2_ARGV_LEN - 1");
     }
 
     if (!ReadFile(pipe, command_line, (DWORD) size, &txsize, NULL)) {
-        LOG_F(ERROR, "handleGenerateRunId: failed to read program argument list (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read program argument list");
     }
 
     memset(target_file, 0, (MAX_PATH + 1) * sizeof(wchar_t));
@@ -336,63 +313,55 @@ static void handleGenerateRunId(HANDLE pipe)
     file = CreateFile(target_file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
     if (file == INVALID_HANDLE_VALUE) {
-        LOG_F(ERROR, "handleGenerateRunId: failed to open arguments.txt: %S (0x%x)", target_file, GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to open arguments.txt: %S", target_file);
     }
 
     if (!WriteFile(file, command_line, (DWORD) size, &txsize, NULL)) {
-        LOG_F(ERROR, "handleGenerateRunId: failed to write argument list to arguments.txt (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to write argument list to arguments.txt");
     }
 
     if (!CloseHandle(file)) {
-        LOG_F(ERROR, "handleGenerateRunId: failed to close arguments.txt (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to close arguments.txt");
     }
 
     RpcStringFree((RPC_WSTR *)&run_id_s);
 
-    LOG_F(INFO, "handleGenerateRunId: finished");
+    SL2_SERVER_LOG_INFO("finished");
 }
 
-static void handleRegisterMutation(HANDLE pipe)
+static void handle_register_mutation(HANDLE pipe)
 {
     DWORD txsize;
     UUID run_id;
     wchar_t *run_id_s;
 
-    LOG_F(INFO, "handleRegisterMutation: starting mutation registration");
+    SL2_SERVER_LOG_INFO("starting mutation registration");
 
     if (!ReadFile(pipe, &run_id, sizeof(run_id), &txsize, NULL)) {
-        LOG_F(ERROR, "handleRegisterMutation: failed to read run ID (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read run ID");
     }
 
     UuidToString(&run_id, (RPC_WSTR *)&run_id_s);
 
     uint32_t type = 0;
     if (!ReadFile(pipe, &type, sizeof(type), &txsize, NULL)) {
-        LOG_F(ERROR, "handleRegisterMutation: failed to read function type (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read function type");
     }
 
     uint32_t mutate_count = 0;
     wchar_t mutate_fname[MAX_PATH + 1] = {0};
     if (!ReadFile(pipe, &mutate_count, sizeof(mutate_count), &txsize, NULL)) {
-        LOG_F(ERROR, "handleRegisterMutation: failed to read mutation count (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read mutation count");
     }
     StringCchPrintfW(mutate_fname, MAX_PATH, FUZZ_RUN_FKT_FMT, mutate_count);
 
     size_t resource_size = 0;
     if (!ReadFile(pipe, &resource_size, sizeof(resource_size), &txsize, NULL)) {
-        LOG_F(ERROR, "handleRegisterMutation: failed to read size of mutation filepath (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read size of mutation filepath");
     }
 
     if (resource_size > MAX_PATH) {
-        LOG_F(ERROR, "handleRegisterMutation: resource_size > MAX_PATH", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("resource_size > MAX_PATH");
     }
 
     wchar_t resource_path[MAX_PATH + 1] = {0};
@@ -402,49 +371,45 @@ static void handleRegisterMutation(HANDLE pipe)
     // other, and failing to do either on one side causes a truncated read or write.
     if (resource_size > 0) {
         if (!ReadFile(pipe, &resource_path, (DWORD) resource_size, &txsize, NULL)) {
-            LOG_F(ERROR, "handleRegisterMutation: failed to read mutation filepath (0x%x)", GetLastError());
-            exit(1);
-        }
+            SL2_SERVER_LOG_FATAL("failed to read mutation filepath");
+            }
 
         resource_path[resource_size] = 0;
 
-        LOG_F(INFO, "handleRegisterMutation: mutation file path: %S", resource_path);
+        SL2_SERVER_LOG_INFO("mutation file path: %S", resource_path);
     }
     else {
-        LOG_F(WARNING, "handleRegisterMutation: the fuzzer didn't send us a file path!");
+        SL2_SERVER_LOG_WARN("the fuzzer didn't send us a file path!");
     }
 
     size_t position = 0;
     if (!ReadFile(pipe, &position, sizeof(position), &txsize, NULL)) {
-        LOG_F(ERROR, "handleRegisterMutation: failed to read mutation offset (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read mutation offset");
     }
 
     size_t size = 0;
     if (!ReadFile(pipe, &size, sizeof(size), &txsize, NULL)) {
-        LOG_F(ERROR, "handleRegisterMutation: failed to read size of mutation buffer (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read size of mutation buffer");
     }
 
     uint8_t *buf = (uint8_t *) malloc(size);
 
     if (buf == NULL) {
-        LOG_F(ERROR, "handleRegisterMutation: failed to allocate mutation buffer (size=%lu) (0x%x)", size, GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to allocate mutation buffer (size=%lu)", size);
     }
 
     if (!ReadFile(pipe, buf, (DWORD)size, &txsize, NULL)) {
-        LOG_F(ERROR, "handleRegisterMutation: failed to read mutation buffer from pipe (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read mutation buffer from pipe");
     }
 
     if (txsize < size) {
-        LOG_F(WARNING, "handleRegisterMutation: read fewer bytes than expected (%d < %lu)", txsize, size);
+        SL2_SERVER_LOG_WARN("read fewer bytes than expected (%d < %lu)", txsize, size);
         size = txsize;
     }
 
+    // TODO(ww): Do we need this?
     if (size < 0) {
-        LOG_F(WARNING, "handleRegisterMutation: got an unexpectedly small buffer (%lu < 0), skipping mutation");
+        SL2_SERVER_LOG_WARN("got an unexpectedly small buffer (%lu < 0), skipping mutation");
     }
 
     wchar_t run_dir[MAX_PATH + 1] = {0};
@@ -453,47 +418,43 @@ static void handleRegisterMutation(HANDLE pipe)
     PathCchCombine(run_dir, MAX_PATH, FUZZ_WORKING_PATH, run_id_s);
     PathCchCombine(target_file, MAX_PATH, run_dir, mutate_fname);
 
-    writeFKT(target_file, type, resource_size, resource_path, position, size, buf);
+    write_fkt(target_file, type, resource_size, resource_path, position, size, buf);
 
     RpcStringFree((RPC_WSTR *)&run_id_s);
 }
 
 /* Handles requests over the named pipe from the triage client for replays of mutated bytes */
-static void handleReplay(HANDLE pipe)
+static void handle_replay(HANDLE pipe)
 {
     DWORD txsize;
     UUID run_id;
     wchar_t *run_id_s;
 
     if (!ReadFile(pipe, &run_id, sizeof(run_id), &txsize, NULL)) {
-        LOG_F(ERROR, "handleReplay: failed to read run ID (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read run ID");
     }
 
     UuidToString(&run_id, (RPC_WSTR *)&run_id_s);
 
-    LOG_F(INFO, "Replaying for run id %S", run_id_s);
+    SL2_SERVER_LOG_INFO("Replaying for run id %S", run_id_s);
 
     uint32_t mutate_count = 0;
     wchar_t mutate_fname[MAX_PATH + 1] = {0};
     if (!ReadFile(pipe, &mutate_count, sizeof(mutate_count), &txsize, NULL)) {
-        LOG_F(ERROR, "handleReplay: failed to read mutate count (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read mutate count");
     }
 
     StringCchPrintfW(mutate_fname, MAX_PATH, FUZZ_RUN_FKT_FMT, mutate_count);
 
     size_t size = 0;
     if (!ReadFile(pipe, &size, sizeof(size), &txsize, NULL)) {
-        LOG_F(ERROR, "handleReplay: failed to read size of replay buffer (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read size of replay buffer");
     }
 
     uint8_t *buf = (uint8_t *) malloc(size);
 
     if (buf == NULL) {
-        LOG_F(ERROR, "handleReplay: failed to allocate replay buffer (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to allocate replay buffer");
     }
 
     wchar_t target_file[MAX_PATH + 1];
@@ -504,50 +465,45 @@ static void handleReplay(HANDLE pipe)
     DWORD attrs = GetFileAttributes(target_file);
 
     if (attrs == INVALID_FILE_ATTRIBUTES || (attrs & FILE_ATTRIBUTE_DIRECTORY)) {
-        LOG_F(ERROR, "handleReplay: missing FKT or is a directory: %S", target_file);
-        exit(1);
+        SL2_SERVER_LOG_FATAL("handle_replay: missing FKT or is a directory: %S", target_file);
     }
 
-    getBytesFKT(target_file, buf, size);
+    get_bytes_fkt(target_file, buf, size);
 
     if (!WriteFile(pipe, buf, (DWORD) size, &txsize, NULL)) {
-        LOG_F(ERROR, "handleReplay: failed to write replay buffer (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to write replay buffer");
     }
 
     RpcStringFree((RPC_WSTR *)&run_id_s);
 }
 
 /* Deletes the run files to free up a Run ID if the last run didn't find a crash */
-static void handleFinalizeRun(HANDLE pipe)
+static void handle_finalize_run(HANDLE pipe)
 {
     DWORD txsize;
     UUID run_id;
     wchar_t *run_id_s;
 
     if (!ReadFile(pipe, &run_id, sizeof(UUID), &txsize, NULL)) {
-        LOG_F(ERROR, "handleFinalizeRun: failed to read run ID (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read run ID");
     }
 
     UuidToString(&run_id, (RPC_WSTR *)&run_id_s);
 
     bool crash = false;
     if (!ReadFile(pipe, &crash, sizeof(bool), &txsize, NULL)) {
-        LOG_F(ERROR, "handleFinalizeRun: failed to read crash status (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read crash status");
     }
 
     bool preserve = false;
     if (!ReadFile(pipe, &preserve, sizeof(bool), &txsize, NULL)) {
-        LOG_F(ERROR, "handleFinalizeRun: failed to read preserve flag (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read preserve flag");
     }
 
-    LOG_F(INFO, "handleFinalizeRun: finalizing %S", run_id_s);
+    SL2_SERVER_LOG_INFO("finalizing %S", run_id_s);
 
     if (!crash && !preserve) {
-        LOG_F(INFO, "handleFinalizeRun: no crash, removing run %S", run_id_s);
+        SL2_SERVER_LOG_INFO("no crash, removing run %S", run_id_s);
         EnterCriticalSection(&run_lock);
 
         wchar_t run_dir[MAX_PATH + 1] = {0};
@@ -568,37 +524,34 @@ static void handleFinalizeRun(HANDLE pipe)
         LeaveCriticalSection(&run_lock);
     }
     else if (!crash && preserve) {
-        LOG_F(INFO, "handleFinalizeRun: no crash, but not removing files (requested)");
+        SL2_SERVER_LOG_INFO("no crash, but not removing files (requested)");
     }
     else {
-        LOG_F(INFO, "handleFinalizeRun: crash found for run %S", run_id_s);
+        SL2_SERVER_LOG_INFO("crash found for run %S", run_id_s);
     }
 
     RpcStringFree((RPC_WSTR *)&run_id_s);
 }
 
-static void handleGetArena(HANDLE pipe)
+static void handle_get_arena(HANDLE pipe)
 {
     DWORD txsize;
     size_t size = 0;
     sl2_arena arena = {0};
 
     if (!ReadFile(pipe, &size, sizeof(size), &txsize, NULL)) {
-        LOG_F(ERROR, "handleGetArena: failed to read arena ID size (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read arena ID size");
     }
 
     if (size != SL2_HASH_LEN * sizeof(wchar_t)) {
-        LOG_F(ERROR, "handleGetArena: wrong arena ID size %lu != %lu", size, SL2_HASH_LEN * sizeof(wchar_t));
-        exit(1);
+        SL2_SERVER_LOG_FATAL("wrong arena ID size %lu != %lu", size, SL2_HASH_LEN * sizeof(wchar_t));
     }
 
     if (!ReadFile(pipe, arena.id, (DWORD) size, &txsize, NULL)) {
-        LOG_F(ERROR, "handleGetArena: failed to read arena ID (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read arena ID");
     }
 
-    LOG_F(INFO, "handleGetArena: got arena ID: %S", arena.id);
+    SL2_SERVER_LOG_INFO("got arena ID: %S", arena.id);
 
     wchar_t arena_path[MAX_PATH + 1] = {0};
 
@@ -607,62 +560,58 @@ static void handleGetArena(HANDLE pipe)
     DWORD attrs = GetFileAttributes(arena_path);
 
     if (attrs == INVALID_FILE_ATTRIBUTES) {
-        LOG_F(INFO, "handleGetArena: no arena found, creating one");
+        SL2_SERVER_LOG_INFO("no arena found, creating one");
         dump_arena(arena_path, &arena);
     }
     else {
-        LOG_F(INFO, "handleGetArena: arena found, loading from disk");
+        SL2_SERVER_LOG_INFO("arena found, loading from disk");
         load_arena(arena_path, &arena);
     }
 
     if (!WriteFile(pipe, arena.map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
-        LOG_F(ERROR, "handleGetArena: failed to write arena (0x%x)", GetLastError());
+        SL2_SERVER_LOG_FATAL("failed to write arena");
     }
 }
 
-static void handleSetArena(HANDLE pipe)
+static void handle_set_arena(HANDLE pipe)
 {
     DWORD txsize;
     size_t size = 0;
     sl2_arena arena = {0};
 
     if (!ReadFile(pipe, &size, sizeof(size), &txsize, NULL)) {
-        LOG_F(ERROR, "handleSetArena: failed to read arena ID size (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read arena ID size");
     }
 
     if (size != SL2_HASH_LEN * sizeof(wchar_t)) {
-        LOG_F(ERROR, "handleSetArena: wrong arena ID size %lu != %lu", size, SL2_HASH_LEN * sizeof(wchar_t));
-        exit(1);
+        SL2_SERVER_LOG_FATAL("wrong arena ID size %lu != %lu", size, SL2_HASH_LEN * sizeof(wchar_t));
     }
 
     if (!ReadFile(pipe, arena.id, (DWORD) size, &txsize, NULL)) {
-        LOG_F(ERROR, "handleSetArena: failed to read arena ID (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read arena ID");
     }
 
-    LOG_F(INFO, "handleSetArena: got arena ID: %S", arena.id);
+    SL2_SERVER_LOG_INFO("got arena ID: %S", arena.id);
 
     wchar_t arena_path[MAX_PATH + 1] = {0};
 
     PathCchCombine(arena_path, MAX_PATH, FUZZ_ARENAS_PATH, arena.id);
 
     if (!ReadFile(pipe, arena.map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
-        LOG_F(ERROR, "handleSetArena: failed to read arena (0x%x)", GetLastError());
+        SL2_SERVER_LOG_FATAL("failed to read arena");
     }
 
     dump_arena(arena_path, &arena);
 }
 
-static void handleCrashPaths(HANDLE pipe)
+static void handle_crash_paths(HANDLE pipe)
 {
     DWORD txsize;
     UUID run_id;
     wchar_t *run_id_s;
 
     if (!ReadFile(pipe, &run_id, sizeof(UUID), &txsize, NULL)) {
-        LOG_F(ERROR, "handleMiniDumpPath: failed to read UUID (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to read UUID");
     }
 
     UuidToString(&run_id, (RPC_WSTR *)&run_id_s);
@@ -676,13 +625,11 @@ static void handleCrashPaths(HANDLE pipe)
     size_t size = lstrlen(target_file) * sizeof(wchar_t);
 
     if (!WriteFile(pipe, &size, sizeof(size), &txsize, NULL)) {
-        LOG_F(ERROR, "handleCrashPaths: failed to write length of crash.json to pipe (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to write length of crash.json to pipe");
     }
 
     if (!WriteFile(pipe, &target_file, (DWORD)size, &txsize, NULL)) {
-        LOG_F(ERROR, "handleCrashPath: failed to write crash.json path to pipe (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to write crash.json path to pipe");
     }
 
     memset(target_file, 0, (MAX_PATH + 1) * sizeof(wchar_t));
@@ -691,13 +638,11 @@ static void handleCrashPaths(HANDLE pipe)
     size = lstrlen(target_file) * sizeof(wchar_t);
 
     if (!WriteFile(pipe, &size, sizeof(size), &txsize, NULL)) {
-        LOG_F(ERROR, "handleCrashPath: failed to write length of mem.dmp path to pipe (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to write length of mem.dmp path to pipe");
     }
 
     if (!WriteFile(pipe, &target_file, (DWORD)size, &txsize, NULL)) {
-        LOG_F(ERROR, "handleCrashPath: failed to write mem.dmp path to pipe (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to write mem.dmp path to pipe");
     }
 
     memset(target_file, 0, (MAX_PATH + 1) * sizeof(wchar_t));
@@ -706,58 +651,52 @@ static void handleCrashPaths(HANDLE pipe)
     size = lstrlen(target_file) * sizeof(wchar_t);
 
     if (!WriteFile(pipe, &size, sizeof(size), &txsize, NULL)) {
-        LOG_F(ERROR, "handleCrashPath: failed to write length of initial.dmp path to pipe (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to write length of initial.dmp path to pipe");
     }
 
     if (!WriteFile(pipe, &target_file, (DWORD)size, &txsize, NULL)) {
-        LOG_F(ERROR, "handleCrashPath: failed to write initial.dmp path to pipe (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to write initial.dmp path to pipe");
     }
 
     RpcStringFree((RPC_WSTR *)&run_id_s);
 }
 
-static void handlePing(HANDLE pipe)
+static void handle_ping(HANDLE pipe)
 {
     DWORD txsize;
     uint8_t ok = 1;
 
-    LOG_F(INFO, "handlePing: ponging the client");
+    SL2_SERVER_LOG_INFO("ponging the client");
 
     if (!WriteFile(pipe, &ok, sizeof(ok), &txsize, NULL)) {
-        LOG_F(ERROR, "handleCrashPath: failed to write pong status to pipe (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to write pong status to pipe");
     }
 }
 
 static void destroy_pipe(HANDLE pipe)
 {
     if (!FlushFileBuffers(pipe)) {
-        LOG_F(ERROR, "threadHandler: failed to flush pipe (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to flush pipe");
     }
 
     if (!DisconnectNamedPipe(pipe)) {
-        LOG_F(ERROR, "threadHandler: failed to disconnect pipe (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to disconnect pipe");
     }
 
     if (!CloseHandle(pipe)) {
-        LOG_F(ERROR, "threadHandler: failed to close pipe (0x%x)", GetLastError());
-        exit(1);
+        SL2_SERVER_LOG_FATAL("failed to close pipe");
     }
 }
 
 /* Handles incoming connections from clients */
-static DWORD WINAPI threadHandler(void *lpvPipe)
+static DWORD WINAPI thread_handler(void *data)
 {
-    HANDLE pipe = (HANDLE)lpvPipe;
+    HANDLE pipe = (HANDLE) data;
     DWORD txsize;
     uint8_t event;
 
     // NOTE(ww): This is a second event loop, inside of the infinite event loop that
-    // creates each thread and calls threadHandler. We do this so that clients can
+    // creates each thread and calls thread_handler. We do this so that clients can
     // re-use their pipe instances to send multiple events -- with only the top-level
     // loop, each connection would be discarded after a single event.
     //
@@ -767,23 +706,22 @@ static DWORD WINAPI threadHandler(void *lpvPipe)
     do {
         event = EVT_INVALID;
 
-        LOG_F(INFO, "threadHandler: waiting for the next event!");
+        SL2_SERVER_LOG_INFO("waiting for the next event!");
 
         if (!ReadFile(pipe, &event, sizeof(event), &txsize, NULL)) {
             if (GetLastError() != ERROR_BROKEN_PIPE) {
-                LOG_F(ERROR, "threadHandler: failed to read event (0x%x)", GetLastError());
-                exit(1);
+                SL2_SERVER_LOG_FATAL("failed to read event");
             }
             else {
                 // Pipe was broken when we tried to read it. Happens when the python client
                 // checks if it exists.
-                LOG_F(ERROR, "threadHandler: broken pipe! ending session on event=%d", event);
+                SL2_SERVER_LOG_ERROR("broken pipe! ending session on event=%d", event);
                 destroy_pipe(pipe);
                 return 0;
             }
         }
 
-        LOG_F(INFO, "threadHandler: got event ID: %d", event);
+        SL2_SERVER_LOG_INFO("got event ID: %d", event);
 
         // Dispatch individual requests based on which event the client requested
         // TODO(ww): Construct a sl2_conn here, and pass it to each event handler.
@@ -791,56 +729,56 @@ static DWORD WINAPI threadHandler(void *lpvPipe)
         // in sl2_server_api.cpp to deduplicate some of the transaction code.
         switch (event) {
             case EVT_RUN_ID:
-                handleGenerateRunId(pipe);
+                handle_generate_run_id(pipe);
                 break;
             case EVT_REGISTER_MUTATION:
-                handleRegisterMutation(pipe);
+                handle_register_mutation(pipe);
                 break;
             case EVT_CRASH_PATHS:
-                handleCrashPaths(pipe);
+                handle_crash_paths(pipe);
                 break;
             case EVT_REPLAY:
-                handleReplay(pipe);
+                handle_replay(pipe);
                 break;
             case EVT_RUN_COMPLETE:
-                handleFinalizeRun(pipe);
+                handle_finalize_run(pipe);
                 break;
             case EVT_GET_ARENA:
-                handleGetArena(pipe);
+                handle_get_arena(pipe);
                 break;
             case EVT_SET_ARENA:
-                handleSetArena(pipe);
+                handle_set_arena(pipe);
                 break;
             case EVT_PING:
-                handlePing(pipe);
+                handle_ping(pipe);
                 break;
             case EVT_SESSION_TEARDOWN:
-                LOG_F(INFO, "threadHandler: ending a client's session with the server.");
+                SL2_SERVER_LOG_INFO("ending a client's session with the server.");
                 break;
             case EVT_MUTATION:
             case EVT_RUN_INFO:
             case EVT_CRASH_PATH:
             case EVT_MEM_DMP_PATH:
-                LOG_F(WARNING, "threadHandler: deprecated event requested.");
+                SL2_SERVER_LOG_ERROR("deprecated event requested.");
                 event = EVT_INVALID;
                 break;
             default:
-                LOG_F(ERROR, "threadHandler: unknown or invalid event %d", event);
+                SL2_SERVER_LOG_ERROR("unknown or invalid event %d", event);
                 break;
         }
     } while (event != EVT_SESSION_TEARDOWN && event != EVT_INVALID);
 
-    LOG_F(INFO, "threadHandler: closing pipe after event=%d", event);
+    SL2_SERVER_LOG_INFO("closing pipe after event=%d", event);
     destroy_pipe(pipe);
 
     return 0;
 }
 
 // Init dirs and create a new thread to handle input from the named pipe
-int main(int mArgc, char **mArgv)
+int main(int argvc, char **argv)
 {
     init_logging_path();
-    loguru::init(mArgc, mArgv);
+    loguru::init(argvc, argv);
     char log_path_mbs[MAX_PATH + 1]= {0};
     wcstombs_s(NULL, log_path_mbs, MAX_PATH, FUZZ_LOG, MAX_PATH);
     loguru::add_file(log_path_mbs, loguru::Append, loguru::Verbosity_MAX);
@@ -849,7 +787,7 @@ int main(int mArgc, char **mArgv)
 
     init_working_paths();
 
-    LOG_F(INFO, "main: server started!");
+    SL2_SERVER_LOG_INFO("server started!");
 
     lock_process();
 
@@ -868,8 +806,7 @@ int main(int mArgc, char **mArgv)
         );
 
         if (pipe == INVALID_HANDLE_VALUE) {
-            LOG_F(ERROR, "main: could not create pipe");
-            return 1;
+            SL2_SERVER_LOG_FATAL("could not create pipe");
         }
 
         bool connected = ConnectNamedPipe(pipe, NULL) ?
@@ -879,22 +816,21 @@ int main(int mArgc, char **mArgv)
             HANDLE thread = CreateThread(
                 NULL,
                 0,
-                threadHandler,
+                thread_handler,
                 (void *) pipe,
                 0,
                 NULL);
 
             if (thread == NULL)
             {
-                LOG_F(ERROR, "main: CreateThread failed (0x%x)\n", GetLastError());
-                return -1;
+                SL2_SERVER_LOG_FATAL("CreateThread failed\n");
             }
             else {
                 CloseHandle(thread);
             }
         }
         else {
-            LOG_F(ERROR, "main: could not connect to pipe");
+            SL2_SERVER_LOG_ERROR("could not connect to pipe");
             CloseHandle(pipe);
         }
     }
