@@ -90,8 +90,8 @@ def run_dr(config_dict, verbose=False, timeout=None):
             print_l("Process Timed Out after %s seconds" % (time.time() - started))
 
         # Parse PID of target application and kill it, which causes drrun to exit
-        with open(pidfile, 'r') as pidfile:
-            pid = pidfile.read().strip()
+        with open(pidfile, 'r') as pidfile_contents:
+            pid = pidfile_contents.read().strip()
             if verbose:
                 print_l("Killing child process:", pid)
             try:
