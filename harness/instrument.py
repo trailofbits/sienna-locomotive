@@ -54,8 +54,7 @@ def ps_run(command):
     """
     Runs the given command in a new PowerShell session.
     """
-    subprocess.Popen(["powershell", "start", "powershell",
-                      "{-NoExit", "-Command", "\"{}\"}}".format(command)])
+    subprocess.Popen(["powershell", "start", "powershell", "{-NoExit", "-Command", "\"{}\"}}".format(command)])
 
 
 def start_server():
@@ -130,10 +129,7 @@ def run_dr(config_dict, verbose=False, timeout=None):
 
             # Fix types again (expects bytes)
             popen_obj.stdout = "ERROR".encode('utf-8')
-            popen_obj.stderr = json.dumps(
-                {
-                    "exception": "EXCEPTION_SL2_TIMEOUT"
-                }).encode('utf-8')
+            popen_obj.stderr = json.dumps({"exception": "EXCEPTION_SL2_TIMEOUT"}).encode('utf-8')
 
         popen_obj.timed_out = True
     finally:
