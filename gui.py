@@ -333,8 +333,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self.pause_all_threads()
 
         print(crash)
-        triager = Triager(crash['crash_file'])
-        self.triage_output.append(str(triager))
+        if crash:
+            triager = Triager(crash['crash_file'])
+            self.triage_output.append(str(triager))
         self.triage_output.append(formatted)
         self.crashes.append(crash)
 
