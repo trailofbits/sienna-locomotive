@@ -150,10 +150,10 @@ on_dr_exit(void)
     SL2_DR_DEBUG("Dynamorio exiting (fuzzer)\n");
 
     if (crashed) {
-        wchar_t run_id_s[SL2_UUID_SIZE];
-        sl2_uuid_to_wstring(sl2_conn.run_id, run_id_s);
-        SL2_DR_DEBUG("<crash found for run id %S>\n", run_id_s);
-        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#on_dr_exit: Crash found for run id %S!", run_id_s);
+        char run_id_s[SL2_UUID_SIZE];
+        sl2_uuid_to_string(sl2_conn.run_id, run_id_s);
+        SL2_DR_DEBUG("<crash found for run id %s>\n", run_id_s);
+        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#on_dr_exit: Crash found for run id %s!", run_id_s);
 
         sl2_crash_paths crash_paths = {0};
         sl2_conn_request_crash_paths(&sl2_conn, &crash_paths);
