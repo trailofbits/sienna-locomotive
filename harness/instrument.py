@@ -194,7 +194,7 @@ def fuzzer_run(config_dict):
                 print_l("[!] Not UTF-8:", repr(line))
 
     if not run_id:
-        print_l("Error: No run ID could be parsed from the server output")
+        print_l("Error: No run ID could be parsed from the server output. Did it crash?")
         return False, -1
 
     if crashed:

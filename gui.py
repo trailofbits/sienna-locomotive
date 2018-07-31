@@ -276,6 +276,7 @@ class MainWindow(QtWidgets.QMainWindow):
         fuzzer_thread.runComplete.connect(self.calculate_throughput)
         fuzzer_thread.runComplete.connect(self.check_for_completion)
         fuzzer_thread.foundCrash.connect(self.handle_new_crash)
+        fuzzer_thread.server_crashed.connect(self.handle_server_crash)
 
         self.continuous_mode_cbox.stateChanged.connect(fuzzer_thread.continuous_state_changed)
         self.pause_mode_cbox.stateChanged.connect(fuzzer_thread.pause_state_changed)
@@ -298,6 +299,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.crashes.append(crash)
         if not thread.should_fuzz:
             self.pause_all_threads()
+
+    def handle_server_crash(self):
+        self.pause_all_threads()
+        self.server_thread.start()
 
     def build_func_tree(self):
         """ Build the function target display tree """

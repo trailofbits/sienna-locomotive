@@ -26,6 +26,7 @@ class FuzzerThread(QThread):
     foundCrash = pyqtSignal(QThread, str, object)
     runComplete = pyqtSignal()
     paused = pyqtSignal()
+    server_crashed = pyqtSignal()
 
     def __init__(self, config_dict, target_file):
         QThread.__init__(self)
@@ -58,6 +59,10 @@ class FuzzerThread(QThread):
                 self.foundCrash.emit(self, formatted, raw)
 
             if not self.config_dict['continuous']:
+                self.pause()
+
+            if run_id == -1:
+                self.server_crashed.emit()
                 self.pause()
             self.runComplete.emit()
 
