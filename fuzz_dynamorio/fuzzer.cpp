@@ -235,14 +235,14 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
         SL2_DR_DEBUG("mutate: resource: %S\n", resource);
     }
 
-    sl2_mutation mutation;
-
-    mutation.function = static_cast<uint32_t>(function);
-    mutation.mut_count = mut_count++;
-    mutation.resource = resource;
-    mutation.position = position;
-    mutation.bufsize = bufsize;
-    mutation.buffer = (uint8_t *) buffer;
+    sl2_mutation mutation = {
+        (uint32_t) function,
+        mut_count++,
+        resource,
+        position,
+        bufsize,
+        (uint8_t *) buffer,
+    };
 
     if (coverage_guided) {
         // sl2_mutation_advice advice;
