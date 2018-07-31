@@ -185,6 +185,8 @@ static void get_bytes_fkt(wchar_t *target_file, uint8_t *buf, size_t size)
 
 static void dump_arena(wchar_t *arena_path, sl2_arena *arena)
 {
+    EnterCriticalSection(&run_lock);
+
     DWORD txsize;
     HANDLE file = CreateFile(
         arena_path,
@@ -207,10 +209,14 @@ static void dump_arena(wchar_t *arena_path, sl2_arena *arena)
     }
 
     CloseHandle(file);
+
+    LeaveCriticalSection(&run_lock);
 }
 
 static void load_arena(wchar_t *arena_path, sl2_arena *arena)
 {
+    EnterCriticalSection(&run_lock);
+
     DWORD txsize;
     HANDLE file = CreateFile(
         arena_path,
@@ -233,6 +239,8 @@ static void load_arena(wchar_t *arena_path, sl2_arena *arena)
     }
 
     CloseHandle(file);
+
+    LeaveCriticalSection(&run_lock);
 }
 
 /* Generates a new run UUID, writes relevant run metadata files into the corresponding run metadata dir
