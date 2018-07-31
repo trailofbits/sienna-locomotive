@@ -39,6 +39,7 @@ class Triager:
                 self.json['crashAddress'],
                 self.json['stackPointer'] )
 
+
 class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self):
@@ -358,9 +359,11 @@ class MainWindow(QtWidgets.QMainWindow):
         for index, option in enumerate(self.target_data):
             funcname_widget = CheckboxTreeWidgetItem(self._func_tree, index, "{func_name}".format(**option))
             filename_widget = QStandardItem(option.get('source', None))
+            filename_widget.setEditable(False)
             offset_widget = QStandardItem("0x{:x} - 0x{:x}".format(option['start'], option['end'])
                                           if ('end' in option and 'start' in option)
                                           else None)
+            offset_widget.setEditable(False)
             funcname_widget.setCheckState(Qt.Checked if option["selected"] else Qt.Unchecked)
             funcname_widget.setColumnCount(3)
 
@@ -374,16 +377,25 @@ class MainWindow(QtWidgets.QMainWindow):
             addr = QStandardItem('\n'.join(add))
             hexstr = QStandardItem('\n'.join(hx))
             asciistr = QStandardItem('\n'.join(asc))
+            addr.setEditable(False)
+            hexstr.setEditable(False)
+            asciistr.setEditable(False)
             addr.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
             hexstr.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
             asciistr.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
             funcname_widget.appendRow([addr, hexstr, asciistr])
 
+
+            idxwidget = QStandardItem(str(index))
+            idxwidget.setEditable(False)
+            modwidget = QStandardItem(str(option.get('called_from', None)))
+            modwidget.setEditable(False)
+
             self.model.appendRow([funcname_widget,
                                   filename_widget,
                                   offset_widget,
-                                  QStandardItem(str(index)),
-                                  QStandardItem(str(option.get('called_from', None)))])
+                                  idxwidget,
+                                  modwidget])
 
         self._func_tree.expandAll()
         self._func_tree.resizeColumnToContents(0)
