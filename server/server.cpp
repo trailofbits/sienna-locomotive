@@ -372,7 +372,7 @@ static void handle_register_mutation(HANDLE pipe)
     if (resource_size > 0) {
         if (!ReadFile(pipe, &resource_path, (DWORD) resource_size, &txsize, NULL)) {
             SL2_SERVER_LOG_FATAL("failed to read mutation filepath");
-            }
+        }
 
         resource_path[resource_size] = 0;
 
