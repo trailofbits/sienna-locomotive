@@ -1,16 +1,13 @@
-from PyQt5.QtCore import QThread, pyqtSignal, Qt
+from PySide2.QtCore import QThread, Signal, Qt
 from .instrument import wizard_run, fuzzer_run, triage_run, start_server
 
 
 class WizardThread(QThread):
-    resultReady = pyqtSignal(list)
+    resultReady = Signal(list)
 
     def __init__(self, config_dict):
         QThread.__init__(self)
         self.config_dict = config_dict
-
-    def __del__(self):
-        self.wait()
 
     def run(self):
         self.resultReady.emit(wizard_run(self.config_dict))
@@ -23,10 +20,10 @@ class ServerThread(QThread):
 
 
 class FuzzerThread(QThread):
-    foundCrash = pyqtSignal(QThread, str, object)
-    runComplete = pyqtSignal()
-    paused = pyqtSignal()
-    server_crashed = pyqtSignal()
+    foundCrash = Signal(QThread, str, object)
+    runComplete = Signal()
+    paused = Signal()
+    server_crashed = Signal()
 
     def __init__(self, config_dict, target_file):
         QThread.__init__(self)
@@ -39,7 +36,6 @@ class FuzzerThread(QThread):
 
     def __del__(self):
         self.should_fuzz = False
-        self.wait()
 
     def pause(self):
         self.should_fuzz = False

@@ -4,10 +4,10 @@ from multiprocessing import cpu_count
 import os
 import json
 
-from PyQt5.QtWidgets import QFileDialog, QMenu, QAction
-from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt, QSize, QModelIndex
-from PyQt5.QtGui import QFontDatabase, QMovie, QStandardItem
+from PySide2.QtWidgets import QFileDialog, QMenu, QAction
+from PySide2 import QtWidgets
+from PySide2.QtCore import Qt, QSize, QModelIndex
+from PySide2.QtGui import QFontDatabase, QMovie, QStandardItem
 
 from gui.checkbox_tree import CheckboxTreeWidget, CheckboxTreeWidgetItem, CheckboxTreeModel, CheckboxTreeSortFilterProxyModel
 from gui.QtHelpers import QIntVariable, QFloatVariable, QTextAdapter
@@ -453,12 +453,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
-
-    try:
-        import qdarkstyle
-        app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
-    except ImportError:
-        pass
 
     mainWin = MainWindow()
     mainWin.show()

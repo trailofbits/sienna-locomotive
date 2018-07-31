@@ -1,6 +1,6 @@
-from PyQt5.QtWidgets import QTreeView
-from PyQt5.QtGui import QStandardItem, QStandardItemModel
-from PyQt5.QtCore import pyqtSignal, Qt, QSortFilterProxyModel
+from PySide2.QtWidgets import QTreeView
+from PySide2.QtGui import QStandardItem, QStandardItemModel
+from PySide2.QtCore import Signal, Qt, QSortFilterProxyModel
 
 
 class CheckboxTreeWidgetItem(QStandardItem):
@@ -32,7 +32,7 @@ class CheckboxTreeModel(QStandardItemModel):
 
 class CheckboxTreeWidget(QTreeView):
 
-    itemCheckedStateChanged = pyqtSignal(CheckboxTreeWidgetItem, bool)
+    itemCheckedStateChanged = Signal(CheckboxTreeWidgetItem, bool)
 
     def __init__(self, *args):
         super().__init__(*args)
