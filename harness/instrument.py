@@ -95,7 +95,7 @@ def run_dr(config_dict, verbose=False, timeout=None):
                 print_l("Killing child process:", pid)
             try:
                 os.kill(int(pid), signal.SIGTERM)
-            except PermissionError:
+            except (PermissionError, OSError):
                 print_l("WARNING: Couldn't kill child process")
 
         # Try to get the output again
