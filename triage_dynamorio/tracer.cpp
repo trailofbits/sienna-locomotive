@@ -1099,12 +1099,16 @@ on_exception(void *drcontext, dr_exception_t *excpt)
 
 void wrap_pre_IsProcessorFeaturePresent(void *wrapcxt, OUT void **user_data)
 {
+    #pragma warning(suppress: 4311 4302)
     DWORD feature = (DWORD) drwrap_get_arg(wrapcxt, 0);
+
+    #pragma warning(suppress: 4312)
     *user_data = (void *) feature;
 }
 
 void wrap_post_IsProcessorFeaturePresent(void *wrapcxt, void *user_data)
 {
+    #pragma warning(suppress: 4311 4302)
     DWORD feature = (DWORD) user_data;
 
     if (feature == PF_FASTFAIL_AVAILABLE) {
@@ -1154,9 +1158,12 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
 {
     SL2_DR_DEBUG("<in wrap_pre_ReadEventLog>\n");
     HANDLE hEventLog                 = (HANDLE)drwrap_get_arg(wrapcxt, 0);
+    #pragma warning(suppress: 4311 4302)
     DWORD  dwReadFlags               = (DWORD)drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
     DWORD  dwRecordOffset            = (DWORD)drwrap_get_arg(wrapcxt, 2);
     void   *lpBuffer                 = (void *)drwrap_get_arg(wrapcxt, 3);
+    #pragma warning(suppress: 4311 4302)
     DWORD  nNumberOfBytesToRead      = (DWORD)drwrap_get_arg(wrapcxt, 4);
     DWORD  *pnBytesRead              = (DWORD *)drwrap_get_arg(wrapcxt, 5);
     DWORD  *pnMinNumberOfBytesNeeded = (DWORD *)drwrap_get_arg(wrapcxt, 6);
@@ -1203,8 +1210,10 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
     SL2_DR_DEBUG("<in wrap_pre_WinHttpWebSocketReceive>\n");
     HINTERNET hRequest                          = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     void *pvBuffer                              = drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
     DWORD dwBufferLength                        = (DWORD)drwrap_get_arg(wrapcxt, 2);
     DWORD *pdwBytesRead                         = (DWORD *)drwrap_get_arg(wrapcxt, 3);
+    #pragma warning(suppress: 4311 4302)
     WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE)(int)drwrap_get_arg(wrapcxt, 3);
 
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
@@ -1223,6 +1232,7 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
     SL2_DR_DEBUG("<in wrap_pre_InternetReadFile>\n");
     HINTERNET hFile             = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     void *lpBuffer              = drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
     DWORD *lpNumberOfBytesRead  = (DWORD*)drwrap_get_arg(wrapcxt, 3);
 
@@ -1242,6 +1252,7 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
     SL2_DR_DEBUG("<in wrap_pre_WinHttpReadData>\n");
     HINTERNET hRequest          = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     void *lpBuffer              = drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
     DWORD *lpNumberOfBytesRead  = (DWORD*)drwrap_get_arg(wrapcxt, 3);
 
@@ -1261,7 +1272,9 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data)
     SL2_DR_DEBUG("<in wrap_pre_recv>\n");
     SOCKET s  = (SOCKET)drwrap_get_arg(wrapcxt, 0);
     char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
     int len   = (int)drwrap_get_arg(wrapcxt, 2);
+    #pragma warning(suppress: 4311 4302)
     int flags = (int)drwrap_get_arg(wrapcxt, 3);
 
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
@@ -1280,6 +1293,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     SL2_DR_DEBUG("<in wrap_pre_ReadFile>\n");
     HANDLE hFile                = drwrap_get_arg(wrapcxt, 0);
     void *lpBuffer              = drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
     DWORD *lpNumberOfBytesRead  = (DWORD*)drwrap_get_arg(wrapcxt, 3);
 
@@ -1316,7 +1330,9 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
 {
     SL2_DR_DEBUG("<in wrap_pre_fread_s>\n");
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
+    #pragma warning(suppress: 4311 4302)
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 2);
+    #pragma warning(suppress: 4311 4302)
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 3);
 
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
@@ -1334,7 +1350,9 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data)
 {
     SL2_DR_DEBUG("<in wrap_pre_fread>\n");
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
+    #pragma warning(suppress: 4311 4302)
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
 
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
