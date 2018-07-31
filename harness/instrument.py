@@ -125,6 +125,10 @@ def run_dr(config_dict, verbose=False, timeout=None):
 
 
 def triager_run(run_id):
+    """
+    Runs the (breakpad-based) triager on the minidmp generated
+    by a fuzzing run.
+    """
     dmpfile = get_path_to_run_file(run_id, "initial.dmp")
     if os.path.isfile(dmpfile):
         cmd = [r'.\build\triage\Debug\triager.exe', dmpfile]
@@ -137,15 +141,22 @@ def triager_run(run_id):
 
 
 def wizard_run(config_dict):
-    """ Runs the wizard and lets the user select a target function """
-    completed_process = run_dr({'drrun_path': config_dict['drrun_path'],
-                                'drrun_args': config_dict['drrun_args'],
-                                'client_path': config_dict['wizard_path'],
-                                'client_args': [],
-                                'target_application_path': config_dict['target_application_path'],
-                                'target_args': config_dict['target_args'],
-                                'inline_stdout': config_dict['inline_stdout']},
-                               verbose=config_dict['verbose'])
+    """
+    Runs the wizard and lets the user select a target function.
+    """
+    completed_process = run_dr(
+        {
+            'drrun_path': config_dict['drrun_path'],
+            'drrun_args': config_dict['drrun_args'],
+            'client_path': config_dict['wizard_path'],
+            'client_args': [],
+            'target_application_path': config_dict['target_application_path'],
+            'target_args': config_dict['target_args'],
+            'inline_stdout': config_dict['inline_stdout']
+        },
+        verbose=config_dict['verbose']
+    )
+
     wizard_findings = []
     mem_map = {}
     base_addr = None
@@ -181,7 +192,11 @@ def wizard_run(config_dict):
 
 def fuzzer_run(config_dict):
     """ Runs the fuzzer """
-    completed_process = run_dr(config_dict, verbose=config_dict['verbose'], timeout=config_dict.get('fuzz_timeout', None))
+    completed_process = run_dr(
+        config_dict,
+        verbose=config_dict['verbose'],
+        timeout=config_dict.get('fuzz_timeout', None)
+    )
 
     # Parse run ID from fuzzer output
     run_id = None
@@ -206,7 +221,8 @@ def fuzzer_run(config_dict):
         return False, -1
 
     if crashed:
-        print_l('Fuzzing run %s returned %s after raising %s' % (run_id, completed_process.returncode, exception))
+        print_l('Fuzzing run %s returned %s after raising %s'
+                % (run_id, completed_process.returncode, exception))
         # Write stdout and stderr to files
         # TODO fix issue #40
         write_output_files(completed_process, run_id, 'fuzz')
@@ -222,15 +238,19 @@ def fuzzer_run(config_dict):
 
 def triage_run(config_dict, run_id):
     """ Runs the triaging tool """
-    completed_process = run_dr({'drrun_path': config_dict['drrun_path'],
-                                'drrun_args': config_dict['drrun_args'],
-                                'client_path': config_dict['triage_path'],
-                                'client_args': config_dict['client_args'] + ['-r', str(run_id)],
-                                'target_application_path': config_dict['target_application_path'],
-                                'target_args': config_dict['target_args'],
-                                'inline_stdout': config_dict['inline_stdout']},
-                               config_dict['verbose'],
-                               config_dict.get('triage_timeout', None))
+    completed_process = run_dr(
+        {
+            'drrun_path': config_dict['drrun_path'],
+            'drrun_args': config_dict['drrun_args'],
+            'client_path': config_dict['triage_path'],
+            'client_args': [*config_dict['client_args'], '-r', str(run_id)],
+            'target_application_path': config_dict['target_application_path'],
+            'target_args': config_dict['target_args'],
+            'inline_stdout': config_dict['inline_stdout']
+        },
+        config_dict['verbose'],
+        config_dict.get('triage_timeout', None)
+    )
 
     # Write stdout and stderr to files
     write_output_files(completed_process, run_id, 'triage')
@@ -241,7 +261,10 @@ def triage_run(config_dict, run_id):
 
 
 def fuzz_and_triage(config_dict):
-    """ Runs the fuzzer (in a loop if continuous is true), then runs the triage tool if a crash is found """
+    """
+    Runs the fuzzer (in a loop if continuous is true), then runs the triage
+    tools (DR and breakpad) if a crash is found.
+    """
     global can_fuzz
     # TODO: Move try/except so we can start new runs after an exception
     try:
@@ -252,7 +275,8 @@ def fuzz_and_triage(config_dict):
                 print_l(formatted)
 
                 if config_dict['exit_early']:
-                    can_fuzz = False  # Prevent other threads from starting new fuzzing runs
+                    # Prevent other threads from starting new fuzzing runs
+                    can_fuzz = False
 
             if not config_dict['continuous']:
                 return
