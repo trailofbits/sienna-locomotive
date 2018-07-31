@@ -30,10 +30,18 @@ class Triager:
     
 
     def __repr__(self):
-        return """Exploitability: %s
-Exception: %s
-Tag: %s
-        """ % (self.json['exploitability'], self.json['crashReason'], self.json['tag'])
+        prevaddy = 0
+        try: 
+            prevaddy = self.json['callStack'][0]
+        except IndexError:
+            pass
+
+        return "%s exploitability, %s at pc 0x%x -> 0x%x, memory address 0x%x." % (
+                self.json['exploitability'],  
+                self.json['crashReason'], 
+                prevaddy, 
+                self.json['instructionPointer'], 
+                self.json['crashAddress'] )
 
 class MainWindow(QtWidgets.QMainWindow):
 
@@ -324,8 +332,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def handle_new_crash(self, formatted, crash):
         triager = Triager( crash['crash_file'] )
-        self.triage_output.append(formatted)
         self.triage_output.append(str(triager))
+        self.triage_output.append(formatted)        
         self.crashes.append(crash)
 
     def save_crashes(self):
