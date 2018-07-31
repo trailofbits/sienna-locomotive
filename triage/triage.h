@@ -45,10 +45,12 @@ public:
     const string                exploitability()            const;
     const string                minidumpPath()              const;
     const string                ranksString()               const;
-    const string                triageTag()                 const;
     const string                stackHash()                 const;
-    const vector<uint64_t>      callStack()                 const;
+    const string                triageTag()                 const;
     const uint64_t              crashAddress()              const;
+    const uint64_t              instructionPointer()        const;
+    const uint64_t              stackPointer()              const;
+    const vector<uint64_t>      callStack()                 const;
     friend ostream&             operator<< (ostream& os, Triage& self);
     int                         signalType();
     json                        toJson()                    const;
@@ -65,8 +67,6 @@ private:
     SimpleSymbolSupplier            symbolSupplier_;
     const string                    minidumpPath_;
     fs::path                        dirPath_;
-    uint64_t                        instructionPtr_;
-    uint64_t                        stackPtr_;
     unique_ptr<XploitabilityTracer> tracer_;
     vector<XploitabilityResult>     results_;
 

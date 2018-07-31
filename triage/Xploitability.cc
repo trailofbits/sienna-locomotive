@@ -42,6 +42,32 @@ ostream& operator<<( ostream& os, const XploitabilityResult& result ) {
     return os << result.rank;
 }
 
+
+string Xploitability::str() const {
+    ostringstream oss;
+    oss << this;
+    return oss.str();
+}
+
+
+static string polybase( uint64_t addr ) {
+    ostringstream oss;
+    oss << "0x" << hex << addr;    
+    oss << " (" << dec << ")" << addr;
+    return oss.str();
+}
+
+ostream& operator<<( ostream& os, Xploitability& self ) {
+    const MDRawContextAMD64* ctx = self.context_->GetContextAMD64();
+    os << "ip           : " <<polybase( self.instructionPointer() ) << endl;
+    os << "stackPtr     : " <<polybase( self.stackPointer() ) << endl;
+    os << "rip          : " <<polybase( ctx->rip ) << endl;
+    os << "rsp          : " <<polybase( ctx->rsp ) << endl;    
+    os << "crash_address: " <<polybase( self.process_state_->crash_address() ) << endl;
+    return os;
+}
+
+
 ////////////////////////////////////////////////////////////////////////////
 // Xploitability()
 //      Main container for things 

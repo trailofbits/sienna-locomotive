@@ -203,6 +203,19 @@ const uint64_t Triage::crashAddress() const {
 }
 
 ////////////////////////////////////////////////////////////////////////////
+// stackPointer()
+const uint64_t Triage::stackPointer() const { 
+    return tracer_->stackPointer();
+}
+
+////////////////////////////////////////////////////////////////////////////
+// instructionPointer()
+const uint64_t Triage::instructionPointer() const { 
+    return tracer_->instructionPointer();
+}
+
+
+////////////////////////////////////////////////////////////////////////////
 // exploitability()
 //      returns value from 0 to 4 for exploitabilty.  0 being None, 4 being
 // High
@@ -270,8 +283,8 @@ json Triage::toJson() const {
         { "minidumpPath",       minidumpPath() },
         { "ranks",              ranks() },
         { "rank",               exploitabilityRank() },
-        { "instructionPointer", instructionPtr_, },
-        { "stackPointer",       stackPtr_, },
+        { "instructionPointer", instructionPointer(), },
+        { "stackPointer",       stackPointer(), },
         { "tracer",             tracer_->toJson() }
     };
 }
