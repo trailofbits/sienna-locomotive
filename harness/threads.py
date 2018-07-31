@@ -1,5 +1,5 @@
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
-from .instrument import wizard_run, fuzzer_run, triage_run
+from .instrument import wizard_run, fuzzer_run, triage_run, start_server
 
 
 class WizardThread(QThread):
@@ -14,6 +14,12 @@ class WizardThread(QThread):
 
     def run(self):
         self.resultReady.emit(wizard_run(self.config_dict))
+
+
+class ServerThread(QThread):
+
+    def run(self):
+        start_server()
 
 
 class FuzzerThread(QThread):
@@ -66,4 +72,3 @@ class FuzzerThread(QThread):
 
     def triage_timeout_changed(self, new_timeout):
         self.config_dict['triage_timeout'] = None if int(new_timeout) == 0 else int(new_timeout)
-

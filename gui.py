@@ -1,4 +1,5 @@
-import sys, time
+import sys
+import time
 from multiprocessing import cpu_count
 
 from PyQt5.QtWidgets import QFileDialog, QMenu, QAction
@@ -11,8 +12,7 @@ from gui.QtHelpers import QIntVariable, QFloatVariable, QTextAdapter
 
 from harness import config
 from harness.state import get_target, export_crash_data_to_csv
-from harness.threads import WizardThread, FuzzerThread
-from harness.instrument import start_server
+from harness.threads import WizardThread, FuzzerThread, ServerThread
 from functools import partial
 
 from config_window import ConfigWindow
@@ -43,6 +43,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Set up Wizard thread and button
         self.wizard_thread = WizardThread(config.config)
+        self.server_thread = ServerThread()
 
         self.wizard_button = QtWidgets.QPushButton("Run Wizard")
         self._layout.addWidget(self.wizard_button)
@@ -232,7 +233,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.expand_button.clicked.connect(self.toggle_expansion)
 
-        self.fuzzer_button.clicked.connect(self.start_all_threads)
+        self.fuzzer_button.clicked.connect(self.server_thread.start)
+        self.server_thread.finished.connect(self.start_all_threads)
+
         # Connect the stop button to the thread so we can pause it
         self.stop_button.clicked.connect(self.pause_all_threads)
 
@@ -252,8 +255,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.thread_count.setDisabled(True)
         self.fuzzer_button.setDisabled(True)
         self.busy_label.show()
-
-        start_server()
 
         for thread in self.thread_holder[:int(self.thread_count.value())]:
             thread.start()
