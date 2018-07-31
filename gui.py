@@ -269,6 +269,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Connect the thread counter to the thread pool
         self.thread_count.valueChanged.connect(self.change_thread_count)
         self.change_thread_count(self.thread_count.value())
+        self.customContextMenuRequested.connect(self.contextMenuEvent)
 
     def change_thread_count(self, new_count):
         """ Creates new threads if we don't have as many as the user wants """
@@ -426,7 +427,7 @@ class MainWindow(QtWidgets.QMainWindow):
         menu.addAction(self.collapse_action)
         menu.addAction(self.check_action)
         menu.addAction(self.uncheck_action)
-        menu.exec(QContextMenuEvent.globalPos())
+        menu.popup(QContextMenuEvent.globalPos())
 
     def wizard_finished(self, wizard_output):
         """ Dump the results of a wizard run to the target file and rebuild the tree """
