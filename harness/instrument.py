@@ -19,7 +19,7 @@ from .state import (
     parse_triage_output,
     finalize,
     write_output_files,
-    create_invokation_statement,
+    create_invocation_statement,
     check_fuzz_line_for_crash,
     check_fuzz_line_for_run_id,
     get_path_to_run_file,
@@ -56,7 +56,7 @@ def start_server():
 
 def run_dr(config_dict, verbose=False, timeout=None):
     """ Runs dynamorio with the given config. Clobbers console output if save_stderr/stdout are true """
-    program_arr, program_str = create_invokation_statement(config_dict)
+    program_arr, program_str, pidfile = create_invocation_statement(config_dict)
 
     if verbose:
         print_l("Executing drrun: %s" % program_str)
@@ -90,7 +90,7 @@ def run_dr(config_dict, verbose=False, timeout=None):
             print_l("Process Timed Out after %s seconds" % (time.time() - started))
 
         # Parse PID of target application and kill it, which causes drrun to exit
-        with open('pidfile', 'r') as pidfile:
+        with open(pidfile, 'r') as pidfile:
             pid = pidfile.read().strip()
             if verbose:
                 print_l("Killing child process:", pid)
@@ -115,8 +115,13 @@ def run_dr(config_dict, verbose=False, timeout=None):
             popen_obj.stderr = json.dumps({"exception": "EXCEPTION_SL2_TIMEOUT"}).encode('utf-8')
 
         popen_obj.timed_out = True
+    finally:
+        try:
+            os.remove(pidfile)
+        except OSError:
+            print_l("[!] Couldn't remove pidfile: ", pidfile)
 
-        return popen_obj
+    return popen_obj
 
 
 def triager_run(run_id):
