@@ -327,7 +327,6 @@ class MainWindow(QtWidgets.QMainWindow):
     def handle_new_crash(self, thread, formatted, crash):
         """ Updates the crash counter and pauses other threads if specified """
         self.crash_counter.increment()
-        self.triage_output.append(formatted)
         # self.triage_output.append(formatted)
         self.crashes.append(crash)
         if not thread.should_fuzz:
