@@ -9,9 +9,6 @@ class WizardThread(QThread):
         QThread.__init__(self)
         self.config_dict = config_dict
 
-    def __del__(self):
-        self.wait()
-
     def run(self):
         self.resultReady.emit(wizard_run(self.config_dict))
 
@@ -39,7 +36,6 @@ class FuzzerThread(QThread):
 
     def __del__(self):
         self.should_fuzz = False
-        self.wait()
 
     def pause(self):
         self.should_fuzz = False
