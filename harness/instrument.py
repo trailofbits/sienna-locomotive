@@ -30,8 +30,6 @@ print_lock = threading.Lock()
 can_fuzz = True
 
 
-
-
 class Mode(IntEnum):
     """ Function selection modes. KEEP THIS UP-TO-DATE with common/enums.h """
     MATCH_INDEX = 1 << 0

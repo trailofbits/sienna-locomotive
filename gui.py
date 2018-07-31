@@ -1,4 +1,5 @@
-import sys
+import sys, time
+from multiprocessing import cpu_count
 
 from PyQt5.QtWidgets import QFileDialog, QMenu, QAction
 from PyQt5 import QtWidgets
@@ -11,15 +12,19 @@ from gui.QtHelpers import QIntVariable, QFloatVariable, QTextAdapter
 from harness import config
 from harness.state import get_target, export_crash_data_to_csv
 from harness.threads import WizardThread, FuzzerThread
+from harness.instrument import start_server
 from functools import partial
 
 from config_window import ConfigWindow
+
 
 class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self):
         QtWidgets.QMainWindow.__init__(self)
         self.crashes = []
+        self.thread_holder = []
+        self.start_time = None
 
         # Select config profile before starting
         self.cfg = ConfigWindow()
@@ -88,7 +93,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Set up fuzzer button and thread
         self.fuzzer_button = QtWidgets.QPushButton("Fuzz selected targets")
-        self.fuzzer_thread = FuzzerThread(config.config, self.target_data.filename)
 
         # Create checkboxes for continuous mode
         self.continuous_mode_cbox = QtWidgets.QCheckBox("Continuous")
@@ -114,6 +118,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.thread_count = QtWidgets.QSpinBox()
         self.thread_count.setSuffix(" threads")
+        self.thread_count.setRange(1, 2*cpu_count())
+        if 'simultaneous' in config.config:
+            self.thread_count.setValue(config.config['simultaneous'])
 
         self.expand_button = QtWidgets.QToolButton()
         self.expand_button.setArrowType(Qt.DownArrow)
@@ -201,20 +208,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.throughput_adapter.updated.connect(self.throughput_label.setText)
         self.crash_adapter.updated.connect(self.crash_count.setText)
 
-        # Update the run/crash/throughput variables after every fuzzing run
-        self.fuzzer_thread.runComplete.connect(self.runs.increment)
-        self.fuzzer_thread.runComplete.connect(self.calculate_throughput)
-        self.fuzzer_thread.foundCrash.connect(self.crash_counter.increment)
-
-        # Show the busy symbol while we're fuzzing and hide it while we're not
-        self.fuzzer_thread.started.connect(self.busy_label.show)
-        self.fuzzer_thread.finished.connect(self.busy_label.hide)
-
-        self.continuous_mode_cbox.stateChanged.connect(self.fuzzer_thread.continuous_state_changed)
-        self.pause_mode_cbox.stateChanged.connect(self.fuzzer_thread.pause_state_changed)
-        self.fuzz_timeout_box.valueChanged.connect(self.fuzzer_thread.fuzz_timeout_changed)
-        self.triage_timeout_box.valueChanged.connect(self.fuzzer_thread.triage_timeout_changed)
-
         # Start the wizard when we click the button and update the tree when we're done
         self.wizard_button.clicked.connect(self.wizard_thread.start)
         self.wizard_thread.started.connect(partial(self.setCursor, Qt.WaitCursor))
@@ -235,26 +228,75 @@ class MainWindow(QtWidgets.QMainWindow):
         # Handle checks/unchecks in the target tree
         self._func_tree.itemCheckedStateChanged.connect(self.tree_changed)
 
-        # Start the fuzzer and display triage output
-        self.fuzzer_thread.foundCrash.connect(self.handle_new_crash)
-        self.fuzzer_button.clicked.connect(self.fuzzer_thread.start)
         self.save_button.clicked.connect(self.save_crashes)
-
-        # Connect the stop button to the thread so we can pause it
-        self.stop_button.clicked.connect(self.fuzzer_thread.pause)
-        self.fuzzer_thread.started.connect(self.stop_button.show)
-        self.fuzzer_thread.finished.connect(self.stop_button.hide)
-        self.fuzzer_thread.paused.connect(self.stop_button.hide)
 
         self.expand_button.clicked.connect(self.toggle_expansion)
 
+        self.fuzzer_button.clicked.connect(self.start_all_threads)
+        # Connect the stop button to the thread so we can pause it
+        self.stop_button.clicked.connect(self.pause_all_threads)
+
+        self.thread_count.valueChanged.connect(self.change_thread_count)
+        self.change_thread_count(self.thread_count.value())
 
         # TODO - delete this
         self.expand_button.click()
 
-    def calculate_throughput(self, total_time):
-        """ Calculate our current runs/second. TODO: make this a lambda? """
-        self.throughput.update(self.runs.value / total_time)
+    def change_thread_count(self, new_count):
+        if len(self.thread_holder) < new_count:
+            self.thread_holder.append(FuzzerThread(config.config, self.target_data.filename))
+            self.connect_thread_callbacks(self.thread_holder[-1])
+
+    def start_all_threads(self):
+        self.start_time = self.start_time if self.start_time is not None else time.time()
+        self.thread_count.setDisabled(True)
+        self.fuzzer_button.setDisabled(True)
+        self.busy_label.show()
+
+        start_server()
+
+        for thread in self.thread_holder[:int(self.thread_count.value())]:
+            thread.start()
+        self.stop_button.show()
+
+    def all_threads_paused(self):
+        self.fuzzer_button.setDisabled(False)
+        self.thread_count.setDisabled(False)
+        self.stop_button.hide()
+        self.busy_label.hide()
+
+    def pause_all_threads(self):
+        for thread in self.thread_holder:
+            thread.pause()
+        self.all_threads_paused()
+
+    def connect_thread_callbacks(self, fuzzer_thread):
+        # Update the run/crash/throughput variables after every fuzzing run
+        fuzzer_thread.runComplete.connect(self.calculate_throughput)
+        fuzzer_thread.runComplete.connect(self.check_for_completion)
+        fuzzer_thread.foundCrash.connect(self.handle_new_crash)
+
+        self.continuous_mode_cbox.stateChanged.connect(fuzzer_thread.continuous_state_changed)
+        self.pause_mode_cbox.stateChanged.connect(fuzzer_thread.pause_state_changed)
+        self.fuzz_timeout_box.valueChanged.connect(fuzzer_thread.fuzz_timeout_changed)
+        self.triage_timeout_box.valueChanged.connect(fuzzer_thread.triage_timeout_changed)
+
+    def check_for_completion(self):
+        still_running = list(filter(lambda k: k.should_fuzz, self.thread_holder))
+        if len(still_running) == 0:
+            self.all_threads_paused()
+
+    def calculate_throughput(self):
+        """ Calculate our current runs/second. """
+        self.runs.increment()
+        self.throughput.update(self.runs.value / float(time.time() - self.start_time))
+
+    def handle_new_crash(self, thread, formatted, crash):
+        self.crash_counter.increment()
+        self.triage_output.append(formatted)
+        self.crashes.append(crash)
+        if not thread.should_fuzz:
+            self.pause_all_threads()
 
     def build_func_tree(self):
         """ Build the function target display tree """
@@ -312,11 +354,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def get_visible_indices(self):
         for row in range(self.module_proxy_model.rowCount()):
-            index = self.func_proxy_model.mapToSource(
+            yield self.func_proxy_model.mapToSource(
                         self.file_proxy_model.mapToSource(
                             self.module_proxy_model.mapToSource(
                                 self.module_proxy_model.index(row, 0))))
-            yield index
 
     def check_all(self):
         self.target_data.pause()
@@ -342,10 +383,6 @@ class MainWindow(QtWidgets.QMainWindow):
         """ Dump the results of a wizard run to the target file and rebuild the tree """
         self.target_data.set_target_list(wizard_output)
         self.build_func_tree()
-
-    def handle_new_crash(self, formatted, crash):
-        self.triage_output.append(formatted)
-        self.crashes.append(crash)
 
     def save_crashes(self):
         savefile, not_canceled = QFileDialog.getSaveFileName(self, filter="*.csv")

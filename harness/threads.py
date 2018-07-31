@@ -1,6 +1,5 @@
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
-import time
-from .instrument import wizard_run, fuzzer_run, triage_run, start_server
+from .instrument import wizard_run, fuzzer_run, triage_run
 
 
 class WizardThread(QThread):
@@ -18,8 +17,8 @@ class WizardThread(QThread):
 
 
 class FuzzerThread(QThread):
-    foundCrash = pyqtSignal(str, object)
-    runComplete = pyqtSignal(float)
+    foundCrash = pyqtSignal(QThread, str, object)
+    runComplete = pyqtSignal()
     paused = pyqtSignal()
 
     def __init__(self, config_dict, target_file):
@@ -27,7 +26,9 @@ class FuzzerThread(QThread):
         self.target_file = target_file
         self.config_dict = config_dict
         self.should_fuzz = True
-        self.start_time = time.time()
+
+        self.config_dict['client_args'].append('-t')
+        self.config_dict['client_args'].append(self.target_file)
 
     def __del__(self):
         self.should_fuzz = False
@@ -40,27 +41,19 @@ class FuzzerThread(QThread):
     def run(self):
         self.should_fuzz = True
 
-        start_server()
-
-        self.config_dict['client_args'].append('-t')
-        self.config_dict['client_args'].append(self.target_file)
-
-        # self.start_time = time.time()
-
         while self.should_fuzz:
             crashed, run_id = fuzzer_run(self.config_dict)
 
             if crashed:
-                formatted, raw = triage_run(self.config_dict, run_id)
-                self.foundCrash.emit(formatted, raw)
-
                 if self.config_dict['exit_early']:
-                    self.should_fuzz = False
+                    self.pause()
 
-            self.runComplete.emit(float(time.time() - self.start_time))
+                formatted, raw = triage_run(self.config_dict, run_id)
+                self.foundCrash.emit(self, formatted, raw)
 
             if not self.config_dict['continuous']:
-                break
+                self.pause()
+            self.runComplete.emit()
 
     def continuous_state_changed(self, new_state):
         self.config_dict['continuous'] = (new_state == Qt.Checked)
