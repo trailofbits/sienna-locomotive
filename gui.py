@@ -39,12 +39,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self._layout = QtWidgets.QVBoxLayout(_central_widget)
         _central_widget.setLayout(self._layout)
 
-        # CREATE WIDGETS #
-
-        # Set up Wizard thread and button
+        # Set up Wizard and Server threads so we don't block the UI
+        # when they're running
         self.wizard_thread = WizardThread(config.config)
         self.server_thread = ServerThread()
 
+        # CREATE WIDGETS #
+
+        # Create wizard button
         self.wizard_button = QtWidgets.QPushButton("Run Wizard")
         self._layout.addWidget(self.wizard_button)
 
@@ -92,7 +94,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.module_filter_box = QtWidgets.QLineEdit()
         self.filter_layout.addWidget(self.module_filter_box)
 
-        # Set up fuzzer button and thread
+        # Set up fuzzer button
         self.fuzzer_button = QtWidgets.QPushButton("Fuzz selected targets")
 
         # Create checkboxes for continuous mode
@@ -103,6 +105,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if config.config['exit_early']:
             self.pause_mode_cbox.setChecked(True)
 
+        # Set up spinboxes for setting timeout values
         self.fuzz_timeout_box = QtWidgets.QSpinBox()
         self.fuzz_timeout_box.setSuffix(" seconds")
         self.fuzz_timeout_box.setMaximum(1200)
@@ -117,15 +120,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.triage_timeout_box.setSpecialValueText("None")
         self.triage_timeout_box.setSingleStep(10)
 
+        # Create spinbox for controlling simultaneous fuzzing instances
         self.thread_count = QtWidgets.QSpinBox()
         self.thread_count.setSuffix(" threads")
         self.thread_count.setRange(1, 2*cpu_count())
         if 'simultaneous' in config.config:
             self.thread_count.setValue(config.config['simultaneous'])
 
+        # Create button for hiding and showing the extended controls
         self.expand_button = QtWidgets.QToolButton()
         self.expand_button.setArrowType(Qt.DownArrow)
 
+        # Create nested widget to hold the expanded fuzzing controls
         self.extension_widget = QtWidgets.QWidget()
         self.extension_layout = QtWidgets.QGridLayout()
         self.extension_widget.setLayout(self.extension_layout)
@@ -135,7 +141,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.fuzz_controls_inner_left = QtWidgets.QVBoxLayout()
         self.fuzz_controls_inner_right = QtWidgets.QVBoxLayout()
 
-        # Add widgets to left and right layouts
+        # Add widgets to left, right, and expanded layouts
         self.fuzz_controls_inner_left.addLayout(self.filter_layout)
         self.fuzz_controls_inner_left.addWidget(self.extension_widget)
         self.extension_widget.hide()
@@ -231,26 +237,26 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.save_button.clicked.connect(self.save_crashes)
 
+        # Fuzzer controll buttons for showing the panel and starting a run
         self.expand_button.clicked.connect(self.toggle_expansion)
-
         self.fuzzer_button.clicked.connect(self.server_thread.start)
         self.server_thread.finished.connect(self.start_all_threads)
 
         # Connect the stop button to the thread so we can pause it
         self.stop_button.clicked.connect(self.pause_all_threads)
 
+        # Connect the thread counter to the thread pool
         self.thread_count.valueChanged.connect(self.change_thread_count)
         self.change_thread_count(self.thread_count.value())
 
-        # TODO - delete this
-        self.expand_button.click()
-
     def change_thread_count(self, new_count):
+        """ Creates new threads if we don't have as many as the user wants """
         if len(self.thread_holder) < new_count:
             self.thread_holder.append(FuzzerThread(config.config, self.target_data.filename))
             self.connect_thread_callbacks(self.thread_holder[-1])
 
     def start_all_threads(self):
+        """ Maps over the thread list and starts all the threads """
         self.start_time = self.start_time if self.start_time is not None else time.time()
         self.thread_count.setDisabled(True)
         self.fuzzer_button.setDisabled(True)
@@ -261,17 +267,20 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stop_button.show()
 
     def all_threads_paused(self):
+        """ Updates the UI after we've sent the pause signal to all the threads"""
         self.fuzzer_button.setDisabled(False)
         self.thread_count.setDisabled(False)
         self.stop_button.hide()
         self.busy_label.hide()
 
     def pause_all_threads(self):
+        """ Maps over the thread list and send the pause signal to all the threads"""
         for thread in self.thread_holder:
             thread.pause()
         self.all_threads_paused()
 
     def connect_thread_callbacks(self, fuzzer_thread):
+        """ Sets up callbacks that should fire when any thread emits a signal (or should be received by all threads """
         # Update the run/crash/throughput variables after every fuzzing run
         fuzzer_thread.runComplete.connect(self.calculate_throughput)
         fuzzer_thread.runComplete.connect(self.check_for_completion)
@@ -284,6 +293,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.triage_timeout_box.valueChanged.connect(fuzzer_thread.triage_timeout_changed)
 
     def check_for_completion(self):
+        """ Filters the threads and checks if any are still running """
         still_running = list(filter(lambda k: k.should_fuzz, self.thread_holder))
         if len(still_running) == 0:
             self.all_threads_paused()
@@ -294,6 +304,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.throughput.update(self.runs.value / float(time.time() - self.start_time))
 
     def handle_new_crash(self, thread, formatted, crash):
+        """ Updates the crash counter and pauses other threads if specified """
         self.crash_counter.increment()
         self.triage_output.append(formatted)
         self.crashes.append(crash)
@@ -301,6 +312,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.pause_all_threads()
 
     def handle_server_crash(self):
+        """ Pauses fuzzing threads and attempts to restart the server if it crashes """
         self.pause_all_threads()
         self.server_thread.start()
 
@@ -359,6 +371,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.target_data.update(widget.index, selected=is_checked)
 
     def get_visible_indices(self):
+        """ Get the indices in the root model of all the visible items in the tree view """
         for row in range(self.module_proxy_model.rowCount()):
             yield self.func_proxy_model.mapToSource(
                         self.file_proxy_model.mapToSource(
@@ -366,18 +379,21 @@ class MainWindow(QtWidgets.QMainWindow):
                                 self.module_proxy_model.index(row, 0))))
 
     def check_all(self):
+        """ Check all the visible boxes in the tree view """
         self.target_data.pause()
         for index in self.get_visible_indices():
             self.model.itemFromIndex(index).setCheckState(Qt.Checked)
         self.target_data.unpause()
 
     def uncheck_all(self):
+        """ The opposite of check_all """
         self.target_data.pause()
         for index in self.get_visible_indices():
             self.model.itemFromIndex(index).setCheckState(Qt.Unchecked)
         self.target_data.unpause()
 
     def contextMenuEvent(self, QContextMenuEvent):
+        """ Displays the right-click menu """
         menu = QMenu(self)
         menu.addAction(self.expand_action)
         menu.addAction(self.collapse_action)
@@ -391,11 +407,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.build_func_tree()
 
     def save_crashes(self):
+        """ Saves a csv of crash data """
         savefile, not_canceled = QFileDialog.getSaveFileName(self, filter="*.csv")
         if not_canceled:
             export_crash_data_to_csv(self.crashes, savefile)
 
     def toggle_expansion(self):
+        """ Toggles whether or not the extended fuzzing controls are shown """
         if not self.extension_widget.isVisible():
             self.extension_widget.show()
             self.expand_button.setArrowType(Qt.UpArrow)
