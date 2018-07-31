@@ -32,7 +32,10 @@ can_fuzz = True
 
 
 class Mode(IntEnum):
-    """ Function selection modes. KEEP THIS UP-TO-DATE with common/enums.h """
+    """
+    Function selection modes.
+    KEEP THIS UP-TO-DATE with common/enums.h
+    """
     MATCH_INDEX = 1 << 0
     MATCH_RETN_ADDRESS = 1 << 1
     MATCH_ARG_HASH = 1 << 2
@@ -40,33 +43,47 @@ class Mode(IntEnum):
 
 
 def print_l(*args):
-    """ Thread safe print """
+    """
+    Prints the given arguments in a thread-safe manner.
+    """
     with print_lock:
         print(*args)
 
 
+def ps_run(command):
+    """
+    Runs the given command in a new PowerShell session.
+    """
+    subprocess.Popen(["powershell", "start", "powershell",
+                      "{-NoExit", "-Command", "\"{}\"}}".format(command)])
+
+
 def start_server():
-    """ Start the server if it's not already running """
+    """
+    Start the server, if it's not already running.
+    """
     if not os.path.isfile(config.sl2_server_pipe_path):
-        subprocess.Popen(["powershell", "start", "powershell",
-                          "{-NoExit", "-Command", "\"{}\"}}".format(config.config['server_path'])])
+        ps_run(config.config['server_path'])
     while not os.path.isfile(config.sl2_server_pipe_path):
         time.sleep(1)
 
 
 def run_dr(config_dict, verbose=False, timeout=None):
-    """ Runs dynamorio with the given config. Clobbers console output if save_stderr/stdout are true """
-    program_arr, program_str, pidfile = create_invocation_statement(config_dict)
+    """
+    Runs dynamorio with the given config.
+    Clobbers console output if save_stderr/stdout are true
+    """
+    cmd_arr, cmd_str, pidfile = create_invocation_statement(config_dict)
 
     if verbose:
-        print_l("Executing drrun: %s" % program_str)
+        print_l("Executing drrun: %s" % cmd_str)
 
     # Run client on target application
     started = time.time()
 
     stdout = sys.stdout if config_dict['inline_stdout'] else subprocess.PIPE
     stderr = subprocess.PIPE
-    popen_obj = subprocess.Popen(program_arr,
+    popen_obj = subprocess.Popen(cmd_arr,
                                  stdout=stdout,
                                  stderr=stderr)
 
@@ -101,7 +118,8 @@ def run_dr(config_dict, verbose=False, timeout=None):
 
         # Try to get the output again
         try:
-            stdout, stderr = popen_obj.communicate(timeout=5)  # Try to grab the existing console output
+            # Try to grab the existing console output
+            stdout, stderr = popen_obj.communicate(timeout=5)
             popen_obj.stdout = stdout
             popen_obj.stderr = stderr
 
@@ -112,7 +130,10 @@ def run_dr(config_dict, verbose=False, timeout=None):
 
             # Fix types again (expects bytes)
             popen_obj.stdout = "ERROR".encode('utf-8')
-            popen_obj.stderr = json.dumps({"exception": "EXCEPTION_SL2_TIMEOUT"}).encode('utf-8')
+            popen_obj.stderr = json.dumps(
+                {
+                    "exception": "EXCEPTION_SL2_TIMEOUT"
+                }).encode('utf-8')
 
         popen_obj.timed_out = True
     finally:
