@@ -116,8 +116,12 @@ def run_dr(config_dict, verbose=False, timeout=None):
 
         popen_obj.timed_out = True
     finally:
-        os.remove(pidfile)
-        return popen_obj
+        try:
+            os.remove(pidfile)
+        except OSError:
+            print_l("[!] Couldn't remove pidfile: ", pidfile)
+
+    return popen_obj
 
 
 def triager_run(run_id):
