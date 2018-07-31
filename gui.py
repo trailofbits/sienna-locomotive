@@ -1,4 +1,6 @@
 import sys
+import os
+import json
 
 from PyQt5.QtWidgets import QFileDialog, QMenu, QAction
 from PyQt5 import QtWidgets
@@ -14,6 +16,32 @@ from harness.threads import WizardThread, FuzzerThread
 from functools import partial
 
 from config_window import ConfigWindow
+
+
+class Triager:
+
+    def __init__(self, crashpath):
+        triagepath = os.path.join( os.path.dirname(crashpath),
+            "triage.json" )
+        self.json = {}
+
+        with open(triagepath) as f:
+            self.json = json.load(f)
+    
+
+    def __repr__(self):
+        prevaddy = 0
+        try: 
+            prevaddy = self.json['callStack'][0]
+        except IndexError:
+            pass
+
+        return "%s exploitability, %s at pc 0x%x -> 0x%x, memory address 0x%x." % (
+                self.json['exploitability'],  
+                self.json['crashReason'], 
+                prevaddy, 
+                self.json['instructionPointer'], 
+                self.json['crashAddress'] )
 
 class MainWindow(QtWidgets.QMainWindow):
 
@@ -303,7 +331,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.build_func_tree()
 
     def handle_new_crash(self, formatted, crash):
-        self.triage_output.append(formatted)
+        triager = Triager( crash['crash_file'] )
+        self.triage_output.append(str(triager))
+        self.triage_output.append(formatted)        
         self.crashes.append(crash)
 
     def save_crashes(self):

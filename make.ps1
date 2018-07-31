@@ -12,7 +12,7 @@ function Unzip
 
 
 Function InstallDependencies {
-    $deps = @("msgpack")
+    $deps = @("msgpack", "pyqt5")
     foreach ( $dep in $deps ) {
         "Installing $dep"
         pip install "${dep}"
