@@ -102,11 +102,15 @@ def get_target_dir(_config):
     """
     # TODO(ww): Use os.path.basename for this?
     exe_name = _config['target_application_path'].split('\\')[-1].strip('.exe').upper()
-    dir_hash = sha1("{} {}".format(_config['target_application_path'], _config['target_args']).encode('utf-8')).hexdigest()
+    dir_hash = sha1(
+        "{} {}".format(_config['target_application_path'], _config['target_args']).encode('utf-8')
+    ).hexdigest()
     dir_name = os.path.join(config.sl2_targets_dir, "{}_{}".format(exe_name, dir_hash))
+
     if not os.path.isdir(dir_name):
         os.makedirs(dir_name)
     arg_file = os.path.join(dir_name, 'arguments.txt')
+
     if not os.path.exists(arg_file):
         with open(arg_file, 'w') as argfile:
             argfile.write(
