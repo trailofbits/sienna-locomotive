@@ -30,18 +30,12 @@ class Triager:
     
 
     def __repr__(self):
-        prevaddy = 0
-        try: 
-            prevaddy = self.json['callStack'][0]
-        except IndexError:
-            pass
-
-        return "%s exploitability, %s at pc 0x%x -> 0x%x, memory address 0x%x." % (
+        return "%s exploitability, %s at pc 0x%x, memory address 0x%x, stack address 0x%x" % (
                 self.json['exploitability'],  
                 self.json['crashReason'], 
-                prevaddy, 
                 self.json['instructionPointer'], 
-                self.json['crashAddress'] )
+                self.json['crashAddress'],
+                self.json['stackPointer'] )
 
 class MainWindow(QtWidgets.QMainWindow):
 
