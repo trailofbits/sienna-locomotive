@@ -23,12 +23,44 @@ def esc_quote(raw):
         return "\"{}\"".format(raw)
 
 
-def create_invokation_statement(config_dict):
-    program_arr = [config_dict['drrun_path'], '-pidfile', 'pidfile'] + config_dict['drrun_args'] + ['-prng_seed', str(random.getrandbits(64))] + \
-          ['-c', config_dict['client_path']] + config_dict['client_args'] + \
-          ['--', config_dict['target_application_path'].strip('\"')] + config_dict['target_args']
+def unique_pidfile():
+    """
+    Returns a unique path for a pidfile within the main
+    SL2 data directory.
+    """
+    pidfile = "%s.pid" % uuid.uuid4()
+    return os.path.join(config.sl2_dir, pidfile)
 
-    return program_arr, stringify_program_array(program_arr[0], program_arr[1:])
+
+def create_invocation_statement(config_dict):
+    """
+    Returns a tuple of a DR invocation (as an array),
+    its stringified equivalent, and the pidfile that
+    will be created by the invocation.
+    """
+    pidfile = unique_pidfile()
+    program_arr = [
+        config_dict['drrun_path'],
+        '-pidfile',
+        pidfile,
+        *config_dict['drrun_args'],
+        '-prng_seed',
+        str(random.getrandbits(64)),
+        '-c',
+        config_dict['client_path'],
+        *config_dict['client_args'],
+        '--',
+        config_dict['target_application_path'].strip('\"'),
+        *config_dict['target_args']
+    ]
+
+    tup = (
+        program_arr,
+        stringify_program_array(program_arr[0], program_arr[1:]),
+        pidfile
+    )
+
+    return tup
 
 
 # TODO(ww): Use shlex or something similar here.
