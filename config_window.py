@@ -1,7 +1,7 @@
 
-from PyQt5.QtWidgets import QFileDialog, QStyle
-from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt, QSize
+from PySide2.QtWidgets import QFileDialog, QStyle
+from PySide2 import QtWidgets
+from PySide2.QtCore import Qt, QSize
 import os
 
 from harness import config
@@ -30,7 +30,7 @@ class ConfigWindow(QtWidgets.QDialog):
         self.okay_button.clicked.connect(self.accept)
 
         self.profiles = QtWidgets.QComboBox()
-        self.profiles.addItems(config._config.keys())
+        self.profiles.addItems(list(config._config.keys()))
 
         cbox_layout.addWidget(self.profiles)
         cbox_layout.addWidget(self.okay_button)
