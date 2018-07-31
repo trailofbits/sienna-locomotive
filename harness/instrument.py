@@ -90,13 +90,13 @@ def run_dr(config_dict, verbose=False, timeout=None):
             print_l("Process Timed Out after %s seconds" % (time.time() - started))
 
         # Parse PID of target application and kill it, which causes drrun to exit
-        with open(pidfile, 'r') as pidfile:
-            pid = pidfile.read().strip()
+        with open(pidfile, 'r') as pidfile_contents:
+            pid = pidfile_contents.read().strip()
             if verbose:
                 print_l("Killing child process:", pid)
             try:
                 os.kill(int(pid), signal.SIGTERM)
-            except PermissionError:
+            except (PermissionError, OSError):
                 print_l("WARNING: Couldn't kill child process")
 
         # Try to get the output again
@@ -202,7 +202,7 @@ def fuzzer_run(config_dict):
                 print_l("[!] Not UTF-8:", repr(line))
 
     if not run_id:
-        print_l("Error: No run ID could be parsed from the server output")
+        print_l("Error: No run ID could be parsed from the server output. Did it crash?")
         return False, -1
 
     if crashed:

@@ -128,8 +128,8 @@ class ConfigWindow(QtWidgets.QDialog):
         if len(self.target_path.text()) == 0:
             QtWidgets.QMessageBox.critical(self, "Invalid Path", "Target application path cannot be empty")
             return
-        config.create_new_profile(name, self.drrun_path.text(), self.build_dir.text(),
-                                  self.target_path.text(), self.target_args.text())
+        config.create_new_profile(name, os.path.normpath(self.drrun_path.text()), os.path.normpath(self.build_dir.text()),
+                                  os.path.normpath(self.target_path.text()), os.path.normpath(self.target_args.text()))
 
         self.profiles.clear()
         profile_names = list(config._config.keys())

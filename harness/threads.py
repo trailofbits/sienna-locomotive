@@ -1,5 +1,4 @@
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
-import time
 from .instrument import wizard_run, fuzzer_run, triage_run, start_server
 
 
@@ -17,17 +16,26 @@ class WizardThread(QThread):
         self.resultReady.emit(wizard_run(self.config_dict))
 
 
+class ServerThread(QThread):
+
+    def run(self):
+        start_server()
+
+
 class FuzzerThread(QThread):
-    foundCrash = pyqtSignal(str, object)
-    runComplete = pyqtSignal(float)
+    foundCrash = pyqtSignal(QThread, str, object)
+    runComplete = pyqtSignal()
     paused = pyqtSignal()
+    server_crashed = pyqtSignal()
 
     def __init__(self, config_dict, target_file):
         QThread.__init__(self)
         self.target_file = target_file
         self.config_dict = config_dict
         self.should_fuzz = True
-        self.start_time = time.time()
+
+        self.config_dict['client_args'].append('-t')
+        self.config_dict['client_args'].append(self.target_file)
 
     def __del__(self):
         self.should_fuzz = False
@@ -40,27 +48,23 @@ class FuzzerThread(QThread):
     def run(self):
         self.should_fuzz = True
 
-        start_server()
-
-        self.config_dict['client_args'].append('-t')
-        self.config_dict['client_args'].append(self.target_file)
-
-        # self.start_time = time.time()
-
         while self.should_fuzz:
             crashed, run_id = fuzzer_run(self.config_dict)
 
             if crashed:
-                formatted, raw = triage_run(self.config_dict, run_id)
-                self.foundCrash.emit(formatted, raw)
-
                 if self.config_dict['exit_early']:
-                    self.should_fuzz = False
+                    self.pause()
 
-            self.runComplete.emit(float(time.time() - self.start_time))
+                formatted, raw = triage_run(self.config_dict, run_id)
+                self.foundCrash.emit(self, formatted, raw)
 
             if not self.config_dict['continuous']:
-                break
+                self.pause()
+
+            if run_id == -1:
+                self.server_crashed.emit()
+                self.pause()
+            self.runComplete.emit()
 
     def continuous_state_changed(self, new_state):
         self.config_dict['continuous'] = (new_state == Qt.Checked)
@@ -68,3 +72,8 @@ class FuzzerThread(QThread):
     def pause_state_changed(self, new_state):
         self.config_dict['exit_early'] = (new_state == Qt.Checked)
 
+    def fuzz_timeout_changed(self, new_timeout):
+        self.config_dict['fuzz_timeout'] = None if int(new_timeout) == 0 else int(new_timeout)
+
+    def triage_timeout_changed(self, new_timeout):
+        self.config_dict['triage_timeout'] = None if int(new_timeout) == 0 else int(new_timeout)
