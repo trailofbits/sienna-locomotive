@@ -306,5 +306,8 @@ def fuzz_and_triage(config_dict):
 
 
 def kill():
+    """
+    Ends a sequence of fuzzing runs.
+    """
     global can_fuzz
     can_fuzz = False
