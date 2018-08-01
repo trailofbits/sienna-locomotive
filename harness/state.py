@@ -39,13 +39,14 @@ def create_invocation_statement(config_dict):
     will be created by the invocation.
     """
     pidfile = unique_pidfile()
+    seed = str(random.getrandbits(64))
     program_arr = [
         config_dict['drrun_path'],
         '-pidfile',
         pidfile,
         *config_dict['drrun_args'],
         '-prng_seed',
-        str(random.getrandbits(64)),
+        seed,
         '-c',
         config_dict['client_path'],
         *config_dict['client_args'],
@@ -57,7 +58,8 @@ def create_invocation_statement(config_dict):
     tup = (
         program_arr,
         stringify_program_array(program_arr[0], program_arr[1:]),
-        pidfile
+        pidfile,
+        seed,
     )
 
     return tup
@@ -194,12 +196,14 @@ def get_path_to_run_file(run_id, filename):
     return os.path.join(config.sl2_runs_dir, str(run_id), filename)
 
 
-def write_output_files(proc, run_id, stage_name):
+def write_output_files(proc, seed, run_id, stage_name):
     """
-    Writes the stdout and stderr buffers for a particular stage
+    Writes the PRNG seed, stdout, and stderr buffers for a particular stage
     into a run's directory.
     """
     try:
+        with open(get_path_to_run_file(run_id, '{}.seed'.format(stage_name)), 'w') as seedfile:
+            seedfile.write(seed)
         if proc.stdout is not None:
             with open(get_path_to_run_file(run_id, '{}.stdout'.format(stage_name)), 'wb') as stdoutfile:
                 stdoutfile.write(proc.stdout)

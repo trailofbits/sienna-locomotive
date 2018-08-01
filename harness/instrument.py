@@ -70,9 +70,10 @@ def start_server():
 def run_dr(config_dict, verbose=False, timeout=None):
     """
     Runs dynamorio with the given config.
-    Clobbers console output if save_stderr/stdout are true
+    Clobbers console output if save_stderr/stdout are true.
+    Returns a popen object and the PRNG seed used during the run.
     """
-    cmd_arr, cmd_str, pidfile = create_invocation_statement(config_dict)
+    cmd_arr, cmd_str, pidfile, seed = create_invocation_statement(config_dict)
 
     if verbose:
         print_l("Executing drrun: %s" % cmd_str)
@@ -98,7 +99,7 @@ def run_dr(config_dict, verbose=False, timeout=None):
         popen_obj.stderr = stderr
         popen_obj.timed_out = False
 
-        return popen_obj
+        return popen_obj, seed
 
     # Handle cases where the program didn't exit in time
     except subprocess.TimeoutExpired:
@@ -138,7 +139,7 @@ def run_dr(config_dict, verbose=False, timeout=None):
         except OSError:
             print_l("[!] Couldn't remove pidfile: ", pidfile)
 
-    return popen_obj
+    return popen_obj, seed
 
 
 def triager_run(run_id):
@@ -161,7 +162,7 @@ def wizard_run(config_dict):
     """
     Runs the wizard and lets the user select a target function.
     """
-    completed_process = run_dr(
+    completed_process, _seed = run_dr(
         {
             'drrun_path': config_dict['drrun_path'],
             'drrun_args': config_dict['drrun_args'],
@@ -209,7 +210,7 @@ def wizard_run(config_dict):
 
 def fuzzer_run(config_dict):
     """ Runs the fuzzer """
-    completed_process = run_dr(
+    completed_process, seed = run_dr(
         config_dict,
         verbose=config_dict['verbose'],
         timeout=config_dict.get('fuzz_timeout', None)
@@ -242,7 +243,7 @@ def fuzzer_run(config_dict):
                 % (run_id, completed_process.returncode, exception))
         # Write stdout and stderr to files
         # TODO fix issue #40
-        write_output_files(completed_process, run_id, 'fuzz')
+        write_output_files(completed_process, seed, run_id, 'fuzz')
     elif config_dict['verbose']:
         print_l("Run %s did not find a crash" % run_id)
 
@@ -258,7 +259,7 @@ def fuzzer_run(config_dict):
 # (trace_and_triage, maybe?)
 def triage_run(config_dict, run_id):
     """ Runs the triaging tool """
-    completed_process = run_dr(
+    completed_process, seed = run_dr(
         {
             'drrun_path': config_dict['drrun_path'],
             'drrun_args': config_dict['drrun_args'],
@@ -273,7 +274,7 @@ def triage_run(config_dict, run_id):
     )
 
     # Write stdout and stderr to files
-    write_output_files(completed_process, run_id, 'triage')
+    write_output_files(completed_process, seed, run_id, 'triage')
 
     formatted, raw = parse_triage_output(run_id)
     triager_run(run_id)
