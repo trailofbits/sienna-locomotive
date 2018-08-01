@@ -14,11 +14,11 @@ def runAndCaptureOutput( cmd ):
         cmd = " ".join(cmd)
 
     if DEBUG:
-        print('cmd', cmd)
+        print( '\n[%s]' % cmd)
     out =  subprocess.getoutput(cmd)    
     if DEBUG:
-        print("out", out )
-    return out
+        print( "\n<%s>" % out )
+    return str(out)
 
 class TestWizard(unittest.TestCase):
 
@@ -66,8 +66,6 @@ class TestWizard(unittest.TestCase):
         output = runAndCaptureOutput(cmd)
         self.assertFalse( targetString in output )
 
-
-
     def test_TheWiz(self):
         cmd = r'echo 0 | python .\harness.py -v'
         output = runAndCaptureOutput(cmd)
@@ -79,6 +77,20 @@ class TestWizard(unittest.TestCase):
         self.assertTrue( 'Process completed after' in output )
         self.assertRegex(  output, r'Triage .*: breakpoint .*caused EXCEPTION_BREAKPOINT'  )
         self.assertTrue( 'int3' in output )
+        
+
+        workingdir = os.path.join( os.environ['APPDATA'],  "Trail of Bits", "fuzzkit", "runs" )        
+        pattern = "%s/*/triage.json" % workingdir        
+        paths = glob.glob(  pattern )
+        self.assertTrue( len(paths) > 0 )
+
+        with open(paths[0]) as f:
+            data = f.read()
+            self.assertTrue( "instructionPointer" in data )
+        
+
+
+
 
 class  TestMinidumpOnly(unittest.TestCase):
     def test_minidump(self):

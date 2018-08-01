@@ -125,15 +125,16 @@ def run_dr(config_dict, verbose=False, timeout=None):
 
 
 def triager_run(run_id):
+    out = None
     dmpfile = get_path_to_run_file(run_id, "initial.dmp")
     if os.path.isfile(dmpfile):
-        cmd = [r'.\build\triage\Debug\triager.exe', dmpfile]
-        # TODO(ww): Unused variable.
+        cmd = [config.config['triager_path'], dmpfile]        
         out = subprocess.check_output(cmd, shell=False)
         if config.config["debug"]:
             print_l(repr(out))
     else:
         print_l("[!] No initial.dmp to triage!")
+    return out
 
 
 def wizard_run(config_dict):
