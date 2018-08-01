@@ -111,9 +111,10 @@ def main():
             targets = get_all_targets()
             mapping = []
             for target in targets:
-                print("{}) [{}]  {}".format(len(mapping),
-                                            target[-40:][:8],  # first 8 bytes of the SHA hash
-                                            stringify_program_array(targets[target][0], targets[target][1])))
+                print("{}) [{}]  {}".format(
+                    len(mapping),
+                    target[-40:][:8],  # first 8 bytes of the SHA hash
+                    stringify_program_array(targets[target][0], targets[target][1])))
                 mapping.append(target)
             target_id = mapping[select_from_range(len(mapping), "Select a target to fuzz> ")]
             config['target_application_path'], config['target_args'] = targets[target_id]
@@ -135,7 +136,7 @@ def main():
             config['client_args'].append('-t')
             config['client_args'].append(target_file)
             triageResults = triage_run(config, run_id[-36:])[0]
-            print( triageResults )
+            print(triageResults)
 
     else:
         # Run the wizard to select a target function if we don't have one saved
