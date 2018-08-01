@@ -32,7 +32,10 @@ can_fuzz = True
 
 
 class Mode(IntEnum):
-    """ Function selection modes. KEEP THIS UP-TO-DATE with common/enums.h """
+    """
+    Function selection modes.
+    KEEP THIS UP-TO-DATE with common/enums.h
+    """
     MATCH_INDEX = 1 << 0
     MATCH_RETN_ADDRESS = 1 << 1
     MATCH_ARG_HASH = 1 << 2
@@ -40,33 +43,46 @@ class Mode(IntEnum):
 
 
 def print_l(*args):
-    """ Thread safe print """
+    """
+    Prints the given arguments in a thread-safe manner.
+    """
     with print_lock:
         print(*args)
 
 
+def ps_run(command):
+    """
+    Runs the given command in a new PowerShell session.
+    """
+    subprocess.Popen(["powershell", "start", "powershell", "{-NoExit", "-Command", "\"{}\"}}".format(command)])
+
+
 def start_server():
-    """ Start the server if it's not already running """
+    """
+    Start the server, if it's not already running.
+    """
     if not os.path.isfile(config.sl2_server_pipe_path):
-        subprocess.Popen(["powershell", "start", "powershell",
-                          "{-NoExit", "-Command", "\"{}\"}}".format(config.config['server_path'])])
+        ps_run(config.config['server_path'])
     while not os.path.isfile(config.sl2_server_pipe_path):
         time.sleep(1)
 
 
 def run_dr(config_dict, verbose=False, timeout=None):
-    """ Runs dynamorio with the given config. Clobbers console output if save_stderr/stdout are true """
-    program_arr, program_str, pidfile = create_invocation_statement(config_dict)
+    """
+    Runs dynamorio with the given config.
+    Clobbers console output if save_stderr/stdout are true
+    """
+    cmd_arr, cmd_str, pidfile = create_invocation_statement(config_dict)
 
     if verbose:
-        print_l("Executing drrun: %s" % program_str)
+        print_l("Executing drrun: %s" % cmd_str)
 
     # Run client on target application
     started = time.time()
 
     stdout = sys.stdout if config_dict['inline_stdout'] else subprocess.PIPE
     stderr = subprocess.PIPE
-    popen_obj = subprocess.Popen(program_arr,
+    popen_obj = subprocess.Popen(cmd_arr,
                                  stdout=stdout,
                                  stderr=stderr)
 
@@ -101,7 +117,8 @@ def run_dr(config_dict, verbose=False, timeout=None):
 
         # Try to get the output again
         try:
-            stdout, stderr = popen_obj.communicate(timeout=5)  # Try to grab the existing console output
+            # Try to grab the existing console output
+            stdout, stderr = popen_obj.communicate(timeout=5)
             popen_obj.stdout = stdout
             popen_obj.stderr = stderr
 
@@ -125,27 +142,38 @@ def run_dr(config_dict, verbose=False, timeout=None):
 
 
 def triager_run(run_id):
+    """
+    Runs the (breakpad-based) triager on the minidmp generated
+    by a fuzzing run.
+    """
     dmpfile = get_path_to_run_file(run_id, "initial.dmp")
     if os.path.isfile(dmpfile):
-        cmd = [r'.\build\triage\Debug\triager.exe', dmpfile]
-        # TODO(ww): Unused variable.
+        cmd = [config.config['triager_path'], dmpfile]
         out = subprocess.check_output(cmd, shell=False)
         if config.config["debug"]:
             print_l(repr(out))
     else:
         print_l("[!] No initial.dmp to triage!")
+    return out
 
 
 def wizard_run(config_dict):
-    """ Runs the wizard and lets the user select a target function """
-    completed_process = run_dr({'drrun_path': config_dict['drrun_path'],
-                                'drrun_args': config_dict['drrun_args'],
-                                'client_path': config_dict['wizard_path'],
-                                'client_args': [],
-                                'target_application_path': config_dict['target_application_path'],
-                                'target_args': config_dict['target_args'],
-                                'inline_stdout': config_dict['inline_stdout']},
-                               verbose=config_dict['verbose'])
+    """
+    Runs the wizard and lets the user select a target function.
+    """
+    completed_process = run_dr(
+        {
+            'drrun_path': config_dict['drrun_path'],
+            'drrun_args': config_dict['drrun_args'],
+            'client_path': config_dict['wizard_path'],
+            'client_args': [],
+            'target_application_path': config_dict['target_application_path'],
+            'target_args': config_dict['target_args'],
+            'inline_stdout': config_dict['inline_stdout']
+        },
+        verbose=config_dict['verbose']
+    )
+
     wizard_findings = []
     mem_map = {}
     base_addr = None
@@ -181,7 +209,11 @@ def wizard_run(config_dict):
 
 def fuzzer_run(config_dict):
     """ Runs the fuzzer """
-    completed_process = run_dr(config_dict, verbose=config_dict['verbose'], timeout=config_dict.get('fuzz_timeout', None))
+    completed_process = run_dr(
+        config_dict,
+        verbose=config_dict['verbose'],
+        timeout=config_dict.get('fuzz_timeout', None)
+    )
 
     # Parse run ID from fuzzer output
     run_id = None
@@ -206,7 +238,8 @@ def fuzzer_run(config_dict):
         return False, -1
 
     if crashed:
-        print_l('Fuzzing run %s returned %s after raising %s' % (run_id, completed_process.returncode, exception))
+        print_l('Fuzzing run %s returned %s after raising %s'
+                % (run_id, completed_process.returncode, exception))
         # Write stdout and stderr to files
         # TODO fix issue #40
         write_output_files(completed_process, run_id, 'fuzz')
@@ -220,17 +253,24 @@ def fuzzer_run(config_dict):
     return crashed, run_id
 
 
+# TODO(ww): Rename this to "tracer_run" or something similar,
+# and break the internal triager_run call into another method
+# (trace_and_triage, maybe?)
 def triage_run(config_dict, run_id):
     """ Runs the triaging tool """
-    completed_process = run_dr({'drrun_path': config_dict['drrun_path'],
-                                'drrun_args': config_dict['drrun_args'],
-                                'client_path': config_dict['triage_path'],
-                                'client_args': config_dict['client_args'] + ['-r', str(run_id)],
-                                'target_application_path': config_dict['target_application_path'],
-                                'target_args': config_dict['target_args'],
-                                'inline_stdout': config_dict['inline_stdout']},
-                               config_dict['verbose'],
-                               config_dict.get('triage_timeout', None))
+    completed_process = run_dr(
+        {
+            'drrun_path': config_dict['drrun_path'],
+            'drrun_args': config_dict['drrun_args'],
+            'client_path': config_dict['tracer_path'],
+            'client_args': [*config_dict['client_args'], '-r', str(run_id)],
+            'target_application_path': config_dict['target_application_path'],
+            'target_args': config_dict['target_args'],
+            'inline_stdout': config_dict['inline_stdout']
+        },
+        config_dict['verbose'],
+        config_dict.get('triage_timeout', None)
+    )
 
     # Write stdout and stderr to files
     write_output_files(completed_process, run_id, 'triage')
@@ -241,7 +281,10 @@ def triage_run(config_dict, run_id):
 
 
 def fuzz_and_triage(config_dict):
-    """ Runs the fuzzer (in a loop if continuous is true), then runs the triage tool if a crash is found """
+    """
+    Runs the fuzzer (in a loop if continuous is true), then runs the triage
+    tools (DR and breakpad) if a crash is found.
+    """
     global can_fuzz
     # TODO: Move try/except so we can start new runs after an exception
     try:
@@ -252,7 +295,8 @@ def fuzz_and_triage(config_dict):
                 print_l(formatted)
 
                 if config_dict['exit_early']:
-                    can_fuzz = False  # Prevent other threads from starting new fuzzing runs
+                    # Prevent other threads from starting new fuzzing runs
+                    can_fuzz = False
 
             if not config_dict['continuous']:
                 return
@@ -262,5 +306,8 @@ def fuzz_and_triage(config_dict):
 
 
 def kill():
+    """
+    Ends a sequence of fuzzing runs.
+    """
     global can_fuzz
     can_fuzz = False

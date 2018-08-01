@@ -63,19 +63,28 @@ def create_invocation_statement(config_dict):
     return tup
 
 
-# TODO(ww): Use shlex or something similar here.
 def stringify_program_array(target_application_path, target_args_array):
-    """ Escape paths with spaces in them by surrounding them with quotes """
-    out = "{} {}\n".format(esc_quote(target_application_path), ' '.join(esc_quote(k) for k in target_args_array))
+    """
+    Escape paths with spaces in them by surrounding them with quotes.
+    """
+    out = "{} {}\n".format(
+        esc_quote(target_application_path),
+        ' '.join(esc_quote(k) for k in target_args_array)
+    )
+
     return out
 
 
 # TODO: Use shlex or something similar here.
 def unstringify_program_array(stringified):
-    """ Turn a stringified program array back into the tokens that went in. Treats quoted entities as atomic,
-         splits all others on spaces. """
+    """
+    Turn a stringified program array back into the tokens that went in.
+    Treats quoted entities as atomic,
+    splits all others on spaces.
+    """
     invoke = []
-    split = re.split('(\".*?\")', stringified)  # TODO use this for config file parsing
+    # TODO use this for config file parsing
+    split = re.split('(\".*?\")', stringified)
     for token in split:
         if "\"" in token:
             invoke.append(token)
@@ -87,13 +96,21 @@ def unstringify_program_array(stringified):
 
 
 def get_target_dir(_config):
-    """ Gets (or creates) the path to a target directory for the current config file """
+    """
+    Gets (or creates) the path to a target directory for the current
+    config file.
+    """
+    # TODO(ww): Use os.path.basename for this?
     exe_name = _config['target_application_path'].split('\\')[-1].strip('.exe').upper()
-    dir_hash = sha1("{} {}".format(_config['target_application_path'], _config['target_args']).encode('utf-8')).hexdigest()
+    dir_hash = sha1(
+        "{} {}".format(_config['target_application_path'], _config['target_args']).encode('utf-8')
+    ).hexdigest()
     dir_name = os.path.join(config.sl2_targets_dir, "{}_{}".format(exe_name, dir_hash))
+
     if not os.path.isdir(dir_name):
         os.makedirs(dir_name)
     arg_file = os.path.join(dir_name, 'arguments.txt')
+
     if not os.path.exists(arg_file):
         with open(arg_file, 'w') as argfile:
             argfile.write(stringify_program_array(_config['target_application_path'], _config['target_args']))
@@ -208,7 +225,11 @@ def parse_triage_output(run_id):
             formatted += ("\n\t0x{location:02x}: {instruction}".format(**results))
             return formatted, results
     except FileNotFoundError:
-        message = "The triage tool exited improperly during run {}, but no crash file could be found. It may have timed out. To retry it manually, run `python harness.py -v -e TRIAGE [-p <PROFILE>]`"
+        message = "The triage tool exited improperly during run {}, \
+        but no crash file could be found. It may have timed out. \
+        To retry it manually, run \
+        `python harness.py -v -e TRIAGE [-p <PROFILE>]`"
+
         return message.format(run_id), None
 
 
@@ -261,8 +282,10 @@ def check_fuzz_line_for_crash(line):
         obj = json.loads(line)
         if obj["exception"]:
             return True, obj["exception"]
-    except Exception:
+    except (json.JSONDecodeError, KeyError):
         pass
+    except Exception as e:
+        print("[!] Unexpected exception while checking for crash:", e)
     return False, None
 
 
@@ -275,6 +298,8 @@ def check_fuzz_line_for_run_id(line):
         obj = json.loads(line)
         if obj["run_id"]:
             return uuid.UUID(obj["run_id"])
-    except Exception:
+    except (json.JSONDecodeError, KeyError):
         pass
+    except Exception as e:
+        print("[!] Unexpected exception while checking for run id:", e)
     return None

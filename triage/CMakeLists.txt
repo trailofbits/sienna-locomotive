@@ -3,12 +3,11 @@ file(
     GLOB SOURCES ${BREAKPAD_DIR}/third_party/libdisasm/*.c
 )
 
-
+# add_compile_definitions isn't added until cmake 3.12
 # add_compile_definitions( BPLOG_MINIMUM_SEVERITY=SEVERITY_CRITICAL )
-
+add_definitions( -DBPLOG_MINIMUM_SEVERITY=SEVERITY_CRITICAL )
 
 #GLOB SOURCES ${BREAKPAD_DIR}/processor/*.cc
-
 # include(ExternalProject)
 # ExternalProject_Add(googletest
 #     URL https://github.com/google/googletest/archive/release-1.7.0.zip
@@ -25,9 +24,6 @@ file(
 # # )
 # add_dependencies(gtest googletest)
 # #add_dependencies(gtest_main googletest)
-
-
-
 
 include_directories(
     ${BREAKPAD_DIR}
