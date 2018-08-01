@@ -114,9 +114,7 @@ def main():
                 print("{}) [{}]  {}".format(
                     len(mapping),
                     target[-40:][:8],  # first 8 bytes of the SHA hash
-                    stringify_program_array(
-                        targets[target][0],
-                        targets[target][1])))
+                    stringify_program_array(targets[target][0], targets[target][1])))
                 mapping.append(target)
             target_id = mapping[select_from_range(len(mapping), "Select a target to fuzz> ")]
             config['target_application_path'], config['target_args'] = targets[target_id]
