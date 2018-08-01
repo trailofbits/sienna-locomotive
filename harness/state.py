@@ -46,9 +46,8 @@ def unique_pidfile():
 
 def create_invocation_statement(config_dict):
     """
-    Returns a tuple of a DR invocation (as an array),
-    its stringified equivalent, and the pidfile that
-    will be created by the invocation.
+    Returns an InvocationState containing the command run,
+    its incipient pidfile, and the PRNG seed used.
     """
     pidfile = unique_pidfile()
     seed = str(random.getrandbits(64))

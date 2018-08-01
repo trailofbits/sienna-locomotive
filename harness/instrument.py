@@ -80,7 +80,8 @@ def run_dr(config_dict, verbose=False, timeout=None):
     """
     Runs dynamorio with the given config.
     Clobbers console output if save_stderr/stdout are true.
-    Returns a popen object and the PRNG seed used during the run.
+    Returns a DRRun instance containing the popen object and PRNG seed
+    used during the run.
     """
     invoke = create_invocation_statement(config_dict)
 
