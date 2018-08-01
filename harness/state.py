@@ -282,7 +282,7 @@ def check_fuzz_line_for_crash(line):
         obj = json.loads(line)
         if obj["exception"]:
             return True, obj["exception"]
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, KeyError):
         pass
     except Exception as e:
         print("[!] Unexpected exception while checking for crash:", e)
@@ -298,7 +298,7 @@ def check_fuzz_line_for_run_id(line):
         obj = json.loads(line)
         if obj["run_id"]:
             return uuid.UUID(obj["run_id"])
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, KeyError):
         pass
     except Exception as e:
         print("[!] Unexpected exception while checking for run id:", e)
