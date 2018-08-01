@@ -20,28 +20,33 @@ import configparser
 # TODO(ww): Add conversion to the schema as well?
 CONFIG_SCHEMA = {}
 
-for path in ['drrun_path', 'client_path', 'server_path', 'wizard_path', 'tracer_path', 'triager_path']:
+PATH_KEYS = ['drrun_path', 'client_path', 'server_path', 'wizard_path', 'tracer_path', 'triager_path']
+ARGS_KEYS = ['drrun_args', 'client_args', 'target_args']
+INT_KEYS = ['runs', 'simultaneous', 'fuzz_timeout', 'triage_timeout']
+FLAG_KEYS = ['verbose', 'debug', 'nopersist', 'continuous', 'exit_early', 'inline_stdout']
+
+for path in PATH_KEYS:
     CONFIG_SCHEMA[path] = {
         'test': os.path.isfile,
         'expected': 'path to a extant file',
         'required': True,
     }
 
-for args in ['drrun_args', 'client_args', 'target_args']:
+for args in ARGS_KEYS:
     CONFIG_SCHEMA[args] = {
         'test': lambda xs: type(xs) is list and all(type(x) is str for x in xs),
         'expected': 'command-line arguments (array of strings)',
         'required': True,
     }
 
-for num in ['runs', 'simultaneous', 'fuzz_timeout', 'triage_timeout']:
+for num in INT_KEYS:
     CONFIG_SCHEMA[num] = {
         'test': lambda x: type(x) is int and x > 0,
         'expected': 'nonnegative integer',
         'required': False,
     }
 
-for flag in ['verbose', 'debug', 'nopersist', 'continuous', 'exit_early', 'inline_stdout']:
+for flag in FLAG_KEYS:
     CONFIG_SCHEMA[flag] = {
         'test': lambda x: type(x) is bool,
         'expected': 'boolean',
@@ -252,15 +257,12 @@ def update_config_from_args():
     """
     global config
     # Convert numeric arguments into ints.
-    # Need to update this list manually if adding anything.
-    int_options = ['runs', 'simultaneous', 'fuzz_timeout', 'triage_timeout']
-    for opt in int_options:
+    for opt in INT_KEYS:
         if opt in config:
             config[opt] = int(config[opt])
 
     # Convert comma-separated arguments into lists
-    list_options = ['drrun_args', 'client_args', 'target_args']
-    for opt in list_options:
+    for opt in ARGS_KEYS:
         config[opt] = [] if (len(config[opt]) == 0) else config[opt].split(',')
 
     if args.target_application_path is not None and len(config['target_args']) > 0:
@@ -296,7 +298,6 @@ def update_config_from_args():
 
 
 def validate_config():
-    global config
     for key in CONFIG_SCHEMA:
         # If the key is required but not present, fail loudly.
         if CONFIG_SCHEMA[key]['required'] and key not in config:
