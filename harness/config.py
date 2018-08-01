@@ -221,7 +221,6 @@ def set_profile(new_profile):
 
     update_config_from_args()
     validate_config()
-    # TODO(ww): validate config (make sure all required keys are present)
 
 
 def create_new_profile(name, dynamorio_exe, build_dir, target_path, target_args):
