@@ -272,6 +272,7 @@ def update_config_from_args():
         config['drrun_args'].append('-verbose')
 
     if args.debug:
+        print("WARNING: debug mode may destabilize the binary instrumentation!")
         config['drrun_args'].append('-debug')
 
     if not args.nopersist:
