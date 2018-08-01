@@ -253,6 +253,9 @@ def fuzzer_run(config_dict):
     return crashed, run_id
 
 
+# TODO(ww): Rename this to "tracer_run" or something similar,
+# and break the internal triager_run call into another method
+# (trace_and_triage, maybe?)
 def triage_run(config_dict, run_id):
     """ Runs the triaging tool """
     completed_process = run_dr(
