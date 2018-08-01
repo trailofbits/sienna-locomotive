@@ -1,5 +1,5 @@
 """
-Handles argument and config file parsing for the fuzzer.
+Handles argument and config file parsing for SL2.
 
 1: Check if the config file exists. If not, create it with sensible defaults.
 2: If the config file exists, read in the contents.
@@ -11,6 +11,42 @@ import os
 import sys
 import argparse
 import configparser
+
+# Schematizes the SL2 configuration.
+# Every configuration key has a 'test' function, an 'expected'
+# string that explains the result of a failed test, and a 'required'
+# bool that indicates whether the harness should continue without its
+# presence.
+# TODO(ww): Add conversion to the schema as well?
+CONFIG_SCHEMA = {}
+
+for path in ['drrun_path', 'client_path', 'server_path', 'wizard_path', 'tracer_path', 'triager_path']:
+    CONFIG_SCHEMA[path] = {
+        'test': os.path.isfile,
+        'expected': 'path to a extant file',
+        'required': True,
+    }
+
+for args in ['drrun_args', 'client_args', 'target_args']:
+    CONFIG_SCHEMA[args] = {
+        'test': lambda xs: type(xs) is list and all(type(x) is str for x in xs),
+        'expected': 'command-line arguments (array of strings)',
+        'required': True,
+    }
+
+for num in ['runs', 'simultaneous', 'fuzz_timeout', 'triage_timeout']:
+    CONFIG_SCHEMA[num] = {
+        'test': lambda x: type(x) is int and x > 0,
+        'expected': 'nonnegative integer',
+        'required': False,
+    }
+
+for flag in ['verbose', 'debug', 'nopersist', 'continuous', 'exit_early', 'inline_stdout']:
+    CONFIG_SCHEMA[flag] = {
+        'test': lambda x: type(x) is bool,
+        'expected': 'boolean',
+        'required': False,
+    }
 
 # NOTE(ww): Keep these up-to-data with include/server.hpp!
 sl2_server_pipe_path = "\\\\.\\pipe\\fuzz_server"
@@ -184,6 +220,7 @@ def set_profile(new_profile):
         sys.exit()
 
     update_config_from_args()
+    validate_config()
     # TODO(ww): validate config (make sure all required keys are present)
 
 
@@ -247,6 +284,7 @@ def update_config_from_args():
         if getattr(args, arg) is not None:
             config[arg] = getattr(args, arg)
 
+    # TODO(ww): Remove this validation now that validate_config is present.
     for key in config:
         if 'path' in key:
             if not os.path.exists(config[key]):
@@ -256,6 +294,20 @@ def update_config_from_args():
                 if len(root) > 0 and ':' not in root:  # UNC Path
                     print("WARNING: Replacing UNC Path", config[key], "with", extension)
                     config[key] = extension
+
+
+def validate_config():
+    global config
+    for key in CONFIG_SCHEMA:
+        # If the key is required but not present, fail loudly.
+        if CONFIG_SCHEMA[key]['required'] and key not in config:
+            print("ERROR: Missing required key:", key)
+            sys.exit()
+        # If they key is present but doesn't validate, fail loudly.
+        if key in config:
+            if not CONFIG_SCHEMA[key]['test'](config[key]):
+                print("ERROR: Failed to validate %s: expected %s" % (key, CONFIG_SCHEMA[key]['expected']))
+                sys.exit()
 
 
 set_profile(args.profile)
