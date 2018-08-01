@@ -73,17 +73,17 @@ def run_dr(config_dict, verbose=False, timeout=None):
     Clobbers console output if save_stderr/stdout are true.
     Returns a popen object and the PRNG seed used during the run.
     """
-    cmd_arr, cmd_str, pidfile, seed = create_invocation_statement(config_dict)
+    invoke = create_invocation_statement(config_dict)
 
     if verbose:
-        print_l("Executing drrun: %s" % cmd_str)
+        print_l("Executing drrun: %s" % invoke.cmd_str)
 
     # Run client on target application
     started = time.time()
 
     stdout = sys.stdout if config_dict['inline_stdout'] else subprocess.PIPE
     stderr = subprocess.PIPE
-    popen_obj = subprocess.Popen(cmd_arr,
+    popen_obj = subprocess.Popen(invoke.cmd_arr,
                                  stdout=stdout,
                                  stderr=stderr)
 
@@ -99,7 +99,7 @@ def run_dr(config_dict, verbose=False, timeout=None):
         popen_obj.stderr = stderr
         popen_obj.timed_out = False
 
-        return popen_obj, seed
+        return popen_obj, invoke.seed
 
     # Handle cases where the program didn't exit in time
     except subprocess.TimeoutExpired:
@@ -107,7 +107,7 @@ def run_dr(config_dict, verbose=False, timeout=None):
             print_l("Process Timed Out after %s seconds" % (time.time() - started))
 
         # Parse PID of target application and kill it, which causes drrun to exit
-        with open(pidfile, 'r') as pidfile_contents:
+        with open(invoke.pidfile, 'r') as pidfile_contents:
             pid = pidfile_contents.read().strip()
             if verbose:
                 print_l("Killing child process:", pid)
@@ -135,11 +135,11 @@ def run_dr(config_dict, verbose=False, timeout=None):
         popen_obj.timed_out = True
     finally:
         try:
-            os.remove(pidfile)
+            os.remove(invoke.pidfile)
         except OSError:
-            print_l("[!] Couldn't remove pidfile: ", pidfile)
+            print_l("[!] Couldn't remove pidfile: ", invoke.pidfile)
 
-    return popen_obj, seed
+    return popen_obj, invoke.seed
 
 
 def triager_run(run_id):

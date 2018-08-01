@@ -12,8 +12,20 @@ import uuid
 import random
 from hashlib import sha1
 from csv import DictWriter
+from typing import NamedTuple
 
 from . import config
+
+
+class InvocationState(NamedTuple):
+    """
+    Represents the state created by a call to
+    create_invocation_statement.
+    """
+    cmd_arr: list
+    cmd_str: str
+    pidfile: str
+    seed: str
 
 
 def esc_quote(raw):
@@ -55,14 +67,12 @@ def create_invocation_statement(config_dict):
         *config_dict['target_args']
     ]
 
-    tup = (
+    return InvocationState(
         program_arr,
         stringify_program_array(program_arr[0], program_arr[1:]),
         pidfile,
-        seed,
+        seed
     )
-
-    return tup
 
 
 def stringify_program_array(target_application_path, target_args_array):
