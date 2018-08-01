@@ -148,7 +148,7 @@ def triager_run(run_id):
     """
     dmpfile = get_path_to_run_file(run_id, "initial.dmp")
     if os.path.isfile(dmpfile):
-        cmd = [config.config['triager_path'], dmpfile]        
+        cmd = [config.config['triager_path'], dmpfile]
         out = subprocess.check_output(cmd, shell=False)
         if config.config["debug"]:
             print_l(repr(out))
@@ -259,7 +259,7 @@ def triage_run(config_dict, run_id):
         {
             'drrun_path': config_dict['drrun_path'],
             'drrun_args': config_dict['drrun_args'],
-            'client_path': config_dict['triage_path'],
+            'client_path': config_dict['tracer_path'],
             'client_args': [*config_dict['client_args'], '-r', str(run_id)],
             'target_application_path': config_dict['target_application_path'],
             'target_args': config_dict['target_args'],

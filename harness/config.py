@@ -29,20 +29,21 @@ os.makedirs(sl2_targets_dir, exist_ok=True)
 # Create a default config file if one doesn't exist
 if not os.path.exists(sl2_config_path):
     default_config = configparser.ConfigParser()
-    default_config['DEFAULT'] = {'drrun_path': 'dynamorio\\bin64\\drrun.exe',
-                                 'drrun_args': '',
-                                 'client_path': 'build\\fuzz_dynamorio\\Debug\\fuzzer.dll',
-                                 'client_args': '',
-                                 'server_path': 'build\\server\\Debug\\server.exe',
-                                 'wizard_path': 'build\\wizard\\Debug\\wizard.dll',
-                                 'triage_path': 'build\\triage_dynamorio\\Debug\\tracer.dll',
-                                 'triager_path': r'.\build\triage\Debug\triager.exe',
-                                 'target_application_path': 'build\\corpus\\test_application\\Debug\\test_application.exe',
-                                 'target_args': '0,-f',
-                                 'runs': 1,
-                                 'simultaneous': 1,
-                                 'inline_stdout': False
-                                 }
+    default_config['DEFAULT'] = {
+        'drrun_path': 'dynamorio\\bin64\\drrun.exe',
+        'drrun_args': '',
+        'client_path': 'build\\fuzz_dynamorio\\Debug\\fuzzer.dll',
+        'client_args': '',
+        'server_path': 'build\\server\\Debug\\server.exe',
+        'wizard_path': 'build\\wizard\\Debug\\wizard.dll',
+        'tracer_path': 'build\\triage_dynamorio\\Debug\\tracer.dll',
+        'triager_path': r'.\build\triage\Debug\triager.exe',
+        'target_application_path': 'build\\corpus\\test_application\\Debug\\test_application.exe',
+        'target_args': '0,-f',
+        'runs': 1,
+        'simultaneous': 1,
+        'inline_stdout': False
+    }
     with open(sl2_config_path, 'w') as configfile:
         default_config.write(configfile)
 
@@ -187,19 +188,21 @@ def set_profile(new_profile):
 
 def create_new_profile(name, dynamorio_exe, build_dir, target_path, target_args):
     global _config
-    _config[name] = {'drrun_path': dynamorio_exe,
-                     'drrun_args': '',
-                     'client_path': os.path.join(build_dir, 'fuzz_dynamorio\\Debug\\fuzzer.dll'),
-                     'client_args': '',
-                     'server_path': os.path.join(build_dir, 'server\\Debug\\server.exe'),
-                     'wizard_path': os.path.join(build_dir, 'wizard\\Debug\\wizard.dll'),
-                     'triage_path': os.path.join(build_dir, 'triage_dynamorio\\Debug\\tracer.dll'),
-                     'triager_path': os.path.join(build_dir,  r'\triage\Debug\triager.exe'),
-                     'target_application_path': target_path,
-                     'target_args': target_args,
-                     'runs': 1,
-                     'simultaneous': 1,
-                     'inline_stdout': False}
+    _config[name] = {
+        'drrun_path': dynamorio_exe,
+        'drrun_args': '',
+        'client_path': os.path.join(build_dir, 'fuzz_dynamorio\\Debug\\fuzzer.dll'),
+        'client_args': '',
+        'server_path': os.path.join(build_dir, 'server\\Debug\\server.exe'),
+        'wizard_path': os.path.join(build_dir, 'wizard\\Debug\\wizard.dll'),
+        'tracer_path': os.path.join(build_dir, 'triage_dynamorio\\Debug\\tracer.dll'),
+        'triager_path': os.path.join(build_dir,  r'\triage\Debug\triager.exe'),
+        'target_application_path': target_path,
+        'target_args': target_args,
+        'runs': 1,
+        'simultaneous': 1,
+        'inline_stdout': False
+    }
 
     with open(sl2_config_path, 'w') as configfile:
         _config.write(configfile)
