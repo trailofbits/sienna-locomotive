@@ -106,13 +106,13 @@ def run_dr(config_dict, verbose=False, timeout=None):
             print_l("Process Timed Out after %s seconds" % (time.time() - started))
 
         # Parse PID of target application and kill it, which causes drrun to exit
-        with open(pidfile, 'r') as pidfile:
-            pid = pidfile.read().strip()
+        with open(pidfile, 'r') as pidfile_contents:
+            pid = pidfile_contents.read().strip()
             if verbose:
                 print_l("Killing child process:", pid)
             try:
                 os.kill(int(pid), signal.SIGTERM)
-            except PermissionError:
+            except (PermissionError, OSError):
                 print_l("WARNING: Couldn't kill child process")
 
         # Try to get the output again
@@ -148,13 +148,13 @@ def triager_run(run_id):
     """
     dmpfile = get_path_to_run_file(run_id, "initial.dmp")
     if os.path.isfile(dmpfile):
-        cmd = [r'.\build\triage\Debug\triager.exe', dmpfile]
-        # TODO(ww): Unused variable.
+        cmd = [config.config['triager_path'], dmpfile]        
         out = subprocess.check_output(cmd, shell=False)
         if config.config["debug"]:
             print_l(repr(out))
     else:
         print_l("[!] No initial.dmp to triage!")
+    return out
 
 
 def wizard_run(config_dict):
@@ -234,7 +234,7 @@ def fuzzer_run(config_dict):
                 print_l("[!] Not UTF-8:", repr(line))
 
     if not run_id:
-        print_l("Error: No run ID could be parsed from the server output")
+        print_l("Error: No run ID could be parsed from the server output. Did it crash?")
         return False, -1
 
     if crashed:

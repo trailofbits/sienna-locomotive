@@ -1,7 +1,7 @@
 
-from PyQt5.QtWidgets import QFileDialog, QStyle
-from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt, QSize
+from PySide2.QtWidgets import QFileDialog, QStyle
+from PySide2 import QtWidgets
+from PySide2.QtCore import Qt, QSize
 import os
 
 from harness import config
@@ -30,7 +30,7 @@ class ConfigWindow(QtWidgets.QDialog):
         self.okay_button.clicked.connect(self.accept)
 
         self.profiles = QtWidgets.QComboBox()
-        self.profiles.addItems(config._config.keys())
+        self.profiles.addItems(list(config._config.keys()))
 
         cbox_layout.addWidget(self.profiles)
         cbox_layout.addWidget(self.okay_button)
@@ -128,8 +128,8 @@ class ConfigWindow(QtWidgets.QDialog):
         if len(self.target_path.text()) == 0:
             QtWidgets.QMessageBox.critical(self, "Invalid Path", "Target application path cannot be empty")
             return
-        config.create_new_profile(name, self.drrun_path.text(), self.build_dir.text(),
-                                  self.target_path.text(), self.target_args.text())
+        config.create_new_profile(name, os.path.normpath(self.drrun_path.text()), os.path.normpath(self.build_dir.text()),
+                                  os.path.normpath(self.target_path.text()), self.target_args.text())
 
         self.profiles.clear()
         profile_names = list(config._config.keys())
@@ -142,7 +142,7 @@ class ConfigWindow(QtWidgets.QDialog):
         super().done(*args)
 
     def get_drrun_path(self):
-        path, good = QFileDialog.getOpenFileName(filter="*.exe", directory=config._config['DEFAULT']['drrun_path'])
+        path, good = QFileDialog.getOpenFileName(filter="*.exe", dir=config._config['DEFAULT']['drrun_path'])
         if good:
             self.drrun_path.setText(path)
 
@@ -152,7 +152,7 @@ class ConfigWindow(QtWidgets.QDialog):
             self.target_path.setText(path)
 
     def get_build_dir(self):
-        path = QFileDialog.getExistingDirectory(directory='build')
+        path = QFileDialog.getExistingDirectory(dir='build')
         if len(path) > 0:
             self.build_dir.setText(path)
 
