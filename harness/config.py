@@ -293,6 +293,11 @@ def update_config_from_args():
 
 
 def validate_config():
+    """
+    Check the (argv-supplanted) configuration, making sure that
+    all required keys are present and that all keys satisfy their
+    invariants.
+    """
     for key in CONFIG_SCHEMA:
         # If the key is required but not present, fail loudly.
         if CONFIG_SCHEMA[key]['required'] and key not in config:
