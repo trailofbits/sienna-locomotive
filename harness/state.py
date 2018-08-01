@@ -206,20 +206,20 @@ def get_path_to_run_file(run_id, filename):
     return os.path.join(config.sl2_runs_dir, str(run_id), filename)
 
 
-def write_output_files(proc, seed, run_id, stage_name):
+def write_output_files(run, run_id, stage_name):
     """
     Writes the PRNG seed, stdout, and stderr buffers for a particular stage
     into a run's directory.
     """
     try:
         with open(get_path_to_run_file(run_id, '{}.seed'.format(stage_name)), 'w') as seedfile:
-            seedfile.write(seed)
-        if proc.stdout is not None:
+            seedfile.write(run.seed)
+        if run.process.stdout is not None:
             with open(get_path_to_run_file(run_id, '{}.stdout'.format(stage_name)), 'wb') as stdoutfile:
-                stdoutfile.write(proc.stdout)
-        if proc.stderr is not None:
+                stdoutfile.write(run.process.stdout)
+        if run.process.stderr is not None:
             with open(get_path_to_run_file(run_id, '{}.stderr'.format(stage_name)), 'wb') as stderrfile:
-                stderrfile.write(proc.stderr)
+                stderrfile.write(run.process.stderr)
     except FileNotFoundError:
         print("Couldn't find an output directory for run %s" % run_id)
 
