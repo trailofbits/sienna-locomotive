@@ -14,6 +14,7 @@ import json
 import traceback
 import sys
 from enum import IntEnum
+from typing import NamedTuple
 
 from .state import (
     parse_triage_output,
@@ -40,6 +41,14 @@ class Mode(IntEnum):
     MATCH_RETN_ADDRESS = 1 << 1
     MATCH_ARG_HASH = 1 << 2
     MATCH_ARG_COMPARE = 1 << 3
+
+
+class DRRun(NamedTuple):
+    """
+    Represents the state returned by a call to run_dr.
+    """
+    process: subprocess.Popen
+    seed: str
 
 
 def print_l(*args):
@@ -70,19 +79,21 @@ def start_server():
 def run_dr(config_dict, verbose=False, timeout=None):
     """
     Runs dynamorio with the given config.
-    Clobbers console output if save_stderr/stdout are true
+    Clobbers console output if save_stderr/stdout are true.
+    Returns a DRRun instance containing the popen object and PRNG seed
+    used during the run.
     """
-    cmd_arr, cmd_str, pidfile = create_invocation_statement(config_dict)
+    invoke = create_invocation_statement(config_dict)
 
     if verbose:
-        print_l("Executing drrun: %s" % cmd_str)
+        print_l("Executing drrun: %s" % invoke.cmd_str)
 
     # Run client on target application
     started = time.time()
 
     stdout = sys.stdout if config_dict['inline_stdout'] else subprocess.PIPE
     stderr = subprocess.PIPE
-    popen_obj = subprocess.Popen(cmd_arr,
+    popen_obj = subprocess.Popen(invoke.cmd_arr,
                                  stdout=stdout,
                                  stderr=stderr)
 
@@ -98,7 +109,7 @@ def run_dr(config_dict, verbose=False, timeout=None):
         popen_obj.stderr = stderr
         popen_obj.timed_out = False
 
-        return popen_obj
+        return DRRun(popen_obj, invoke.seed)
 
     # Handle cases where the program didn't exit in time
     except subprocess.TimeoutExpired:
@@ -106,7 +117,7 @@ def run_dr(config_dict, verbose=False, timeout=None):
             print_l("Process Timed Out after %s seconds" % (time.time() - started))
 
         # Parse PID of target application and kill it, which causes drrun to exit
-        with open(pidfile, 'r') as pidfile_contents:
+        with open(invoke.pidfile, 'r') as pidfile_contents:
             pid = pidfile_contents.read().strip()
             if verbose:
                 print_l("Killing child process:", pid)
@@ -134,11 +145,11 @@ def run_dr(config_dict, verbose=False, timeout=None):
         popen_obj.timed_out = True
     finally:
         try:
-            os.remove(pidfile)
+            os.remove(invoke.pidfile)
         except OSError:
-            print_l("[!] Couldn't remove pidfile: ", pidfile)
+            print_l("[!] Couldn't remove pidfile: ", invoke.pidfile)
 
-    return popen_obj
+    return DRRun(popen_obj, invoke.seed)
 
 
 def triager_run(run_id):
@@ -161,7 +172,7 @@ def wizard_run(config_dict):
     """
     Runs the wizard and lets the user select a target function.
     """
-    completed_process = run_dr(
+    run = run_dr(
         {
             'drrun_path': config_dict['drrun_path'],
             'drrun_args': config_dict['drrun_args'],
@@ -178,7 +189,7 @@ def wizard_run(config_dict):
     mem_map = {}
     base_addr = None
 
-    for line in completed_process.stderr.split(b'\n'):
+    for line in run.process.stderr.split(b'\n'):
         try:
             line = line.decode('utf-8')
             obj = json.loads(line)
@@ -209,7 +220,7 @@ def wizard_run(config_dict):
 
 def fuzzer_run(config_dict):
     """ Runs the fuzzer """
-    completed_process = run_dr(
+    run = run_dr(
         config_dict,
         verbose=config_dict['verbose'],
         timeout=config_dict.get('fuzz_timeout', None)
@@ -219,7 +230,7 @@ def fuzzer_run(config_dict):
     run_id = None
     crashed = False
 
-    for line in completed_process.stderr.split(b'\n'):
+    for line in run.process.stderr.split(b'\n'):
         try:
             line = line.decode('utf-8')
             # Extract the run id from the run
@@ -239,15 +250,15 @@ def fuzzer_run(config_dict):
 
     if crashed:
         print_l('Fuzzing run %s returned %s after raising %s'
-                % (run_id, completed_process.returncode, exception))
+                % (run_id, run.process.returncode, exception))
         # Write stdout and stderr to files
         # TODO fix issue #40
-        write_output_files(completed_process, run_id, 'fuzz')
+        write_output_files(run, run_id, 'fuzz')
     elif config_dict['verbose']:
         print_l("Run %s did not find a crash" % run_id)
 
     # Handle orphaned pipes after a timeout
-    if completed_process.timed_out:
+    if run.process.timed_out:
         finalize(run_id, crashed)
 
     return crashed, run_id
@@ -258,7 +269,7 @@ def fuzzer_run(config_dict):
 # (trace_and_triage, maybe?)
 def triage_run(config_dict, run_id):
     """ Runs the triaging tool """
-    completed_process = run_dr(
+    run = run_dr(
         {
             'drrun_path': config_dict['drrun_path'],
             'drrun_args': config_dict['drrun_args'],
@@ -273,7 +284,7 @@ def triage_run(config_dict, run_id):
     )
 
     # Write stdout and stderr to files
-    write_output_files(completed_process, run_id, 'triage')
+    write_output_files(run, run_id, 'triage')
 
     formatted, raw = parse_triage_output(run_id)
     triager_run(run_id)

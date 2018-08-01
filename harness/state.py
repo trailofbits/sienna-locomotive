@@ -12,8 +12,20 @@ import uuid
 import random
 from hashlib import sha1
 from csv import DictWriter
+from typing import NamedTuple
 
 from . import config
+
+
+class InvocationState(NamedTuple):
+    """
+    Represents the state created by a call to
+    create_invocation_statement.
+    """
+    cmd_arr: list
+    cmd_str: str
+    pidfile: str
+    seed: str
 
 
 def esc_quote(raw):
@@ -34,18 +46,18 @@ def unique_pidfile():
 
 def create_invocation_statement(config_dict):
     """
-    Returns a tuple of a DR invocation (as an array),
-    its stringified equivalent, and the pidfile that
-    will be created by the invocation.
+    Returns an InvocationState containing the command run,
+    its incipient pidfile, and the PRNG seed used.
     """
     pidfile = unique_pidfile()
+    seed = str(random.getrandbits(64))
     program_arr = [
         config_dict['drrun_path'],
         '-pidfile',
         pidfile,
         *config_dict['drrun_args'],
         '-prng_seed',
-        str(random.getrandbits(64)),
+        seed,
         '-c',
         config_dict['client_path'],
         *config_dict['client_args'],
@@ -54,13 +66,12 @@ def create_invocation_statement(config_dict):
         *config_dict['target_args']
     ]
 
-    tup = (
+    return InvocationState(
         program_arr,
         stringify_program_array(program_arr[0], program_arr[1:]),
-        pidfile
+        pidfile,
+        seed
     )
-
-    return tup
 
 
 def stringify_program_array(target_application_path, target_args_array):
@@ -194,18 +205,20 @@ def get_path_to_run_file(run_id, filename):
     return os.path.join(config.sl2_runs_dir, str(run_id), filename)
 
 
-def write_output_files(proc, run_id, stage_name):
+def write_output_files(run, run_id, stage_name):
     """
-    Writes the stdout and stderr buffers for a particular stage
+    Writes the PRNG seed, stdout, and stderr buffers for a particular stage
     into a run's directory.
     """
     try:
-        if proc.stdout is not None:
+        with open(get_path_to_run_file(run_id, '{}.seed'.format(stage_name)), 'w') as seedfile:
+            seedfile.write(run.seed)
+        if run.process.stdout is not None:
             with open(get_path_to_run_file(run_id, '{}.stdout'.format(stage_name)), 'wb') as stdoutfile:
-                stdoutfile.write(proc.stdout)
-        if proc.stderr is not None:
+                stdoutfile.write(run.process.stdout)
+        if run.process.stderr is not None:
             with open(get_path_to_run_file(run_id, '{}.stderr'.format(stage_name)), 'wb') as stderrfile:
-                stderrfile.write(proc.stderr)
+                stderrfile.write(run.process.stderr)
     except FileNotFoundError:
         print("Couldn't find an output directory for run %s" % run_id)
 
