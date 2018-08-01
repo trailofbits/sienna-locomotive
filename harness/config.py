@@ -285,16 +285,11 @@ def update_config_from_args():
         if getattr(args, arg) is not None:
             config[arg] = getattr(args, arg)
 
-    # TODO(ww): Remove this validation now that validate_config is present.
-    for key in config:
-        if 'path' in key:
-            if not os.path.exists(config[key]):
-                print("WARNING: {key} = {dest}, which does not exist.".format(key=key, dest=config[key]))
-            else:
-                root, extension = os.path.splitdrive(config[key])
-                if len(root) > 0 and ':' not in root:  # UNC Path
-                    print("WARNING: Replacing UNC Path", config[key], "with", extension)
-                    config[key] = extension
+    for key in PATH_KEYS:
+        root, extension = os.path.splitdrive(config[key])
+        if len(root) > 0 and ':' not in root:  # UNC Path
+            print("WARNING: Replacing UNC Path", config[key], "with", extension)
+            config[key] = extension
 
 
 def validate_config():
