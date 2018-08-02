@@ -179,8 +179,6 @@ static void get_bytes_fkt(wchar_t *target_file, uint8_t *buf, size_t size)
     if (!CloseHandle(fkt)) {
         SL2_SERVER_LOG_FATAL("failed to close FKT");
     }
-
-    SL2_SERVER_LOG_INFO("read in %02x %02x %02x %02x %02x %02x %02x %02x\n", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
 }
 
 static void dump_arena(wchar_t *arena_path, sl2_arena *arena)
@@ -362,6 +360,12 @@ static void handle_register_mutation(HANDLE pipe)
         SL2_SERVER_LOG_FATAL("failed to read mutation count");
     }
     StringCchPrintfW(mutate_fname, MAX_PATH, FUZZ_RUN_FKT_FMT, mutate_count);
+
+    // TODO(ww): Add this to the FKT.
+    uint32_t mutation_type = 0;
+    if (!ReadFile(pipe, &mutation_type, sizeof(mutation_type), &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("failed to read mutation type");
+    }
 
     size_t resource_size = 0;
     if (!ReadFile(pipe, &resource_size, sizeof(resource_size), &txsize, NULL)) {
