@@ -9,8 +9,42 @@
 #define KNOWN_VALUES4 -2147483648, -100663046, -32769, 32768, 65536, 100663045, 2147483647, 4294967295
 #define KNOWN_VALUES8  -9151314442816848000, -2147483649, 2147483648, 4294967296, 432345564227567365, 18446744073709551615
 
+#define SL2_NUM_STRATEGIES (sizeof(SL2_STRATEGY_TABLE) / sizeof(SL2_STRATEGY_TABLE[0]))
+
 // Represents a custom mutation strategy.
 typedef void (*sl2_strategy_t)(uint8_t *buf, size_t size);
+
+extern sl2_strategy_t SL2_STRATEGY_TABLE[];
+
+SL2_EXPORT
+void strategyAAAA(uint8_t *buf, size_t size);
+
+SL2_EXPORT
+void strategyFlipBit(uint8_t *buf, size_t size);
+
+SL2_EXPORT
+void strategyRepeatBytes(uint8_t *buf, size_t size);
+
+SL2_EXPORT
+void strategyRepeatBytesBackwards(uint8_t *buf, size_t size);
+
+SL2_EXPORT
+void strategyDeleteBytes(uint8_t *buf, size_t size);
+
+SL2_EXPORT
+void strategyDeleteBytesAscii(uint8_t *buf, size_t size);
+
+SL2_EXPORT
+void strategyRandValues(uint8_t *buf, size_t size);
+
+SL2_EXPORT
+void strategyKnownValues(uint8_t *buf, size_t size);
+
+SL2_EXPORT
+void strategyAddSubKnownValues(uint8_t *buf, size_t size);
+
+SL2_EXPORT
+void strategyEndianSwap(uint8_t *buf, size_t size);
 
 // Mutates the given buffer using a user-selected, pre-defined strategy.
 // Returns false if the strategy does not exist or if the buffer is empy
