@@ -8,20 +8,34 @@
 #include "common/mutation.hpp"
 #include "common/sl2_dr_client.hpp"
 
-/*
-  Mutation strategies. The server selects one each time the fuzzing harness requests mutated bytes
-*/
+// TODO(ww): Additional strategies:
+// insert bytes
+// move bytes
+// add random bytes to space
+sl2_strategy_t SL2_STRATEGY_TABLE[] = {
+    // NOTE(ww): We probably don't need to use this.
+    // Some of the other strategies call it as a fallback.
+    // strategyAAAA,
+    strategyFlipBit,
+    strategyRandValues,
+    strategyRepeatBytes,
+    strategyRepeatBytesBackwards,
+    strategyKnownValues,
+    strategyAddSubKnownValues,
+    strategyEndianSwap,
+    strategyDeleteBytes,
+    strategyDeleteBytesAscii,
+};
 
-// NOTE(ww): Keep this up-to-date with the number of strategy functions we implement.
-#define NUM_STRATEGIES 9
-
-static void strategyAAAA(uint8_t *buf, size_t size)
+SL2_EXPORT
+void strategyAAAA(uint8_t *buf, size_t size)
 {
     memset(buf, 'A', size);
 }
 
 // Flip a random bit within a random byte in the input buffer.
-static void strategyFlipBit(uint8_t *buf, size_t size)
+SL2_EXPORT
+void strategyFlipBit(uint8_t *buf, size_t size)
 {
     size_t pos = dr_get_random_value(size);
     buf[pos] ^= (1 << dr_get_random_value(8));
@@ -29,7 +43,8 @@ static void strategyFlipBit(uint8_t *buf, size_t size)
 
 // Repeat a random continuous span of bytes
 // within the input buffer.
-static void strategyRepeatBytes(uint8_t *buf, size_t size)
+SL2_EXPORT
+void strategyRepeatBytes(uint8_t *buf, size_t size)
 {
     // pos -> zero to second to last byte
     size_t pos = dr_get_random_value(size - 1);
@@ -56,7 +71,8 @@ static void strategyRepeatBytes(uint8_t *buf, size_t size)
 
 // Reverse the order of a random continuous span of bytes
 // within the input buffer.
-static void strategyRepeatBytesBackwards(uint8_t *buf, size_t size)
+SL2_EXPORT
+void strategyRepeatBytesBackwards(uint8_t *buf, size_t size)
 {
     size_t start = dr_get_random_value(size - 1);
     size_t end = start + dr_get_random_value((size + 1) - start);
@@ -66,7 +82,8 @@ static void strategyRepeatBytesBackwards(uint8_t *buf, size_t size)
 
 // Delete (null out) a random continuous span of bytes
 // within the input buffer.
-static void strategyDeleteBytes(uint8_t *buf, size_t size)
+SL2_EXPORT
+void strategyDeleteBytes(uint8_t *buf, size_t size)
 {
     size_t start = dr_get_random_value(size - 1);
     size_t count = dr_get_random_value((size + 1) - start);
@@ -76,7 +93,8 @@ static void strategyDeleteBytes(uint8_t *buf, size_t size)
 
 // Delete (ASCII zero-out) a random continuous span of bytes
 // within the input buffer.
-static void strategyDeleteBytesAscii(uint8_t *buf, size_t size)
+SL2_EXPORT
+void strategyDeleteBytesAscii(uint8_t *buf, size_t size)
 {
     size_t start = dr_get_random_value(size - 1);
     size_t count = dr_get_random_value((size + 1) - start);
@@ -86,7 +104,8 @@ static void strategyDeleteBytesAscii(uint8_t *buf, size_t size)
 
 // Replace a random continuous span of bytes within the input
 // buffer with random values.
-static void strategyRandValues(uint8_t *buf, size_t size)
+SL2_EXPORT
+void strategyRandValues(uint8_t *buf, size_t size)
 {
     size_t rand_size = 0;
     size_t max = 0;
@@ -111,7 +130,8 @@ static void strategyRandValues(uint8_t *buf, size_t size)
 
 // Replace a random continuous span of bytes within the input
 // buffer with well-known values (maxes, overflows, etc).
-static void strategyKnownValues(uint8_t *buf, size_t size)
+SL2_EXPORT
+void strategyKnownValues(uint8_t *buf, size_t size)
 {
     int8_t values1[] = { KNOWN_VALUES1 };
     int16_t values2[] = { KNOWN_VALUES1, KNOWN_VALUES2 };
@@ -165,7 +185,8 @@ static void strategyKnownValues(uint8_t *buf, size_t size)
 
 // Add or subtract a random well-known value from a random u8/u16/u32/u64.
 // Additionally, perform a random byteswap.
-static void strategyAddSubKnownValues(uint8_t *buf, size_t size)
+SL2_EXPORT
+void strategyAddSubKnownValues(uint8_t *buf, size_t size)
 {
     int8_t values1[] = { KNOWN_VALUES1 };
     int16_t values2[] = { KNOWN_VALUES1, KNOWN_VALUES2 };
@@ -218,7 +239,8 @@ static void strategyAddSubKnownValues(uint8_t *buf, size_t size)
 }
 
 // Swap the endiannness of a random u8/u16/u32/u64.
-static void strategyEndianSwap(uint8_t *buf, size_t size)
+SL2_EXPORT
+void strategyEndianSwap(uint8_t *buf, size_t size)
 {
     size_t rand_size = 0;
     size_t max = 0;
@@ -258,49 +280,11 @@ static void strategyEndianSwap(uint8_t *buf, size_t size)
 SL2_EXPORT
 bool mutate_buffer_choice(uint8_t *buf, size_t size, uint32_t choice)
 {
-    if (size == 0 || choice > NUM_STRATEGIES - 1) {
+    if (size == 0 || choice > SL2_NUM_STRATEGIES - 1) {
         return false;
     }
 
-    switch (choice) {
-        case 0:
-            strategyFlipBit(buf, size);
-            break;
-        case 1:
-            strategyRandValues(buf, size);
-            break;
-        case 2:
-            strategyRepeatBytes(buf, size);
-            break;
-        case 3:
-            strategyKnownValues(buf, size);
-            break;
-        case 4:
-            strategyAddSubKnownValues(buf, size);
-            break;
-        case 5:
-            strategyEndianSwap(buf, size);
-            break;
-        case 6:
-            strategyDeleteBytes(buf, size);
-            break;
-        case 7:
-            strategyDeleteBytesAscii(buf, size);
-            break;
-        case 8:
-            strategyRepeatBytesBackwards(buf, size);
-            break;
-        default:
-            // NOTE(ww): We should never reach this, unless NUM_STRATEGIES gets out-of-sync.
-            strategyAAAA(buf, size);
-            break;
-    }
-
-
-    // TODO(ww): Additional strategies:
-    // insert bytes
-    // move bytes
-    // add random bytes to space
+    SL2_STRATEGY_TABLE[choice](buf, size);
 
     return true;
 }
@@ -308,7 +292,7 @@ bool mutate_buffer_choice(uint8_t *buf, size_t size, uint32_t choice)
 SL2_EXPORT
 bool mutate_buffer(uint8_t *buf, size_t size)
 {
-    return mutate_buffer_choice(buf, size, dr_get_random_value(NUM_STRATEGIES));
+    return mutate_buffer_choice(buf, size, dr_get_random_value(SL2_NUM_STRATEGIES));
 }
 
 SL2_EXPORT
