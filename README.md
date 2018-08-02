@@ -208,7 +208,7 @@ After the tracer has been run, `triager.exe` is run on the minidump file. It als
 
     // A unique identifier for the crash. The algorithm uses 12 bits from the called functions, 
     // and is unaffected by ASLR, function call order, or function call count
-    "stackHash": "f96808cfc4798256",
+    "crashash": "f96808cfc4798256",
 
     // Stack pointer at time of crash
     "stackPointer": 14757395258967641292,

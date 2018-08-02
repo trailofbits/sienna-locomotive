@@ -40,12 +40,13 @@ public:
     Triage( const string& path );
 
     StatusCode                  process();
+    StatusCode                  preProcess();
     XploitabilityRank           exploitabilityRank()        const;
     const string                crashReason()               const;
     const string                exploitability()            const;
     const string                minidumpPath()              const;
     const string                ranksString()               const;
-    const string                stackHash()                 const;
+    const string                crashash()                 const;
     const string                triageTag()                 const;
     const uint64_t              crashAddress()              const;
     const uint64_t              instructionPointer()        const;
