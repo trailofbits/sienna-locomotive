@@ -33,7 +33,6 @@ void strategyAAAA(uint8_t *buf, size_t size)
     memset(buf, 'A', size);
 }
 
-// Flip a random bit within a random byte in the input buffer.
 SL2_EXPORT
 void strategyFlipBit(uint8_t *buf, size_t size)
 {
@@ -41,8 +40,6 @@ void strategyFlipBit(uint8_t *buf, size_t size)
     buf[pos] ^= (1 << dr_get_random_value(8));
 }
 
-// Repeat a random continuous span of bytes
-// within the input buffer.
 SL2_EXPORT
 void strategyRepeatBytes(uint8_t *buf, size_t size)
 {
@@ -69,8 +66,6 @@ void strategyRepeatBytes(uint8_t *buf, size_t size)
     }
 }
 
-// Reverse the order of a random continuous span of bytes
-// within the input buffer.
 SL2_EXPORT
 void strategyRepeatBytesBackwards(uint8_t *buf, size_t size)
 {
@@ -80,8 +75,6 @@ void strategyRepeatBytesBackwards(uint8_t *buf, size_t size)
     std::reverse(buf + start, buf + end);
 }
 
-// Delete (null out) a random continuous span of bytes
-// within the input buffer.
 SL2_EXPORT
 void strategyDeleteBytes(uint8_t *buf, size_t size)
 {
@@ -91,8 +84,6 @@ void strategyDeleteBytes(uint8_t *buf, size_t size)
     memset(buf + start, 0, count);
 }
 
-// Delete (ASCII zero-out) a random continuous span of bytes
-// within the input buffer.
 SL2_EXPORT
 void strategyDeleteBytesAscii(uint8_t *buf, size_t size)
 {
@@ -102,8 +93,6 @@ void strategyDeleteBytesAscii(uint8_t *buf, size_t size)
     memset(buf + start, '0', count);
 }
 
-// Replace a random continuous span of bytes within the input
-// buffer with random values.
 SL2_EXPORT
 void strategyRandValues(uint8_t *buf, size_t size)
 {
@@ -128,8 +117,6 @@ void strategyRandValues(uint8_t *buf, size_t size)
     }
 }
 
-// Replace a random continuous span of bytes within the input
-// buffer with well-known values (maxes, overflows, etc).
 SL2_EXPORT
 void strategyKnownValues(uint8_t *buf, size_t size)
 {
@@ -183,8 +170,6 @@ void strategyKnownValues(uint8_t *buf, size_t size)
     }
 }
 
-// Add or subtract a random well-known value from a random u8/u16/u32/u64.
-// Additionally, perform a random byteswap.
 SL2_EXPORT
 void strategyAddSubKnownValues(uint8_t *buf, size_t size)
 {
@@ -238,7 +223,6 @@ void strategyAddSubKnownValues(uint8_t *buf, size_t size)
     }
 }
 
-// Swap the endiannness of a random u8/u16/u32/u64.
 SL2_EXPORT
 void strategyEndianSwap(uint8_t *buf, size_t size)
 {
