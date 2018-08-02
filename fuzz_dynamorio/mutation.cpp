@@ -36,7 +36,7 @@ void strategyAAAA(uint8_t *buf, size_t size)
 SL2_EXPORT
 void strategyFlipBit(uint8_t *buf, size_t size)
 {
-    size_t pos = dr_get_random_value(size);
+    size_t pos = dr_get_random_value((uint) size);
     buf[pos] ^= (1 << dr_get_random_value(8));
 }
 
@@ -44,19 +44,19 @@ SL2_EXPORT
 void strategyRepeatBytes(uint8_t *buf, size_t size)
 {
     // pos -> zero to second to last byte
-    size_t pos = dr_get_random_value(size - 1);
+    size_t pos = dr_get_random_value((uint) (size - 1));
 
     // repeat_length -> 1 to (remaining_size - 1)
     size_t size_m2 = size - 2;
     size_t repeat_length = 0;
     if (size_m2 > pos) {
-        repeat_length = dr_get_random_value(size_m2 - pos);
+        repeat_length = dr_get_random_value((uint) (size_m2 - pos));
     }
     repeat_length++;
 
     // set start and end
     size_t curr_pos = pos + repeat_length;
-    size_t end = dr_get_random_value(size - curr_pos);
+    size_t end = dr_get_random_value((uint) (size - curr_pos));
     end += curr_pos + 1;
 
     while (curr_pos < end) {
@@ -69,8 +69,8 @@ void strategyRepeatBytes(uint8_t *buf, size_t size)
 SL2_EXPORT
 void strategyRepeatBytesBackwards(uint8_t *buf, size_t size)
 {
-    size_t start = dr_get_random_value(size - 1);
-    size_t end = start + dr_get_random_value((size + 1) - start);
+    size_t start = dr_get_random_value((uint) (size - 1));
+    size_t end = start + dr_get_random_value((uint) ((size + 1) - start));
 
     std::reverse(buf + start, buf + end);
 }
@@ -78,8 +78,8 @@ void strategyRepeatBytesBackwards(uint8_t *buf, size_t size)
 SL2_EXPORT
 void strategyDeleteBytes(uint8_t *buf, size_t size)
 {
-    size_t start = dr_get_random_value(size - 1);
-    size_t count = dr_get_random_value((size + 1) - start);
+    size_t start = dr_get_random_value((uint) (size - 1));
+    size_t count = dr_get_random_value((uint) ((size + 1) - start));
 
     memset(buf + start, 0, count);
 }
@@ -87,8 +87,8 @@ void strategyDeleteBytes(uint8_t *buf, size_t size)
 SL2_EXPORT
 void strategyDeleteBytesAscii(uint8_t *buf, size_t size)
 {
-    size_t start = dr_get_random_value(size - 1);
-    size_t count = dr_get_random_value((size + 1) - start);
+    size_t start = dr_get_random_value((uint) (size - 1));
+    size_t count = dr_get_random_value((uint) ((size + 1) - start));
 
     memset(buf + start, '0', count);
 }
@@ -109,7 +109,7 @@ void strategyRandValues(uint8_t *buf, size_t size)
     // e.g. buf size is 16, rand_size is 8
     // max will be from 0 to 9 guanteeing a
     // pos that will fit into the buffer
-    size_t pos = dr_get_random_value(max);
+    size_t pos = dr_get_random_value((uint) max);
 
     for (size_t i = 0; i < rand_size; i++) {
         uint8_t mut = dr_get_random_value(UINT8_MAX + 1);
@@ -138,7 +138,7 @@ void strategyKnownValues(uint8_t *buf, size_t size)
     // e.g. buf size is 16, rand_size is 8
     // max will be from 0 to 9 guaranteeing a
     // pos that will fit into the buffer
-    size_t pos = dr_get_random_value(max);
+    size_t pos = dr_get_random_value((uint) max);
     bool endian = dr_get_random_value(2);
 
     size_t selection = 0;
@@ -190,7 +190,7 @@ void strategyAddSubKnownValues(uint8_t *buf, size_t size)
     // e.g. buf size is 16, rand_size is 8
     // max will be from 0 to 9 guaranteeing a
     // pos that will fit into the buffer
-    size_t pos = dr_get_random_value(max);
+    size_t pos = dr_get_random_value((uint) max);
     bool endian = dr_get_random_value(2);
     uint8_t sub = dr_get_random_value(2) ? -1 : 1;
     size_t selection = 0;
@@ -238,7 +238,7 @@ void strategyEndianSwap(uint8_t *buf, size_t size)
     // e.g. buf size is 16, rand_size is 8
     // max will be from 0 to 9 guaranteeing a
     // pos that will fit into the buffer
-    size_t pos = dr_get_random_value(max);
+    size_t pos = dr_get_random_value((uint) max);
 
     switch (rand_size) {
         case 1:
