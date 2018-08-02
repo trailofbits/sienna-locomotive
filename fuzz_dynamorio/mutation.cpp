@@ -260,8 +260,7 @@ void strategyEndianSwap(uint8_t *buf, size_t size)
     }
 }
 
-// TODO(ww): Make `choice` an enum or something else that's friendlier.
-SL2_EXPORT
+static
 bool mutate_buffer_choice(uint8_t *buf, size_t size, uint32_t choice)
 {
     if (size == 0 || choice > SL2_NUM_STRATEGIES - 1) {
@@ -273,13 +272,7 @@ bool mutate_buffer_choice(uint8_t *buf, size_t size, uint32_t choice)
     return true;
 }
 
-SL2_EXPORT
-bool mutate_buffer(uint8_t *buf, size_t size)
-{
-    return mutate_buffer_choice(buf, size, dr_get_random_value(SL2_NUM_STRATEGIES));
-}
-
-SL2_EXPORT
+static
 bool mutate_buffer_custom(uint8_t *buf, size_t size, sl2_strategy_t strategy)
 {
     if (size == 0) {
@@ -289,4 +282,20 @@ bool mutate_buffer_custom(uint8_t *buf, size_t size, sl2_strategy_t strategy)
     strategy(buf, size);
 
     return true;
+}
+
+SL2_EXPORT
+bool do_mutation(sl2_mutation *mutation)
+{
+    mutation->mut_type = dr_get_random_value(SL2_NUM_STRATEGIES);
+
+    return mutate_buffer_choice(mutation->buffer, mutation->bufsize, mutation->mut_type);
+}
+
+SL2_EXPORT
+bool do_mutation_custom(sl2_mutation *mutation, sl2_strategy_t strategy)
+{
+    mutation->mut_type = SL2_CUSTOM_STRATEGY;
+
+    return mutate_buffer_custom(mutation->buffer, mutation->bufsize, strategy);
 }

@@ -238,6 +238,7 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
     sl2_mutation mutation = {
         (uint32_t) function,
         mut_count++,
+        0, // NOTE(ww): We don't know the mutation type yet.
         resource,
         position,
         bufsize,
@@ -248,10 +249,10 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
         // sl2_mutation_advice advice;
         // sl2_conn_advise_mutation(&sl2_conn, &arena, &advice);
         // mutate_buffer_arena(mutation.buffer, mutation.bufsize, &advice);
-        mutate_buffer(mutation.buffer, mutation.bufsize);
+        do_mutation(&mutation);
     }
     else {
-        mutate_buffer(mutation.buffer, mutation.bufsize);
+        do_mutation(&mutation);
     }
 
     SL2_DR_DEBUG("mutate: %.*s\n", mutation.bufsize, mutation.buffer);

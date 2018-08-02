@@ -79,6 +79,7 @@ enum Event {
 struct sl2_mutation {
     uint32_t function;
     uint32_t mut_count;
+    uint32_t mut_type;
     wchar_t *resource;
     size_t position;
     size_t bufsize;

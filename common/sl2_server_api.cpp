@@ -149,6 +149,7 @@ SL2Response sl2_conn_register_mutation(sl2_conn *conn, sl2_mutation *mutation)
 
     // Then, send our mutation state over.
     // TODO(ww): Check for truncated writes.
+    // TODO(ww): Send mut_type.
     SL2_CONN_WRITE(&(mutation->function), sizeof(mutation->function));
     SL2_CONN_WRITE(&(mutation->mut_count), sizeof(mutation->mut_count));
     sl2_conn_write_prefixed_string(conn, mutation->resource);
