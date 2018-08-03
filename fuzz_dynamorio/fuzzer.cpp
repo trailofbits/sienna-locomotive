@@ -75,27 +75,6 @@ static sl2_arena arena = {0};
 static bool coverage_guided = false;
 static module_data_t *target_mod;
 
-/* Read the PEB of the target application and get the full command line */
-static void get_target_command_line(wchar_t **argv, size_t *len)
-{
-    // see: https://github.com/DynamoRIO/dynamorio/issues/2662
-    // alternatively: https://wj32.org/wp/2009/01/24/howto-get-the-command-line-of-processes/
-    PEB * clientPEB = (PEB *) dr_get_app_PEB();
-    RTL_USER_PROCESS_PARAMETERS parameterBlock;
-
-    // Read process parameter block from PEB
-    memcpy(&parameterBlock, clientPEB->ProcessParameters, sizeof(RTL_USER_PROCESS_PARAMETERS));
-
-    // Allocate space for the command line
-    *argv = (wchar_t *) dr_global_alloc(parameterBlock.CommandLine.Length + 2);
-    memset(*argv, 0, parameterBlock.CommandLine.Length + 2);
-
-    // Read the command line from the parameter block
-    memcpy(*argv, parameterBlock.CommandLine.Buffer, parameterBlock.CommandLine.Length);
-
-    *len = parameterBlock.CommandLine.Length + 2;
-}
-
 static dr_emit_flags_t
 on_bb_instrument(void *drcontext, void *tag, instrlist_t *bb, instr_t *inst, bool for_trace, bool translating, void *user_data)
 {
@@ -891,11 +870,6 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_log(NULL, DR_LOG_ALL, ERROR, "Client SL Fuzzer is running\n");
     }
 
-    // Get application name
-    const char* target_app_name_mbs = dr_get_application_name();
-    wchar_t target_app_name[MAX_PATH + 1] = {0};
-    mbstowcs_s(NULL, target_app_name, MAX_PATH, target_app_name_mbs, MAX_PATH);
-
     if (sl2_conn_open(&sl2_conn) != SL2Response::OK) {
         SL2_DR_DEBUG("ERROR: Couldn't open a connection to the server!\n");
         dr_abort();
@@ -904,18 +878,6 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     UUID run_id;
     sl2_string_to_uuid(run_id_s.c_str(), &run_id);
     sl2_conn_assign_run_id(&sl2_conn, run_id);
-
-    // wchar_t *target_argv;
-    // size_t target_argv_size;
-    // get_target_command_line(&target_argv, &target_argv_size);
-
-    // SL2_DR_DEBUG("target_app_name=%S\n", target_app_name);
-
-    // sl2_conn_request_run_id(&sl2_conn, target_app_name, target_argv);
-    // dr_global_free(target_argv, target_argv_size);
-
-    // char run_id_s[SL2_UUID_SIZE] = {0};
-    // sl2_uuid_to_string(sl2_conn.run_id, run_id_s);
 
     json j;
     j["run_id"] = run_id_s;
