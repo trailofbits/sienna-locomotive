@@ -52,6 +52,13 @@ static droption_t<bool> op_no_coverage(
     "nocoverage",
     "disable coverage, even when possible");
 
+static droption_t<std::string> op_run_id(
+    DROPTION_SCOPE_CLIENT,
+    "r",
+    "",
+    "run_id",
+    "specify the run ID for this fuzzer instance");
+
 
 // TODO(ww): Add options here for edge/bb coverage,
 // if we decided to support edge as well.
@@ -201,7 +208,7 @@ on_dr_exit(void)
     }
 
 
-    sl2_conn_finalize_run(&sl2_conn, crashed, false);
+    sl2_conn_finalize_run(&sl2_conn, crashed, true);
 
     sl2_conn_close(&sl2_conn);
 
@@ -855,12 +862,20 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     }
 
     std::string target = op_target.get_value();
+
     if (target == "") {
         SL2_DR_DEBUG("ERROR: arg -t (target file) required\n");
         dr_abort();
     }
 
     bool no_coverage = op_no_coverage.get_value();
+
+    std::string run_id_s = op_run_id.get_value();
+
+    if (run_id_s == "") {
+        SL2_DR_DEBUG("ERROR: arg -r required\n");
+        dr_abort();
+    }
 
     if (!client.loadJson(target)) {
         SL2_DR_DEBUG("Failed to load targets!\n");
@@ -886,18 +901,25 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_abort();
     }
 
-    wchar_t *target_argv;
-    size_t target_argv_size;
-    get_target_command_line(&target_argv, &target_argv_size);
+    UUID run_id;
+    sl2_string_to_uuid(run_id_s.c_str(), &run_id);
+    sl2_conn_assign_run_id(&sl2_conn, run_id);
 
-    sl2_conn_request_run_id(&sl2_conn, target_app_name, target_argv);
-    dr_global_free(target_argv, target_argv_size);
+    // wchar_t *target_argv;
+    // size_t target_argv_size;
+    // get_target_command_line(&target_argv, &target_argv_size);
 
-    char run_id_s[SL2_UUID_SIZE] = {0};
-    sl2_uuid_to_string(sl2_conn.run_id, run_id_s);
+    // SL2_DR_DEBUG("target_app_name=%S\n", target_app_name);
+
+    // sl2_conn_request_run_id(&sl2_conn, target_app_name, target_argv);
+    // dr_global_free(target_argv, target_argv_size);
+
+    // char run_id_s[SL2_UUID_SIZE] = {0};
+    // sl2_uuid_to_string(sl2_conn.run_id, run_id_s);
 
     json j;
     j["run_id"] = run_id_s;
+    j["pid"] = dr_get_process_id();
     SL2_LOG_JSONL(j);
 
     drmgr_init();

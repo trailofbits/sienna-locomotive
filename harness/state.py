@@ -58,6 +58,7 @@ def create_invocation_statement(config_dict):
         *config_dict['drrun_args'],
         '-prng_seed',
         seed,
+        # '-no_follow_children', # NOTE(ww): We almost certainly don't want this.
         '-c',
         config_dict['client_path'],
         *config_dict['client_args'],
@@ -263,6 +264,23 @@ def export_crash_data_to_csv(crashes, csv_filename):
         writer.writerows(crashes)
 
 
+def generate_run_id(config_dict):
+    run_id = uuid.uuid4()
+
+    os.makedirs(os.path.join(config.sl2_runs_dir, str(run_id)))
+
+    program = os.path.basename(config_dict['target_application_path'])
+    argv = [program, *config_dict['target_args']]
+
+    with open(get_path_to_run_file(run_id, "program.txt"), "wb") as program_file:
+        program_file.write(program.encode("utf-16"))
+
+    with open(get_path_to_run_file(run_id, "arguments.txt"), "wb") as arguments_file:
+        arguments_file.write(' '.join(argv).encode("utf-16"))
+
+    return run_id
+
+
 def finalize(run_id, crashed):
     """
     Manually closes out a fuzzing run.
@@ -302,15 +320,15 @@ def check_fuzz_line_for_crash(line):
     return False, None
 
 
-def check_fuzz_line_for_run_id(line):
+def check_fuzz_line_for_pid(line):
     """
-    Attempt to parse a line as JSON, returning a UUID object
+    Attempt to parse a line as JSON, returning a pid (int) object
     if the JSON object contains one. Otherwise, return None.
     """
     try:
         obj = json.loads(line)
-        if obj["run_id"]:
-            return uuid.UUID(obj["run_id"])
+        if obj["pid"]:
+            return obj["pid"]
     except (json.JSONDecodeError, KeyError):
         pass
     except Exception as e:

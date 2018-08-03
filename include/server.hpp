@@ -35,6 +35,7 @@
 
 enum Event {
     // Request a new run ID from the server.
+    // NOTE(ww): Deprecated; the server will complain and may die if you send this.
     EVT_RUN_ID,             // 0
     // Request a mutation from the server.
     // NOTE(ww): Deprecated; the server will complain and may die if you send this.

@@ -99,27 +99,6 @@ SL2Response sl2_conn_close(sl2_conn *conn)
 }
 
 SL2_EXPORT
-SL2Response sl2_conn_request_run_id(sl2_conn *conn, wchar_t *target_name, wchar_t *target_args)
-{
-    UUID run_id;
-    DWORD txsize;
-
-    // First, tell the server that we're requesting a UUID.
-    SL2_CONN_EVT(EVT_RUN_ID);
-
-    // Then, read the UUID from the server.
-    SL2_CONN_READ(&run_id, sizeof(run_id));
-
-    sl2_conn_write_prefixed_string(conn, target_name);
-    sl2_conn_write_prefixed_string(conn, target_args);
-
-    conn->run_id = run_id;
-    conn->has_run_id = true;
-
-    return SL2Response::OK;
-}
-
-SL2_EXPORT
 SL2Response sl2_conn_assign_run_id(sl2_conn *conn, UUID run_id)
 {
     if (conn->has_run_id) {

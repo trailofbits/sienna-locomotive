@@ -241,100 +241,6 @@ static void load_arena(wchar_t *arena_path, sl2_arena *arena)
     LeaveCriticalSection(&run_lock);
 }
 
-/* Generates a new run UUID, writes relevant run metadata files into the corresponding run metadata dir
-    This, like many things in the server, is pretty overzealous about exiting after any errors, often without an
-    explanation of what happened. TODO - fix this */
-static void handle_generate_run_id(HANDLE pipe)
-{
-    DWORD txsize;
-    UUID run_id;
-    wchar_t *run_id_s;
-
-    SL2_SERVER_LOG_INFO("received request");
-
-    // NOTE(ww): On recent versions of Windows, UuidCreate generates a v4 UUID that
-    // is sufficiently diffuse for our purposes (avoiding conflicts between runs).
-    // See: https://stackoverflow.com/questions/35366368/does-uuidcreate-use-a-csprng
-    UuidCreate(&run_id);
-    UuidToString(&run_id, (RPC_WSTR *)&run_id_s);
-
-    wchar_t run_dir[MAX_PATH + 1] = {0};
-    PathCchCombine(run_dir, MAX_PATH, FUZZ_WORKING_PATH, run_id_s);
-    if (!CreateDirectory(run_dir, NULL)) {
-        SL2_SERVER_LOG_FATAL("couldn't create working directory");
-    }
-
-    WriteFile(pipe, &run_id, sizeof(run_id), &txsize, NULL);
-    SL2_SERVER_LOG_INFO("generated ID %S", run_id_s);
-
-    // get program name
-    wchar_t command_line[SL2_ARGV_LEN] = {0};
-    size_t size = 0;
-    if (!ReadFile(pipe, &size, sizeof(size), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to read size of program name (size=%lu)", size);
-    }
-
-    if ((size / sizeof(wchar_t)) > SL2_ARGV_LEN - 1) {
-        SL2_SERVER_LOG_FATAL("program name length %lu > SL2_ARGV_LEN - 1", size);
-    }
-
-    if (!ReadFile(pipe, command_line, (DWORD) size, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to read size of argument list");
-    }
-
-    wchar_t target_file[MAX_PATH + 1] = {0};
-    PathCchCombine(target_file, MAX_PATH, run_dir, FUZZ_RUN_PROGRAM_TXT);
-    HANDLE file = CreateFile(target_file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
-
-    if (file == INVALID_HANDLE_VALUE) {
-        SL2_SERVER_LOG_FATAL("failed to open program.txt: %S", target_file);
-    }
-
-    if (!WriteFile(file, command_line, (DWORD) size, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to write program name to program.txt");
-    }
-
-    if (!CloseHandle(file)) {
-        SL2_SERVER_LOG_FATAL("failed to close program.txt");
-    }
-
-    memset(command_line, 0, SL2_ARGV_LEN * sizeof(wchar_t));
-
-    // get program arguments
-    size = 0;
-    if (!ReadFile(pipe, &size, sizeof(size), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to read program argument list length");
-    }
-
-    if ((size / sizeof(wchar_t)) > SL2_ARGV_LEN - 1) {
-        SL2_SERVER_LOG_FATAL("program argument list length > SL2_ARGV_LEN - 1");
-    }
-
-    if (!ReadFile(pipe, command_line, (DWORD) size, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to read program argument list");
-    }
-
-    memset(target_file, 0, (MAX_PATH + 1) * sizeof(wchar_t));
-    PathCchCombine(target_file, MAX_PATH, run_dir, FUZZ_RUN_ARGUMENTS_TXT);
-    file = CreateFile(target_file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
-
-    if (file == INVALID_HANDLE_VALUE) {
-        SL2_SERVER_LOG_FATAL("failed to open arguments.txt: %S", target_file);
-    }
-
-    if (!WriteFile(file, command_line, (DWORD) size, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to write argument list to arguments.txt");
-    }
-
-    if (!CloseHandle(file)) {
-        SL2_SERVER_LOG_FATAL("failed to close arguments.txt");
-    }
-
-    RpcStringFree((RPC_WSTR *)&run_id_s);
-
-    SL2_SERVER_LOG_INFO("finished");
-}
-
 static void handle_register_mutation(HANDLE pipe)
 {
     DWORD txsize;
@@ -740,9 +646,6 @@ static DWORD WINAPI thread_handler(void *data)
         // Then, re-use our length-prefixed read and write utility functions
         // in sl2_server_api.cpp to deduplicate some of the transaction code.
         switch (event) {
-            case EVT_RUN_ID:
-                handle_generate_run_id(pipe);
-                break;
             case EVT_REGISTER_MUTATION:
                 handle_register_mutation(pipe);
                 break;
@@ -767,6 +670,7 @@ static DWORD WINAPI thread_handler(void *data)
             case EVT_SESSION_TEARDOWN:
                 SL2_SERVER_LOG_INFO("ending a client's session with the server.");
                 break;
+            case EVT_RUN_ID:
             case EVT_MUTATION:
             case EVT_RUN_INFO:
             case EVT_CRASH_PATH:

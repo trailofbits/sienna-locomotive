@@ -55,12 +55,6 @@ SL2Response sl2_conn_end_session(sl2_conn *conn);
 SL2_EXPORT
 SL2Response sl2_conn_close(sl2_conn *conn);
 
-// Requests a new run ID from the SL2 server.
-// `target_name` and `target_args` contain the program name and arguments that
-// the server should associate with the run ID.
-SL2_EXPORT
-SL2Response sl2_conn_request_run_id(sl2_conn *conn, wchar_t *target_name, wchar_t *target_args);
-
 // Associates this connection with an extant run ID.
 SL2_EXPORT
 SL2Response sl2_conn_assign_run_id(sl2_conn *conn, UUID run_id);
