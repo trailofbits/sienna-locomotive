@@ -267,8 +267,18 @@ def fuzzer_run(config_dict):
 
     write_output_files(run, run_id, 'fuzz')
 
-    # Handle orphaned pipes after a timeout
+    # If we timed out, tell the server to end the run.
+    # Additionally, make sure that every process spawned by the run is dead.
     if run.process.timed_out:
+        print_l("pids:", pids)
+
+        for pid in pids:
+            print_l("Killing child process:", pid)
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except (PermissionError, OSError):
+                print_l("WARNING: Couldn't kill child process:", pid, " (maybe already dead?)")
+
         finalize(run_id, crashed)
 
     return crashed, run_id
