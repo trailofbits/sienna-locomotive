@@ -4,12 +4,31 @@ import json
 import os
 import shutil
 
-class Postprocessor:
+from typing import NamedTuple
+
+
+def noop(**args):
+    pass
+
+
+class RollupMessage(NamedTuple):
+    path        : str
+    i           : int
+    iCnt        : int
+    duplicate   : bool
+
+
+class Rollup(json.JSONEncoder):
+
+
+    def default(self, o):
+        return o.__dict__
 
     def __init__(self):
-        self.cfg = harness.config.config
+        self.cfg        = harness.config.config
         self.crashashes = {}
-        self.runsdir =  harness.config.sl2_runs_dir
+        self.runsdir    =  harness.config.sl2_runs_dir
+        self.sl2dir     = harness.config.sl2_dir
 
 
     # @staticmethod
@@ -21,20 +40,31 @@ class Postprocessor:
 
         shutil.rmtree(path, onerror=print)
 
-    def process(self):
+
+    def process(self, cb=noop):
+        """
+        Does a post process rollup of all the data in the runs dir.  You can optionally specific a callback to get updates
+        """
         pattern = "%s/*/triage.json" % self.runsdir
         paths = glob.glob(  pattern )
         print("Processing %d crashes..." % len(paths))
+        pathsCnt = len(paths)
+        i = 0
         for path in paths:
+            i += 1
             with open(path) as f:
                 triageJson = json.load(f)
                 f.close()
                 crashash = triageJson["crashash"]
                 if crashash in self.crashashes:
+                    rmsg = RollupMessage( path, i, pathsCnt, True )
+                    cb( rmsg )
                     dirtodelete = os.path.dirname(path)
                     print("Deleting %s" % dirtodelete)
-                    Postprocessor.safedelete(dirtodelete)
+                    #Rollup.safedelete(dirtodelete)
                 else:
+                    rmsg = RollupMessage( path, i, pathsCnt, False )
+                    cb( rmsg )
                     self.crashashes[crashash] = triageJson
 
 
@@ -44,19 +74,16 @@ class Postprocessor:
         self.persist()
 
     def persist(self):
-        outpath = os.path.join( self.runsdir, "rollup.json" )
+        outpath = os.path.join( self.sl2dir, "rollup.json" )
         with open(outpath, "w+") as f:
             outobj = {}
             outobj['crashes'] = self.crashashes
-            json.dump(outobj,f)
-
-
-
+            json.dump(self,f, skipkeys=True, default=lambda o: o.__dict__ )
 
 
 def main():
 
-    proc = Postprocessor()
+    proc = Rollup()
     proc.process()
 
 if __name__ == "__main__":
