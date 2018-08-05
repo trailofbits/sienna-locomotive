@@ -6,6 +6,9 @@ from PySide2.QtCore import Qt, QSize, QModelIndex
 from PySide2.QtCore import QThread, Signal, Qt
 from functools import partial
 
+from PySide2.QtWidgets import QTableView, QVBoxLayout, QApplication
+from PySide2.QtCore import QAbstractTableModel
+
 
 class PostprocThread(QThread):
     resultReady = Signal(list)
@@ -18,7 +21,28 @@ class PostprocThread(QThread):
     def run(self):
         rollup = postprocess.Rollup()
         rollup.process(self.callback)
-        self.resultReady.emit("done")
+        self.resultReady.emit(rollup)
+
+class RollupModel(QAbstractTableModel):
+
+
+    def attachModel(self, rollup):
+        self.rollup = rollup
+
+    def rowCount(self, parent):
+        if self.rollup == None:
+            return 0
+        else:
+            return self.rollup.rows()
+
+    def columnCount( self, parent ):
+        if self.rollup == None:
+            return 0
+        else:
+            return self.rollup.cols()
+
+    def data(self, index, role):
+        return self.rollup.toCSV()[index.row()][index.column()]
 
 
 class MainWin(QtWidgets.QMainWindow):
@@ -49,6 +73,13 @@ class MainWin(QtWidgets.QMainWindow):
         self.web.setHtml(html)
         self.layout.addWidget(self.web)
 
+        # table
+        self.tableModel = RollupModel()
+        self.table = QTableView()
+        self.table.show()
+        self.layout.addWidget(self.table)
+
+
         #Postproc thread
         self.postprocThread = PostprocThread({}, self.postprocCallback)
 
@@ -67,8 +98,10 @@ class MainWin(QtWidgets.QMainWindow):
         self.statusBar.addWidget(self.statusText)
         self.layout.addWidget(self.statusBar)
 
-    def postprocFinished(self, output):
-        print("done")
+    def postprocFinished(self, rollup):
+        self.tableModel.attachModel(rollup)
+        self.table.setModel(self.tableModel)
+        print("rollup", rollup)
 
 
     def postprocCallback( self, rmsg ):

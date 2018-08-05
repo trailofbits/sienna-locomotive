@@ -26,6 +26,7 @@ class Rollup(json.JSONEncoder):
         return o.__dict__
 
     def __init__(self):
+        self.csvs       = None
         self.cfg        = harness.config.config
         self.crashashes = {}
         self.runsdir    =  harness.config.sl2_runs_dir
@@ -35,6 +36,13 @@ class Rollup(json.JSONEncoder):
     # @staticmethod
     # def delerror( function, path, info ):
     #     print("Unable to rm %s because %s" % (path, info))
+
+
+    def cols(self):
+        return 3
+
+    def rows(self):
+        return len(self.crashashes.keys())
 
     @staticmethod
     def safedelete(path):
@@ -71,10 +79,25 @@ class Rollup(json.JSONEncoder):
 
         for k,v in self.crashashes.items():
             print( "%s\t%s" % (v['exploitability'], k) )
-
         self.persist()
 
+    def toCSV(self):
+        if self.csvs != None:
+            return self.csvs
+
+        self.csvs = []
+        for  crash in self.crashashes.values():
+            crash =  crash.copy()
+            del crash['tracer']
+            crash = [ hex(_) if isinstance(_, int) else _  for _ in crash.values() ]
+            self.csvs.append(crash)
+        return self.csvs
+
+
     def persist(self):
+        """
+        Saves rollup as csv and json
+        """
         outpath = os.path.join( self.sl2dir, "rollup.json" )
         with open(outpath, "w+") as f:
             outobj = {}
@@ -84,11 +107,9 @@ class Rollup(json.JSONEncoder):
         outpath = os.path.join( self.sl2dir, "rollup.csv" )
         with open(outpath, "w+") as f:
             cvsf = csv.writer( f )
-            for  crash in self.crashashes.values():
-                crashes =  crash.copy()
-                del crash['tracer']
-                print(crash)
-                cvsf.writerow(crash.values())
+            for  crash in self.toCSV():
+                print("crash", crash)
+                cvsf.writerow(crash)
 
 
 
