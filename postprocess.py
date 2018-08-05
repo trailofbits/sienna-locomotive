@@ -1,13 +1,14 @@
 import harness.config
 import glob
 import json
+import csv
 import os
 import shutil
 
 from typing import NamedTuple
 
 
-def noop(**args):
+def noop(*args):
     pass
 
 
@@ -79,6 +80,17 @@ class Rollup(json.JSONEncoder):
             outobj = {}
             outobj['crashes'] = self.crashashes
             json.dump(self,f, skipkeys=True, default=lambda o: o.__dict__ )
+
+        outpath = os.path.join( self.sl2dir, "rollup.csv" )
+        with open(outpath, "w+") as f:
+            cvsf = csv.writer( f )
+            for  crash in self.crashashes.values():
+                crashes =  crash.copy()
+                del crash['tracer']
+                print(crash)
+                cvsf.writerow(crash.values())
+
+
 
 
 def main():
