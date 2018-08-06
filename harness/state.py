@@ -275,20 +275,6 @@ def generate_run_id(config_dict):
     return run_id
 
 
-def finalize(run_id, crashed):
-    """
-    Manually closes out a fuzzing run.
-    Only necessary if we killed the target binary before DynamoRIO could
-    close out the run.
-
-    TODO(ww): Provide an interface for this, rather than manually
-    writing the relevant parts of the protocol to the pipe.
-    """
-    f = open(config.sl2_server_pipe_path, 'w+b', buffering=0)
-    f.write(struct.pack('B', 0x6))  # EVT_SESSION_TEARDOWN
-    f.close()
-
-
 def check_fuzz_line_for_crash(line):
     """
     Attempt to parse a line as JSON, returning a tuple of the crash state
