@@ -39,7 +39,7 @@ def create_invocation_statement(config_dict):
     Returns an InvocationState containing the command run
     and the PRNG seed used.
     """
-    seed = str(random.getrandbits(64))
+    seed = str(random.getrandbits(64)) if 'seed' not in config_dict else config_dict['seed']
     program_arr = [
         config_dict['drrun_path'],
         *config_dict['drrun_args'],
@@ -226,9 +226,9 @@ def parse_triage_output(run_id):
             return formatted, results
     except FileNotFoundError:
         message = "The triage tool exited improperly during run {}, \
-        but no crash file could be found. It may have timed out. \
-        To retry it manually, run \
-        `python harness.py -v -e TRIAGE [-p <PROFILE>]`"
+but no crash file could be found. It may have timed out. \
+To retry it manually, run \
+`python harness.py -v -e TRIAGE [-p <PROFILE>]`"
 
         return message.format(run_id), None
 
@@ -251,7 +251,7 @@ def export_crash_data_to_csv(crashes, csv_filename):
 
 
 def generate_run_id(config_dict):
-    run_id = uuid.uuid4()
+    run_id = uuid.uuid4() if 'run_id' not in config_dict else config_dict['run_id']
 
     os.makedirs(os.path.join(config.sl2_runs_dir, str(run_id)))
 
