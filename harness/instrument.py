@@ -123,6 +123,8 @@ def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False)
             with open(pids_file, 'rb') as pids_contents:
                 for line in pids_contents.read().decode('utf-16').split('\n'):
                     if line:
+                        # TODO(ww): We probably want to call finalize() once per pid here,
+                        # since each pid has its own session/thread on the server.
                         pid = int(line)
                         if verbose:
                             print_l("Killing child process:", pid)
