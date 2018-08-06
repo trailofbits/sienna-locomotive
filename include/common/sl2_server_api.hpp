@@ -55,12 +55,6 @@ SL2Response sl2_conn_end_session(sl2_conn *conn);
 SL2_EXPORT
 SL2Response sl2_conn_close(sl2_conn *conn);
 
-// Requests a new run ID from the SL2 server.
-// `target_name` and `target_args` contain the program name and arguments that
-// the server should associate with the run ID.
-SL2_EXPORT
-SL2Response sl2_conn_request_run_id(sl2_conn *conn, wchar_t *target_name, wchar_t *target_args);
-
 // Associates this connection with an extant run ID.
 SL2_EXPORT
 SL2Response sl2_conn_assign_run_id(sl2_conn *conn, UUID run_id);
@@ -76,12 +70,6 @@ SL2Response sl2_conn_register_mutation(sl2_conn *conn, sl2_mutation *mutation);
 // `buffer` is the mutable buffer. This function writes to `buffer`.
 SL2_EXPORT
 SL2Response sl2_conn_request_replay(sl2_conn *conn, uint32_t mut_count, size_t bufsize, void *buffer);
-
-// Finalizes a run with the SL2 server.
-// `crash` indicates whether the run crashed or not.
-// `preserve` indicates whether to keep the run on disk, even without a crash.
-SL2_EXPORT
-SL2Response sl2_conn_finalize_run(sl2_conn *conn, bool crash, bool preserve);
 
 // Requests information about a run's crash from the SL2 server.
 // Stores crash information within a `sl2_crash_paths` structure.
@@ -103,5 +91,11 @@ SL2Response sl2_conn_register_arena(sl2_conn *conn, sl2_arena *arena);
 SL2_EXPORT
 SL2Response sl2_conn_ping(sl2_conn *conn, uint8_t *ok);
 
+// Registers a pid with the SL2 server.
+// `pid` is a process ID.
+// `tracing` indicates whether the `pid` belongs to a tracer process (true) or a fuzzer
+// process (false).
+SL2_EXPORT
+SL2Response sl2_conn_register_pid(sl2_conn *conn, uint32_t pid, bool tracing);
 
 #endif

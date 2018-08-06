@@ -30,11 +30,18 @@
 // The format for files (under a run directory) containing replayable mutations.
 #define FUZZ_RUN_FKT_FMT (L"%d.fkt")
 
+// The file (under the run directory) in which the program's fuzzing pid(s) are stored.
+#define FUZZ_RUN_FUZZER_PIDS (L"fuzz.pids")
+
+// The file (under the run directory) in which the program's tracing pid(s) are stored.
+#define FUZZ_RUN_TRACER_PIDS (L"trace.pids")
+
 // The size, in bytes, of our fuzzing arena.
 #define FUZZ_ARENA_SIZE 65536
 
 enum Event {
     // Request a new run ID from the server.
+    // NOTE(ww): Deprecated; the server will complain and may die if you send this.
     EVT_RUN_ID,             // 0
     // Request a mutation from the server.
     // NOTE(ww): Deprecated; the server will complain and may die if you send this.
@@ -45,6 +52,7 @@ enum Event {
     // NOTE(ww): Deprecated; the server will complain and may die if you send this.
     EVT_RUN_INFO,           // 3
     // Tell the server to finalize a run.
+    // NOTE(ww): Deprecated; the server will complain and may die if you send this.
     EVT_RUN_COMPLETE,       // 4
     // Request a pathname for storing crash information from the server.
     // NOTE(ww): Deprecated; the server will complain and may die if you send this.
@@ -64,6 +72,8 @@ enum Event {
     EVT_SET_ARENA,          // 11
     // Ping the server. Debugging only.
     EVT_PING,               // 12
+    // Tell the server about a pid associated with a fuzzing or tracing run.
+    EVT_REGISTER_PID,       // 13
     // Use this as a default value when handling multiple events.
     // NOTE(ww): The server will complain and may die if you send this.
     EVT_INVALID = 255,

@@ -241,100 +241,6 @@ static void load_arena(wchar_t *arena_path, sl2_arena *arena)
     LeaveCriticalSection(&run_lock);
 }
 
-/* Generates a new run UUID, writes relevant run metadata files into the corresponding run metadata dir
-    This, like many things in the server, is pretty overzealous about exiting after any errors, often without an
-    explanation of what happened. TODO - fix this */
-static void handle_generate_run_id(HANDLE pipe)
-{
-    DWORD txsize;
-    UUID run_id;
-    wchar_t *run_id_s;
-
-    SL2_SERVER_LOG_INFO("received request");
-
-    // NOTE(ww): On recent versions of Windows, UuidCreate generates a v4 UUID that
-    // is sufficiently diffuse for our purposes (avoiding conflicts between runs).
-    // See: https://stackoverflow.com/questions/35366368/does-uuidcreate-use-a-csprng
-    UuidCreate(&run_id);
-    UuidToString(&run_id, (RPC_WSTR *)&run_id_s);
-
-    wchar_t run_dir[MAX_PATH + 1] = {0};
-    PathCchCombine(run_dir, MAX_PATH, FUZZ_WORKING_PATH, run_id_s);
-    if (!CreateDirectory(run_dir, NULL)) {
-        SL2_SERVER_LOG_FATAL("couldn't create working directory");
-    }
-
-    WriteFile(pipe, &run_id, sizeof(run_id), &txsize, NULL);
-    SL2_SERVER_LOG_INFO("generated ID %S", run_id_s);
-
-    // get program name
-    wchar_t command_line[SL2_ARGV_LEN] = {0};
-    size_t size = 0;
-    if (!ReadFile(pipe, &size, sizeof(size), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to read size of program name (size=%lu)", size);
-    }
-
-    if ((size / sizeof(wchar_t)) > SL2_ARGV_LEN - 1) {
-        SL2_SERVER_LOG_FATAL("program name length %lu > SL2_ARGV_LEN - 1", size);
-    }
-
-    if (!ReadFile(pipe, command_line, (DWORD) size, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to read size of argument list");
-    }
-
-    wchar_t target_file[MAX_PATH + 1] = {0};
-    PathCchCombine(target_file, MAX_PATH, run_dir, FUZZ_RUN_PROGRAM_TXT);
-    HANDLE file = CreateFile(target_file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
-
-    if (file == INVALID_HANDLE_VALUE) {
-        SL2_SERVER_LOG_FATAL("failed to open program.txt: %S", target_file);
-    }
-
-    if (!WriteFile(file, command_line, (DWORD) size, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to write program name to program.txt");
-    }
-
-    if (!CloseHandle(file)) {
-        SL2_SERVER_LOG_FATAL("failed to close program.txt");
-    }
-
-    memset(command_line, 0, SL2_ARGV_LEN * sizeof(wchar_t));
-
-    // get program arguments
-    size = 0;
-    if (!ReadFile(pipe, &size, sizeof(size), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to read program argument list length");
-    }
-
-    if ((size / sizeof(wchar_t)) > SL2_ARGV_LEN - 1) {
-        SL2_SERVER_LOG_FATAL("program argument list length > SL2_ARGV_LEN - 1");
-    }
-
-    if (!ReadFile(pipe, command_line, (DWORD) size, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to read program argument list");
-    }
-
-    memset(target_file, 0, (MAX_PATH + 1) * sizeof(wchar_t));
-    PathCchCombine(target_file, MAX_PATH, run_dir, FUZZ_RUN_ARGUMENTS_TXT);
-    file = CreateFile(target_file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
-
-    if (file == INVALID_HANDLE_VALUE) {
-        SL2_SERVER_LOG_FATAL("failed to open arguments.txt: %S", target_file);
-    }
-
-    if (!WriteFile(file, command_line, (DWORD) size, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to write argument list to arguments.txt");
-    }
-
-    if (!CloseHandle(file)) {
-        SL2_SERVER_LOG_FATAL("failed to close arguments.txt");
-    }
-
-    RpcStringFree((RPC_WSTR *)&run_id_s);
-
-    SL2_SERVER_LOG_INFO("finished");
-}
-
 static void handle_register_mutation(HANDLE pipe)
 {
     DWORD txsize;
@@ -411,7 +317,7 @@ static void handle_register_mutation(HANDLE pipe)
     }
 
     if (!ReadFile(pipe, buf, (DWORD)size, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to read mutation buffer from pipe");
+        SL2_SERVER_LOG_FATAL("failed to read mutation buffer from pipe (size=%lu)", size);
     }
 
     if (txsize < size) {
@@ -484,62 +390,6 @@ static void handle_replay(HANDLE pipe)
 
     if (!WriteFile(pipe, buf, (DWORD) size, &txsize, NULL)) {
         SL2_SERVER_LOG_FATAL("failed to write replay buffer");
-    }
-
-    RpcStringFree((RPC_WSTR *)&run_id_s);
-}
-
-/* Deletes the run files to free up a Run ID if the last run didn't find a crash */
-static void handle_finalize_run(HANDLE pipe)
-{
-    DWORD txsize;
-    UUID run_id;
-    wchar_t *run_id_s;
-
-    if (!ReadFile(pipe, &run_id, sizeof(UUID), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to read run ID");
-    }
-
-    UuidToString(&run_id, (RPC_WSTR *)&run_id_s);
-
-    bool crash = false;
-    if (!ReadFile(pipe, &crash, sizeof(bool), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to read crash status");
-    }
-
-    bool preserve = false;
-    if (!ReadFile(pipe, &preserve, sizeof(bool), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to read preserve flag");
-    }
-
-    SL2_SERVER_LOG_INFO("finalizing %S", run_id_s);
-
-    if (!crash && !preserve) {
-        SL2_SERVER_LOG_INFO("no crash, removing run %S", run_id_s);
-        EnterCriticalSection(&run_lock);
-
-        wchar_t run_dir[MAX_PATH + 1] = {0};
-        PathCchCombine(run_dir, MAX_PATH, FUZZ_WORKING_PATH, run_id_s);
-
-        SHFILEOPSTRUCT remove_op = {
-            NULL,
-            FO_DELETE,
-            run_dir,
-            L"",
-            FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT,
-            false,
-            NULL,
-            L""
-        };
-
-        SHFileOperation(&remove_op);
-        LeaveCriticalSection(&run_lock);
-    }
-    else if (!crash && preserve) {
-        SL2_SERVER_LOG_INFO("no crash, but not removing files (requested)");
-    }
-    else {
-        SL2_SERVER_LOG_INFO("crash found for run %S", run_id_s);
     }
 
     RpcStringFree((RPC_WSTR *)&run_id_s);
@@ -685,6 +535,62 @@ static void handle_ping(HANDLE pipe)
     }
 }
 
+static void handle_register_pid(HANDLE pipe)
+{
+    DWORD txsize;
+    UUID run_id;
+    wchar_t *run_id_s;
+    bool tracing;
+    uint32_t pid;
+
+    SL2_SERVER_LOG_INFO("received pid registration request");
+
+    if (!ReadFile(pipe, &run_id, sizeof(run_id), &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("failed to read UUID");
+    }
+
+    if (!ReadFile(pipe, &tracing, sizeof(tracing), &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("failed to read tracing/fuzzing flag");
+    }
+
+    if (!ReadFile(pipe, &pid, sizeof(pid), &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("failed to read pid");
+    }
+
+    UuidToString(&run_id, (RPC_WSTR *) &run_id_s);
+
+    wchar_t run_dir[MAX_PATH + 1] = {0};
+    wchar_t pids_file[MAX_PATH + 1] = {0};
+    wchar_t pid_s[64] = {0};
+
+    swprintf_s(pid_s, sizeof(pid_s) - 1, L"%lu\n", pid);
+
+    PathCchCombine(run_dir, MAX_PATH, FUZZ_WORKING_PATH, run_id_s);
+    PathCchCombine(pids_file, MAX_PATH, run_dir, tracing ? FUZZ_RUN_TRACER_PIDS
+                                                         : FUZZ_RUN_FUZZER_PIDS);
+
+    EnterCriticalSection(&run_lock);
+
+    HANDLE file = CreateFile(
+        pids_file,
+        FILE_APPEND_DATA,
+        0, NULL,
+        OPEN_ALWAYS,
+        FILE_ATTRIBUTE_NORMAL,
+        NULL);
+
+
+    if (!WriteFile(file, pid_s, lstrlen(pid_s) * sizeof(wchar_t), &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("failed to write pid (pid=%lu, pids_file=%S)", pid, pids_file);
+    }
+
+    CloseHandle(file);
+
+    LeaveCriticalSection(&run_lock);
+
+    RpcStringFree((RPC_WSTR *)&run_id_s);
+}
+
 static void destroy_pipe(HANDLE pipe)
 {
     if (!FlushFileBuffers(pipe)) {
@@ -740,9 +646,6 @@ static DWORD WINAPI thread_handler(void *data)
         // Then, re-use our length-prefixed read and write utility functions
         // in sl2_server_api.cpp to deduplicate some of the transaction code.
         switch (event) {
-            case EVT_RUN_ID:
-                handle_generate_run_id(pipe);
-                break;
             case EVT_REGISTER_MUTATION:
                 handle_register_mutation(pipe);
                 break;
@@ -751,9 +654,6 @@ static DWORD WINAPI thread_handler(void *data)
                 break;
             case EVT_REPLAY:
                 handle_replay(pipe);
-                break;
-            case EVT_RUN_COMPLETE:
-                handle_finalize_run(pipe);
                 break;
             case EVT_GET_ARENA:
                 handle_get_arena(pipe);
@@ -764,13 +664,18 @@ static DWORD WINAPI thread_handler(void *data)
             case EVT_PING:
                 handle_ping(pipe);
                 break;
+            case EVT_REGISTER_PID:
+                handle_register_pid(pipe);
+                break;
             case EVT_SESSION_TEARDOWN:
                 SL2_SERVER_LOG_INFO("ending a client's session with the server.");
                 break;
+            case EVT_RUN_ID:
             case EVT_MUTATION:
             case EVT_RUN_INFO:
             case EVT_CRASH_PATH:
             case EVT_MEM_DMP_PATH:
+            case EVT_RUN_COMPLETE:
                 SL2_SERVER_LOG_ERROR("deprecated event requested.");
                 event = EVT_INVALID;
                 break;

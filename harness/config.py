@@ -23,7 +23,7 @@ CONFIG_SCHEMA = {}
 PATH_KEYS = ['drrun_path', 'client_path', 'server_path', 'wizard_path', 'tracer_path', 'triager_path']
 ARGS_KEYS = ['drrun_args', 'client_args', 'target_args']
 INT_KEYS = ['runs', 'simultaneous', 'fuzz_timeout', 'triage_timeout']
-FLAG_KEYS = ['verbose', 'debug', 'nopersist', 'continuous', 'exit_early', 'inline_stdout']
+FLAG_KEYS = ['verbose', 'debug', 'nopersist', 'continuous', 'exit_early', 'inline_stdout', 'preserve_runs']
 
 for path in PATH_KEYS:
     CONFIG_SCHEMA[path] = {
@@ -83,7 +83,8 @@ if not os.path.exists(sl2_config_path):
         'target_args': '0,-f',
         'runs': 1,
         'simultaneous': 1,
-        'inline_stdout': False
+        'inline_stdout': False,
+        'preserve_runs': False,
     }
     with open(sl2_config_path, 'w') as configfile:
         default_config.write(configfile)
@@ -224,6 +225,13 @@ parser.add_argument(
     default=False,
     help="Inline stdout of program under test to console stdout")
 
+parser.add_argument(
+    '-P', '--preserve_runs',
+    action='store_true',
+    dest='preserve_runs',
+    default=False,
+    help="Preserve all fuzzer runs, even when they don't cause crashes")
+
 args = parser.parse_args()
 
 # Read the ConfigParser object into a standard dict
@@ -260,7 +268,8 @@ def create_new_profile(name, dynamorio_exe, build_dir, target_path, target_args)
         'target_args': target_args,
         'runs': 1,
         'simultaneous': 1,
-        'inline_stdout': False
+        'inline_stdout': False,
+        'preserve_runs': False,
     }
 
     with open(sl2_config_path, 'w') as configfile:

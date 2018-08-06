@@ -24,7 +24,6 @@ class InvocationState(NamedTuple):
     """
     cmd_arr: list
     cmd_str: str
-    pidfile: str
     seed: str
 
 
@@ -35,29 +34,18 @@ def esc_quote(raw):
         return "\"{}\"".format(raw)
 
 
-def unique_pidfile():
-    """
-    Returns a unique path for a pidfile within the main
-    SL2 data directory.
-    """
-    pidfile = "%s.pid" % uuid.uuid4()
-    return os.path.join(config.sl2_dir, pidfile)
-
-
 def create_invocation_statement(config_dict):
     """
-    Returns an InvocationState containing the command run,
-    its incipient pidfile, and the PRNG seed used.
+    Returns an InvocationState containing the command run
+    and the PRNG seed used.
     """
-    pidfile = unique_pidfile()
     seed = str(random.getrandbits(64))
     program_arr = [
         config_dict['drrun_path'],
-        '-pidfile',
-        pidfile,
         *config_dict['drrun_args'],
         '-prng_seed',
         seed,
+        # '-no_follow_children', # NOTE(ww): We almost certainly don't want this.
         '-c',
         config_dict['client_path'],
         *config_dict['client_args'],
@@ -69,7 +57,6 @@ def create_invocation_statement(config_dict):
     return InvocationState(
         program_arr,
         stringify_program_array(program_arr[0], program_arr[1:]),
-        pidfile,
         seed
     )
 
@@ -263,6 +250,23 @@ def export_crash_data_to_csv(crashes, csv_filename):
         writer.writerows(crashes)
 
 
+def generate_run_id(config_dict):
+    run_id = uuid.uuid4()
+
+    os.makedirs(os.path.join(config.sl2_runs_dir, str(run_id)))
+
+    program = os.path.basename(config_dict['target_application_path'])
+    argv = [program, *config_dict['target_args']]
+
+    with open(get_path_to_run_file(run_id, "program.txt"), "wb") as program_file:
+        program_file.write(program.encode("utf-16"))
+
+    with open(get_path_to_run_file(run_id, "arguments.txt"), "wb") as arguments_file:
+        arguments_file.write(' '.join(argv).encode("utf-16"))
+
+    return run_id
+
+
 def finalize(run_id, crashed):
     """
     Manually closes out a fuzzing run.
@@ -273,14 +277,6 @@ def finalize(run_id, crashed):
     writing the relevant parts of the protocol to the pipe.
     """
     f = open(config.sl2_server_pipe_path, 'w+b', buffering=0)
-    f.write(struct.pack('B', 0x4))  # EVT_RUN_COMPLETE
-    f.seek(0)
-    f.write(run_id.bytes)  # Write the run ID
-    f.seek(0)
-    # Write a bool indicating a crash
-    f.write(struct.pack('?', 1 if crashed else 0))
-    # Write a bool indicating whether to preserve run files (without a crash)
-    f.write(struct.pack('?', 1 if crashed else 0))
     f.write(struct.pack('B', 0x6))  # EVT_SESSION_TEARDOWN
     f.close()
 
@@ -300,19 +296,3 @@ def check_fuzz_line_for_crash(line):
     except Exception as e:
         print("[!] Unexpected exception while checking for crash:", e)
     return False, None
-
-
-def check_fuzz_line_for_run_id(line):
-    """
-    Attempt to parse a line as JSON, returning a UUID object
-    if the JSON object contains one. Otherwise, return None.
-    """
-    try:
-        obj = json.loads(line)
-        if obj["run_id"]:
-            return uuid.UUID(obj["run_id"])
-    except (json.JSONDecodeError, KeyError):
-        pass
-    except Exception as e:
-        print("[!] Unexpected exception while checking for run id:", e)
-    return None
