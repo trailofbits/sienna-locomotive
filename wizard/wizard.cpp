@@ -318,6 +318,27 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
     info->argHash              = NULL;
 }
 
+static void
+wrap_pre__read(void *wrapcxt, OUT void **user_data)
+{
+    #pragma warning(suppress: 4311 4302)
+    int fd = (int) drwrap_get_arg(wrapcxt, 0);
+    void *buffer = drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
+    unsigned int count = (unsigned int) drwrap_get_arg(wrapcxt, 2);
+
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
+    wizard_read_info *info = (wizard_read_info *) *user_data;
+
+    info->lpBuffer             = buffer;
+    info->nNumberOfBytesToRead = count;
+    info->function             = Function::_read;
+    info->source               = NULL;
+    info->position             = NULL;
+    info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->argHash              = NULL;
+}
+
 /* prints information about the function call to stderr so the harness can ingest it */
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data)
@@ -403,6 +424,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_PRE_HOOK1(toHookPre, recv);
     SL2_PRE_HOOK1(toHookPre, fread_s);
     SL2_PRE_HOOK1(toHookPre, fread);
+    SL2_PRE_HOOK1(toHookPre, _read);
 
     std::map<char *, SL2_POST_PROTO> toHookPost;
     SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
@@ -416,6 +438,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_POST_HOOK2(toHookPost, recv, Generic);
     SL2_POST_HOOK2(toHookPost, fread_s, Generic);
     SL2_POST_HOOK2(toHookPost, fread, Generic);
+    SL2_POST_HOOK2(toHookPost, _read, Generic);
 
     std::map<char *, SL2_PRE_PROTO>::iterator it;
     for (it = toHookPre.begin(); it != toHookPre.end(); it++) {

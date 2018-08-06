@@ -54,6 +54,7 @@ enum class Function {
     ReadEventLog,
     fread,
     fread_s,
+    _read,
 };
 
 // The set of supported function targetting techniques.

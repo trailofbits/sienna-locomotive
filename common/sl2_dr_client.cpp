@@ -20,6 +20,7 @@ sl2_funcmod SL2_FUNCMOD_TABLE[] = {
     {"ReadEventLogW", "KERNELBASE.DLL"},
     {"fread", "UCRTBASE.DLL"},
     {"fread_s", "UCRTBASE.DLL"},
+    {"_read", "UCRTBASE.DLL"},
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -196,6 +197,8 @@ const char *function_to_string(Function function)
             return "fread";
         case Function::fread_s:
             return "fread_s";
+        case Function::_read:
+            return "_read";
     }
 
     return "unknown";
