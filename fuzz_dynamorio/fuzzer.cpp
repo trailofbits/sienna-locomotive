@@ -687,10 +687,22 @@ wrap_pre__read(void *wrapcxt, OUT void **user_data)
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data)
 {
-    SL2_DR_DEBUG("<in wrap_post_Generic>\n");
-    if (user_data == NULL) {
+    void *drcontext;
+
+    if (!user_data) {
+        SL2_DR_DEBUG("Warning: user_data=NULL in wrap_post_Generic!\n");
         return;
     }
+
+    if (!wrapcxt) {
+        SL2_DR_DEBUG("Warning: wrapcxt=NULL in wrap_post_Generic! Using dr_get_current_drcontext.\n");
+        drcontext = dr_get_current_drcontext();
+    }
+    else {
+        drcontext = drwrap_get_drcontext(wrapcxt);
+    }
+
+    SL2_DR_DEBUG("<in wrap_post_Generic>\n");
 
     client_read_info *info = (client_read_info *) user_data;
 
@@ -716,23 +728,10 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     }
 
     if (info->argHash) {
-        if (wrapcxt == 0x0){
-            SL2_DR_DEBUG("Warning: NULL wrapcxt pointer in wrap_post_Generic (1)\n");
-            dr_thread_free(dr_get_current_drcontext(), info->argHash, SL2_HASH_LEN + 1);
-        }
-        else {
-            dr_thread_free(drwrap_get_drcontext(wrapcxt), info->argHash, SL2_HASH_LEN + 1);
-        }
+        dr_thread_free(drcontext, info->argHash, SL2_HASH_LEN + 1);
     }
 
-    if (wrapcxt == 0x0){
-        SL2_DR_DEBUG("Warning: NULL wrapcxt pointer in wrap_post_Generic (2)\n");
-        dr_thread_free(dr_get_current_drcontext(), info, sizeof(client_read_info));
-    }
-    else {
-         dr_thread_free(drwrap_get_drcontext(wrapcxt), info, sizeof(client_read_info));
-    }
-
+    dr_thread_free(drcontext, info, sizeof(client_read_info));
 }
 
 /* Runs when a new module (typically an exe or dll) is loaded. Tells DynamoRIO to hook all the interesting functions

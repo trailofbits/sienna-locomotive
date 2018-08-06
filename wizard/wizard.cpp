@@ -343,8 +343,19 @@ wrap_pre__read(void *wrapcxt, OUT void **user_data)
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data)
 {
-    if (user_data == NULL) {
+    void *drcontext;
+
+    if (!user_data) {
+        SL2_DR_DEBUG("Warning: user_data=NULL in wrap_post_Generic!\n");
         return;
+    }
+
+    if (!wrapcxt) {
+        SL2_DR_DEBUG("Warning: wrapcxt=NULL in wrap_post_Generic! Using dr_get_current_drcontext.\n");
+        drcontext = dr_get_current_drcontext();
+    }
+    else {
+        drcontext = drwrap_get_drcontext(wrapcxt);
     }
 
     wstring_convert<std::codecvt_utf8<wchar_t>> utf8Converter;
@@ -382,13 +393,13 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     SL2_LOG_JSONL(j);
 
     if (info->source) {
-        dr_thread_free(drwrap_get_drcontext(wrapcxt), info->source, MAX_PATH + 1);
+        dr_thread_free(drcontext, info->source, MAX_PATH + 1);
     }
     if (info->argHash) {
-        dr_thread_free(drwrap_get_drcontext(wrapcxt), info->argHash, SL2_HASH_LEN + 1);
+        dr_thread_free(drcontext, info->argHash, SL2_HASH_LEN + 1);
     }
 
-    dr_thread_free(drwrap_get_drcontext(wrapcxt), info, sizeof(wizard_read_info));
+    dr_thread_free(drcontext, info, sizeof(wizard_read_info));
 }
 
 /* Runs every time we load a new module. Wraps functions we can target. See fuzzer.cpp for a more-detailed version */
