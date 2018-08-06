@@ -569,7 +569,8 @@ static void handle_register_pid(HANDLE pipe)
     PathCchCombine(pids_file, MAX_PATH, run_dir, tracing ? FUZZ_RUN_TRACER_PIDS
                                                          : FUZZ_RUN_FUZZER_PIDS);
 
-    // TODO(ww): We should probably acquire a lock here.
+    EnterCriticalSection(&run_lock);
+
     HANDLE file = CreateFile(
         pids_file,
         FILE_APPEND_DATA,
@@ -584,6 +585,8 @@ static void handle_register_pid(HANDLE pipe)
     }
 
     CloseHandle(file);
+
+    LeaveCriticalSection(&run_lock);
 
     RpcStringFree((RPC_WSTR *)&run_id_s);
 }
