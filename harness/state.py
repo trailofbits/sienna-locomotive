@@ -39,7 +39,7 @@ def create_invocation_statement(config_dict):
     Returns an InvocationState containing the command run
     and the PRNG seed used.
     """
-    seed = str(random.getrandbits(64))
+    seed = str(random.getrandbits(64)) if 'seed' not in config_dict else config_dict['seed']
     program_arr = [
         config_dict['drrun_path'],
         *config_dict['drrun_args'],
@@ -168,18 +168,26 @@ def get_all_targets():
     """
     targets = {}
     for _dir in glob.glob(os.path.join(config.sl2_targets_dir, '*')):
-        with open(os.path.join(_dir, 'arguments.txt'), 'r') as program_string_file:
+        argfile = os.path.join(_dir, 'arguments.txt')
+        if not os.path.exists(argfile):
+            print("Warning: {} is missing".format(argfile))
+            continue
+        with open(argfile, 'r') as program_string_file:
             targets[_dir] = unstringify_program_array(program_string_file.read().strip())
     return targets
 
 
-def get_runs():
+def get_runs(run_id=None):
     """
     Returns a dict mapping run ID's to the contents of the argument file.
     """
     runs = {}
-    for _dir in glob.glob(os.path.join(config.sl2_runs_dir, '*')):
-        with open(os.path.join(_dir, 'arguments.txt'), 'rb') as program_string_file:
+    for _dir in glob.glob(os.path.join(config.sl2_runs_dir, '*' if run_id is None else run_id)):
+        argfile = os.path.join(_dir, 'arguments.txt')
+        if not os.path.exists(argfile):
+            print("Warning: {} is missing".format(argfile))
+            continue
+        with open(argfile, 'rb') as program_string_file:
             runs[_dir] = unstringify_program_array(program_string_file.read().decode('utf-16').strip())
     return runs
 
@@ -226,11 +234,11 @@ def parse_triage_output(run_id):
             return formatted, results
     except FileNotFoundError:
         message = "The triage tool exited improperly during run {}, \
-        but no crash file could be found. It may have timed out. \
-        To retry it manually, run \
-        `python harness.py -v -e TRIAGE [-p <PROFILE>]`"
+but no crash file could be found. It may have timed out. \
+To retry it manually, run \
+`python harness.py -v -e TRIAGE -p {} -r {}`"
 
-        return message.format(run_id), None
+        return message.format(run_id, config.profile, run_id), None
 
 
 def export_crash_data_to_csv(crashes, csv_filename):
@@ -251,7 +259,7 @@ def export_crash_data_to_csv(crashes, csv_filename):
 
 
 def generate_run_id(config_dict):
-    run_id = uuid.uuid4()
+    run_id = uuid.uuid4() if 'run_id' not in config_dict else config_dict['run_id']
 
     os.makedirs(os.path.join(config.sl2_runs_dir, str(run_id)))
 

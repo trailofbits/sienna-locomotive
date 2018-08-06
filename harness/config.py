@@ -22,8 +22,10 @@ CONFIG_SCHEMA = {}
 
 PATH_KEYS = ['drrun_path', 'client_path', 'server_path', 'wizard_path', 'tracer_path', 'triager_path']
 ARGS_KEYS = ['drrun_args', 'client_args', 'target_args']
-INT_KEYS = ['runs', 'simultaneous', 'fuzz_timeout', 'triage_timeout']
+INT_KEYS = ['runs', 'simultaneous', 'fuzz_timeout', 'triage_timeout', 'seed']
 FLAG_KEYS = ['verbose', 'debug', 'nopersist', 'continuous', 'exit_early', 'inline_stdout', 'preserve_runs']
+
+profile = 'DEFAULT'
 
 for path in PATH_KEYS:
     CONFIG_SCHEMA[path] = {
@@ -70,7 +72,7 @@ os.makedirs(sl2_targets_dir, exist_ok=True)
 # Create a default config file if one doesn't exist
 if not os.path.exists(sl2_config_path):
     default_config = configparser.ConfigParser()
-    default_config['DEFAULT'] = {
+    default_config[profile] = {
         'drrun_path': 'dynamorio\\bin64\\drrun.exe',
         'drrun_args': '',
         'client_path': 'build\\fuzz_dynamorio\\Debug\\fuzzer.dll',
@@ -128,7 +130,7 @@ parser.add_argument(
     '-p', '--profile',
     action='store',
     dest='profile',
-    default='DEFAULT',
+    default=profile,
     type=str,
     help="Load the given profile (from config.ini). Defaults to DEFAULT")
 
@@ -161,6 +163,23 @@ parser.add_argument(
     type=int,
     help="Timeout (seconds) after which triage runs should be killed. \
     By default, runs are not killed.")
+
+parser.add_argument(
+    '--seed',
+    action='store',
+    dest='seed',
+    type=int,
+    help="PRNG Seed to use for mutations. Leaving this blank will \
+    result in a randomly chosen seed. You should use a random seed \
+    unless trying to replay a specific run.")
+
+parser.add_argument(
+    '--run_id',
+    action='store',
+    dest='run_id',
+    type=str,
+    help="Set the Run ID for a given run to a specific value instead \
+    of using an auto-generated value. Useful for replaying triage runs.")
 
 parser.add_argument(
     '-r', '--runs',
@@ -226,12 +245,14 @@ def set_profile(new_profile):
     Updates the global configuration to match the supplied profile.
     """
     global config
+    global profile
     try:
         config = dict(_config[new_profile])
     except Exception as e:
         print("ERROR: No such profile:", new_profile)
         sys.exit()
 
+    profile = new_profile
     update_config_from_args()
     validate_config()
 

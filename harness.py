@@ -124,14 +124,20 @@ def main():
 
         # Parse the list of run ID's and select one to triage
         if config['stage'] == 'TRIAGE':
-            runs = get_runs()
-            mapping = []
-            for run_id in runs:
-                print("{}) [{}]  {}".format(len(mapping),
-                                            run_id[-36:][:8],  # first 8 bytes of the UUID
-                                            stringify_program_array(runs[run_id][0], runs[run_id][1])))
-                mapping.append(run_id)
-            run_id = mapping[select_from_range(len(mapping), "Select a run to triage> ")]
+            if 'run_id' in config:
+                run_id = config['run_id']
+                runs = get_runs(run_id)
+                run_id = list(runs.keys())[0]
+            else:
+                runs = get_runs()
+                mapping = []
+                for run_id in runs:
+                    print("{}) [{}]  {}".format(len(mapping),
+                                                run_id[-36:][:8],  # first 8 bytes of the UUID
+                                                stringify_program_array(runs[run_id][0], runs[run_id][1])))
+                    mapping.append(run_id)
+
+                run_id = mapping[select_from_range(len(mapping), "Select a run to triage> ")]
             config['target_application_path'], config['target_args'] = runs[run_id]
             config['client_args'].append('-t')
             config['client_args'].append(target_file)

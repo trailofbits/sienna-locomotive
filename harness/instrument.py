@@ -284,7 +284,11 @@ def fuzzer_run(config_dict):
             #     except (PermissionError, OSError):
             #         print_l("WARNING: Couldn't kill child process:", pid, " (maybe already dead?)")
 
-        finalize(run_id, crashed)
+        try:
+            finalize(run_id, crashed)
+        except Exception as e:
+            print(e)
+            return False, -1
 
     return crashed, run_id
 
