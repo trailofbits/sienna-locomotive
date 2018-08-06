@@ -168,7 +168,11 @@ def get_all_targets():
     """
     targets = {}
     for _dir in glob.glob(os.path.join(config.sl2_targets_dir, '*')):
-        with open(os.path.join(_dir, 'arguments.txt'), 'r') as program_string_file:
+        argfile = os.path.join(_dir, 'arguments.txt')
+        if not os.path.exists(argfile):
+            print("Warning: {} is missing".format(argfile))
+            continue
+        with open(argfile, 'r') as program_string_file:
             targets[_dir] = unstringify_program_array(program_string_file.read().strip())
     return targets
 
@@ -179,7 +183,11 @@ def get_runs(run_id=None):
     """
     runs = {}
     for _dir in glob.glob(os.path.join(config.sl2_runs_dir, '*' if run_id is None else run_id)):
-        with open(os.path.join(_dir, 'arguments.txt'), 'rb') as program_string_file:
+        argfile = os.path.join(_dir, 'arguments.txt')
+        if not os.path.exists(argfile):
+            print("Warning: {} is missing".format(argfile))
+            continue
+        with open(argfile, 'rb') as program_string_file:
             runs[_dir] = unstringify_program_array(program_string_file.read().decode('utf-16').strip())
     return runs
 
