@@ -134,7 +134,10 @@ SL2Response sl2_conn_register_mutation(sl2_conn *conn, sl2_mutation *mutation)
     sl2_conn_write_prefixed_string(conn, mutation->resource);
     SL2_CONN_WRITE(&(mutation->position), sizeof(mutation->position));
     SL2_CONN_WRITE(&(mutation->bufsize), sizeof(mutation->bufsize));
-    SL2_CONN_WRITE(mutation->buffer, mutation->bufsize);
+
+    if (mutation->bufsize > 0) {
+        SL2_CONN_WRITE(mutation->buffer, mutation->bufsize);
+    }
 
     return SL2Response::OK;
 }

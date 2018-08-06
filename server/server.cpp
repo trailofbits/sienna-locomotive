@@ -310,33 +310,33 @@ static void handle_register_mutation(HANDLE pipe)
         SL2_SERVER_LOG_FATAL("failed to read size of mutation buffer");
     }
 
-    uint8_t *buf = (uint8_t *) malloc(size);
+    if (size > 0) {
+        uint8_t *buf = (uint8_t *) malloc(size);
 
-    if (buf == NULL) {
-        SL2_SERVER_LOG_FATAL("failed to allocate mutation buffer (size=%lu)", size);
+        if (buf == NULL) {
+            SL2_SERVER_LOG_FATAL("failed to allocate mutation buffer (size=%lu)", size);
+        }
+
+        if (!ReadFile(pipe, buf, (DWORD)size, &txsize, NULL)) {
+            SL2_SERVER_LOG_FATAL("failed to read mutation buffer from pipe (size=%lu)", size);
+        }
+
+        if (txsize < size) {
+            SL2_SERVER_LOG_WARN("read fewer bytes than expected (%d < %lu)", txsize, size);
+            size = txsize;
+        }
+
+        wchar_t run_dir[MAX_PATH + 1] = {0};
+        wchar_t target_file[MAX_PATH + 1] = {0};
+
+        PathCchCombine(run_dir, MAX_PATH, FUZZ_WORKING_PATH, run_id_s);
+        PathCchCombine(target_file, MAX_PATH, run_dir, mutate_fname);
+
+        write_fkt(target_file, type, resource_size, resource_path, position, size, buf);
     }
-
-    if (!ReadFile(pipe, buf, (DWORD)size, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to read mutation buffer from pipe (size=%lu)", size);
+    else {
+        SL2_SERVER_LOG_WARN("got size=%lu, skipping registration", size);
     }
-
-    if (txsize < size) {
-        SL2_SERVER_LOG_WARN("read fewer bytes than expected (%d < %lu)", txsize, size);
-        size = txsize;
-    }
-
-    // TODO(ww): Do we need this?
-    if (size < 0) {
-        SL2_SERVER_LOG_WARN("got an unexpectedly small buffer (%lu < 0), skipping mutation");
-    }
-
-    wchar_t run_dir[MAX_PATH + 1] = {0};
-    wchar_t target_file[MAX_PATH + 1] = {0};
-
-    PathCchCombine(run_dir, MAX_PATH, FUZZ_WORKING_PATH, run_id_s);
-    PathCchCombine(target_file, MAX_PATH, run_dir, mutate_fname);
-
-    write_fkt(target_file, type, resource_size, resource_path, position, size, buf);
 
     RpcStringFree((RPC_WSTR *)&run_id_s);
 }
