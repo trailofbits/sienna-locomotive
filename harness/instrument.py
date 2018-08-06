@@ -132,6 +132,7 @@ def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False)
                             os.kill(pid, signal.SIGTERM)
                         except (PermissionError, OSError) as e:
                             print_l("WARNING: Couldn't kill child process:", e)
+                            print_l("Try running the harness as an Administrator.")
         else:
             print_l("WARNING: No run ID, so not looking for PIDs to kill.")
 
@@ -169,6 +170,7 @@ def triager_run(run_id):
             print_l(repr(out))
     else:
         print_l("[!] No initial.dmp to triage!")
+        return None
     return out
 
 
