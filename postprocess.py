@@ -31,6 +31,7 @@ class Rollup(json.JSONEncoder):
         self.crashashes = {}
         self.runsdir    =  harness.config.sl2_runs_dir
         self.sl2dir     = harness.config.sl2_dir
+        self.cols_      = []
 
 
     # @staticmethod
@@ -39,9 +40,9 @@ class Rollup(json.JSONEncoder):
 
 
     def cols(self):
-        return 3
+        return self.cols_
 
-    def rows(self):
+    def rowsCount(self):
         return len(self.crashashes.keys())
 
     @staticmethod
@@ -81,6 +82,9 @@ class Rollup(json.JSONEncoder):
             print( "%s\t%s" % (v['exploitability'], k) )
         self.persist()
 
+        # Prime the tocsts
+        self.toCSV()
+
     def toCSV(self):
         if self.csvs != None:
             return self.csvs
@@ -88,6 +92,7 @@ class Rollup(json.JSONEncoder):
         self.csvs = []
         for  crash in self.crashashes.values():
             crash =  crash.copy()
+            self.cols_ = list(crash.keys())
             del crash['tracer']
             crash = [ hex(_) if isinstance(_, int) else _  for _ in crash.values() ]
             self.csvs.append(crash)

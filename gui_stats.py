@@ -29,17 +29,17 @@ class RollupModel(QAbstractTableModel):
     def attachModel(self, rollup):
         self.rollup = rollup
 
+
+    def horizontalHeaderItem(self, col):
+        ret = self.rollup.cols()[col]
+        print("ret", ret)
+        return ret
+
     def rowCount(self, parent):
-        if self.rollup == None:
-            return 0
-        else:
-            return self.rollup.rows()
+        return self.rollup.rowsCount()
 
     def columnCount( self, parent ):
-        if self.rollup == None:
-            return 0
-        else:
-            return self.rollup.cols()
+        return len(self.rollup.cols())
 
     def data(self, index, role):
         return self.rollup.toCSV()[index.row()][index.column()]
