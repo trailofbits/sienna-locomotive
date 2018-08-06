@@ -277,14 +277,6 @@ def finalize(run_id, crashed):
     writing the relevant parts of the protocol to the pipe.
     """
     f = open(config.sl2_server_pipe_path, 'w+b', buffering=0)
-    f.write(struct.pack('B', 0x4))  # EVT_RUN_COMPLETE
-    f.seek(0)
-    f.write(run_id.bytes)  # Write the run ID
-    f.seek(0)
-    # Write a bool indicating a crash
-    f.write(struct.pack('?', 1 if crashed else 0))
-    # Write a bool indicating whether to preserve run files (without a crash)
-    f.write(struct.pack('?', 1 if crashed else 0))
     f.write(struct.pack('B', 0x6))  # EVT_SESSION_TEARDOWN
     f.close()
 
