@@ -162,6 +162,23 @@ parser.add_argument(
     By default, runs are not killed.")
 
 parser.add_argument(
+    '--seed',
+    action='store',
+    dest='seed',
+    type=int,
+    help="PRNG Seed to use for mutations. Leaving this blank will \
+    result in a randomly chosen seed. You should use a random seed \
+    unless trying to replay a specific run.")
+
+parser.add_argument(
+    '--run_id',
+    action='store',
+    dest='run_id',
+    type=str,
+    help="Set the Run ID for a given run to a specific value instead \
+    of using an auto-generated value. Useful for replaying triage runs.")
+
+parser.add_argument(
     '-r', '--runs',
     action='store',
     dest='runs',

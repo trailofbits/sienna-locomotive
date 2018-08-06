@@ -259,8 +259,11 @@ def fuzzer_run(config_dict):
 
     # Handle orphaned pipes after a timeout
     if run.process.timed_out:
-        finalize(run_id, crashed)
-
+        try:
+            finalize(run_id, crashed)
+        except Exception as e:
+            print(e)
+            return False, -1
     return crashed, run_id
 
 
