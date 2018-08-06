@@ -22,8 +22,10 @@ CONFIG_SCHEMA = {}
 
 PATH_KEYS = ['drrun_path', 'client_path', 'server_path', 'wizard_path', 'tracer_path', 'triager_path']
 ARGS_KEYS = ['drrun_args', 'client_args', 'target_args']
-INT_KEYS = ['runs', 'simultaneous', 'fuzz_timeout', 'triage_timeout']
+INT_KEYS = ['runs', 'simultaneous', 'fuzz_timeout', 'triage_timeout', 'seed']
 FLAG_KEYS = ['verbose', 'debug', 'nopersist', 'continuous', 'exit_early', 'inline_stdout', 'preserve_runs']
+
+profile = 'DEFAULT'
 
 for path in PATH_KEYS:
     CONFIG_SCHEMA[path] = {
@@ -70,7 +72,7 @@ os.makedirs(sl2_targets_dir, exist_ok=True)
 # Create a default config file if one doesn't exist
 if not os.path.exists(sl2_config_path):
     default_config = configparser.ConfigParser()
-    default_config['DEFAULT'] = {
+    default_config[profile] = {
         'drrun_path': 'dynamorio\\bin64\\drrun.exe',
         'drrun_args': '',
         'client_path': 'build\\fuzz_dynamorio\\Debug\\fuzzer.dll',
@@ -128,7 +130,7 @@ parser.add_argument(
     '-p', '--profile',
     action='store',
     dest='profile',
-    default='DEFAULT',
+    default=profile,
     type=str,
     help="Load the given profile (from config.ini). Defaults to DEFAULT")
 
@@ -243,12 +245,14 @@ def set_profile(new_profile):
     Updates the global configuration to match the supplied profile.
     """
     global config
+    global profile
     try:
         config = dict(_config[new_profile])
     except Exception as e:
         print("ERROR: No such profile:", new_profile)
         sys.exit()
 
+    profile = new_profile
     update_config_from_args()
     validate_config()
 

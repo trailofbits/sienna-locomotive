@@ -173,12 +173,12 @@ def get_all_targets():
     return targets
 
 
-def get_runs():
+def get_runs(run_id=None):
     """
     Returns a dict mapping run ID's to the contents of the argument file.
     """
     runs = {}
-    for _dir in glob.glob(os.path.join(config.sl2_runs_dir, '*')):
+    for _dir in glob.glob(os.path.join(config.sl2_runs_dir, '*' if run_id is None else run_id)):
         with open(os.path.join(_dir, 'arguments.txt'), 'rb') as program_string_file:
             runs[_dir] = unstringify_program_array(program_string_file.read().decode('utf-16').strip())
     return runs
@@ -228,9 +228,9 @@ def parse_triage_output(run_id):
         message = "The triage tool exited improperly during run {}, \
 but no crash file could be found. It may have timed out. \
 To retry it manually, run \
-`python harness.py -v -e TRIAGE [-p <PROFILE>]`"
+`python harness.py -v -e TRIAGE -p {} -r {}`"
 
-        return message.format(run_id), None
+        return message.format(run_id, config.profile, run_id), None
 
 
 def export_crash_data_to_csv(crashes, csv_filename):
