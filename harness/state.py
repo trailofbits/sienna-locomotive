@@ -24,7 +24,6 @@ class InvocationState(NamedTuple):
     """
     cmd_arr: list
     cmd_str: str
-    pidfile: str
     seed: str
 
 
@@ -35,26 +34,14 @@ def esc_quote(raw):
         return "\"{}\"".format(raw)
 
 
-def unique_pidfile():
-    """
-    Returns a unique path for a pidfile within the main
-    SL2 data directory.
-    """
-    pidfile = "%s.pid" % uuid.uuid4()
-    return os.path.join(config.sl2_dir, pidfile)
-
-
 def create_invocation_statement(config_dict):
     """
-    Returns an InvocationState containing the command run,
-    its incipient pidfile, and the PRNG seed used.
+    Returns an InvocationState containing the command run
+    and the PRNG seed used.
     """
-    pidfile = unique_pidfile()
     seed = str(random.getrandbits(64))
     program_arr = [
         config_dict['drrun_path'],
-        '-pidfile',
-        pidfile,
         *config_dict['drrun_args'],
         '-prng_seed',
         seed,
@@ -70,7 +57,6 @@ def create_invocation_statement(config_dict):
     return InvocationState(
         program_arr,
         stringify_program_array(program_arr[0], program_arr[1:]),
-        pidfile,
         seed
     )
 
@@ -318,19 +304,3 @@ def check_fuzz_line_for_crash(line):
     except Exception as e:
         print("[!] Unexpected exception while checking for crash:", e)
     return False, None
-
-
-def check_fuzz_line_for_pid(line):
-    """
-    Attempt to parse a line as JSON, returning a pid (int) object
-    if the JSON object contains one. Otherwise, return None.
-    """
-    try:
-        obj = json.loads(line)
-        if obj["pid"]:
-            return obj["pid"]
-    except (json.JSONDecodeError, KeyError):
-        pass
-    except Exception as e:
-        print("[!] Unexpected exception while checking for run id:", e)
-    return None

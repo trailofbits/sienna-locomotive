@@ -172,32 +172,6 @@ SL2Response sl2_conn_request_replay(
 }
 
 SL2_EXPORT
-SL2Response sl2_conn_finalize_run(sl2_conn *conn, bool crash, bool preserve)
-{
-    DWORD txsize;
-
-    // If the connection doesn't a run ID, then we don't have a run to finalize.
-    if (!conn->has_run_id) {
-        return SL2Response::MissingRunID;
-    }
-
-    // First, tell the server that we're finalizing a run.
-    SL2_CONN_EVT(EVT_RUN_COMPLETE);
-
-    // Then, tell the server which run we're finalizing.
-    SL2_CONN_WRITE(&(conn->run_id), sizeof(conn->run_id));
-
-    // Then, tell the server whether we've found a crash.
-    SL2_CONN_WRITE(&crash, sizeof(crash));
-
-    // Finally, tell the server if we'd like to preserve the run's on-disk state,
-    // even without a crash. This is only checked if by the server if crash is false.
-    SL2_CONN_WRITE(&preserve, sizeof(preserve));
-
-    return SL2Response::OK;
-}
-
-SL2_EXPORT
 SL2Response sl2_conn_request_crash_paths(sl2_conn *conn, sl2_crash_paths *paths)
 {
     DWORD txsize;
@@ -278,4 +252,27 @@ SL2Response sl2_conn_ping(sl2_conn *conn, uint8_t *ok)
     return SL2Response::OK;
 }
 
+SL2_EXPORT
+SL2Response sl2_conn_register_pid(sl2_conn *conn, uint32_t pid, bool tracing)
+{
+    DWORD txsize;
+
+    if (!conn->has_run_id) {
+        return SL2Response::MissingRunID;
+    }
+
+    // First, tell the server that we're registering a pid.
+    SL2_CONN_EVT(EVT_REGISTER_PID);
+
+    // Then, tell the server which run the pid is associated with.
+    SL2_CONN_WRITE(&(conn->run_id), sizeof(conn->run_id));
+
+    // Then, tell the server whether we're registering a tracer pid or not.
+    SL2_CONN_WRITE(&tracing, sizeof(tracing));
+
+    // Finally, write the pid to the server.
+    SL2_CONN_WRITE(&pid, sizeof(pid));
+
+    return SL2Response::OK;
+}
 

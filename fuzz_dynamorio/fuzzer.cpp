@@ -186,9 +186,6 @@ on_dr_exit(void)
         sl2_conn_register_arena(&sl2_conn, &arena);
     }
 
-
-    sl2_conn_finalize_run(&sl2_conn, crashed, true);
-
     sl2_conn_close(&sl2_conn);
 
     dr_free_module_data(target_mod);
@@ -879,10 +876,7 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     sl2_string_to_uuid(run_id_s.c_str(), &run_id);
     sl2_conn_assign_run_id(&sl2_conn, run_id);
 
-    json j;
-    j["run_id"] = run_id_s;
-    j["pid"] = dr_get_process_id();
-    SL2_LOG_JSONL(j);
+    sl2_conn_register_pid(&sl2_conn, dr_get_process_id(), false);
 
     drmgr_init();
     drwrap_init();
