@@ -317,7 +317,7 @@ static void handle_register_mutation(HANDLE pipe)
     }
 
     if (!ReadFile(pipe, buf, (DWORD)size, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to read mutation buffer from pipe");
+        SL2_SERVER_LOG_FATAL("failed to read mutation buffer from pipe (size=%lu)", size);
     }
 
     if (txsize < size) {
