@@ -52,6 +52,13 @@ static droption_t<bool> op_no_coverage(
     "nocoverage",
     "disable coverage, even when possible");
 
+static droption_t<std::string> op_run_id(
+    DROPTION_SCOPE_CLIENT,
+    "r",
+    "",
+    "run_id",
+    "specify the run ID for this fuzzer instance");
+
 
 // TODO(ww): Add options here for edge/bb coverage,
 // if we decided to support edge as well.
@@ -67,27 +74,6 @@ static uint32_t mut_count = 0;
 static sl2_arena arena = {0};
 static bool coverage_guided = false;
 static module_data_t *target_mod;
-
-/* Read the PEB of the target application and get the full command line */
-static void get_target_command_line(wchar_t **argv, size_t *len)
-{
-    // see: https://github.com/DynamoRIO/dynamorio/issues/2662
-    // alternatively: https://wj32.org/wp/2009/01/24/howto-get-the-command-line-of-processes/
-    PEB * clientPEB = (PEB *) dr_get_app_PEB();
-    RTL_USER_PROCESS_PARAMETERS parameterBlock;
-
-    // Read process parameter block from PEB
-    memcpy(&parameterBlock, clientPEB->ProcessParameters, sizeof(RTL_USER_PROCESS_PARAMETERS));
-
-    // Allocate space for the command line
-    *argv = (wchar_t *) dr_global_alloc(parameterBlock.CommandLine.Length + 2);
-    memset(*argv, 0, parameterBlock.CommandLine.Length + 2);
-
-    // Read the command line from the parameter block
-    memcpy(*argv, parameterBlock.CommandLine.Buffer, parameterBlock.CommandLine.Length);
-
-    *len = parameterBlock.CommandLine.Length + 2;
-}
 
 static dr_emit_flags_t
 on_bb_instrument(void *drcontext, void *tag, instrlist_t *bb, instr_t *inst, bool for_trace, bool translating, void *user_data)
@@ -199,9 +185,6 @@ on_dr_exit(void)
     if (coverage_guided) {
         sl2_conn_register_arena(&sl2_conn, &arena);
     }
-
-
-    sl2_conn_finalize_run(&sl2_conn, crashed, false);
 
     sl2_conn_close(&sl2_conn);
 
@@ -855,12 +838,20 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     }
 
     std::string target = op_target.get_value();
+
     if (target == "") {
         SL2_DR_DEBUG("ERROR: arg -t (target file) required\n");
         dr_abort();
     }
 
     bool no_coverage = op_no_coverage.get_value();
+
+    std::string run_id_s = op_run_id.get_value();
+
+    if (run_id_s == "") {
+        SL2_DR_DEBUG("ERROR: arg -r required\n");
+        dr_abort();
+    }
 
     if (!client.loadJson(target)) {
         SL2_DR_DEBUG("Failed to load targets!\n");
@@ -876,29 +867,16 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_log(NULL, DR_LOG_ALL, ERROR, "Client SL Fuzzer is running\n");
     }
 
-    // Get application name
-    const char* target_app_name_mbs = dr_get_application_name();
-    wchar_t target_app_name[MAX_PATH + 1] = {0};
-    mbstowcs_s(NULL, target_app_name, MAX_PATH, target_app_name_mbs, MAX_PATH);
-
     if (sl2_conn_open(&sl2_conn) != SL2Response::OK) {
         SL2_DR_DEBUG("ERROR: Couldn't open a connection to the server!\n");
         dr_abort();
     }
 
-    wchar_t *target_argv;
-    size_t target_argv_size;
-    get_target_command_line(&target_argv, &target_argv_size);
+    UUID run_id;
+    sl2_string_to_uuid(run_id_s.c_str(), &run_id);
+    sl2_conn_assign_run_id(&sl2_conn, run_id);
 
-    sl2_conn_request_run_id(&sl2_conn, target_app_name, target_argv);
-    dr_global_free(target_argv, target_argv_size);
-
-    char run_id_s[SL2_UUID_SIZE] = {0};
-    sl2_uuid_to_string(sl2_conn.run_id, run_id_s);
-
-    json j;
-    j["run_id"] = run_id_s;
-    SL2_LOG_JSONL(j);
+    sl2_conn_register_pid(&sl2_conn, dr_get_process_id(), false);
 
     drmgr_init();
     drwrap_init();

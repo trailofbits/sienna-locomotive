@@ -13,16 +13,17 @@ import os
 import json
 import traceback
 import sys
+import shutil
 from enum import IntEnum
 from typing import NamedTuple
 
 from .state import (
     parse_triage_output,
+    generate_run_id,
     finalize,
     write_output_files,
     create_invocation_statement,
     check_fuzz_line_for_crash,
-    check_fuzz_line_for_run_id,
     get_path_to_run_file,
 )
 
@@ -76,7 +77,7 @@ def start_server():
         time.sleep(1)
 
 
-def run_dr(config_dict, verbose=False, timeout=None):
+def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False):
     """
     Runs dynamorio with the given config.
     Clobbers console output if save_stderr/stdout are true.
@@ -116,15 +117,23 @@ def run_dr(config_dict, verbose=False, timeout=None):
         if verbose:
             print_l("Process Timed Out after %s seconds" % (time.time() - started))
 
-        # Parse PID of target application and kill it, which causes drrun to exit
-        with open(invoke.pidfile, 'r') as pidfile_contents:
-            pid = pidfile_contents.read().strip()
-            if verbose:
-                print_l("Killing child process:", pid)
-            try:
-                os.kill(int(pid), signal.SIGTERM)
-            except (PermissionError, OSError):
-                print_l("WARNING: Couldn't kill child process")
+        if run_id:
+            pids_file = get_path_to_run_file(run_id, "trace.pids" if tracing else "fuzz.pids")
+
+            with open(pids_file, 'rb') as pids_contents:
+                for line in pids_contents.read().decode('utf-16').split('\n'):
+                    if line:
+                        # TODO(ww): We probably want to call finalize() once per pid here,
+                        # since each pid has its own session/thread on the server.
+                        pid = int(line)
+                        if verbose:
+                            print_l("Killing child process:", pid)
+                        try:
+                            os.kill(pid, signal.SIGTERM)
+                        except (PermissionError, OSError) as e:
+                            print_l("WARNING: Couldn't kill child process:", e)
+        else:
+            print_l("WARNING: No run ID, so not looking for PIDs to kill.")
 
         # Try to get the output again
         try:
@@ -143,11 +152,6 @@ def run_dr(config_dict, verbose=False, timeout=None):
             popen_obj.stderr = json.dumps({"exception": "EXCEPTION_SL2_TIMEOUT"}).encode('utf-8')
 
         popen_obj.timed_out = True
-    finally:
-        try:
-            os.remove(invoke.pidfile)
-        except OSError:
-            print_l("[!] Couldn't remove pidfile: ", invoke.pidfile)
 
     return DRRun(popen_obj, invoke.seed)
 
@@ -220,22 +224,32 @@ def wizard_run(config_dict):
 
 def fuzzer_run(config_dict):
     """ Runs the fuzzer """
+
+    # Generate a run ID and hand it to the fuzzer.
+    run_id = generate_run_id(config_dict)
+
     run = run_dr(
-        config_dict,
+        {
+            'drrun_path': config_dict['drrun_path'],
+            'drrun_args': config_dict['drrun_args'],
+            'client_path': config_dict['client_path'],
+            'client_args': [*config_dict['client_args'], '-r', str(run_id)],
+            'target_application_path': config_dict['target_application_path'],
+            'target_args': config_dict['target_args'],
+            'inline_stdout': config_dict['inline_stdout']
+        },
         verbose=config_dict['verbose'],
-        timeout=config_dict.get('fuzz_timeout', None)
+        timeout=config_dict.get('fuzz_timeout', None),
+        run_id=run_id,
+        tracing=False,
     )
 
-    # Parse run ID from fuzzer output
-    run_id = None
+    # Parse crash status from the output.
     crashed = False
 
     for line in run.process.stderr.split(b'\n'):
         try:
             line = line.decode('utf-8')
-            # Extract the run id from the run
-            if not run_id:
-                run_id = check_fuzz_line_for_run_id(line)
 
             # Identify whether the fuzzing run resulted in a crash
             if not crashed:
@@ -244,21 +258,32 @@ def fuzzer_run(config_dict):
             if config_dict['verbose']:
                 print_l("[!] Not UTF-8:", repr(line))
 
-    if not run_id:
-        print_l("Error: No run ID could be parsed from the server output. Did it crash?")
-        return False, -1
+    write_output_files(run, run_id, 'fuzz')
 
     if crashed:
         print_l('Fuzzing run %s returned %s after raising %s'
                 % (run_id, run.process.returncode, exception))
-        # Write stdout and stderr to files
-        # TODO fix issue #40
-        write_output_files(run, run_id, 'fuzz')
-    elif config_dict['verbose']:
-        print_l("Run %s did not find a crash" % run_id)
+    else:
+        if config_dict['verbose']:
+            print_l("Run %s did not find a crash" % run_id)
 
-    # Handle orphaned pipes after a timeout
+        if config_dict['preserve_runs']:
+            print_l('Preserving run %s without a crash (requested)' % run_id)
+        else:
+            shutil.rmtree(os.path.join(config.sl2_runs_dir, str(run_id)), ignore_errors=True)
+
+    # If we timed out, tell the server to end the run.
+    # Additionally, make sure that every process spawned by the run is dead.
     if run.process.timed_out:
+            # print_l("pids:", pids)
+
+            # for pid in pids:
+            #     print_l("Killing child process:", pid)
+            #     try:
+            #         os.kill(pid, signal.SIGTERM)
+            #     except (PermissionError, OSError):
+            #         print_l("WARNING: Couldn't kill child process:", pid, " (maybe already dead?)")
+
         finalize(run_id, crashed)
 
     return crashed, run_id

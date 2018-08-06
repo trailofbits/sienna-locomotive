@@ -1568,6 +1568,8 @@ void tracer(client_id_t id, int argc, const char *argv[])
     sl2_string_to_uuid(run_id_s.c_str(), &run_id);
     sl2_conn_assign_run_id(&sl2_conn, run_id);
 
+    sl2_conn_register_pid(&sl2_conn, dr_get_process_id(), true);
+
     mutatex = dr_mutex_create();
     dr_register_exit_event(on_dr_exit);
 
