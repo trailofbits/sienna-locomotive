@@ -690,10 +690,23 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     }
 
     if (info->argHash) {
-        dr_thread_free(drwrap_get_drcontext(wrapcxt), info->argHash, SL2_HASH_LEN + 1);
+        if (wrapcxt == 0x0){
+            SL2_DR_DEBUG("Warning: NULL wrapcxt pointer in wrap_post_Generic (1)\n");
+            dr_thread_free(dr_get_current_drcontext(), info->argHash, SL2_HASH_LEN + 1);
+        }
+        else {
+            dr_thread_free(drwrap_get_drcontext(wrapcxt), info->argHash, SL2_HASH_LEN + 1);
+        }
     }
 
-    dr_thread_free(drwrap_get_drcontext(wrapcxt), info, sizeof(fuzzer_read_info));
+    if (wrapcxt == 0x0){
+        SL2_DR_DEBUG("Warning: NULL wrapcxt pointer in wrap_post_Generic (2)\n");
+        dr_thread_free(dr_get_current_drcontext(), info, sizeof(client_read_info));
+    }
+    else {
+         dr_thread_free(drwrap_get_drcontext(wrapcxt), info, sizeof(client_read_info));
+    }
+
 }
 
 /* Runs when a new module (typically an exe or dll) is loaded. Tells DynamoRIO to hook all the interesting functions
