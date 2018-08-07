@@ -194,19 +194,22 @@ static void dump_arena(wchar_t *arena_path, sl2_arena *arena)
         FILE_ATTRIBUTE_NORMAL,
         NULL);
 
-    if (file == INVALID_HANDLE_VALUE) {
-        SL2_SERVER_LOG_FATAL("dump_arena: failed to open %S", arena_path);
-    }
+    if (file != INVALID_HANDLE_VALUE) {
+        if (!WriteFile(file, arena->map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
+            SL2_SERVER_LOG_FATAL("failed to write arena to disk!");
+        }
 
-    if (!WriteFile(file, arena->map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("dump_arena: failed to write arena to disk!");
-    }
+        if (txsize != FUZZ_ARENA_SIZE) {
+            SL2_SERVER_LOG_FATAL("(txsize=%lu) != (FUZZ_ARENA_SIZE=%lu), truncated write?", txsize, FUZZ_ARENA_SIZE);
+        }
 
-    if (txsize != FUZZ_ARENA_SIZE) {
-        SL2_SERVER_LOG_FATAL("dump_arena: %lu != %lu, truncated write?", txsize, FUZZ_ARENA_SIZE);
+        if (!CloseHandle(file)) {
+            SL2_SERVER_LOG_ERROR("failed to close arena (arena_path=%S)", arena_path);
+        }
     }
-
-    CloseHandle(file);
+    else {
+        SL2_SERVER_LOG_ERROR("failed to open arena_path=%S, skipping dump!", arena_path);
+    }
 
     LeaveCriticalSection(&run_lock);
 }
@@ -279,7 +282,8 @@ static void handle_register_mutation(HANDLE pipe)
     }
 
     wchar_t resource_path[MAX_PATH + 1] = {0};
-    if ( resource_size >= MAX_PATH*sizeof(wchar_t) ) {
+    if (resource_size >= (MAX_PATH * sizeof(wchar_t))) {
+        // TODO(ww): Instead of failing, maybe just truncate here?
         SL2_SERVER_LOG_FATAL("resource_size >= MAX_PATH");
     }
 
@@ -566,6 +570,8 @@ static void handle_register_pid(HANDLE pipe)
     PathCchCombine(pids_file, MAX_PATH, run_dir, tracing ? FUZZ_RUN_TRACER_PIDS
                                                          : FUZZ_RUN_FUZZER_PIDS);
 
+    RpcStringFree((RPC_WSTR *)&run_id_s);
+
     EnterCriticalSection(&run_lock);
 
     HANDLE file = CreateFile(
@@ -576,30 +582,34 @@ static void handle_register_pid(HANDLE pipe)
         FILE_ATTRIBUTE_NORMAL,
         NULL);
 
+    if (file != INVALID_HANDLE_VALUE) {
+        if (!WriteFile(file, pid_s, lstrlen(pid_s) * sizeof(wchar_t), &txsize, NULL)) {
+            SL2_SERVER_LOG_ERROR("failed to write pid (pid=%lu, pids_file=%S)", pid, pids_file);
+        }
 
-    if (!WriteFile(file, pid_s, lstrlen(pid_s) * sizeof(wchar_t), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to write pid (pid=%lu, pids_file=%S)", pid, pids_file);
+        if (!CloseHandle(file)) {
+            SL2_SERVER_LOG_ERROR("failed to close pids_file=%S", pids_file);
+        }
+    }
+    else {
+        SL2_SERVER_LOG_ERROR("failed to open pids_file=%S, not recording pid!");
     }
 
-    CloseHandle(file);
-
     LeaveCriticalSection(&run_lock);
-
-    RpcStringFree((RPC_WSTR *)&run_id_s);
 }
 
 static void destroy_pipe(HANDLE pipe)
 {
     if (!FlushFileBuffers(pipe)) {
-        SL2_SERVER_LOG_FATAL("failed to flush pipe");
+        SL2_SERVER_LOG_ERROR("failed to flush pipe");
     }
 
     if (!DisconnectNamedPipe(pipe)) {
-        SL2_SERVER_LOG_FATAL("failed to disconnect pipe");
+        SL2_SERVER_LOG_ERROR("failed to disconnect pipe");
     }
 
     if (!CloseHandle(pipe)) {
-        SL2_SERVER_LOG_FATAL("failed to close pipe");
+        SL2_SERVER_LOG_ERROR("failed to close pipe");
     }
 }
 
@@ -630,7 +640,7 @@ static DWORD WINAPI thread_handler(void *data)
             else {
                 // Pipe was broken when we tried to read it. Happens when the python client
                 // checks if it exists.
-                SL2_SERVER_LOG_ERROR("broken pipe! ending session on event=%d", event);
+                SL2_SERVER_LOG_WARN("broken pipe! ending session on event=%d", event);
                 destroy_pipe(pipe);
                 return 0;
             }
@@ -735,8 +745,7 @@ int main(int argvc, char **argv)
                 0,
                 NULL);
 
-            if (thread == NULL)
-            {
+            if (thread == NULL) {
                 SL2_SERVER_LOG_FATAL("CreateThread failed\n");
             }
             else {
