@@ -236,7 +236,7 @@ def parse_triage_output(run_id):
         message = "The triage tool exited improperly during run {}, \
 but no crash file could be found. It may have timed out. \
 To retry it manually, run \
-`python harness.py -v -e TRIAGE -p {} -r {}`"
+`python harness.py -v -e TRIAGE -p {} -run_id {}`"
 
         return message.format(run_id, config.profile, run_id), None
 
