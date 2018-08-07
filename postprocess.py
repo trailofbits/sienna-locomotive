@@ -4,7 +4,7 @@ import json
 import csv
 import os
 import shutil
-
+import re
 from typing import NamedTuple
 
 
@@ -25,14 +25,22 @@ class Rollup(json.JSONEncoder):
     def default(self, o):
         return o.__dict__
 
-    def __init__(self):
+    def __init__(self, dedupe=False):
         self.csvs       = None
         self.cfg        = harness.config.config
         self.crashashes = {}
         self.runsdir    =  harness.config.sl2_runs_dir
         self.sl2dir     = harness.config.sl2_dir
         self.cols_      = []
-
+        self.dupes      = 0
+        self.dedupe     = dedupe
+        self.rankStats  = {
+            'High'      : 0,
+            'Medium'    : 0,
+            'Low'       : 0,
+            'Unknown'   : 0,
+            'None'      : 0
+        }
 
     # @staticmethod
     # def delerror( function, path, info ):
@@ -42,7 +50,7 @@ class Rollup(json.JSONEncoder):
     def cols(self):
         return self.cols_
 
-    def rowsCount(self):
+    def rowCount(self):
         return len(self.crashashes.keys())
 
     @staticmethod
@@ -66,12 +74,15 @@ class Rollup(json.JSONEncoder):
                 triageJson = json.load(f)
                 f.close()
                 crashash = triageJson["crashash"]
+                self.rankStats[triageJson["exploitability"]] += 1
                 if crashash in self.crashashes:
+                    self.dupes += 1
                     rmsg = RollupMessage( path, i, pathsCnt, True )
                     cb( rmsg )
-                    dirtodelete = os.path.dirname(path)
-                    print("Deleting %s" % dirtodelete)
-                    #Rollup.safedelete(dirtodelete)
+                    if self.dedupe:
+                        dirtodelete = os.path.dirname(path)
+                        print("Deleting %s" % dirtodelete)
+                        Rollup.safedelete(dirtodelete)
                 else:
                     rmsg = RollupMessage( path, i, pathsCnt, False )
                     cb( rmsg )
@@ -90,12 +101,18 @@ class Rollup(json.JSONEncoder):
             return self.csvs
 
         self.csvs = []
+        crashLast = None
         for  crash in self.crashashes.values():
             crash =  crash.copy()
-            self.cols_ = list(crash.keys())
             del crash['tracer']
-            crash = [ hex(_) if isinstance(_, int) else _  for _ in crash.values() ]
+            crashLast = crash
+            crash = [ hex(_) if isinstance(_, int) and _>0x1000 else _  for _ in crash.values() ]
             self.csvs.append(crash)
+
+        crashLast = list(crashLast.keys())
+        crashLast = [ re.sub( r"([A-Z])", r" \1", _ ) for _ in crashLast ]
+        crashLast = [ str(_).capitalize()  for _ in crashLast ]
+        self.cols_ = crashLast
         return self.csvs
 
 
