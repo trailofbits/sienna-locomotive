@@ -45,7 +45,7 @@ static void lock_process()
 {
     process_mutex = CreateMutex(NULL, false, L"fuzz_server_mutex");
     if (!process_mutex || process_mutex == INVALID_HANDLE_VALUE) {
-        SL2_SERVER_LOG_FATAL("could not get create process lock");
+        SL2_SERVER_LOG_FATAL("could not create process lock");
     }
 
     DWORD result = WaitForSingleObject(process_mutex, 0);
@@ -57,7 +57,7 @@ static void lock_process()
 // Called on process termination (by atexit).
 static void server_cleanup()
 {
-    SL2_SERVER_LOG_INFO("Called, cleaning things up");
+    SL2_SERVER_LOG_INFO("cleaning things up");
 
     // NOTE(ww): We could probably check return codes here, but there's
     // no point -- the process is about to be destroyed anyways.
@@ -216,9 +216,10 @@ static void dump_arena(wchar_t *arena_path, sl2_arena *arena)
 
 static void load_arena(wchar_t *arena_path, sl2_arena *arena)
 {
+    DWORD txsize;
+
     EnterCriticalSection(&run_lock);
 
-    DWORD txsize;
     HANDLE file = CreateFile(
         arena_path,
         GENERIC_READ,
@@ -228,7 +229,7 @@ static void load_arena(wchar_t *arena_path, sl2_arena *arena)
         NULL);
 
     if (file == INVALID_HANDLE_VALUE) {
-        SL2_SERVER_LOG_FATAL("failed to open %S", arena_path);
+        SL2_SERVER_LOG_FATAL("failed to open arena (arena_path=%S)", arena_path);
     }
 
     if (!ReadFile(file, arena->map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
@@ -236,10 +237,12 @@ static void load_arena(wchar_t *arena_path, sl2_arena *arena)
     }
 
     if (txsize != FUZZ_ARENA_SIZE) {
-        SL2_SERVER_LOG_FATAL("%lu != %lu, truncated read?", txsize, FUZZ_ARENA_SIZE);
+        SL2_SERVER_LOG_FATAL("(txsize=%lu) != (FUZZ_ARENA_SIZE=%lu), truncated read?", txsize, FUZZ_ARENA_SIZE);
     }
 
-    CloseHandle(file);
+    if (!CloseHandle(file)) {
+        SL2_SERVER_LOG_FATAL("failed to close arena (arena_path=%S)", arena_path);
+    }
 
     LeaveCriticalSection(&run_lock);
 }
@@ -677,6 +680,9 @@ static DWORD WINAPI thread_handler(void *data)
             case EVT_SESSION_TEARDOWN:
                 SL2_SERVER_LOG_INFO("ending a client's session with the server.");
                 break;
+            // NOTE(ww): These are just here for completeness.
+            // Any client that requests them and expects anything back is
+            // almost certain to misbehave.
             case EVT_RUN_ID:
             case EVT_MUTATION:
             case EVT_RUN_INFO:
