@@ -278,7 +278,7 @@ static void handle_register_mutation(HANDLE pipe)
         SL2_SERVER_LOG_FATAL("failed to read size of mutation filepath");
     }
 
-    if (resource_size > MAX_PATH) {
+    if ((resource_size / sizeof(wchar_t)) > MAX_PATH) {
         SL2_SERVER_LOG_FATAL("resource_size > MAX_PATH");
     }
 
