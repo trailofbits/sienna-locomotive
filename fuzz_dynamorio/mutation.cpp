@@ -96,19 +96,9 @@ void strategyDeleteBytesAscii(uint8_t *buf, size_t size)
 SL2_EXPORT
 void strategyRandValues(uint8_t *buf, size_t size)
 {
-    size_t rand_size = 0;
-    size_t max = 0;
-    while (max < 1) {
-        // rand_size -> 1, 2, 4, 8
-        rand_size = (size_t) 1 << dr_get_random_value(4);
-        max = (size + 1);
-        max -= rand_size;
-    }
-
-    // pos -> zero to ((size + 1) - rand_size)
-    // e.g. buf size is 16, rand_size is 8
-    // max will be from 0 to 9 guanteeing a
-    // pos that will fit into the buffer
+    size_t rand_size;
+    do { rand_size = (size_t) 1 << dr_get_random_value(4); } while (size < rand_size);
+    size_t max = (size + 1) - rand_size;
     size_t pos = dr_get_random_value((uint) max);
 
     for (size_t i = 0; i < rand_size; i++) {
@@ -125,21 +115,16 @@ void strategyKnownValues(uint8_t *buf, size_t size)
     int32_t values4[] = { KNOWN_VALUES1, KNOWN_VALUES2, KNOWN_VALUES4 };
     int64_t values8[] = { KNOWN_VALUES1, KNOWN_VALUES2, KNOWN_VALUES4, KNOWN_VALUES8 };
 
-    size_t rand_size = 0;
-    size_t max = 0;
-    while (max < 1) {
-        // size -> 1, 2, 4, 8
-        rand_size = (size_t) 1 << dr_get_random_value(4);
-        max = (size + 1);
-        max -= rand_size;
-    }
+    size_t rand_size;
+    do { rand_size = (size_t) 1 << dr_get_random_value(4); } while (size < rand_size);
+    size_t max = (size + 1) - rand_size;
+    size_t pos = dr_get_random_value((uint) max);
+    bool endian = dr_get_random_value(2);
 
     // pos -> zero to ((size + 1) - rand_size)
     // e.g. buf size is 16, rand_size is 8
-    // max will be from 0 to 9 guaranteeing a
+    // max will be from 0 to 9 guanteeing a
     // pos that will fit into the buffer
-    size_t pos = dr_get_random_value((uint) max);
-    bool endian = dr_get_random_value(2);
 
     size_t selection = 0;
     switch (rand_size) {
@@ -178,18 +163,9 @@ void strategyAddSubKnownValues(uint8_t *buf, size_t size)
     int32_t values4[] = { KNOWN_VALUES1, KNOWN_VALUES2, KNOWN_VALUES4 };
     int64_t values8[] = { KNOWN_VALUES1, KNOWN_VALUES2, KNOWN_VALUES4, KNOWN_VALUES8 };
 
-    size_t rand_size = 0;
-    size_t max = 0;
-    while (max < 1) {
-        // size -> 1, 2, 4, 8
-        rand_size = (size_t) 1 << dr_get_random_value(4);
-        max = (size + 1) - rand_size;
-    }
-
-    // pos -> zero to ((size + 1) - rand_size)
-    // e.g. buf size is 16, rand_size is 8
-    // max will be from 0 to 9 guaranteeing a
-    // pos that will fit into the buffer
+    size_t rand_size;
+    do { rand_size = (size_t) 1 << dr_get_random_value(4); } while (size < rand_size);
+    size_t max = (size + 1) - rand_size;
     size_t pos = dr_get_random_value((uint) max);
     bool endian = dr_get_random_value(2);
     uint8_t sub = dr_get_random_value(2) ? -1 : 1;
@@ -226,18 +202,9 @@ void strategyAddSubKnownValues(uint8_t *buf, size_t size)
 SL2_EXPORT
 void strategyEndianSwap(uint8_t *buf, size_t size)
 {
-    size_t rand_size = 0;
-    size_t max = 0;
-    while (max < 1) {
-        // size -> 1, 2, 4, 8
-        rand_size = (size_t) 1 << dr_get_random_value(4);
-        max = (size + 1) - rand_size;
-    }
-
-    // pos -> zero to ((size + 1) - rand_size)
-    // e.g. buf size is 16, rand_size is 8
-    // max will be from 0 to 9 guaranteeing a
-    // pos that will fit into the buffer
+    size_t rand_size;
+    do { rand_size = (size_t) 1 << dr_get_random_value(4); } while (size < rand_size);
+    size_t max = (size + 1) - rand_size;
     size_t pos = dr_get_random_value((uint) max);
 
     switch (rand_size) {
