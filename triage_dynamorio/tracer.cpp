@@ -1663,6 +1663,6 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
         SL2_DR_DEBUG("ERROR: Couldn't open a connection to the server!\n");
         dr_abort();
     }
-
+    dr_enable_console_printing();
     tracer(id, argc, argv);
 }

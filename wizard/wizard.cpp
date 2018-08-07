@@ -520,6 +520,6 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
         SL2_DR_DEBUG("wizard#main: usage error: %s", parse_err.c_str());
         dr_abort();
     }
-
+    dr_enable_console_printing();
     wizard(id, argc, argv);
 }
