@@ -25,7 +25,7 @@ class Rollup(json.JSONEncoder):
     def default(self, o):
         return o.__dict__
 
-    def __init__(self, dedupe=False):
+    def __init__(self, dedupe=True):
         self.csvs       = None
         self.cfg        = harness.config.config
         self.crashashes = {}

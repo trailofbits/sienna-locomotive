@@ -33,7 +33,6 @@ class RollupModel(QAbstractTableModel):
 
     def horizontalHeaderItem(self, col):
         ret = self.rollup.cols()[col]
-        print("ret", ret)
         return ret
 
     def rowCount(self, parent=None):
@@ -155,7 +154,6 @@ class MainWin(QtWidgets.QMainWindow):
         for row in range(m.rowCount()):
             for col in range(m.columnCount()):
                 item = m.item(row,col)
-                print("%d:%d:%s" % (row, col, item))
                 self.table.setItem( row, col, item )
 
         # Lets skip col #6, since it's the minidump path and not that important
@@ -169,7 +167,6 @@ class MainWin(QtWidgets.QMainWindow):
         dupe = "(Duplicate)" if rmsg.duplicate else ""
         percentdone = 100*rmsg.i / rmsg.iCnt
         msg =  "%d%% done %s %s" % (percentdone, rmsg.path, dupe)
-        print(msg)
         self.status(msg)
 
     def status(self, msg):
