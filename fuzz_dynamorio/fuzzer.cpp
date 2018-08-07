@@ -898,12 +898,10 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_abort();
     }
 
+    dr_enable_console_printing();
     // Set up console printing
     dr_log(NULL, DR_LOG_ALL, 1, "DR client 'SL Fuzzer' initializing\n");
     if (dr_is_notify_on()) {
-#ifdef WINDOWS
-        dr_enable_console_printing();  // TODO - necessary?
-#endif
         dr_log(NULL, DR_LOG_ALL, ERROR, "Client SL Fuzzer is running\n");
     }
 
