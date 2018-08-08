@@ -2,6 +2,7 @@
 #include <map>
 #include <set>
 #include <fstream>
+#include <memory>
 
 #include <Windows.h>
 #include <Dbghelp.h>
@@ -27,7 +28,37 @@ extern "C" {
 #include "common/sl2_dr_client.hpp"
 #include "common/sl2_dr_client_options.hpp"
 
-static SL2Client   client;
+template<typename T>
+struct sl2_dr_allocator {
+    using value_type = T;
+
+    sl2_dr_allocator() {}
+
+    template<typename U>
+    sl2_dr_allocator(const sl2_dr_allocator<U>&) {}
+
+    T* allocate(size_t size) {
+        return static_cast<T*>(dr_global_alloc(size * sizeof(T)));
+    }
+
+    void deallocate(T* ptr, size_t size) {
+        dr_global_free(ptr, size);
+    }
+};
+
+template <class T, class U>
+constexpr bool operator== (const sl2_dr_allocator<T>&, const sl2_dr_allocator<U>&)
+{
+    return true;
+}
+
+template <class T, class U>
+constexpr bool operator!= (const sl2_dr_allocator<T>&, const sl2_dr_allocator<U>&)
+{
+    return false;
+}
+
+static SL2Client client;
 static sl2_conn sl2_conn;
 static sl2_exception_ctx trace_exception_ctx;
 static void *mutatex;
@@ -35,8 +66,8 @@ static bool replay;
 static bool no_mutate;
 static uint32_t mutate_count;
 
-static std::set<reg_id_t> tainted_regs;
-static std::set<app_pc> tainted_mems;
+static std::set<reg_id_t, std::less<reg_id_t>, sl2_dr_allocator<reg_id_t>> tainted_regs;
+static std::set<app_pc, std::less<app_pc>, sl2_dr_allocator<app_pc>> tainted_mems;
 
 #define LAST_COUNT 5
 
