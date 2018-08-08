@@ -149,16 +149,16 @@ OK
 
 ## Triage
 
-The triage system is a separate executable, `triager.exe` that is run by the harness.  It takes care of ranking exploitability, uniqueness, and binning of crashes. 
+The triage system is a separate executable, `triager.exe` that is run by the harness.  It takes care of ranking exploitability, uniqueness, and binning of crashes.
 
 ### Exploitability
 
 The Exploitability ranking is a score for the potential ability to exploit a crash based on 3 engines.  The ranks, ranging from High (4) to None (0), in order of likelyhood are:
 
-  * **High** (4): The mostly likely case of a crash being exploitable. 
+  * **High** (4): The mostly likely case of a crash being exploitable.
   * **Medium** (3): Between High and Low.
-  * **Low** (2): At or above the cutoff for low exploitability. 
-  * **Unknown** (1): Unknown cases are below the cutoff for low, but still have the potential to be of interest. 
+  * **Low** (2): At or above the cutoff for low exploitability.
+  * **Unknown** (1): Unknown cases are below the cutoff for low, but still have the potential to be of interest.
   * **None** (0): Very unlikely the crash is exploitable.
 
 #### Engines
@@ -206,7 +206,7 @@ After the tracer has been run, `triager.exe` is run on the minidump file. It als
         1
     ],
 
-    // A unique identifier for the crash. The algorithm uses 12 bits from the called functions, 
+    // A unique identifier for the crash. The algorithm uses 12 bits from the called functions,
     // and is unaffected by ASLR, function call order, or function call count
     "crashash": "f96808cfc4798256",
 
@@ -282,3 +282,8 @@ There's a 010 template for this in `misc`
 
 ### Outdated components
 You can safely ignore most of the stuff in `corpus/asm` and `electriage`
+
+# Changes
+
+## 20180808
+Changed passing of arguments to clients and target applications from using comma separated to just normally how it would appear on the command line. The `shlex.split()` function will split them up appropriately
