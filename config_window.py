@@ -62,7 +62,7 @@ class ConfigWindow(QtWidgets.QDialog):
         self.build_dir.setText("build")
 
         self.target_path.setPlaceholderText("Path to target application")
-        self.target_args.setPlaceholderText("Target arguments (comma separated)")
+        self.target_args.setPlaceholderText("Target arguments")
 
         self.drrun_path_button = QtWidgets.QPushButton("Choose Path")
         self.build_dir_button = QtWidgets.QPushButton("Choose Directory")

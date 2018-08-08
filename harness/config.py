@@ -11,6 +11,7 @@ import os
 import sys
 import argparse
 import configparser
+import shlex
 
 # Schematizes the SL2 configuration.
 # Every configuration key has a 'test' function, an 'expected'
@@ -82,7 +83,7 @@ if not os.path.exists(sl2_config_path):
         'tracer_path': 'build\\triage_dynamorio\\Debug\\tracer.dll',
         'triager_path': 'build\\triage\\Debug\\triager.exe',
         'target_application_path': 'build\\corpus\\test_application\\Debug\\test_application.exe',
-        'target_args': '0,-f',
+        'target_args': '0 -f',
         'runs': 1,
         'simultaneous': 1,
         'inline_stdout': False,
@@ -297,9 +298,9 @@ def update_config_from_args():
         if opt in config:
             config[opt] = int(config[opt])
 
-    # Convert comma-separated arguments into lists
+    # Convert command line strings into lists
     for opt in ARGS_KEYS:
-        config[opt] = [] if (len(config[opt]) == 0) else config[opt].split(',')
+        config[opt] = [] if (len(config[opt]) == 0) else shlex.split(config[opt])
 
     if args.target_application_path is not None and len(config['target_args']) > 0:
         config['target_args'] = []
