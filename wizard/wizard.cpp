@@ -9,6 +9,8 @@
 #include "drwrap.h"
 #include "dr_ir_instr.h"
 #include "droption.h"
+#include "common/sl2_dr_client.hpp"
+#include "common/sl2_dr_client_options.hpp"
 
 #include <Dbghelp.h>
 #include <Windows.h>
@@ -38,6 +40,7 @@ struct wizard_read_info {
 
 static size_t baseAddr;
 static std::map<Function, UINT64> call_counts;
+
 
 /* Run whenever a thread inits/exits */
 static void
@@ -343,8 +346,19 @@ wrap_pre__read(void *wrapcxt, OUT void **user_data)
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data)
 {
-    if (user_data == NULL) {
+    void *drcontext;
+
+    if (!user_data) {
+        SL2_DR_DEBUG("Warning: user_data=NULL in wrap_post_Generic!\n");
         return;
+    }
+
+    if (!wrapcxt) {
+        SL2_DR_DEBUG("Warning: wrapcxt=NULL in wrap_post_Generic! Using dr_get_current_drcontext.\n");
+        drcontext = dr_get_current_drcontext();
+    }
+    else {
+        drcontext = drwrap_get_drcontext(wrapcxt);
     }
 
     wstring_convert<std::codecvt_utf8<wchar_t>> utf8Converter;
@@ -382,13 +396,13 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     SL2_LOG_JSONL(j);
 
     if (info->source) {
-        dr_thread_free(drwrap_get_drcontext(wrapcxt), info->source, MAX_PATH + 1);
+        dr_thread_free(drcontext, info->source, MAX_PATH + 1);
     }
     if (info->argHash) {
-        dr_thread_free(drwrap_get_drcontext(wrapcxt), info->argHash, SL2_HASH_LEN + 1);
+        dr_thread_free(drcontext, info->argHash, SL2_HASH_LEN + 1);
     }
 
-    dr_thread_free(drwrap_get_drcontext(wrapcxt), info, sizeof(wizard_read_info));
+    dr_thread_free(drcontext, info, sizeof(wizard_read_info));
 }
 
 /* Runs every time we load a new module. Wraps functions we can target. See fuzzer.cpp for a more-detailed version */
@@ -417,8 +431,10 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_PRE_HOOK1(toHookPre, InternetReadFile);
     SL2_PRE_HOOK2(toHookPre, ReadEventLogA, ReadEventLog);
     SL2_PRE_HOOK2(toHookPre, ReadEventLogW, ReadEventLog);
-    SL2_PRE_HOOK2(toHookPre, RegQueryValueExW, RegQueryValueEx);
-    SL2_PRE_HOOK2(toHookPre, RegQueryValueExA, RegQueryValueEx);
+    if( op_registry.get_value() ) {
+        SL2_PRE_HOOK2(toHookPre, RegQueryValueExW, RegQueryValueEx);
+        SL2_PRE_HOOK2(toHookPre, RegQueryValueExA, RegQueryValueEx);
+    }
     SL2_PRE_HOOK1(toHookPre, WinHttpWebSocketReceive);
     SL2_PRE_HOOK1(toHookPre, WinHttpReadData);
     SL2_PRE_HOOK1(toHookPre, recv);
@@ -431,8 +447,10 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, ReadEventLogA, Generic);
     SL2_POST_HOOK2(toHookPost, ReadEventLogW, Generic);
-    SL2_POST_HOOK2(toHookPost, RegQueryValueExW, Generic);
-    SL2_POST_HOOK2(toHookPost, RegQueryValueExA, Generic);
+    if( op_registry.get_value() ) {
+        SL2_POST_HOOK2(toHookPost, RegQueryValueExW, Generic);
+        SL2_POST_HOOK2(toHookPost, RegQueryValueExA, Generic);
+    }
     SL2_POST_HOOK2(toHookPost, WinHttpWebSocketReceive, Generic);
     SL2_POST_HOOK2(toHookPost, WinHttpReadData, Generic);
     SL2_POST_HOOK2(toHookPost, recv, Generic);
@@ -509,6 +527,6 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
         SL2_DR_DEBUG("wizard#main: usage error: %s", parse_err.c_str());
         dr_abort();
     }
-
+    dr_enable_console_printing();
     wizard(id, argc, argv);
 }

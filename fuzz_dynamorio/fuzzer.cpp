@@ -21,6 +21,7 @@
 #include "common/mutation.hpp"
 #include "common/sl2_server_api.hpp"
 #include "common/sl2_dr_client.hpp"
+#include "common/sl2_dr_client_options.hpp"
 
 // Metadata object for a target function call
 struct fuzzer_read_info {
@@ -36,14 +37,6 @@ struct fuzzer_read_info {
 };
 
 static bool mutate(HANDLE hFile, size_t position, void *buf, size_t size);
-
-// structure for getting command line client options in dynamorio
-static droption_t<std::string> op_target(
-    DROPTION_SCOPE_CLIENT,
-    "t",
-    "",
-    "targetfile",
-    "JSON file in which to look for targets");
 
 static droption_t<bool> op_no_coverage(
     DROPTION_SCOPE_CLIENT,
@@ -687,10 +680,22 @@ wrap_pre__read(void *wrapcxt, OUT void **user_data)
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data)
 {
-    SL2_DR_DEBUG("<in wrap_post_Generic>\n");
-    if (user_data == NULL) {
+    void *drcontext;
+
+    if (!user_data) {
+        SL2_DR_DEBUG("Warning: user_data=NULL in wrap_post_Generic!\n");
         return;
     }
+
+    if (!wrapcxt) {
+        SL2_DR_DEBUG("Warning: wrapcxt=NULL in wrap_post_Generic! Using dr_get_current_drcontext.\n");
+        drcontext = dr_get_current_drcontext();
+    }
+    else {
+        drcontext = drwrap_get_drcontext(wrapcxt);
+    }
+
+    SL2_DR_DEBUG("<in wrap_post_Generic>\n");
 
     client_read_info *info = (client_read_info *) user_data;
 
@@ -716,23 +721,10 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     }
 
     if (info->argHash) {
-        if (wrapcxt == 0x0){
-            SL2_DR_DEBUG("Warning: NULL wrapcxt pointer in wrap_post_Generic (1)\n");
-            dr_thread_free(dr_get_current_drcontext(), info->argHash, SL2_HASH_LEN + 1);
-        }
-        else {
-            dr_thread_free(drwrap_get_drcontext(wrapcxt), info->argHash, SL2_HASH_LEN + 1);
-        }
+        dr_thread_free(drcontext, info->argHash, SL2_HASH_LEN + 1);
     }
 
-    if (wrapcxt == 0x0){
-        SL2_DR_DEBUG("Warning: NULL wrapcxt pointer in wrap_post_Generic (2)\n");
-        dr_thread_free(dr_get_current_drcontext(), info, sizeof(client_read_info));
-    }
-    else {
-         dr_thread_free(drwrap_get_drcontext(wrapcxt), info, sizeof(client_read_info));
-    }
-
+    dr_thread_free(drcontext, info, sizeof(client_read_info));
 }
 
 /* Runs when a new module (typically an exe or dll) is loaded. Tells DynamoRIO to hook all the interesting functions
@@ -752,8 +744,10 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_PRE_HOOK1(toHookPre, InternetReadFile);
     SL2_PRE_HOOK2(toHookPre, ReadEventLogA, ReadEventLog);
     SL2_PRE_HOOK2(toHookPre, ReadEventLogW, ReadEventLog);
-    SL2_PRE_HOOK2(toHookPre, RegQueryValueExW, RegQueryValueEx);
-    SL2_PRE_HOOK2(toHookPre, RegQueryValueExA, RegQueryValueEx);
+    if( op_registry.get_value() ) {
+        SL2_PRE_HOOK2(toHookPre, RegQueryValueExW, RegQueryValueEx);
+        SL2_PRE_HOOK2(toHookPre, RegQueryValueExA, RegQueryValueEx);
+    }
     SL2_PRE_HOOK1(toHookPre, WinHttpWebSocketReceive);
     SL2_PRE_HOOK1(toHookPre, WinHttpReadData);
     SL2_PRE_HOOK1(toHookPre, recv);
@@ -766,8 +760,10 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, ReadEventLogA, Generic);
     SL2_POST_HOOK2(toHookPost, ReadEventLogW, Generic);
-    SL2_POST_HOOK2(toHookPost, RegQueryValueExW, Generic);
-    SL2_POST_HOOK2(toHookPost, RegQueryValueExA, Generic);
+    if( op_registry.get_value() ) {
+        SL2_POST_HOOK2(toHookPost, RegQueryValueExW, Generic);
+        SL2_POST_HOOK2(toHookPost, RegQueryValueExA, Generic);
+    }
     SL2_POST_HOOK2(toHookPost, WinHttpWebSocketReceive, Generic);
     SL2_POST_HOOK2(toHookPost, WinHttpReadData, Generic);
     SL2_POST_HOOK2(toHookPost, recv, Generic);
@@ -899,12 +895,10 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_abort();
     }
 
+    dr_enable_console_printing();
     // Set up console printing
     dr_log(NULL, DR_LOG_ALL, 1, "DR client 'SL Fuzzer' initializing\n");
     if (dr_is_notify_on()) {
-#ifdef WINDOWS
-        dr_enable_console_printing();  // TODO - necessary?
-#endif
         dr_log(NULL, DR_LOG_ALL, ERROR, "Client SL Fuzzer is running\n");
     }
 

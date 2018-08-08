@@ -51,29 +51,42 @@ Triage::Triage( const string& minidumpPath )
 }
 
 
-////////////////////////////////////////////////////////////////////////////
-// process()
-//      Does actual processing a minidump file, agnostic of exploitability
-//  engine
-StatusCode Triage::process() {
-
+StatusCode Triage::preProcess() {
     ProcessResult   sc;
 
     // Read in minidump
     if( !dump_.Read() ) {
-        cerr << "Unable to read dumpfile." << endl;
         return StatusCode::ERROR;
     }
 
     // Do some breakpad processing
     sc = proc_.Process( &dump_, &state_);
     if( PROCESS_OK!=sc ) {
+        return StatusCode::ERROR;
+    }
+
+    return StatusCode::GOOD;
+}
+
+////////////////////////////////////////////////////////////////////////////
+// process()
+//      Does actual processing a minidump file, agnostic of exploitability
+//  engine
+StatusCode Triage::process() {
+
+
+    StatusCode   sc;
+
+    sc = preProcess();
+    if( StatusCode::GOOD!=sc ) {
         cerr << "Unable to process dumpfile." << endl;
         return StatusCode::ERROR;
     }
 
+
     cout << "-----------------------------------------------" << endl;
     cout << minidumpPath_ << endl;
+    cout << "Crashash: " << crashash() << endl;
 
     // Loads up a crash.json file for taint info
     dirPath_ = fs::path(minidumpPath_);
@@ -140,11 +153,11 @@ const vector<uint64_t> Triage::callStack() const {
 
 
 ////////////////////////////////////////////////////////////////////////////
-// stackHash()
+// crashash()
 //      Returns the hash of the callstack.  This should uniquely identifiy
 // a crash (even with ASLR) by using the last 3 nibbles of the offset for
 // each call in the callstack
-const string Triage::stackHash() const {
+const string Triage::crashash() const {
     uint64_t    stackhash = 0;
     auto calls = callStack();
     sort( calls.begin(), calls.end() );
@@ -172,7 +185,7 @@ const string Triage::triageTag() const {
     fs::path  tPath;
     tPath.append( exploitability() );
     tPath.append( crashReason() );
-    tPath.append(stackHash());
+    tPath.append(crashash());
     string ret =  tPath.generic_string();
     return ret;
 }
@@ -279,7 +292,7 @@ json Triage::toJson() const {
         { "exploitability",     exploitability() },
         { "tag",                triageTag() },
         { "callStack",          callStack() },
-        { "stackHash",          stackHash() },
+        { "crashash",           crashash() },
         { "minidumpPath",       minidumpPath() },
         { "ranks",              ranks() },
         { "rank",               exploitabilityRank() },

@@ -25,6 +25,7 @@ extern "C" {
 
 #include "common/sl2_server_api.hpp"
 #include "common/sl2_dr_client.hpp"
+#include "common/sl2_dr_client_options.hpp"
 
 static SL2Client   client;
 static sl2_conn sl2_conn;
@@ -48,13 +49,7 @@ static app_pc module_start = 0;
 static app_pc module_end = 0;
 static size_t baseAddr;
 
-/* Required, which specific call to target */
-static droption_t<std::string> op_target(
-    DROPTION_SCOPE_CLIENT,
-    "t",
-    "",
-    "target",
-    "Specific call to target.");
+
 
 /* Mostly used to debug if taint tracking is too slow */
 static droption_t<unsigned int> op_no_taint(
@@ -1392,10 +1387,22 @@ wrap_pre__read(void *wrapcxt, OUT void **user_data)
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data)
 {
-    SL2_DR_DEBUG("<in wrap_post_Generic>\n");
-    if (user_data == NULL) {
+    void *drcontext;
+
+    if (!user_data) {
+        SL2_DR_DEBUG("Warning: user_data=NULL in wrap_post_Generic!\n");
         return;
     }
+
+    if (!wrapcxt) {
+        SL2_DR_DEBUG("Warning: wrapcxt=NULL in wrap_post_Generic! Using dr_get_current_drcontext.\n");
+        drcontext = dr_get_current_drcontext();
+    }
+    else {
+        drcontext = drwrap_get_drcontext(wrapcxt);
+    }
+
+    SL2_DR_DEBUG("<in wrap_post_Generic>\n");
 
     client_read_info *info = (client_read_info *) user_data;
 
@@ -1432,22 +1439,10 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     }
 
     if (info->argHash) {
-        if (wrapcxt == 0x0){
-            SL2_DR_DEBUG("Warning: NULL wrapcxt pointer in wrap_post_Generic (1)\n");
-            dr_thread_free(dr_get_current_drcontext(), info->argHash, SL2_HASH_LEN + 1);
-        }
-        else {
-            dr_thread_free(drwrap_get_drcontext(wrapcxt), info->argHash, SL2_HASH_LEN + 1);
-        }
+        dr_thread_free(drcontext, info->argHash, SL2_HASH_LEN + 1);
     }
 
-    if (wrapcxt == 0x0){
-        SL2_DR_DEBUG("Warning: NULL wrapcxt pointer in wrap_post_Generic (2)\n");
-        dr_thread_free(dr_get_current_drcontext(), info, sizeof(client_read_info));
-    }
-    else {
-         dr_thread_free(drwrap_get_drcontext(wrapcxt), info, sizeof(client_read_info));
-    }
+    dr_thread_free(drcontext, info, sizeof(client_read_info));
 }
 
 /* Register function pre/post callbacks in each module */
@@ -1466,8 +1461,10 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_PRE_HOOK1(toHookPre, InternetReadFile);
     SL2_PRE_HOOK2(toHookPre, ReadEventLogA, ReadEventLog);
     SL2_PRE_HOOK2(toHookPre, ReadEventLogW, ReadEventLog);
-    SL2_PRE_HOOK2(toHookPre, RegQueryValueExW, RegQueryValueEx);
-    SL2_PRE_HOOK2(toHookPre, RegQueryValueExA, RegQueryValueEx);
+    if( op_registry.get_value() ) {
+        SL2_PRE_HOOK2(toHookPre, RegQueryValueExW, RegQueryValueEx);
+        SL2_PRE_HOOK2(toHookPre, RegQueryValueExA, RegQueryValueEx);
+    }
     SL2_PRE_HOOK1(toHookPre, WinHttpWebSocketReceive);
     SL2_PRE_HOOK1(toHookPre, WinHttpReadData);
     SL2_PRE_HOOK1(toHookPre, recv);
@@ -1480,8 +1477,10 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, ReadEventLogA, Generic);
     SL2_POST_HOOK2(toHookPost, ReadEventLogW, Generic);
-    SL2_POST_HOOK2(toHookPost, RegQueryValueExW, Generic);
-    SL2_POST_HOOK2(toHookPost, RegQueryValueExA, Generic);
+    if( op_registry.get_value() ) {
+        SL2_POST_HOOK2(toHookPost, RegQueryValueExW, Generic);
+        SL2_POST_HOOK2(toHookPost, RegQueryValueExA, Generic);
+    }
     SL2_POST_HOOK2(toHookPost, WinHttpWebSocketReceive, Generic);
     SL2_POST_HOOK2(toHookPost, WinHttpReadData, Generic);
     SL2_POST_HOOK2(toHookPost, recv, Generic);
@@ -1663,6 +1662,6 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
         SL2_DR_DEBUG("ERROR: Couldn't open a connection to the server!\n");
         dr_abort();
     }
-
+    dr_enable_console_printing();
     tracer(id, argc, argv);
 }

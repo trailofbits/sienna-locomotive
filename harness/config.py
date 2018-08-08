@@ -157,6 +157,12 @@ parser.add_argument(
     By default, runs are not killed.")
 
 parser.add_argument(
+    '-g', '--registry',
+    action='store_true',
+    dest='registry',
+    help="Enable tracking registry calls like RegQuery()")
+
+parser.add_argument(
     '-i', '--triagetimeout',
     action='store',
     dest='triage_timeout',
@@ -307,6 +313,9 @@ def update_config_from_args():
 
     if not args.nopersist:
         config['drrun_args'].append('-persist')
+
+    if args.registry:
+        config['client_args'].append('-registry')
 
     # Replace any values in the config dict with the optional value from the argument.
     # Note that if you set a default value for an arg, this will overwrite its value in the config

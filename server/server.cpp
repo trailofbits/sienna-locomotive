@@ -278,11 +278,10 @@ static void handle_register_mutation(HANDLE pipe)
         SL2_SERVER_LOG_FATAL("failed to read size of mutation filepath");
     }
 
-    if (resource_size > MAX_PATH) {
-        SL2_SERVER_LOG_FATAL("resource_size > MAX_PATH");
-    }
-
     wchar_t resource_path[MAX_PATH + 1] = {0};
+    if ( resource_size >= MAX_PATH*sizeof(wchar_t) ) {
+        SL2_SERVER_LOG_FATAL("resource_size >= MAX_PATH");
+    }
 
     // NOTE(ww): Interestingly, Windows distinguishes between a read of 0 bytes
     // and no read at all -- both the client and the server have to do either one or the
@@ -291,8 +290,6 @@ static void handle_register_mutation(HANDLE pipe)
         if (!ReadFile(pipe, &resource_path, (DWORD) resource_size, &txsize, NULL)) {
             SL2_SERVER_LOG_FATAL("failed to read mutation filepath");
         }
-
-        resource_path[resource_size] = 0;
 
         SL2_SERVER_LOG_INFO("mutation file path: %S", resource_path);
     }

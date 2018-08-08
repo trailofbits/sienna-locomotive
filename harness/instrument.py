@@ -20,7 +20,6 @@ from typing import NamedTuple
 from .state import (
     parse_triage_output,
     generate_run_id,
-    finalize,
     write_output_files,
     create_invocation_statement,
     check_fuzz_line_for_crash,
@@ -183,7 +182,7 @@ def wizard_run(config_dict):
             'drrun_path': config_dict['drrun_path'],
             'drrun_args': config_dict['drrun_args'],
             'client_path': config_dict['wizard_path'],
-            'client_args': [],
+            'client_args': config_dict['client_args'],
             'target_application_path': config_dict['target_application_path'],
             'target_args': config_dict['target_args'],
             'inline_stdout': config_dict['inline_stdout']
@@ -273,24 +272,6 @@ def fuzzer_run(config_dict):
             print_l('Preserving run %s without a crash (requested)' % run_id)
         else:
             shutil.rmtree(os.path.join(config.sl2_runs_dir, str(run_id)), ignore_errors=True)
-
-    # If we timed out, tell the server to end the run.
-    # Additionally, make sure that every process spawned by the run is dead.
-    if run.process.timed_out:
-            # print_l("pids:", pids)
-
-            # for pid in pids:
-            #     print_l("Killing child process:", pid)
-            #     try:
-            #         os.kill(pid, signal.SIGTERM)
-            #     except (PermissionError, OSError):
-            #         print_l("WARNING: Couldn't kill child process:", pid, " (maybe already dead?)")
-
-        try:
-            finalize(run_id, crashed)
-        except Exception as e:
-            print(e)
-            return False, -1
 
     return crashed, run_id
 
