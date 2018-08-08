@@ -21,6 +21,7 @@
 #include "common/mutation.hpp"
 #include "common/sl2_server_api.hpp"
 #include "common/sl2_dr_client.hpp"
+#include "common/sl2_dr_client_options.hpp"
 
 // Metadata object for a target function call
 struct fuzzer_read_info {
@@ -36,14 +37,6 @@ struct fuzzer_read_info {
 };
 
 static bool mutate(HANDLE hFile, size_t position, void *buf, size_t size);
-
-// structure for getting command line client options in dynamorio
-static droption_t<std::string> op_target(
-    DROPTION_SCOPE_CLIENT,
-    "t",
-    "",
-    "targetfile",
-    "JSON file in which to look for targets");
 
 static droption_t<bool> op_no_coverage(
     DROPTION_SCOPE_CLIENT,

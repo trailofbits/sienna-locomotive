@@ -182,7 +182,7 @@ def wizard_run(config_dict):
             'drrun_path': config_dict['drrun_path'],
             'drrun_args': config_dict['drrun_args'],
             'client_path': config_dict['wizard_path'],
-            'client_args': [],
+            'client_args': config_dict['client_args'],
             'target_application_path': config_dict['target_application_path'],
             'target_args': config_dict['target_args'],
             'inline_stdout': config_dict['inline_stdout']

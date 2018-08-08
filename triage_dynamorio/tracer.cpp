@@ -25,6 +25,7 @@ extern "C" {
 
 #include "common/sl2_server_api.hpp"
 #include "common/sl2_dr_client.hpp"
+#include "common/sl2_dr_client_options.hpp"
 
 static SL2Client   client;
 static sl2_conn sl2_conn;
@@ -48,13 +49,7 @@ static app_pc module_start = 0;
 static app_pc module_end = 0;
 static size_t baseAddr;
 
-/* Required, which specific call to target */
-static droption_t<std::string> op_target(
-    DROPTION_SCOPE_CLIENT,
-    "t",
-    "",
-    "target",
-    "Specific call to target.");
+
 
 /* Mostly used to debug if taint tracking is too slow */
 static droption_t<unsigned int> op_no_taint(
