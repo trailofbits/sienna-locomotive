@@ -27,7 +27,7 @@ Function DynamioRioInstall {
     If ( Test-Path $dynamorioDir ) {
         $dynamorioDir + " already exists "
         return
-    } 
+    }
 
     $url="https://github.com/DynamoRIO/dynamorio/releases/download/cronbuild-7.0.17721/${dynamorioBase}.zip"
 
@@ -36,7 +36,7 @@ Function DynamioRioInstall {
     $client = New-Object System.Net.WebClient
 
     $zip = $cwd + "\dr.zip"
-    "Downloading " + $url 
+    "Downloading " + $url
     $client.DownloadFile($url, $zip)
     "Unzipping " + $zip
     Unzip $zip $cwd
@@ -46,6 +46,7 @@ Function DynamioRioInstall {
 
 
 Function Build {
+    taskkill.exe /IM test_application.exe /F
     Push-Location
     InstallDependencies
     DynamioRioInstall
@@ -62,11 +63,11 @@ Function Build {
 
 Function SafeDelete {
     param( [string]$path )
- 
+
     if ( Test-Path "$path" ) {
         "Deleting ${path}"
         Remove-Item $path -Force -Recurse
-    } 
+    }
 }
 
 Function Reconfig {
@@ -76,8 +77,8 @@ Function Reconfig {
 }
 
 Function Test {
-    python harness.py  -v -r10  -t build\corpus\test_application\Debug\test_application -a 8 
-    #python harness.py  -v -r10 -e FUZZER -t build\corpus\test_application\Debug\test_application -a 8 
+    python harness.py  -v -r10  -t build\corpus\test_application\Debug\test_application -a 8
+    #python harness.py  -v -r10 -e FUZZER -t build\corpus\test_application\Debug\test_application -a 8
     #dynamorio\bin64\drrun.exe -pidfile pidfile -verbose -persist -c build\triage_dynamorio\Debug\tracer.dll -t "C:\Users\IEUser\AppData\Roaming\Trail of Bits\fuzzkit\targets\TEST_APPLICATION_acfa4ea300cade2f47bc7f8ab4502453a7fe774b\targets.json" -r d3e03566-8db8-4c94-bb69-353008abae49 -- build\corpus\test_application\Debug\test_application.exe "0 -f"
 }
 
@@ -86,7 +87,7 @@ Function Clean {
     Reconfig
     SafeDelete "build"
     "It's clean!"
-    
+
 }
 
 Function Dep {
@@ -111,13 +112,13 @@ reconfig
     Deletes fuzzkit directory with run configuration
 
 help
-    This info    
+    This info
 '@
 }
 
 
 function Regress {
-    python .\regress.py    
+    python .\regress.py
 }
 
 $cmd = $args[0]
@@ -129,5 +130,5 @@ switch( $cmd ) {
     "regress"           { Regress }
     "help"              { Help }
     "test"              { Test }
-    default             { Build }   
+    default             { Build }
 }
