@@ -918,7 +918,7 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     drmgr_init();
     drwrap_init();
 
-    drreg_options_t opts = {sizeof(ops), 3, false};
+    drreg_options_t opts = {sizeof(opts), 3, false};
     drreg_init(&opts);
 
     // Check whether we can use coverage on this fuzzing run
