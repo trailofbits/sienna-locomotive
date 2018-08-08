@@ -45,7 +45,7 @@ static void lock_process()
 {
     process_mutex = CreateMutex(NULL, false, L"fuzz_server_mutex");
     if (!process_mutex || process_mutex == INVALID_HANDLE_VALUE) {
-        SL2_SERVER_LOG_FATAL("could not get create process lock");
+        SL2_SERVER_LOG_FATAL("could not create process lock");
     }
 
     DWORD result = WaitForSingleObject(process_mutex, 0);
@@ -57,7 +57,7 @@ static void lock_process()
 // Called on process termination (by atexit).
 static void server_cleanup()
 {
-    SL2_SERVER_LOG_INFO("Called, cleaning things up");
+    SL2_SERVER_LOG_INFO("cleaning things up");
 
     // NOTE(ww): We could probably check return codes here, but there's
     // no point -- the process is about to be destroyed anyways.
@@ -194,28 +194,32 @@ static void dump_arena(wchar_t *arena_path, sl2_arena *arena)
         FILE_ATTRIBUTE_NORMAL,
         NULL);
 
-    if (file == INVALID_HANDLE_VALUE) {
-        SL2_SERVER_LOG_FATAL("dump_arena: failed to open %S", arena_path);
-    }
+    if (file != INVALID_HANDLE_VALUE) {
+        if (!WriteFile(file, arena->map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
+            SL2_SERVER_LOG_FATAL("failed to write arena to disk!");
+        }
 
-    if (!WriteFile(file, arena->map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("dump_arena: failed to write arena to disk!");
-    }
+        if (txsize != FUZZ_ARENA_SIZE) {
+            SL2_SERVER_LOG_FATAL("(txsize=%lu) != (FUZZ_ARENA_SIZE=%lu), truncated write?", txsize, FUZZ_ARENA_SIZE);
+        }
 
-    if (txsize != FUZZ_ARENA_SIZE) {
-        SL2_SERVER_LOG_FATAL("dump_arena: %lu != %lu, truncated write?", txsize, FUZZ_ARENA_SIZE);
+        if (!CloseHandle(file)) {
+            SL2_SERVER_LOG_ERROR("failed to close arena (arena_path=%S)", arena_path);
+        }
     }
-
-    CloseHandle(file);
+    else {
+        SL2_SERVER_LOG_ERROR("failed to open arena_path=%S, skipping dump!", arena_path);
+    }
 
     LeaveCriticalSection(&run_lock);
 }
 
 static void load_arena(wchar_t *arena_path, sl2_arena *arena)
 {
+    DWORD txsize;
+
     EnterCriticalSection(&run_lock);
 
-    DWORD txsize;
     HANDLE file = CreateFile(
         arena_path,
         GENERIC_READ,
@@ -225,7 +229,7 @@ static void load_arena(wchar_t *arena_path, sl2_arena *arena)
         NULL);
 
     if (file == INVALID_HANDLE_VALUE) {
-        SL2_SERVER_LOG_FATAL("failed to open %S", arena_path);
+        SL2_SERVER_LOG_FATAL("failed to open arena (arena_path=%S)", arena_path);
     }
 
     if (!ReadFile(file, arena->map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
@@ -233,10 +237,12 @@ static void load_arena(wchar_t *arena_path, sl2_arena *arena)
     }
 
     if (txsize != FUZZ_ARENA_SIZE) {
-        SL2_SERVER_LOG_FATAL("%lu != %lu, truncated read?", txsize, FUZZ_ARENA_SIZE);
+        SL2_SERVER_LOG_FATAL("(txsize=%lu) != (FUZZ_ARENA_SIZE=%lu), truncated read?", txsize, FUZZ_ARENA_SIZE);
     }
 
-    CloseHandle(file);
+    if (!CloseHandle(file)) {
+        SL2_SERVER_LOG_FATAL("failed to close arena (arena_path=%S)", arena_path);
+    }
 
     LeaveCriticalSection(&run_lock);
 }
@@ -253,7 +259,9 @@ static void handle_register_mutation(HANDLE pipe)
         SL2_SERVER_LOG_FATAL("failed to read run ID");
     }
 
-    UuidToString(&run_id, (RPC_WSTR *)&run_id_s);
+    if (UuidToString(&run_id, (RPC_WSTR *)&run_id_s) != RPC_S_OK) {
+        SL2_SERVER_LOG_FATAL("couldn't stringify UUID");
+    }
 
     uint32_t type = 0;
     if (!ReadFile(pipe, &type, sizeof(type), &txsize, NULL)) {
@@ -279,7 +287,8 @@ static void handle_register_mutation(HANDLE pipe)
     }
 
     wchar_t resource_path[MAX_PATH + 1] = {0};
-    if ( resource_size >= MAX_PATH*sizeof(wchar_t) ) {
+    if (resource_size >= (MAX_PATH * sizeof(wchar_t))) {
+        // TODO(ww): Instead of failing, maybe just truncate here?
         SL2_SERVER_LOG_FATAL("resource_size >= MAX_PATH");
     }
 
@@ -349,7 +358,9 @@ static void handle_replay(HANDLE pipe)
         SL2_SERVER_LOG_FATAL("failed to read run ID");
     }
 
-    UuidToString(&run_id, (RPC_WSTR *)&run_id_s);
+    if (UuidToString(&run_id, (RPC_WSTR *)&run_id_s) != RPC_S_OK) {
+        SL2_SERVER_LOG_FATAL("couldn't stringify UUID");
+    }
 
     SL2_SERVER_LOG_INFO("Replaying for run id %S", run_id_s);
 
@@ -473,7 +484,9 @@ static void handle_crash_paths(HANDLE pipe)
         SL2_SERVER_LOG_FATAL("failed to read UUID");
     }
 
-    UuidToString(&run_id, (RPC_WSTR *)&run_id_s);
+    if (UuidToString(&run_id, (RPC_WSTR *)&run_id_s) != RPC_S_OK) {
+        SL2_SERVER_LOG_FATAL("couldn't stringify UUID");
+    }
 
     wchar_t run_dir[MAX_PATH + 1] = {0};
     wchar_t target_file[MAX_PATH + 1] = {0};
@@ -554,7 +567,9 @@ static void handle_register_pid(HANDLE pipe)
         SL2_SERVER_LOG_FATAL("failed to read pid");
     }
 
-    UuidToString(&run_id, (RPC_WSTR *) &run_id_s);
+    if (UuidToString(&run_id, (RPC_WSTR *)&run_id_s) != RPC_S_OK) {
+        SL2_SERVER_LOG_FATAL("couldn't stringify UUID");
+    }
 
     wchar_t run_dir[MAX_PATH + 1] = {0};
     wchar_t pids_file[MAX_PATH + 1] = {0};
@@ -566,6 +581,8 @@ static void handle_register_pid(HANDLE pipe)
     PathCchCombine(pids_file, MAX_PATH, run_dir, tracing ? FUZZ_RUN_TRACER_PIDS
                                                          : FUZZ_RUN_FUZZER_PIDS);
 
+    RpcStringFree((RPC_WSTR *)&run_id_s);
+
     EnterCriticalSection(&run_lock);
 
     HANDLE file = CreateFile(
@@ -576,30 +593,34 @@ static void handle_register_pid(HANDLE pipe)
         FILE_ATTRIBUTE_NORMAL,
         NULL);
 
+    if (file != INVALID_HANDLE_VALUE) {
+        if (!WriteFile(file, pid_s, lstrlen(pid_s) * sizeof(wchar_t), &txsize, NULL)) {
+            SL2_SERVER_LOG_ERROR("failed to write pid (pid=%lu, pids_file=%S)", pid, pids_file);
+        }
 
-    if (!WriteFile(file, pid_s, lstrlen(pid_s) * sizeof(wchar_t), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to write pid (pid=%lu, pids_file=%S)", pid, pids_file);
+        if (!CloseHandle(file)) {
+            SL2_SERVER_LOG_ERROR("failed to close pids_file=%S", pids_file);
+        }
+    }
+    else {
+        SL2_SERVER_LOG_ERROR("failed to open pids_file=%S, not recording pid!");
     }
 
-    CloseHandle(file);
-
     LeaveCriticalSection(&run_lock);
-
-    RpcStringFree((RPC_WSTR *)&run_id_s);
 }
 
 static void destroy_pipe(HANDLE pipe)
 {
     if (!FlushFileBuffers(pipe)) {
-        SL2_SERVER_LOG_FATAL("failed to flush pipe");
+        SL2_SERVER_LOG_ERROR("failed to flush pipe");
     }
 
     if (!DisconnectNamedPipe(pipe)) {
-        SL2_SERVER_LOG_FATAL("failed to disconnect pipe");
+        SL2_SERVER_LOG_ERROR("failed to disconnect pipe");
     }
 
     if (!CloseHandle(pipe)) {
-        SL2_SERVER_LOG_FATAL("failed to close pipe");
+        SL2_SERVER_LOG_ERROR("failed to close pipe");
     }
 }
 
@@ -630,7 +651,7 @@ static DWORD WINAPI thread_handler(void *data)
             else {
                 // Pipe was broken when we tried to read it. Happens when the python client
                 // checks if it exists.
-                SL2_SERVER_LOG_ERROR("broken pipe! ending session on event=%d", event);
+                SL2_SERVER_LOG_WARN("broken pipe! ending session on event=%d", event);
                 destroy_pipe(pipe);
                 return 0;
             }
@@ -667,6 +688,9 @@ static DWORD WINAPI thread_handler(void *data)
             case EVT_SESSION_TEARDOWN:
                 SL2_SERVER_LOG_INFO("ending a client's session with the server.");
                 break;
+            // NOTE(ww): These are just here for completeness.
+            // Any client that requests them and expects anything back is
+            // almost certain to misbehave.
             case EVT_RUN_ID:
             case EVT_MUTATION:
             case EVT_RUN_INFO:
@@ -735,8 +759,7 @@ int main(int argvc, char **argv)
                 0,
                 NULL);
 
-            if (thread == NULL)
-            {
+            if (thread == NULL) {
                 SL2_SERVER_LOG_FATAL("CreateThread failed\n");
             }
             else {
