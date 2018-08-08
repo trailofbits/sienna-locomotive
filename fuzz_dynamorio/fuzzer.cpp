@@ -918,10 +918,8 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     drmgr_init();
     drwrap_init();
 
-    // TODO(ww): Do we need to fill these in, or is zeroing them out enough?
-    drreg_options_t reg_opts = {0};
-    reg_opts.struct_size = sizeof(drreg_options_t);
-    drreg_init(&reg_opts);
+    drreg_options_t opts = {sizeof(ops), 3, false};
+    drreg_init(&opts);
 
     // Check whether we can use coverage on this fuzzing run
     coverage_guided = client.areTargetsArenaCompatible() && !no_coverage;
