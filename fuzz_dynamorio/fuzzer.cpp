@@ -739,6 +739,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     const char *mod_name = dr_module_preferred_name(mod);
     app_pc towrap;
 
+    // TODO(ww): Use sl2_dr_allocator here.
     std::map<char *, SL2_PRE_PROTO> toHookPre;
     SL2_PRE_HOOK1(toHookPre, ReadFile);
     SL2_PRE_HOOK1(toHookPre, InternetReadFile);
@@ -755,6 +756,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_PRE_HOOK1(toHookPre, fread);
     SL2_PRE_HOOK1(toHookPre, _read);
 
+    // TODO(ww): Use sl2_dr_allocator here.
     std::map<char *, SL2_POST_PROTO> toHookPost;
     SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
