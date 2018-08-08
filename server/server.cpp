@@ -259,7 +259,9 @@ static void handle_register_mutation(HANDLE pipe)
         SL2_SERVER_LOG_FATAL("failed to read run ID");
     }
 
-    UuidToString(&run_id, (RPC_WSTR *)&run_id_s);
+    if (UuidToString(&run_id, (RPC_WSTR *)&run_id_s) != RPC_S_OK) {
+        SL2_SERVER_LOG_FATAL("couldn't stringify UUID");
+    }
 
     uint32_t type = 0;
     if (!ReadFile(pipe, &type, sizeof(type), &txsize, NULL)) {
@@ -356,7 +358,9 @@ static void handle_replay(HANDLE pipe)
         SL2_SERVER_LOG_FATAL("failed to read run ID");
     }
 
-    UuidToString(&run_id, (RPC_WSTR *)&run_id_s);
+    if (UuidToString(&run_id, (RPC_WSTR *)&run_id_s) != RPC_S_OK) {
+        SL2_SERVER_LOG_FATAL("couldn't stringify UUID");
+    }
 
     SL2_SERVER_LOG_INFO("Replaying for run id %S", run_id_s);
 
@@ -480,7 +484,9 @@ static void handle_crash_paths(HANDLE pipe)
         SL2_SERVER_LOG_FATAL("failed to read UUID");
     }
 
-    UuidToString(&run_id, (RPC_WSTR *)&run_id_s);
+    if (UuidToString(&run_id, (RPC_WSTR *)&run_id_s) != RPC_S_OK) {
+        SL2_SERVER_LOG_FATAL("couldn't stringify UUID");
+    }
 
     wchar_t run_dir[MAX_PATH + 1] = {0};
     wchar_t target_file[MAX_PATH + 1] = {0};
@@ -561,7 +567,9 @@ static void handle_register_pid(HANDLE pipe)
         SL2_SERVER_LOG_FATAL("failed to read pid");
     }
 
-    UuidToString(&run_id, (RPC_WSTR *) &run_id_s);
+    if (UuidToString(&run_id, (RPC_WSTR *)&run_id_s) != RPC_S_OK) {
+        SL2_SERVER_LOG_FATAL("couldn't stringify UUID");
+    }
 
     wchar_t run_dir[MAX_PATH + 1] = {0};
     wchar_t pids_file[MAX_PATH + 1] = {0};
