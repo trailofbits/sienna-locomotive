@@ -744,8 +744,10 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_PRE_HOOK1(toHookPre, InternetReadFile);
     SL2_PRE_HOOK2(toHookPre, ReadEventLogA, ReadEventLog);
     SL2_PRE_HOOK2(toHookPre, ReadEventLogW, ReadEventLog);
-    SL2_PRE_HOOK2(toHookPre, RegQueryValueExW, RegQueryValueEx);
-    SL2_PRE_HOOK2(toHookPre, RegQueryValueExA, RegQueryValueEx);
+    if( op_registry.get_value() ) {
+        SL2_PRE_HOOK2(toHookPre, RegQueryValueExW, RegQueryValueEx);
+        SL2_PRE_HOOK2(toHookPre, RegQueryValueExA, RegQueryValueEx);
+    }
     SL2_PRE_HOOK1(toHookPre, WinHttpWebSocketReceive);
     SL2_PRE_HOOK1(toHookPre, WinHttpReadData);
     SL2_PRE_HOOK1(toHookPre, recv);
@@ -758,8 +760,10 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, ReadEventLogA, Generic);
     SL2_POST_HOOK2(toHookPost, ReadEventLogW, Generic);
-    SL2_POST_HOOK2(toHookPost, RegQueryValueExW, Generic);
-    SL2_POST_HOOK2(toHookPost, RegQueryValueExA, Generic);
+    if( op_registry.get_value() ) {
+        SL2_POST_HOOK2(toHookPost, RegQueryValueExW, Generic);
+        SL2_POST_HOOK2(toHookPost, RegQueryValueExA, Generic);
+    }
     SL2_POST_HOOK2(toHookPost, WinHttpWebSocketReceive, Generic);
     SL2_POST_HOOK2(toHookPost, WinHttpReadData, Generic);
     SL2_POST_HOOK2(toHookPost, recv, Generic);
