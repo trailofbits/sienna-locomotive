@@ -14,6 +14,8 @@
 #include "drwrap.h"
 #include "dr_ir_instr.h"
 #include "droption.h"
+#include "hashtable.h"
+#include "drvector.h"
 
 #include "vendor/picosha2.h"
 
@@ -26,7 +28,7 @@ extern "C" {
 #include "common/sl2_server_api.hpp"
 #include "common/sl2_dr_client.hpp"
 
-static SL2Client   client;
+static SL2Client client;
 static sl2_conn sl2_conn;
 static sl2_exception_ctx trace_exception_ctx;
 static void *mutatex;
@@ -34,8 +36,9 @@ static bool replay;
 static bool no_mutate;
 static uint32_t mutate_count;
 
-static std::set<reg_id_t> tainted_regs;
-static std::set<app_pc> tainted_mems;
+static hashtable_t tainted_regs;
+static hashtable_t mem_tombstones;
+static drvector_t tainted_mems;
 
 #define LAST_COUNT 5
 
@@ -78,6 +81,28 @@ static droption_t<bool> op_no_mutate(
     false,
     "no-mutate",
     "Don't use the mutated buffer when replaying.");
+
+static bool drvector_has_elem(drvector_t *vec, void *elem)
+{
+    bool found = false;
+
+    if (vec->synch) {
+        drvector_lock(vec);
+    }
+
+    for (uint64_t i = 0; i < vec->entries; i++) {
+        if (vec->array[i] == elem) {
+            found = true;
+            break;
+        }
+    }
+
+    if (vec->synch) {
+        drvector_unlock(vec);
+    }
+
+    return found;
+}
 
 
 /* Currently unused as this runs on 64 bit applications */
@@ -195,7 +220,7 @@ is_tainted(void *drcontext, opnd_t opnd)
         reg_id_t reg = opnd_get_reg(opnd);
         reg = reg_to_full_width64(reg);
 
-        if (tainted_regs.find(reg) != tainted_regs.end()) {
+        if (hashtable_lookup(&tainted_regs, (void *) reg)) {
             return true;
         }
     }
@@ -208,7 +233,10 @@ is_tainted(void *drcontext, opnd_t opnd)
         opnd_size_t dr_size = opnd_get_size(opnd);
         uint size = opnd_size_in_bytes(dr_size);
         for (uint i=0; i<size; i++) {
-            if (tainted_mems.find(addr+i) != tainted_mems.end()) {
+            // An address is tainted only if it's both in tainted_mems and
+            // not marked as untainted in the tombstone map.
+            if (drvector_has_elem(&tainted_mems, addr + i)
+                && !hashtable_lookup(&mem_tombstones, addr + i)) {
                 return true;
             }
         }
@@ -219,15 +247,15 @@ is_tainted(void *drcontext, opnd_t opnd)
             reg_id_t reg_disp = opnd_get_disp(opnd);
             reg_id_t reg_indx = opnd_get_index(opnd);
 
-            if (reg_base != NULL && tainted_regs.find(reg_to_full_width64(reg_base)) != tainted_regs.end()) {
+            if (reg_base != NULL && hashtable_lookup(&tainted_regs, (void *) reg_to_full_width64(reg_base))) {
                 return true;
             }
 
-            if (reg_disp != NULL && tainted_regs.find(reg_to_full_width64(reg_disp)) != tainted_regs.end()) {
+            if (reg_disp != NULL && hashtable_lookup(&tainted_regs, (void *) reg_to_full_width64(reg_disp))) {
                 return true;
             }
 
-            if (reg_indx != NULL && tainted_regs.find(reg_to_full_width64(reg_indx)) != tainted_regs.end()) {
+            if (reg_indx != NULL && hashtable_lookup(&tainted_regs, (void *) reg_to_full_width64(reg_indx))) {
                 return true;
             }
         }
@@ -245,7 +273,10 @@ static void
 taint_mem(app_pc addr, size_t size)
 {
     for (size_t i = 0; i < size; i++) {
-        tainted_mems.insert(addr + i);
+        // Remove the address from our tombstone map, just in case it was previously
+        // marked as untainted.
+        hashtable_remove(&mem_tombstones, addr + i);
+        drvector_append(&tainted_mems, addr + i);
     }
 }
 
@@ -255,10 +286,12 @@ untaint_mem(app_pc addr, uint size)
 {
     bool untainted = false;
     for (uint i = 0; i < size; i++) {
-        size_t n = tainted_mems.erase(addr+i);
-        if (n) {
+        // If the address is indeed tainted, mark it as untained in our tombstone map.
+        if (drvector_has_elem(&tainted_mems, addr + i)) {
+            hashtable_add(&mem_tombstones, addr + i, (void *) 1);
             untainted = true;
         }
+
         if (untainted) {
             // TODO(ww): Why is this branch here?
         }
@@ -274,7 +307,8 @@ taint(void *drcontext, opnd_t opnd)
         reg_id_t reg = opnd_get_reg(opnd);
         reg = reg_to_full_width64(reg);
 
-        tainted_regs.insert(reg);
+        // NOTE(ww): We're using this as a set for now, so the 1 here just signifies existence.
+        hashtable_add(&tainted_regs, (void *) reg, (void *) 1);
 
         // char buf[100];
         // opnd_disassemble_to_buffer(drcontext, opnd, buf, 100);
@@ -309,8 +343,7 @@ untaint(void *drcontext, opnd_t opnd)
         reg_id_t reg = opnd_get_reg(opnd);
         reg = reg_to_full_width64(reg);
 
-        size_t n = tainted_regs.erase(reg);
-        if (n) {
+        if (hashtable_remove(&tainted_regs, (void *) reg)) {
             // char buf[100];
             // opnd_disassemble_to_buffer(drcontext, opnd, buf, 100);
             untainted = true;
@@ -354,11 +387,7 @@ handle_xor(void *drcontext, instr_t *instr)
             reg_id_t reg_1 = reg_to_full_width64(opnd_get_reg(opnd_1));
 
             if (reg_0 == reg_1) {
-                size_t n = tainted_regs.erase(reg_0);
-                // if(n) {
-                //     char buf[100];
-                //     opnd_disassemble_to_buffer(drcontext, opnd_0, buf, 100);
-                // }
+                hashtable_remove(&tainted_regs, (void *) reg_0);
                 result = true;
             }
         }
@@ -437,17 +466,17 @@ handle_xchg(void *drcontext, instr_t *instr)
             reg_id_t reg_1 = reg_to_full_width64(opnd_get_reg(opnd_1));
 
 
-            bool reg_0_tainted = tainted_regs.find(reg_0) != tainted_regs.end();
-            bool reg_1_tainted = tainted_regs.find(reg_1) != tainted_regs.end();
+            bool reg_0_tainted = hashtable_lookup(&tainted_regs, (void *) reg_0);
+            bool reg_1_tainted = hashtable_lookup(&tainted_regs, (void *) reg_1);
 
             if (reg_0_tainted && !reg_1_tainted) {
-                tainted_regs.erase(reg_0);
-                tainted_regs.insert(reg_1);
+                hashtable_remove(&tainted_regs, (void *) reg_0);
+                hashtable_add(&tainted_regs, (void *) reg_1, (void *) 1);
                 result = true;
             }
             else if (reg_1_tainted && !reg_0_tainted) {
-                tainted_regs.erase(reg_1);
-                tainted_regs.insert(reg_0);
+                hashtable_remove(&tainted_regs, (void *) reg_1);
+                hashtable_add(&tainted_regs, (void *) reg_0, (void *) 1);
                 result = true;
             }
         }
@@ -472,7 +501,7 @@ handle_branches(void *drcontext, instr_t *instr)
 
     reg_id_t reg_pc = reg_to_full_width64(DR_REG_NULL);
     reg_id_t reg_stack = reg_to_full_width64(DR_REG_ESP);
-    bool pc_tainted = tainted_regs.find(reg_pc) != tainted_regs.end();
+    bool pc_tainted = !!hashtable_lookup(&tainted_regs, (void *) reg_pc);
 
     bool result = false;
     int src_count = instr_num_srcs(instr);
@@ -496,7 +525,7 @@ handle_branches(void *drcontext, instr_t *instr)
     if (is_direct) {
         if (pc_tainted) {
             // untaint pc
-            tainted_regs.erase(reg_pc);
+            hashtable_remove(&tainted_regs, (void *) reg_pc);
         }
     }
 
@@ -507,9 +536,9 @@ handle_branches(void *drcontext, instr_t *instr)
 
             if (opnd_is_reg(opnd)) {
                 reg_id_t reg = reg_to_full_width64(opnd_get_reg(opnd));
-                if (reg != reg_stack && tainted_regs.find(reg) != tainted_regs.end()) {
+                if (reg != reg_stack && hashtable_lookup(&tainted_regs, (void *) reg)) {
                     // taint pc
-                    tainted_regs.insert(reg_pc);
+                    hashtable_add(&tainted_regs, (void *) reg_pc, (void *) 1);
                 }
             }
         }
@@ -529,11 +558,11 @@ handle_branches(void *drcontext, instr_t *instr)
 
         if (tainted) {
             // taint pc
-            tainted_regs.insert(reg_pc);
+            hashtable_add(&tainted_regs, (void *) reg_pc, (void *) 1);
         }
         else {
             // untaint pc
-            tainted_regs.erase(reg_pc);
+            hashtable_remove(&tainted_regs, (void *) reg_pc);
         }
     }
 
@@ -582,7 +611,9 @@ propagate_taint(app_pc pc)
         last_insn_idx %= LAST_COUNT;
     }
 
-    if (tainted_mems.size() == 0 && tainted_regs.size() == 0) {
+    // NOTE(ww): This misses the case where we have addresses marked as tainted
+    // in tainted_mems, but also marked as tombstoned in &mem_tombstones.
+    if (tainted_mems.entries == 0 && tainted_regs.entries == 0) {
         return;
     }
 
@@ -702,63 +733,67 @@ on_dr_exit(void)
         DR_ASSERT(false);
     }
 
+    hashtable_delete(&tainted_regs);
+    hashtable_delete(&mem_tombstones);
+    drvector_delete(&tainted_mems);
+
     sl2_conn_close(&sl2_conn);
 
     drmgr_exit();
 }
 
-/* Debug functionality. If you need to use it, add the relevant print statements */
-static void
-dump_regs(void *drcontext, app_pc exception_address) {
-    reg_id_t regs[16] = {
-        DR_REG_RAX,
-        DR_REG_RBX,
-        DR_REG_RCX,
-        DR_REG_RDX,
-        DR_REG_RSP,
-        DR_REG_RBP,
-        DR_REG_RSI,
-        DR_REG_RDI,
-        DR_REG_R8,
-        DR_REG_R9,
-        DR_REG_R10,
-        DR_REG_R11,
-        DR_REG_R12,
-        DR_REG_R13,
-        DR_REG_R14,
-        DR_REG_R15,
-    };
+// /* Debug functionality. If you need to use it, add the relevant print statements */
+// static void
+// dump_regs(void *drcontext, app_pc exception_address) {
+//     reg_id_t regs[16] = {
+//         DR_REG_RAX,
+//         DR_REG_RBX,
+//         DR_REG_RCX,
+//         DR_REG_RDX,
+//         DR_REG_RSP,
+//         DR_REG_RBP,
+//         DR_REG_RSI,
+//         DR_REG_RDI,
+//         DR_REG_R8,
+//         DR_REG_R9,
+//         DR_REG_R10,
+//         DR_REG_R11,
+//         DR_REG_R12,
+//         DR_REG_R13,
+//         DR_REG_R14,
+//         DR_REG_R15,
+//     };
 
-    std::set<reg_id_t>::iterator reg_it;
-    for (reg_it = tainted_regs.begin(); reg_it != tainted_regs.end(); reg_it++) {
-        // TODO(ww): Implement.
-    }
+//     std::set<reg_id_t>::iterator reg_it;
+//     for (reg_it = &tainted_regs.begin(); reg_it != &tainted_regs.end(); reg_it++) {
+//         // TODO(ww): Implement.
+//     }
 
-    std::set<app_pc>::iterator mem_it;
-    for (mem_it = tainted_mems.begin(); mem_it != tainted_mems.end(); mem_it++) {
-        // TODO(ww): Implement.
-    }
+//     std::set<app_pc>::iterator mem_it;
+//     for (mem_it = tainted_mems.begin(); mem_it != tainted_mems.end(); mem_it++) {
+//         // TODO(ww): Implement.
+//     }
 
-    for (int i = 0; i < 16; i++) {
-        bool tainted = tainted_regs.find(regs[i]) != tainted_regs.end();
-        dr_mcontext_t mc = {sizeof(mc),DR_MC_ALL};
-        dr_get_mcontext(drcontext, &mc);
-        if (tainted) {
-            // TODO(ww): Implement.
-        }
-        else {
-            // TODO(ww): Implement.
-        }
-    }
+//     for (int i = 0; i < 16; i++) {
+//         bool tainted = &tainted_regs.find(regs[i]) != &tainted_regs.end();
+//         dr_mcontext_t mc = {sizeof(mc),DR_MC_ALL};
+//         dr_get_mcontext(drcontext, &mc);
+//         if (tainted) {
+//             // TODO(ww): Implement.
+//         }
+//         else {
+//             // TODO(ww): Implement.
+//         }
+//     }
 
-    bool tainted = tainted_regs.find(DR_REG_NULL) != tainted_regs.end();
-    if (tainted) {
-        // TODO(ww): Implement.
-    }
-    else {
-        // TODO(ww): Implement.
-    }
-}
+//     bool tainted = &tainted_regs.find(DR_REG_NULL) != &tainted_regs.end();
+//     if (tainted) {
+//         // TODO(ww): Implement.
+//     }
+//     else {
+//         // TODO(ww): Implement.
+//     }
+// }
 
 /* Get crash info as JSON for dumping to stderr */
 std::string
@@ -796,14 +831,15 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
     };
 
     for (int i = 0; i < 16; i++) {
-        bool tainted = tainted_regs.find(regs[i]) != tainted_regs.end();
+        bool tainted = !!hashtable_lookup(&tainted_regs, (void *) regs[i]);
         json reg = {{"reg", get_register_name(regs[i])},
                     {"value", reg_get_value(regs[i], excpt->mcontext)},
                     {"tainted", tainted}};
         j["regs"].push_back(reg);
     }
 
-    bool tainted = tainted_regs.find(DR_REG_NULL) != tainted_regs.end();
+    reg_id_t pc = reg_to_full_width64(DR_REG_NULL);
+    bool tainted = !!hashtable_lookup(&tainted_regs, (void *) pc);
     json rip = {{"reg", "rip"},
                 {"value", (uint64) exception_address},
                 {"tainted", tainted}};
@@ -824,27 +860,53 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
     }
 
     j["tainted_addrs"] = json::array();
-    if (tainted_mems.size() > 0) {
-        std::set<app_pc>::iterator mit = tainted_mems.begin();
-        uint64_t start = (uint64_t) *mit;
-        uint64_t size = 1;
+    drvector_t actual_tainted_mems;
+    drvector_init(&actual_tainted_mems, 4096, true, NULL);
 
-        mit++;
-        for (; mit != tainted_mems.end(); mit++) {
-            uint64_t curr = (uint64_t) *mit;
-            if (curr > (start + size)) {
-              json addr = {{"start", start}, {"size", size}};
-              j["tainted_addrs"].push_back(addr);
+    if (tainted_mems.synch) {
+        drvector_lock(&tainted_mems);
+    }
 
-                start = curr;
-                size = 0;
-            }
-            size++;
+    // First, fill actual_tainted_mems with the non-tombstoned addresses from tainted_mems.
+    for (uint64_t i = 0; i < tainted_mems.entries; i++) {
+        if (hashtable_lookup(&mem_tombstones, tainted_mems.array[i])) {
+            continue;
         }
 
-        json addr = {{"start", start}, {"size", size}};
-        j["tainted_addrs"].push_back(addr);
+        drvector_append(&actual_tainted_mems, tainted_mems.array[i]);
     }
+
+    if (tainted_mems.synch) {
+        drvector_unlock(&tainted_mems);
+    }
+
+    if (actual_tainted_mems.synch) {
+        drvector_lock(&actual_tainted_mems);
+    }
+
+    uint64_t start = (uint64_t) actual_tainted_mems.array[0];
+    uint64_t size = 1;
+
+    for (uint64_t i = 1; i < actual_tainted_mems.entries; i++) {
+        uint64_t curr = (uint64_t) actual_tainted_mems.array[i];
+        if (curr > (start + size)) {
+          json addr = {{"start", start}, {"size", size}};
+          j["tainted_addrs"].push_back(addr);
+
+            start = curr;
+            size = 0;
+        }
+        size++;
+    }
+
+    json addr = {{"start", start}, {"size", size}};
+    j["tainted_addrs"].push_back(addr);
+
+    if (actual_tainted_mems.synch) {
+        drvector_unlock(&actual_tainted_mems);
+    }
+
+    drvector_delete(&actual_tainted_mems);
 
     return j.dump();
 }
@@ -926,8 +988,8 @@ on_exception(void *drcontext, dr_exception_t *excpt)
 
     reg_id_t reg_pc = reg_to_full_width64(DR_REG_NULL);
     reg_id_t reg_stack = reg_to_full_width64(DR_REG_ESP);
-    bool pc_tainted = tainted_regs.find(reg_pc) != tainted_regs.end();
-    bool stack_tainted = tainted_regs.find(reg_stack) != tainted_regs.end();
+    bool pc_tainted = !!hashtable_lookup(&tainted_regs, (void *) reg_pc);
+    bool stack_tainted = !!hashtable_lookup(&tainted_regs, (void *) reg_stack);
 
     // catch-all result
     app_pc exception_address = (app_pc)(excpt->record->ExceptionAddress);
@@ -1636,6 +1698,12 @@ void tracer(client_id_t id, int argc, const char *argv[])
 DR_EXPORT void
 dr_client_main(client_id_t id, int argc, const char *argv[])
 {
+    // Initialize our taint tracking structures.
+    // TODO(ww): Are 32-bit keys sufficient/overkill?
+    hashtable_init(&tainted_regs, 32, HASH_INTPTR, false);
+    hashtable_init(&mem_tombstones, 32, HASH_INTPTR, false);
+    drvector_init(&tainted_mems, 4096, true, NULL);
+
     // parse client options
     std::string parse_err;
     int last_idx = 0;
