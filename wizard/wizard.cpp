@@ -366,7 +366,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     json j;
     j["type"]               = "id";
     j["callCount"]          = call_counts[info->function];
-    j["retAddrOffset"]      = (UINT64) info->retAddrOffset;
+    j["retAddrOffset"]      = (uint64_t) info->retAddrOffset;
     j["func_name"]          = func_name;
 
     call_counts[info->function]++;
@@ -520,10 +520,12 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
 {
     std::string parse_err;
     int last_idx = 0;
+
     if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
         SL2_DR_DEBUG("wizard#main: usage error: %s", parse_err.c_str());
         dr_abort();
     }
+
     dr_enable_console_printing();
     wizard(id, argc, argv);
 }
