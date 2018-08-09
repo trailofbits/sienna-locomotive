@@ -852,13 +852,6 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     }
 }
 
-/*
-    instrument_bb
-
-    is first instr
-    get module names == target
-    insert clean call
-*/
 
 /* Runs after process initialization. Initializes DynamoRIO */
 DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
