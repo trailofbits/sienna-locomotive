@@ -83,7 +83,7 @@ def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False)
     Returns a DRRun instance containing the popen object and PRNG seed
     used during the run.
     """
-    invoke = create_invocation_statement(config_dict)
+    invoke = create_invocation_statement(config_dict, run_id)
 
     if verbose:
         print_l("Executing drrun: %s" % invoke.cmd_str)
@@ -292,7 +292,8 @@ def triage_run(config_dict, run_id):
             'inline_stdout': config_dict['inline_stdout']
         },
         config_dict['verbose'],
-        config_dict.get('triage_timeout', None)
+        config_dict.get('triage_timeout', None),
+        run_id=run_id
     )
 
     # Write stdout and stderr to files

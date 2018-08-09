@@ -5,7 +5,6 @@ Imports harness/config.py for argument and config file handling.
 import os
 import glob
 import re
-import struct
 import json
 import msgpack
 import uuid
@@ -16,6 +15,7 @@ from typing import NamedTuple
 
 from . import config
 
+uuid_regex = re.compile("[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}")
 
 class InvocationState(NamedTuple):
     """
@@ -27,19 +27,19 @@ class InvocationState(NamedTuple):
     seed: str
 
 
-def esc_quote(raw):
-    if " " not in raw or '\"' in raw:
+def esc_quote_paren(raw):
+    if (" " not in raw and "(" not in raw) or '\"' in raw:
         return raw
     else:
         return "\"{}\"".format(raw)
 
 
-def create_invocation_statement(config_dict):
+def create_invocation_statement(config_dict, run_id):
     """
     Returns an InvocationState containing the command run
     and the PRNG seed used.
     """
-    seed = str(random.getrandbits(64)) if 'seed' not in config_dict else config_dict['seed']
+    seed = str(generate_seed(run_id))
     program_arr = [
         config_dict['drrun_path'],
         *config_dict['drrun_args'],
@@ -61,13 +61,27 @@ def create_invocation_statement(config_dict):
     )
 
 
+def generate_seed(run_id):
+    """
+    Takes a UUID, strips out the non-random bits, and returns the rest as an int
+    :param run_id:
+    :return: 120-bit random int
+    """
+    if re.match(uuid_regex, str(run_id)):
+        parsed = str(run_id).replace('-', '')
+        parsed = parsed[:12] + parsed[13:16] + parsed[17:]  # Strip the non-random bits
+        return int(parsed, 16)
+    else:
+        return random.getrandbits(120)
+
+
 def stringify_program_array(target_application_path, target_args_array):
     """
     Escape paths with spaces in them by surrounding them with quotes.
     """
     out = "{} {}\n".format(
-        esc_quote(target_application_path),
-        ' '.join(esc_quote(k) for k in target_args_array)
+        esc_quote_paren(target_application_path),
+        ' '.join(esc_quote_paren(k) for k in target_args_array)
     )
 
     return out
@@ -164,7 +178,7 @@ def get_target(_config):
 def get_all_targets():
     """
     Returns a dict mapping target directories to the contents of the
-    aargument file.
+    argument file.
     """
     targets = {}
     for _dir in glob.glob(os.path.join(config.sl2_targets_dir, '*')):
@@ -236,7 +250,7 @@ def parse_triage_output(run_id):
         message = "The triage tool exited improperly during run {}, \
 but no crash file could be found. It may have timed out. \
 To retry it manually, run \
-`python harness.py -v -e TRIAGE -p {} -r {}`"
+`python harness.py -v -e TRIAGE -p {} --run_id {}`"
 
         return message.format(run_id, config.profile, run_id), None
 
@@ -263,14 +277,13 @@ def generate_run_id(config_dict):
 
     os.makedirs(os.path.join(config.sl2_runs_dir, str(run_id)))
 
-    program = os.path.basename(config_dict['target_application_path'])
-    argv = [program, *config_dict['target_args']]
+    program = esc_quote_paren(config_dict['target_application_path'])
 
     with open(get_path_to_run_file(run_id, "program.txt"), "wb") as program_file:
         program_file.write(program.encode("utf-16"))
 
     with open(get_path_to_run_file(run_id, "arguments.txt"), "wb") as arguments_file:
-        arguments_file.write(' '.join(argv).encode("utf-16"))
+        arguments_file.write(stringify_program_array(program, config_dict['target_args']).encode("utf-16"))
 
     return run_id
 
