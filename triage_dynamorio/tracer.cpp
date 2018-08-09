@@ -1458,7 +1458,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     app_pc towrap;
 
     // TODO(ww): Use sl2_dr_allocator here.
-    std::map<char *, SL2_PRE_PROTO> toHookPre;
+    SL2_PRE_PROTO_MAP toHookPre;
     SL2_PRE_HOOK1(toHookPre, ReadFile);
     SL2_PRE_HOOK1(toHookPre, InternetReadFile);
     SL2_PRE_HOOK2(toHookPre, ReadEventLogA, ReadEventLog);
@@ -1475,7 +1475,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_PRE_HOOK1(toHookPre, _read);
 
     // TODO(ww): Use sl2_dr_allocator here.
-    std::map<char *, SL2_POST_PROTO> toHookPost;
+    SL2_POST_PROTO_MAP toHookPost;
     SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, ReadEventLogA, Generic);
@@ -1528,7 +1528,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     }
 
     // when a module is loaded, iterate its functions looking for matches in toHookPre
-    std::map<char *, SL2_PRE_PROTO>::iterator it;
+    SL2_PRE_PROTO_MAP::iterator it;
     for (it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
         bool hook = false;

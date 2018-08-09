@@ -34,6 +34,12 @@ extern "C" {
 #define SL2_PRE_PROTO void(__cdecl *)(void *, void **)
 #define SL2_POST_PROTO void(__cdecl *)(void *, void *)
 
+#define SL2_PRE_PROTO_MAP std::map<char *, SL2_PRE_PROTO, std::less<char *>, \
+                                    sl2_dr_allocator<std::pair<const char *, SL2_PRE_PROTO>>>
+
+#define SL2_POST_PROTO_MAP std::map<char *, SL2_POST_PROTO, std::less<char *>, \
+                                     sl2_dr_allocator<std::pair<const char *, SL2_POST_PROTO>>>
+
 // Macros for quickly building a map of function names to function pre- and post-hooks.
 // TODO(ww): There should really only be one of each of these (pre and post), but
 // Microsoft's C preprocessor isn't C99 compliant and so makes things with __VA_ARGS__ hard.
