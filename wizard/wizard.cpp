@@ -24,8 +24,6 @@
 #include "vendor/picosha2.h"
 using namespace std;
 
-#include "common/sl2_dr_client.hpp"
-
 // function metadata structure
 struct wizard_read_info {
     void *lpBuffer;
@@ -39,8 +37,7 @@ struct wizard_read_info {
 };
 
 static size_t baseAddr;
-static std::map<Function, UINT64> call_counts;
-
+static std::map<Function, uint64_t, std::less<Function>, sl2_dr_allocator<std::pair<const Function, uint64_t>>> call_counts;
 
 /* Run whenever a thread inits/exits */
 static void
@@ -369,7 +366,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     json j;
     j["type"]               = "id";
     j["callCount"]          = call_counts[info->function];
-    j["retAddrOffset"]      = (UINT64) info->retAddrOffset;
+    j["retAddrOffset"]      = (uint64_t) info->retAddrOffset;
     j["func_name"]          = func_name;
 
     call_counts[info->function]++;
@@ -416,7 +413,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     */
 
     if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))){
-      baseAddr = (size_t) mod->start;
+        baseAddr = (size_t) mod->start;
     }
 
     json j;
@@ -426,7 +423,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     j["mod_name"]           = dr_module_preferred_name(mod);
     SL2_LOG_JSONL(j);
 
-    std::map<char *, SL2_PRE_PROTO> toHookPre;
+    sl2_pre_proto_map toHookPre;
     SL2_PRE_HOOK1(toHookPre, ReadFile);
     SL2_PRE_HOOK1(toHookPre, InternetReadFile);
     SL2_PRE_HOOK2(toHookPre, ReadEventLogA, ReadEventLog);
@@ -442,7 +439,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_PRE_HOOK1(toHookPre, fread);
     SL2_PRE_HOOK1(toHookPre, _read);
 
-    std::map<char *, SL2_POST_PROTO> toHookPost;
+    sl2_post_proto_map toHookPost;
     SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, ReadEventLogA, Generic);
@@ -458,7 +455,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_POST_HOOK2(toHookPost, fread, Generic);
     SL2_POST_HOOK2(toHookPost, _read, Generic);
 
-    std::map<char *, SL2_PRE_PROTO>::iterator it;
+    sl2_pre_proto_map::iterator it;
     for (it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
 
@@ -486,7 +483,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 
             if (!ok) {
                 j["type"] = "error";
-                ostringstream s;
+                std::basic_ostringstream<char, std::char_traits<char>, sl2_dr_allocator<char>> s;
                 s << "FAILED to wrap " << functionName <<  " @ " << towrap << " already wrapped?";
                 j["msg"] = s.str();
                 SL2_LOG_JSONL(j);
@@ -523,10 +520,12 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
 {
     std::string parse_err;
     int last_idx = 0;
+
     if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
         SL2_DR_DEBUG("wizard#main: usage error: %s", parse_err.c_str());
         dr_abort();
     }
+
     dr_enable_console_printing();
     wizard(id, argc, argv);
 }

@@ -27,7 +27,7 @@ extern "C" {
 #include "common/sl2_dr_client.hpp"
 #include "common/sl2_dr_client_options.hpp"
 
-static SL2Client   client;
+static SL2Client client;
 static sl2_conn sl2_conn;
 static sl2_exception_ctx trace_exception_ctx;
 static void *mutatex;
@@ -35,8 +35,8 @@ static bool replay;
 static bool no_mutate;
 static uint32_t mutate_count;
 
-static std::set<reg_id_t> tainted_regs;
-static std::set<app_pc> tainted_mems;
+static std::set<reg_id_t, std::less<reg_id_t>, sl2_dr_allocator<reg_id_t>> tainted_regs;
+static std::set<app_pc, std::less<app_pc>, sl2_dr_allocator<app_pc>> tainted_mems;
 
 #define LAST_COUNT 5
 
@@ -1456,7 +1456,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     const char *mod_name = dr_module_preferred_name(mod);
     app_pc towrap;
 
-    std::map<char *, SL2_PRE_PROTO> toHookPre;
+    sl2_pre_proto_map toHookPre;
     SL2_PRE_HOOK1(toHookPre, ReadFile);
     SL2_PRE_HOOK1(toHookPre, InternetReadFile);
     SL2_PRE_HOOK2(toHookPre, ReadEventLogA, ReadEventLog);
@@ -1472,7 +1472,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_PRE_HOOK1(toHookPre, fread);
     SL2_PRE_HOOK1(toHookPre, _read);
 
-    std::map<char *, SL2_POST_PROTO> toHookPost;
+    sl2_post_proto_map toHookPost;
     SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, ReadEventLogA, Generic);
@@ -1525,7 +1525,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     }
 
     // when a module is loaded, iterate its functions looking for matches in toHookPre
-    std::map<char *, SL2_PRE_PROTO>::iterator it;
+    sl2_pre_proto_map::iterator it;
     for (it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
         bool hook = false;
@@ -1586,8 +1586,10 @@ void tracer(client_id_t id, int argc, const char *argv[])
     dr_set_client_name("Tracer",
                        "https://github.com/trailofbits/sienna-locomotive");
 
-    if (!drmgr_init() || drreg_init(&ops) != DRREG_SUCCESS || !drwrap_init())
+    if (!drmgr_init() || drreg_init(&ops) != DRREG_SUCCESS || !drwrap_init()) {
+        SL2_DR_DEBUG("failed to init drmgr/drreg/drwrap!\n");
         DR_ASSERT(false);
+    }
 
     replay = false;
     mutate_count = 0;
@@ -1617,6 +1619,7 @@ void tracer(client_id_t id, int argc, const char *argv[])
                                                 on_bb_instrument,
                                                 NULL))
         {
+            SL2_DR_DEBUG("failed to register basic block event!\n");
             DR_ASSERT(false);
         }
     }
@@ -1626,6 +1629,7 @@ void tracer(client_id_t id, int argc, const char *argv[])
         !drmgr_register_thread_exit_event(on_thread_exit) ||
         !drmgr_register_exception_event(on_exception))
     {
+        SL2_DR_DEBUG("failed to register module/thread/exception event!\n");
         DR_ASSERT(false);
     }
 
@@ -1662,6 +1666,8 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
         SL2_DR_DEBUG("ERROR: Couldn't open a connection to the server!\n");
         dr_abort();
     }
+
     dr_enable_console_printing();
+
     tracer(id, argc, argv);
 }

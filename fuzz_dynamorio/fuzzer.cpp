@@ -739,7 +739,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     const char *mod_name = dr_module_preferred_name(mod);
     app_pc towrap;
 
-    std::map<char *, SL2_PRE_PROTO> toHookPre;
+    sl2_pre_proto_map toHookPre;
     SL2_PRE_HOOK1(toHookPre, ReadFile);
     SL2_PRE_HOOK1(toHookPre, InternetReadFile);
     SL2_PRE_HOOK2(toHookPre, ReadEventLogA, ReadEventLog);
@@ -755,7 +755,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_PRE_HOOK1(toHookPre, fread);
     SL2_PRE_HOOK1(toHookPre, _read);
 
-    std::map<char *, SL2_POST_PROTO> toHookPost;
+    sl2_post_proto_map toHookPost;
     SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, ReadEventLogA, Generic);
@@ -802,7 +802,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     }
 
     // Iterate over list of hooks and register them with DynamoRIO
-    std::map<char *, SL2_PRE_PROTO>::iterator it;
+    sl2_pre_proto_map::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
         bool hook = false;
@@ -852,13 +852,6 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     }
 }
 
-/*
-    instrument_bb
-
-    is first instr
-    get module names == target
-    insert clean call
-*/
 
 /* Runs after process initialization. Initializes DynamoRIO */
 DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
@@ -916,10 +909,8 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     drmgr_init();
     drwrap_init();
 
-    // TODO(ww): Do we need to fill these in, or is zeroing them out enough?
-    drreg_options_t reg_opts = {0};
-    reg_opts.struct_size = sizeof(drreg_options_t);
-    drreg_init(&reg_opts);
+    drreg_options_t opts = {sizeof(opts), 3, false};
+    drreg_init(&opts);
 
     // Check whether we can use coverage on this fuzzing run
     coverage_guided = client.areTargetsArenaCompatible() && !no_coverage;
