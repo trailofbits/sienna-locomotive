@@ -3,14 +3,16 @@
 
 #include <string>
 #include <fstream>
+
 #include "vendor/json.hpp"
-using json = nlohmann::json;
 using namespace std;
 
 extern "C" {
     #include "util.h"
     #include "uuid.h"
 }
+
+#include "common/sl2_dr_allocator.hpp"
 
 // Used for iterating over the function-module pair table.
 #define SL2_FUNCMOD_TABLE_SIZE (sizeof(SL2_FUNCMOD_TABLE) / sizeof(SL2_FUNCMOD_TABLE[0]))
@@ -31,14 +33,7 @@ extern "C" {
 } while(0)
 
 // Macros for the function prototypes passed to pre- and post-function hooks.
-#define SL2_PRE_PROTO void(__cdecl *)(void *, void **)
-#define SL2_POST_PROTO void(__cdecl *)(void *, void *)
 
-#define SL2_PRE_PROTO_MAP std::map<char *, SL2_PRE_PROTO, std::less<char *>, \
-                                    sl2_dr_allocator<std::pair<const char *, SL2_PRE_PROTO>>>
-
-#define SL2_POST_PROTO_MAP std::map<char *, SL2_POST_PROTO, std::less<char *>, \
-                                     sl2_dr_allocator<std::pair<const char *, SL2_POST_PROTO>>>
 
 // Macros for quickly building a map of function names to function pre- and post-hooks.
 // TODO(ww): There should really only be one of each of these (pre and post), but
@@ -48,6 +43,18 @@ extern "C" {
 
 #define SL2_POST_HOOK1(map, func) (map[#func] = wrap_post_##func)
 #define SL2_POST_HOOK2(map, func, hook_func) (map[#func] = wrap_post_##hook_func)
+
+// Typedefs for common types.
+typedef void(*sl2_pre_proto)(void *, void **);
+typedef void(*sl2_post_proto)(void *, void *);
+
+typedef std::map<char *, sl2_pre_proto, std::less<char *>,
+    sl2_dr_allocator<std::pair<const char *, sl2_pre_proto>>> sl2_pre_proto_map;
+typedef std::map<char *, sl2_post_proto, std::less<char *>,
+    sl2_dr_allocator<std::pair<const char *, sl2_post_proto>>> sl2_post_proto_map;
+
+typedef nlohmann::basic_json<std::map, std::vector, std::string,
+    bool, int64_t, uint64_t, double, sl2_dr_allocator> json;
 
 // The set of currently supported functions.
 enum class Function {

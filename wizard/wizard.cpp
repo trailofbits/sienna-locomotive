@@ -11,7 +11,6 @@
 #include "droption.h"
 #include "common/sl2_dr_client.hpp"
 #include "common/sl2_dr_client_options.hpp"
-#include "common/sl2_dr_allocator.hpp"
 
 #include <Dbghelp.h>
 #include <Windows.h>
@@ -24,8 +23,6 @@
 
 #include "vendor/picosha2.h"
 using namespace std;
-
-#include "common/sl2_dr_client.hpp"
 
 // function metadata structure
 struct wizard_read_info {
@@ -40,8 +37,7 @@ struct wizard_read_info {
 };
 
 static size_t baseAddr;
-static std::map<Function, UINT64> call_counts;
-
+static std::map<Function, uint64_t, std::less<Function>, sl2_dr_allocator<std::pair<const Function, uint64_t>>> call_counts;
 
 /* Run whenever a thread inits/exits */
 static void
@@ -427,7 +423,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     j["mod_name"]           = dr_module_preferred_name(mod);
     SL2_LOG_JSONL(j);
 
-    SL2_PRE_PROTO_MAP toHookPre;
+    sl2_pre_proto_map toHookPre;
     SL2_PRE_HOOK1(toHookPre, ReadFile);
     SL2_PRE_HOOK1(toHookPre, InternetReadFile);
     SL2_PRE_HOOK2(toHookPre, ReadEventLogA, ReadEventLog);
@@ -443,7 +439,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_PRE_HOOK1(toHookPre, fread);
     SL2_PRE_HOOK1(toHookPre, _read);
 
-    SL2_POST_PROTO_MAP toHookPost;
+    sl2_post_proto_map toHookPost;
     SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, ReadEventLogA, Generic);
@@ -459,7 +455,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_POST_HOOK2(toHookPost, fread, Generic);
     SL2_POST_HOOK2(toHookPost, _read, Generic);
 
-    SL2_PRE_PROTO_MAP::iterator it;
+    sl2_pre_proto_map::iterator it;
     for (it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
 
@@ -487,7 +483,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 
             if (!ok) {
                 j["type"] = "error";
-                ostringstream s;
+                std::basic_ostringstream<char, std::char_traits<char>, sl2_dr_allocator<char>> s;
                 s << "FAILED to wrap " << functionName <<  " @ " << towrap << " already wrapped?";
                 j["msg"] = s.str();
                 SL2_LOG_JSONL(j);

@@ -22,7 +22,6 @@
 #include "common/sl2_server_api.hpp"
 #include "common/sl2_dr_client.hpp"
 #include "common/sl2_dr_client_options.hpp"
-#include "common/sl2_dr_allocator.hpp"
 
 // Metadata object for a target function call
 struct fuzzer_read_info {
@@ -740,7 +739,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     const char *mod_name = dr_module_preferred_name(mod);
     app_pc towrap;
 
-    SL2_PRE_PROTO_MAP toHookPre;
+    sl2_pre_proto_map toHookPre;
     SL2_PRE_HOOK1(toHookPre, ReadFile);
     SL2_PRE_HOOK1(toHookPre, InternetReadFile);
     SL2_PRE_HOOK2(toHookPre, ReadEventLogA, ReadEventLog);
@@ -756,7 +755,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_PRE_HOOK1(toHookPre, fread);
     SL2_PRE_HOOK1(toHookPre, _read);
 
-    SL2_POST_PROTO_MAP toHookPost;
+    sl2_post_proto_map toHookPost;
     SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
     SL2_POST_HOOK2(toHookPost, ReadEventLogA, Generic);
@@ -803,7 +802,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     }
 
     // Iterate over list of hooks and register them with DynamoRIO
-    SL2_PRE_PROTO_MAP::iterator it;
+    sl2_pre_proto_map::iterator it;
     for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
         char *functionName = it->first;
         bool hook = false;
