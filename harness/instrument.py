@@ -111,7 +111,6 @@ def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False)
         popen_obj.timed_out = False
 
         # If the server wasn't running
-        print(popen_obj.stderr)
         if b'ERROR' in popen_obj.stderr and b'connection' in popen_obj.stderr:
             print_l("Lost connection to server! Restarting...")
             run_id = -1
