@@ -33,7 +33,9 @@
 #define SL2_SERVER_LOG_ERROR(fmt, ...) SL2_SERVER_LOG_GLE(ERROR, fmt, __VA_ARGS__)
 #define SL2_SERVER_LOG_FATAL(fmt, ...) SL2_SERVER_LOG_GLE(FATAL, fmt, __VA_ARGS__)
 
-static CRITICAL_SECTION run_lock;
+static CRITICAL_SECTION pid_lock;
+static CRITICAL_SECTION fkt_lock;
+static CRITICAL_SECTION arena_lock;
 static HANDLE process_mutex = INVALID_HANDLE_VALUE;
 
 static wchar_t FUZZ_WORKING_PATH[MAX_PATH] = L"";
@@ -63,7 +65,9 @@ static void server_cleanup()
     // no point -- the process is about to be destroyed anyways.
     ReleaseMutex(process_mutex);
     CloseHandle(process_mutex);
-    DeleteCriticalSection(&run_lock);
+    DeleteCriticalSection(&pid_lock);
+    DeleteCriticalSection(&fkt_lock);
+    DeleteCriticalSection(&arena_lock);
 }
 
 // Initialize the global variable (FUZZ_LOG) containing the path to the logging file.
@@ -107,6 +111,9 @@ static void init_working_paths()
 static void write_fkt(wchar_t *target_file, uint32_t type, size_t resource_size, wchar_t *resource_path, size_t position, size_t size, uint8_t* buf)
 {
     DWORD txsize;
+
+    EnterCriticalSection(&fkt_lock);
+
     HANDLE fkt = CreateFile(target_file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
     if (fkt == INVALID_HANDLE_VALUE) {
@@ -145,6 +152,8 @@ static void write_fkt(wchar_t *target_file, uint32_t type, size_t resource_size,
     if (!CloseHandle(fkt)) {
         SL2_SERVER_LOG_FATAL("write_fkt: failed to close FKT");
     }
+
+    LeaveCriticalSection(&fkt_lock);
 }
 
 /* Gets the mutated bytes stored in the FKT file for mutation replay */
@@ -152,6 +161,9 @@ static void get_bytes_fkt(wchar_t *target_file, uint8_t *buf, size_t size)
 {
     DWORD txsize;
     size_t buf_size = 0;
+
+    EnterCriticalSection(&fkt_lock);
+
     HANDLE fkt = CreateFile(target_file, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 
     if (fkt == INVALID_HANDLE_VALUE) {
@@ -179,11 +191,13 @@ static void get_bytes_fkt(wchar_t *target_file, uint8_t *buf, size_t size)
     if (!CloseHandle(fkt)) {
         SL2_SERVER_LOG_FATAL("failed to close FKT");
     }
+
+    LeaveCriticalSection(&fkt_lock);
 }
 
 static void dump_arena(wchar_t *arena_path, sl2_arena *arena)
 {
-    EnterCriticalSection(&run_lock);
+    EnterCriticalSection(&arena_lock);
 
     DWORD txsize;
     HANDLE file = CreateFile(
@@ -211,14 +225,14 @@ static void dump_arena(wchar_t *arena_path, sl2_arena *arena)
         SL2_SERVER_LOG_ERROR("failed to open arena_path=%S, skipping dump!", arena_path);
     }
 
-    LeaveCriticalSection(&run_lock);
+    LeaveCriticalSection(&arena_lock);
 }
 
 static void load_arena(wchar_t *arena_path, sl2_arena *arena)
 {
     DWORD txsize;
 
-    EnterCriticalSection(&run_lock);
+    EnterCriticalSection(&arena_lock);
 
     HANDLE file = CreateFile(
         arena_path,
@@ -244,7 +258,7 @@ static void load_arena(wchar_t *arena_path, sl2_arena *arena)
         SL2_SERVER_LOG_FATAL("failed to close arena (arena_path=%S)", arena_path);
     }
 
-    LeaveCriticalSection(&run_lock);
+    LeaveCriticalSection(&arena_lock);
 }
 
 static void handle_register_mutation(HANDLE pipe)
@@ -583,7 +597,7 @@ static void handle_register_pid(HANDLE pipe)
 
     RpcStringFree((RPC_WSTR *)&run_id_s);
 
-    EnterCriticalSection(&run_lock);
+    EnterCriticalSection(&pid_lock);
 
     HANDLE file = CreateFile(
         pids_file,
@@ -606,7 +620,7 @@ static void handle_register_pid(HANDLE pipe)
         SL2_SERVER_LOG_ERROR("failed to open pids_file=%S, not recording pid!");
     }
 
-    LeaveCriticalSection(&run_lock);
+    LeaveCriticalSection(&pid_lock);
 }
 
 static void destroy_pipe(HANDLE pipe)
@@ -729,7 +743,9 @@ int main(int argvc, char **argv)
 
     lock_process();
 
-    InitializeCriticalSection(&run_lock);
+    InitializeCriticalSection(&pid_lock);
+    InitializeCriticalSection(&fkt_lock);
+    InitializeCriticalSection(&arena_lock);
 
     while (1) {
         HANDLE pipe = CreateNamedPipe(

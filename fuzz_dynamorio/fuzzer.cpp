@@ -906,6 +906,7 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
 
     sl2_conn_register_pid(&sl2_conn, dr_get_process_id(), false);
 
+    // TODO(ww): Guard these initializations.
     drmgr_init();
     drwrap_init();
 
