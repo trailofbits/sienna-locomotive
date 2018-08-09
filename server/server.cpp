@@ -108,7 +108,7 @@ static void init_working_paths()
 }
 
 /* Writes the fkt file in the event we found a crash. Stores information about the mutation that caused it */
-static void write_fkt(wchar_t *target_file, uint32_t type, size_t resource_size, wchar_t *resource_path, size_t position, size_t size, uint8_t* buf)
+static void write_fkt(wchar_t *target_file, uint32_t type, uint32_t mutation_type, size_t resource_size, wchar_t *resource_path, size_t position, size_t size, uint8_t* buf)
 {
     DWORD txsize;
 
@@ -124,9 +124,12 @@ static void write_fkt(wchar_t *target_file, uint32_t type, size_t resource_size,
         SL2_SERVER_LOG_FATAL("write_fkt: failed to write FKT header");
     }
 
-    // only one type for right now, files
     if (!WriteFile(fkt, &type, sizeof(type), &txsize, NULL)) {
         SL2_SERVER_LOG_FATAL("write_fkt: failed to write type");
+    }
+
+    if (!WriteFile(fkt, &mutation_type, sizeof(mutation_type), &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("write_fkt: failed to write mutation type");
     }
 
     if (!WriteFile(fkt, &resource_size, sizeof(resource_size), &txsize, NULL)) {
@@ -352,7 +355,7 @@ static void handle_register_mutation(HANDLE pipe)
         PathCchCombine(run_dir, MAX_PATH, FUZZ_WORKING_PATH, run_id_s);
         PathCchCombine(target_file, MAX_PATH, run_dir, mutate_fname);
 
-        write_fkt(target_file, type, resource_size, resource_path, position, size, buf);
+        write_fkt(target_file, type, mutation_type, resource_size, resource_path, position, size, buf);
     }
     else {
         SL2_SERVER_LOG_WARN("got size=%lu, skipping registration", size);
