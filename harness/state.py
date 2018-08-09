@@ -5,7 +5,6 @@ Imports harness/config.py for argument and config file handling.
 import os
 import glob
 import re
-import struct
 import json
 import msgpack
 import uuid
@@ -16,6 +15,7 @@ from typing import NamedTuple
 
 from . import config
 
+uuid_regex = re.compile("[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}")
 
 class InvocationState(NamedTuple):
     """
@@ -34,12 +34,12 @@ def esc_quote_paren(raw):
         return "\"{}\"".format(raw)
 
 
-def create_invocation_statement(config_dict):
+def create_invocation_statement(config_dict, run_id):
     """
     Returns an InvocationState containing the command run
     and the PRNG seed used.
     """
-    seed = str(random.getrandbits(64)) if 'seed' not in config_dict else config_dict['seed']
+    seed = str(generate_seed(run_id))
     program_arr = [
         config_dict['drrun_path'],
         *config_dict['drrun_args'],
@@ -59,6 +59,20 @@ def create_invocation_statement(config_dict):
         stringify_program_array(program_arr[0], program_arr[1:]),
         seed
     )
+
+
+def generate_seed(run_id):
+    """
+    Takes a UUID, strips out the non-random bits, and returns the rest as an int
+    :param run_id:
+    :return: 120-bit random int
+    """
+    if re.match(uuid_regex, str(run_id)):
+        parsed = str(run_id).replace('-', '')
+        parsed = parsed[:12] + parsed[13:16] + parsed[17:]  # Strip the non-random bits
+        return int(parsed, 16)
+    else:
+        return random.getrandbits(120)
 
 
 def stringify_program_array(target_application_path, target_args_array):
