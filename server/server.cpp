@@ -107,6 +107,9 @@ static void init_working_paths()
 static void write_fkt(wchar_t *target_file, uint32_t type, size_t resource_size, wchar_t *resource_path, size_t position, size_t size, uint8_t* buf)
 {
     DWORD txsize;
+
+    EnterCriticalSection(&run_lock);
+
     HANDLE fkt = CreateFile(target_file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
     if (fkt == INVALID_HANDLE_VALUE) {
@@ -145,6 +148,8 @@ static void write_fkt(wchar_t *target_file, uint32_t type, size_t resource_size,
     if (!CloseHandle(fkt)) {
         SL2_SERVER_LOG_FATAL("write_fkt: failed to close FKT");
     }
+
+    LeaveCriticalSection(&run_lock);
 }
 
 /* Gets the mutated bytes stored in the FKT file for mutation replay */
@@ -152,6 +157,9 @@ static void get_bytes_fkt(wchar_t *target_file, uint8_t *buf, size_t size)
 {
     DWORD txsize;
     size_t buf_size = 0;
+
+    EnterCriticalSection(&run_lock);
+
     HANDLE fkt = CreateFile(target_file, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 
     if (fkt == INVALID_HANDLE_VALUE) {
@@ -179,6 +187,8 @@ static void get_bytes_fkt(wchar_t *target_file, uint8_t *buf, size_t size)
     if (!CloseHandle(fkt)) {
         SL2_SERVER_LOG_FATAL("failed to close FKT");
     }
+
+    LeaveCriticalSection(&run_lock);
 }
 
 static void dump_arena(wchar_t *arena_path, sl2_arena *arena)
