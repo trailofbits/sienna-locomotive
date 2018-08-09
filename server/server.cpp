@@ -174,7 +174,7 @@ static void get_bytes_fkt(wchar_t *target_file, uint8_t *buf, size_t size)
     }
 
     // TODO(ww): We shouldn't be hardcoding this offset.
-    SetFilePointer(fkt, 0x18, NULL, FILE_BEGIN);
+    SetFilePointer(fkt, 0x1c, NULL, FILE_BEGIN);
     if (!ReadFile(fkt, &buf_size, 4, &txsize, NULL)) {
         SL2_SERVER_LOG_FATAL("failed to read replay buffer size from FKT");
     }
