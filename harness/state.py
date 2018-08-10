@@ -215,12 +215,13 @@ def get_path_to_run_file(run_id, filename):
     return os.path.join(config.sl2_runs_dir, str(run_id), filename)
 
 
-def get_paths_to_run_file(run_id, glob):
+def get_paths_to_run_file(run_id, pattern):
     """
     Returns all paths under the given run's directory
-    that match the given glob.
+    that match the given pattern glob.
     """
-    glob.glob(os.path.join(config.sl2_runs_dir, str(run_id), glob))
+    pattern = os.path.join(config.sl2_runs_dir, str(run_id), pattern)
+    return glob.glob(pattern)
 
 
 def write_output_files(run, run_id, stage_name):
