@@ -852,7 +852,7 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
     std::string crash_json = dump_json(drcontext, score, reason, excpt, disassembly);
 
     if (replay) {
-        sl2_conn_request_crash_paths(&sl2_conn, &crash_paths);
+        sl2_conn_request_crash_paths(&sl2_conn, dr_get_process_id(), &crash_paths);
 
         HANDLE hCrashFile = CreateFile(crash_paths.crash_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
