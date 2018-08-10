@@ -231,8 +231,9 @@ static void dump_arena(wchar_t *arena_path, sl2_arena *arena)
     LeaveCriticalSection(&arena_lock);
 }
 
-static void load_arena(wchar_t *arena_path, sl2_arena *arena)
+static bool load_arena(wchar_t *arena_path, sl2_arena *arena)
 {
+    bool rc = true;
     DWORD txsize;
 
     EnterCriticalSection(&arena_lock);
@@ -246,22 +247,34 @@ static void load_arena(wchar_t *arena_path, sl2_arena *arena)
         NULL);
 
     if (file == INVALID_HANDLE_VALUE) {
-        SL2_SERVER_LOG_FATAL("failed to open arena (arena_path=%S)", arena_path);
+        SL2_SERVER_LOG_ERROR("failed to open arena (arena_path=%S)", arena_path);
+        rc = false;
+        goto cleanup;
     }
 
     if (!ReadFile(file, arena->map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to read arena from disk!");
+        SL2_SERVER_LOG_ERROR("failed to read arena from disk!");
+        rc = false;
+        goto cleanup;
     }
 
     if (txsize != FUZZ_ARENA_SIZE) {
-        SL2_SERVER_LOG_FATAL("(txsize=%lu) != (FUZZ_ARENA_SIZE=%lu), truncated read?", txsize, FUZZ_ARENA_SIZE);
+        SL2_SERVER_LOG_ERROR("(txsize=%lu) != (FUZZ_ARENA_SIZE=%lu), truncated read?", txsize, FUZZ_ARENA_SIZE);
+        rc = false;
+        goto cleanup;
     }
 
     if (!CloseHandle(file)) {
-        SL2_SERVER_LOG_FATAL("failed to close arena (arena_path=%S)", arena_path);
+        SL2_SERVER_LOG_ERROR("failed to close arena (arena_path=%S)", arena_path);
+        rc = false;
+        goto cleanup;
     }
 
+    cleanup:
+
     LeaveCriticalSection(&arena_lock);
+
+    return rc;
 }
 
 static void handle_register_mutation(HANDLE pipe)
@@ -452,7 +465,11 @@ static void handle_get_arena(HANDLE pipe)
     }
     else {
         SL2_SERVER_LOG_INFO("arena found, loading from disk");
-        load_arena(arena_path, &arena);
+
+        if (!load_arena(arena_path, &arena)) {
+            SL2_SERVER_LOG_ERROR("load_arena failed, resetting the arena");
+            dump_arena(arena_path, &arena);
+        }
     }
 
     if (!WriteFile(pipe, arena.map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
