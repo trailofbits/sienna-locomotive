@@ -142,6 +142,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.triage_timeout_box.setValue(config.config['triage_timeout'])
         self.triage_timeout_box.setSpecialValueText("None")
         self.triage_timeout_box.setSingleStep(10)
+        self.verboseCheckBox = QtWidgets.QCheckBox()
+        self.verboseCheckBox.clicked.connect(self.verboseCheckBox_clicked)
 
         # Create spinbox for controlling simultaneous fuzzing instances
         self.thread_count = QtWidgets.QSpinBox()
@@ -164,6 +166,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.fuzz_controls_inner_left = QtWidgets.QVBoxLayout()
         self.fuzz_controls_inner_right = QtWidgets.QVBoxLayout()
 
+
         # Add widgets to left, right, and expanded layouts
         self.fuzz_controls_inner_left.addLayout(self.filter_layout)
         self.fuzz_controls_inner_left.addWidget(self.extension_widget)
@@ -177,6 +180,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.extension_layout.addWidget(self.triage_timeout_box, 1, 2, 1, 1, Qt.AlignLeft)
         self.extension_layout.addWidget(QtWidgets.QLabel("Simultaneous fuzzing threads:"), 0, 3, 1, 1, Qt.AlignRight)
         self.extension_layout.addWidget(self.thread_count, 0, 4, 1, 1, Qt.AlignLeft)
+
+        self.extension_layout.addWidget(QtWidgets.QLabel("Verbose:"), 1, 3, 1, 1, Qt.AlignRight)
+        self.extension_layout.addWidget(self.verboseCheckBox, 1, 4, 1, 1, Qt.AlignLeft)
+
+
         self.fuzz_controls_inner_right.addWidget(self.expand_button)
 
         # Compose layouts
@@ -464,6 +472,11 @@ class MainWindow(QtWidgets.QMainWindow):
             self.extension_widget.hide()
             self.expand_button.setArrowType(Qt.DownArrow)
             self.adjustSize()
+
+    def verboseCheckBox_clicked(self):
+        state = self.verboseCheckBox.isChecked()
+        config.config['verbose'] = state
+        config.config['inline_stdout'] = state
 
 
 if __name__ == '__main__':
