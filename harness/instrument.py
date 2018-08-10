@@ -71,10 +71,9 @@ def start_server():
     """
     Start the server, if it's not already running.
     """
-    if not os.path.isfile(config.sl2_server_pipe_path):
-        ps_run(config.config['server_path'])
     while not os.path.isfile(config.sl2_server_pipe_path):
-        time.sleep(1)
+        ps_run(config.config['server_path'])
+        time.sleep(2)
 
 
 def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False):
