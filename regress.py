@@ -96,8 +96,10 @@ class TestWizard(unittest.TestCase):
             self.assertTrue( "instructionPointer" in data )
 
 
-
-
+    def test_fuzzgoat(self):
+        cmd = r'echo 0 | python harness.py -e WIZARD -v -l  -t .\build\fuzzgoat\Debug\fuzzgoat.exe -a .\fuzzgoat\input-files\validObject'
+        output = runAndCaptureOutput(cmd)
+        self.assertRegex( output, r'0[)] ReadFile from.*validObject' )
 
 class  TestMinidumpOnly(unittest.TestCase):
     def test_minidump(self):

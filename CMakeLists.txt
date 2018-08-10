@@ -32,10 +32,10 @@ file( GLOB BREAKPAD_LIBS  ${BREAKPAD_DIR}/client/windows/${CONFIGMODE}/lib/*.lib
 # include_external_msproject( bpad ${BREAKPAD_DIR}/common/windows/common_windows_lib.vcxproj PLATFORM x64 )
 # include_external_msproject( bpad ${BREAKPAD_DIR}/tools/windows/dump_syms/dump_syms.vcxproj PLATFORM x64 )
 # include_external_msproject( bpad ${BREAKPAD_DIR}/client/windows/unittests/processor_bits.vcxproj PLATFORM x64 )
-# set_target_properties(bpad PROPERTIES 
+# set_target_properties(bpad PROPERTIES
 # 	MAP_IMPORTED_CONFIG_RELEASE "${CONFIGMODE}"
 #   MAP_IMPORTED_CONFIG_RELWITHDEBINFO "${CONFIGMODE}")
-  
+
 # ExternalProject_Add(
 #   breakpad
 #   GIT_REPOSITORY     https://github.com/google/breakpad.git
@@ -57,5 +57,6 @@ add_subdirectory(triage_dynamorio)
 add_subdirectory(wizard)
 add_subdirectory(corpus/test_application)
 add_subdirectory(triage)
+add_subdirectory(fuzzgoat)
 
 target_compile_definitions(server PRIVATE -DUNICODE)
