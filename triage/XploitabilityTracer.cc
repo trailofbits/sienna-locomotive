@@ -44,6 +44,7 @@ XploitabilityResult XploitabilityTracer::process() {
         json_ << ifs;
         score = json_["score"];
     } catch(...) {
+        json_["score"] = score;
     }
 
     // Convert the 0-100 ranking to our 0-4 . No information is lost
