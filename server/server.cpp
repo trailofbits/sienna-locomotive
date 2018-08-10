@@ -585,7 +585,7 @@ static void handle_register_pid(HANDLE pipe)
     UUID run_id;
     wchar_t *run_id_s;
     bool tracing;
-    uint32_t pid;
+    uint64_t pid;
 
     SL2_SERVER_LOG_INFO("received pid registration request");
 
@@ -600,6 +600,8 @@ static void handle_register_pid(HANDLE pipe)
     if (!ReadFile(pipe, &pid, sizeof(pid), &txsize, NULL)) {
         SL2_SERVER_LOG_FATAL("failed to read pid");
     }
+
+    SL2_SERVER_LOG_INFO("got pid=%lu", pid);
 
     if (UuidToString(&run_id, (RPC_WSTR *)&run_id_s) != RPC_S_OK) {
         SL2_SERVER_LOG_FATAL("couldn't stringify UUID");

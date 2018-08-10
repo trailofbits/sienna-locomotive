@@ -96,6 +96,6 @@ SL2Response sl2_conn_ping(sl2_conn *conn, uint8_t *ok);
 // `tracing` indicates whether the `pid` belongs to a tracer process (true) or a fuzzer
 // process (false).
 SL2_EXPORT
-SL2Response sl2_conn_register_pid(sl2_conn *conn, uint32_t pid, bool tracing);
+SL2Response sl2_conn_register_pid(sl2_conn *conn, uint64_t pid, bool tracing);
 
 #endif
