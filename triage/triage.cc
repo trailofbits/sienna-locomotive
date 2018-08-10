@@ -298,19 +298,10 @@ json Triage::toJson() const {
         { "rank",               exploitabilityRank() },
         { "instructionPointer", instructionPointer() },
         { "stackPointer",       stackPointer() },
-        { "tracer",             tracerJson() }
+        { "tracer",             tracer_->toJson() }
     };
 }
 
-////////////////////////////////////////////////////////////////////////////
-// tracerJson()
-json Triage::tracerJson() const {
-    if( tracer_->isValid() ) {
-        return tracer_->toJson();
-    } else {
-        return json{};
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////
 // persist()

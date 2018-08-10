@@ -69,8 +69,6 @@ public:
     friend ostream& operator<<( ostream& os,  Xploitability& result );
     string str( ) const;
 
-    bool            isValid() const             { return isValid_; };
-
 
 
 protected:
@@ -87,8 +85,6 @@ protected:
     uint64_t                        instructionPtr_     = 0;
     uint64_t                        stackPtr_           = 0;
     unique_ptr<DisassemblerX86>     disassembler_       = nullptr;
-    bool                            isValid_            = false;
-
 };
 
 
