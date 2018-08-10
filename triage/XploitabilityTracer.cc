@@ -37,6 +37,7 @@ XploitabilityTracer::XploitabilityTracer(
 XploitabilityResult XploitabilityTracer::process() {
     XploitabilityResult ret(name());
 
+
     // If we can't open the crash.json file, we return XPLOITABILITY_NONE
     uint32_t score  = 0;
     try {
@@ -44,7 +45,6 @@ XploitabilityResult XploitabilityTracer::process() {
         json_ << ifs;
         score = json_["score"];
     } catch(...) {
-        json_["score"] = score;
     }
 
     // Convert the 0-100 ranking to our 0-4 . No information is lost
