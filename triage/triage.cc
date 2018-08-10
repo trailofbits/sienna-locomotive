@@ -42,7 +42,7 @@ namespace sl2 {
 //
 // Constructor for Triage class which loads a minidump file at minidumpPath
 ////////////////////////////////////////////////////////////////////////////
-Triage::Triage( const string& minidumpPath ) 
+Triage::Triage( const string& minidumpPath )
     :   minidumpPath_(minidumpPath),
         symbolSupplier_(minidumpPath),
         proc_(&symbolSupplier_, &resolver_, true),
@@ -93,11 +93,11 @@ StatusCode Triage::process() {
     dirPath_ = dirPath_.parent_path();
     fs::path jsonPath(dirPath_.string());
     jsonPath.append("crash.json");
-    
+
     // There is a bug in Visual Studio that doesn't let you do this the sane way...
     vector< unique_ptr<Xploitability> > engine;
     engine.push_back( make_unique<XploitabilityBreakpad>( &dump_, &state_) );
-    engine.push_back( make_unique<XploitabilityBangExploitable>( &dump_, &state_) );    
+    engine.push_back( make_unique<XploitabilityBangExploitable>( &dump_, &state_) );
 
     for( const auto& mod : engine ) {
         const auto result   = mod->process();
@@ -115,7 +115,7 @@ StatusCode Triage::process() {
     fs::path outminidumpPath(dirPath_.string());
     outminidumpPath.append("triage.json");
     persist(outminidumpPath.string());
-    
+
     // It's all good.
     return StatusCode::GOOD;
 }
@@ -143,9 +143,9 @@ const vector<uint64_t> Triage::callStack() const {
     const CallStack* stack = state_.threads()->at(threadid);
 
     uint8_t     i = 0;
-    
+
     vector<uint64_t> ret;
-    for( StackFrame* frame : *stack->frames()  ) { 
+    for( StackFrame* frame : *stack->frames()  ) {
         ret.push_back(frame->ReturnAddress());
     }
     return ret;
@@ -163,17 +163,17 @@ const string Triage::crashash() const {
     sort( calls.begin(), calls.end() );
     auto last  = unique(calls.begin(), calls.end());
     calls.erase(last, calls.end());
-    
+
     RC4x rc4(true);
 
-    for( uint64_t addr : calls ) { 
+    for( uint64_t addr : calls ) {
         // We only want the 12 bits of the offset to ignore aslr
         addr &= 0xFFF;
         rc4.encrypt( (uint8_t*)&addr, (uint8_t*)&stackhash,  (size_t)sizeof(stackhash) );
     }
 
     ostringstream oss;
-    oss << setfill('0') << setw(sizeof(stackhash)/4) << hex << stackhash;    
+    oss << setfill('0') << setw(sizeof(stackhash)/4) << hex << stackhash;
     return oss.str();
 }
 
@@ -202,7 +202,7 @@ const string Triage::crashReason()  const {
     } else {
         ret =  "Unknown";
     }
-    // Filter out bad characters in case we want to use the triageTag for a 
+    // Filter out bad characters in case we want to use the triageTag for a
     // minidumpPath
     ret = regex_replace( ret, regexFilter, "_" );
     return ret;
@@ -211,19 +211,19 @@ const string Triage::crashReason()  const {
 ////////////////////////////////////////////////////////////////////////////
 // crashAddress()
 //      This is the offending memory address
-const uint64_t Triage::crashAddress() const { 
+const uint64_t Triage::crashAddress() const {
     return state_.crash_address();
 }
 
 ////////////////////////////////////////////////////////////////////////////
 // stackPointer()
-const uint64_t Triage::stackPointer() const { 
+const uint64_t Triage::stackPointer() const {
     return tracer_->stackPointer();
 }
 
 ////////////////////////////////////////////////////////////////////////////
 // instructionPointer()
-const uint64_t Triage::instructionPointer() const { 
+const uint64_t Triage::instructionPointer() const {
     return tracer_->instructionPointer();
 }
 
@@ -232,7 +232,7 @@ const uint64_t Triage::instructionPointer() const {
 // exploitability()
 //      returns value from 0 to 4 for exploitabilty.  0 being None, 4 being
 // High
-XploitabilityRank Triage::exploitabilityRank() const {    
+XploitabilityRank Triage::exploitabilityRank() const {
     XploitabilityRank rank = XploitabilityRank::XPLOITABILITY_NONE;
     for( auto arank : ranks() ) {
         if( arank > rank ) {
@@ -247,7 +247,7 @@ XploitabilityRank Triage::exploitabilityRank() const {
 //      String version of exploitabilty from None to High
 const string Triage::exploitability() const {
     //return Xploitability::rankToString( exploitabilityRank() );
-    XploitabilityRank rank = exploitabilityRank();    
+    XploitabilityRank rank = exploitabilityRank();
     return ~rank;
 }
 
@@ -296,8 +296,8 @@ json Triage::toJson() const {
         { "minidumpPath",       minidumpPath() },
         { "ranks",              ranks() },
         { "rank",               exploitabilityRank() },
-        { "instructionPointer", instructionPointer(), },
-        { "stackPointer",       stackPointer(), },
+        { "instructionPointer", instructionPointer() },
+        { "stackPointer",       stackPointer() },
         { "tracer",             tracer_->toJson() }
     };
 }
@@ -321,9 +321,9 @@ ostream& operator<<(ostream& os, Triage& self) {
     os << "Ranks         : "        << self.ranksString()           << endl;
     os << "Crash Reason  : "        << self.crashReason()           << endl;
     os << "Tag           : "        << self.triageTag()            << endl;
-    return os;  
-}  
-  
+    return os;
+}
+
 
 
 } // namespace

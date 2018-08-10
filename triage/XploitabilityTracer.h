@@ -1,6 +1,6 @@
 // XXX_INCLUDE_TOB_COPYRIGHT_HERE
 
-// Xploitability implementation for using sl2 tracer.cpp.  This scores based on taint information 
+// Xploitability implementation for using sl2 tracer.cpp.  This scores based on taint information
 
 #ifndef XploitabilityTracer_H
 #define XploitabilityTracer_H
@@ -22,7 +22,7 @@ public:
 
     json                                    toJson() const;
     virtual XploitabilityResult             process();
-    
+
 protected:
     const string                            crashJsonPath_;
     json                                    json_;

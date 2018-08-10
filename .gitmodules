@@ -1,0 +1,3 @@
+[submodule "fuzzgoat"]
+	path = fuzzgoat
+	url = git@github.com:haxmeadroom/fuzzgoat.git

@@ -19,8 +19,11 @@ sl2_funcmod SL2_FUNCMOD_TABLE[] = {
     {"ReadEventLogA", "KERNELBASE.DLL"},
     {"ReadEventLogW", "KERNELBASE.DLL"},
     {"fread", "UCRTBASE.DLL"},
+    {"fread", "UCRTBASED.DLL"},
     {"fread_s", "UCRTBASE.DLL"},
+    {"fread_s", "UCRTBASED.DLL"},
     {"_read", "UCRTBASE.DLL"},
+    {"_read", "UCRTBASED.DLL"},
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -285,8 +288,8 @@ SL2_EXPORT
 bool function_is_in_expected_module(const char *func, const char *mod)
 {
     for (int i = 0; i < SL2_FUNCMOD_TABLE_SIZE; i++) {
-        if (STREQ(func, SL2_FUNCMOD_TABLE[i].func)) {
-            return STREQI(mod, SL2_FUNCMOD_TABLE[i].mod);
+        if (STREQ(func, SL2_FUNCMOD_TABLE[i].func) && STREQI(mod, SL2_FUNCMOD_TABLE[i].mod)) {
+            return true;
         }
     }
 

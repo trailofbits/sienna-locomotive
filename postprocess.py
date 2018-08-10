@@ -71,23 +71,25 @@ class Rollup(json.JSONEncoder):
         for path in paths:
             i += 1
             with open(path) as f:
-                triageJson = json.load(f)
-                f.close()
-                crashash = triageJson["crashash"]
-                self.rankStats[triageJson["exploitability"]] += 1
-                if crashash in self.crashashes:
-                    self.dupes += 1
-                    rmsg = RollupMessage( path, i, pathsCnt, True )
-                    cb( rmsg )
-                    if self.dedupe:
-                        dirtodelete = os.path.dirname(path)
-                        print("Deleting %s" % dirtodelete)
-                        Rollup.safedelete(dirtodelete)
-                else:
-                    rmsg = RollupMessage( path, i, pathsCnt, False )
-                    cb( rmsg )
-                    self.crashashes[crashash] = triageJson
-
+                try:
+                    triageJson = json.load(f)
+                    f.close()
+                    crashash = triageJson["crashash"]
+                    self.rankStats[triageJson["exploitability"]] += 1
+                    if crashash in self.crashashes:
+                        self.dupes += 1
+                        rmsg = RollupMessage( path, i, pathsCnt, True )
+                        cb( rmsg )
+                        if self.dedupe:
+                            dirtodelete = os.path.dirname(path)
+                            print("Deleting %s" % dirtodelete)
+                            Rollup.safedelete(dirtodelete)
+                    else:
+                        rmsg = RollupMessage( path, i, pathsCnt, False )
+                        cb( rmsg )
+                        self.crashashes[crashash] = triageJson
+                except:
+                    print("Unable to parse " , path)
 
         for k,v in self.crashashes.items():
             print( "%s\t%s" % (v['exploitability'], k) )

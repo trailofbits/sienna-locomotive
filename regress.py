@@ -1,15 +1,25 @@
 import unittest
-#from test import support
 import test.support as support
 import sys
 import subprocess
 import shlex
 import glob
 import os
+import codecs
 
 DEBUG=False
 
+
+TEST_APPLICATION='build/corpus/test_application/Debug/test_application.exe'
+TRIAGER=r'build\triage\Debug\triager.exe'
+
+
+
 def runAndCaptureOutput( cmd ):
+    # This is to fix utf8 encoding issues and makes out streams 8bit clean
+    for _ in [sys.stdout, sys.stderr ]:
+        _ = codecs.getwriter("iso8859")
+
     if type(cmd) == type([]):
         cmd = " ".join(cmd)
 
@@ -24,67 +34,66 @@ class TestWizard(unittest.TestCase):
 
     def test_0(self):
 
-        cmd =  [ r'.\dynamorio\bin64\drrun.exe',
+        cmd =  [ r'dynamorio\bin64\drrun.exe',
             r'-c',
-            r'build\wizard\Debug\wizard.dll',
+            r'build/wizard/Debug/wizard.dll',
             r'--',
-            r'build\corpus\test_application\Debug\test_application.exe',
+            TEST_APPLICATION,
             r'0' ]
 
-        output = runAndCaptureOutput(cmd)
-        self.assertTrue(  r'buffer":[65,65,65,65,65,65,65,65]'  in output )
+        out = runAndCaptureOutput(cmd)
+        self.assertTrue(  r'buffer":[65,65,65,65,65,65,65,65]'  in out )
 
     def test_2(self):
 
-        cmd =  [ r'.\dynamorio\bin64\drrun.exe',
+        cmd =  [ r'dynamorio\bin64\drrun.exe',
             r'-c',
-            r'build\wizard\Debug\wizard.dll',
+            r'build/wizard/Debug/wizard.dll',
             r'--',
-            r'build\corpus\test_application\Debug\test_application.exe',
+            TEST_APPLICATION,
             r'2' ]
 
-        output = runAndCaptureOutput(cmd)
-        self.assertTrue(  r'[60,104,116,109,108,62,10,32]' in output )
+        out = runAndCaptureOutput(cmd)
+        self.assertTrue(  r'[60,104,116,109,108,62,10,32]' in out )
 
     def test_registry(self):
-        cmd = r'echo 0 | python .\harness.py -g -r3 -l -v -e WIZARD -t build\\corpus\\test_application\\Debug\\test_application.exe -a 4 -f'
-        output = runAndCaptureOutput(cmd)
-        self.assertTrue( '0) RegQueryValueEx' in output )
-        self.assertTrue( 'Process completed after' in output )
-        cmd = r'echo 0 | python .\harness.py -r3 -l -v -e WIZARD -t build\\corpus\\test_application\\Debug\\test_application.exe -a 4 -f'
-        output = runAndCaptureOutput(cmd)
-        self.assertFalse( '0) RegQueryValueEx' in output )
-        self.assertTrue( 'Process completed after' in output )
+        cmd = r'echo 0 | python harness.py -g -r3 -l -v -e WIZARD -t '+ TEST_APPLICATION +' -a 4 -f'
+        out = runAndCaptureOutput(cmd)
+        self.assertTrue( '0) RegQueryValueEx' in out )
+        self.assertTrue( 'Process completed after' in out )
+        cmd = r'echo 0 | python harness.py -r3 -l -v -e WIZARD -t '+ TEST_APPLICATION +' -a 4 -f'
+        out = runAndCaptureOutput(cmd)
+        self.assertFalse( '0) RegQueryValueEx' in out )
+        self.assertTrue( 'Process completed after' in out )
 
 
     def test_captureStdout(self):
 
         targetString = 'XXXWWWXXX'
         # First version have -l, inlining stdout for us to capture.   String "XXXWWWXXX" should appear
-        cmd = r'echo 0 | python .\harness.py -r3 -l -v -t build\\corpus\\test_application\\Debug\\test_application.exe -a 9 -f'
-        output = runAndCaptureOutput(cmd)
-        self.assertTrue( targetString in output )
+        cmd = r'echo 0 | python harness.py -r3 -l -v -t '+ TEST_APPLICATION +' -a 9 -f'
+        out = runAndCaptureOutput(cmd)
+        self.assertTrue( targetString in out )
 
 
         # This version does not have have -l, so we aren't capturing stdout and String "XXXWWWXXX" should NOT appear
-        cmd = r'echo 0 | python .\harness.py -r3 -v -t build\\corpus\\test_application\\Debug\\test_application.exe -a 9 -f'
-        output = runAndCaptureOutput(cmd)
-        self.assertFalse( targetString in output )
+        cmd = r'echo 0 | python harness.py -r3 -v -t '+ TEST_APPLICATION +' -a 9 -f'
+        out = runAndCaptureOutput(cmd)
+        self.assertFalse( targetString in out )
 
     def test_TheWiz(self):
-        cmd = r'echo 0 | python .\harness.py -v'
-        output = runAndCaptureOutput(cmd)
-        self.assertTrue( 'Process completed after' in output )
+        cmd = r'echo 0 | python harness.py -v'
+        out = runAndCaptureOutput(cmd)
+        self.assertTrue( 'Process completed after' in out )
 
 
 
     def test_quickCrash(self):
-        cmd =  r'echo 0 | python .\harness.py -c -x -l -v -t build\corpus\test_application\Debug\test_application.exe -a 10 -f'
-        output = runAndCaptureOutput(cmd)
-        self.assertTrue( 'Process completed after' in output )
-        self.assertRegex(  output, r'Triage .*: breakpoint .*caused EXCEPTION_BREAKPOINT'  )
-        self.assertTrue( 'int3' in output )
-
+        cmd =  r'echo 0 | python harness.py -c -x -l -v -t '+ TEST_APPLICATION +' -a 10 -f'
+        out = runAndCaptureOutput(cmd)
+        self.assertTrue( 'Process completed after' in out )
+        self.assertRegex(  out, r'Triage .*: breakpoint .*caused EXCEPTION_BREAKPOINT'  )
+        self.assertTrue( 'int3' in out )
 
         workingdir = os.path.join( os.environ['APPDATA'],  "Trail of Bits", "fuzzkit", "runs" )
         pattern = "%s/*/triage.json" % workingdir
@@ -96,34 +105,24 @@ class TestWizard(unittest.TestCase):
             self.assertTrue( "instructionPointer" in data )
 
 
-
-
-
-class  TestMinidumpOnly(unittest.TestCase):
-    def test_minidump(self):
-        minidumpsdir = "breakpad/src/processor/testdata"
-        pattern = "%s/*.dmp" % minidumpsdir
-        i = 0
-        paths = [ _ for _ in glob.glob(  pattern ) ]
-        paths = " ".join(paths)
-        cmd = r'build\triage\Debug\triager.exe ' + paths
-        print("cmd", cmd)
-
-        out = runAndCaptureOutput(cmd)
-        print(out)
-
-
-class  TestTriage(unittest.TestCase):
     def test_triage(self):
+        for _ in range(3):
+            cmd =  r'echo 0 | python harness.py -c -x -l -v -t '+ TEST_APPLICATION +' -a 10 -f'
+            out = runAndCaptureOutput(cmd)
+
         workingdir = os.path.join( os.environ['APPDATA'],  "Trail of Bits", "fuzzkit", "runs" )
-        pattern = "%s/*/*.dmp" % workingdir
-        print("pattern", pattern)
+        pattern = "%s/*/initial.dmp" % workingdir
         for path in glob.glob(  pattern ):
             #paths = " ".join(paths)
-            cmd = r'build\triage\Debug\triager.exe "%s"' % path
-            print("cmd", cmd)
+            cmd = '%s "%s"'% ( TRIAGER, path )
             out = runAndCaptureOutput(cmd)
-            print(out)
+            for _ in [ 'Crashash', 'Exploitability', 'Ranks', 'Crash Reason' ]:
+                self.assertTrue(  _ in out )
+
+    def test_fuzzgoat(self):
+        cmd = r'echo 0 | python harness.py -e WIZARD -v -l  -t ./build/fuzzgoat/Debug/fuzzgoat.exe -a ./fuzzgoat/input-files/validObject'
+        out = runAndCaptureOutput(cmd)
+        self.assertRegex( out, r'0[)] ReadFile from.*validObject' )
 
 
 def main():
@@ -138,6 +137,6 @@ def main():
 
 
 if __name__ == '__main__':
-    print("Make sure to  .\make reconfig  first.")
+    print("Make sure to  ./make reconfig  first.")
     print("You can also pass a specific test class to run on the command line like  regress.py TestMinidump")
     main()

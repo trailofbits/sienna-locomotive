@@ -58,6 +58,7 @@ public:
     static double               normalize(double x);
     vector<XploitabilityRank>   ranks()                     const;
     void                        persist(const string path)  const;
+    json                        tracerJson()                const;
 
 private:
 
