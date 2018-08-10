@@ -32,7 +32,8 @@ class Triager:
 
 
     def __repr__(self):
-        return "%s exploitability, %s at pc 0x%x, memory address 0x%x, stack address 0x%x" % (
+        return "Crashash %s: %s exploitability, %s at pc 0x%x, memory address 0x%x, stack address 0x%x" % (
+                self.json['crashash'],
                 self.json['exploitability'],
                 self.json['crashReason'],
                 self.json['instructionPointer'],
