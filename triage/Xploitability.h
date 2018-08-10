@@ -21,7 +21,7 @@ enum class XploitabilityRank {
     XPLOITABILITY_HIGH      = 4,
     XPLOITABILITY_MEDIUM    = 3,
     XPLOITABILITY_LOW       = 2,
-    XPLOITABILITY_UNKNOWN   = 1,    
+    XPLOITABILITY_UNKNOWN   = 1,
     XPLOITABILITY_NONE      = 0
 
 };
@@ -39,7 +39,7 @@ class XploitabilityResult {
 public:
     XploitabilityRank       rank;
     const string            moduleName;
-    
+
 
     XploitabilityResult( const string modName ):
         moduleName(modName) {
@@ -56,7 +56,7 @@ public:
 
     Xploitability( Minidump* dmp, ProcessState* state, const string name );
     ~Xploitability(  ){};
-    
+
     virtual XploitabilityResult             process() = 0;
 
     bool            isExceptionAddressInUser() const;
@@ -85,7 +85,6 @@ protected:
     uint64_t                        instructionPtr_     = 0;
     uint64_t                        stackPtr_           = 0;
     unique_ptr<DisassemblerX86>     disassembler_       = nullptr;
-
 };
 
 
