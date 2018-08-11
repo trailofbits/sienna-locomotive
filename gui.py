@@ -32,13 +32,18 @@ class Triager:
 
 
     def __repr__(self):
-        return "Crashash %s: %s exploitability, %s at pc 0x%x, memory address 0x%x, stack address 0x%x" % (
+        ret = "<ERROR PROCESSING>"
+        try:
+            ret = "Crashash %s: %s exploitability, %s at pc 0x%x, memory address 0x%x, stack address 0x%x" % (
                 self.json['crashash'],
                 self.json['exploitability'],
                 self.json['crashReason'],
                 self.json['instructionPointer'],
                 self.json['crashAddress'],
                 self.json['stackPointer'] )
+        except KeyError:
+            pass
+        return ret
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -345,8 +350,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         print(crash)
         if crash:
-            triager = Triager(crash['crash_file'])
-            self.triage_output.append(str(triager))
+            try:
+                triager = Triager(crash['crash_file'])
+                self.triage_output.append(str(triager))
+            except:
+                print("Error loading ", crash['crash_file'])
         self.triage_output.append(formatted)
         self.crashes.append(crash)
 
