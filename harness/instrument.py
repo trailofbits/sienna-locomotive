@@ -284,7 +284,7 @@ def fuzzer_run(config_dict):
 # TODO(ww): Rename this to "tracer_run" or something similar,
 # and break the internal triager_run call into another method
 # (trace_and_triage, maybe?)
-def triage_run(config_dict, run_id):
+def tracer_run(config_dict, run_id):
     """ Runs the triaging tool """
     run = run_dr(
         {
@@ -309,10 +309,10 @@ def triage_run(config_dict, run_id):
     return formatted, raw
 
 
-def fuzz_and_triage(config_dict):
+def fuzz_and_trace(config_dict):
     """
     Runs the fuzzer (in a loop if continuous is true), then runs the triage
-    tools (DR and breakpad) if a crash is found.
+    tools (DR tracer and breakpad) if a crash is found.
     """
     global can_fuzz
     # TODO: Move try/except so we can start new runs after an exception
@@ -320,7 +320,7 @@ def fuzz_and_triage(config_dict):
         while can_fuzz:
             crashed, run_id = fuzzer_run(config_dict)
             if crashed:
-                formatted, _ = triage_run(config_dict, run_id)
+                formatted, _ = tracer_run(config_dict, run_id)
                 print_l(formatted)
 
                 if config_dict['exit_early']:
