@@ -16,6 +16,7 @@
 #include <Windows.h>
 #include <winsock2.h>
 #include <winhttp.h>
+#include <io.h>
 
 #include <iostream>
 #include <codecvt>
@@ -289,6 +290,7 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data)
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 1);
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
+    FILE * fpointer = (FILE *)drwrap_get_arg(wrapcxt, 3);
 
     info->lpBuffer             = buffer;
     info->nNumberOfBytesToRead = size * count;
@@ -296,7 +298,23 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data)
     info->source               = NULL;
     info->position             = NULL;
     info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+
+
+    fileArgHash fStruct = {0};
+
+    fStruct.fileName[0] = (wchar_t) _fileno(fpointer);
+
+//    fStruct.position = ftell(fpointer);  // This instantly crashes DynamoRIO
+    fStruct.position = size; // Field names don't actually matter
+    fStruct.readSize = count;
+
+    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct,
+        ((unsigned char *) &fStruct) + sizeof(fileArgHash));
+    std::string hash_str;
+    picosha2::hash256_hex_string(blob_vec, hash_str);
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    info->argHash[SL2_HASH_LEN] = 0;
+    memcpy(info->argHash, hash_str.c_str(), SL2_HASH_LEN);
 }
 
 static void
@@ -308,6 +326,7 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 2);
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 3);
+    FILE * fpointer = (FILE *)drwrap_get_arg(wrapcxt, 4);
 
     info->lpBuffer             = buffer;
     info->nNumberOfBytesToRead = size * count;
@@ -315,7 +334,21 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
     info->source               = NULL;
     info->position             = NULL;
     info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+
+    fileArgHash fStruct = {0};
+
+    fStruct.fileName[0] = (wchar_t) _fileno(fpointer);
+
+    fStruct.position = size; // Field names don't actually matter
+    fStruct.readSize = count;
+
+    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct,
+        ((unsigned char *) &fStruct) + sizeof(fileArgHash));
+    std::string hash_str;
+    picosha2::hash256_hex_string(blob_vec, hash_str);
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    info->argHash[SL2_HASH_LEN] = 0;
+    memcpy(info->argHash, hash_str.c_str(), SL2_HASH_LEN);
 }
 
 static void
@@ -336,7 +369,19 @@ wrap_pre__read(void *wrapcxt, OUT void **user_data)
     info->source               = NULL;
     info->position             = NULL;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+
+    fileArgHash fStruct = {0};
+
+    fStruct.fileName[0] = (wchar_t) fd;
+    fStruct.readSize = count;
+
+    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct,
+        ((unsigned char *) &fStruct) + sizeof(fileArgHash));
+    std::string hash_str;
+    picosha2::hash256_hex_string(blob_vec, hash_str);
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    info->argHash[SL2_HASH_LEN] = 0;
+    memcpy(info->argHash, hash_str.c_str(), SL2_HASH_LEN);
 }
 
 /* prints information about the function call to stderr so the harness can ingest it */
@@ -386,6 +431,10 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 
     char *lpBuffer = (char *) info->lpBuffer;
     size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
+
+    if (info->function == Function::_read){
+        nNumberOfBytesToRead = min(nNumberOfBytesToRead, (int) drwrap_get_retval(wrapcxt));
+    }
 
     vector<unsigned char> x(lpBuffer, lpBuffer + min(nNumberOfBytesToRead, 64));
     j["buffer"] = x;
