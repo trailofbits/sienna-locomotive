@@ -24,6 +24,7 @@ from .state import (
     create_invocation_statement,
     check_fuzz_line_for_crash,
     get_path_to_run_file,
+    get_paths_to_run_file,
 )
 
 from . import config
@@ -158,19 +159,23 @@ def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False)
 
 def triager_run(run_id):
     """
-    Runs the (breakpad-based) triager on the minidmp generated
+    Runs the (breakpad-based) triager on each of the minidumps generated
     by a fuzzing run.
+
+    Yields the output of each triaging run.
     """
-    dmpfile = get_path_to_run_file(run_id, "initial.dmp")
-    if os.path.isfile(dmpfile):
+    dmpfiles = get_paths_to_run_file(run_id, "initial.*.dmp")
+
+    if not dmpfiles:
+        print_l("[!] No initial minidumps to triage!")
+        return None
+
+    for dmpfile in dmpfiles:
         cmd = [config.config['triager_path'], dmpfile]
         out = subprocess.check_output(cmd, shell=False)
         if config.config["verbose"]:
             print_l(repr(out))
-    else:
-        print_l("[!] No initial.dmp to triage!")
-        return None
-    return out
+        yield out
 
 
 def wizard_run(config_dict):

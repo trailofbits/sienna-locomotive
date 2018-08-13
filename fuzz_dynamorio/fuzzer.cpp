@@ -135,7 +135,7 @@ on_dr_exit(void)
         dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#on_dr_exit: Crash found for run id %s!", run_id_s);
 
         sl2_crash_paths crash_paths = {0};
-        sl2_conn_request_crash_paths(&sl2_conn, &crash_paths);
+        sl2_conn_request_crash_paths(&sl2_conn, dr_get_process_id(), &crash_paths);
 
         HANDLE hDumpFile = CreateFile(crash_paths.initial_dump_path,
             GENERIC_WRITE,

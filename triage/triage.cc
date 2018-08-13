@@ -88,11 +88,35 @@ StatusCode Triage::process() {
     cout << minidumpPath_ << endl;
     cout << "Crashash: " << crashash() << endl;
 
-    // Loads up a crash.json file for taint info
-    dirPath_ = fs::path(minidumpPath_);
-    dirPath_ = dirPath_.parent_path();
-    fs::path jsonPath(dirPath_.string());
-    jsonPath.append("crash.json");
+
+    string pid;
+    regex pidExpr { ".*\\.(\\d+)\\.dmp$" };
+    smatch matches;
+
+    regex_search(minidumpPath_, matches, pidExpr);
+
+    if (matches.empty()) {
+        cerr << "Couldn't extract PID from dumpfile name?" << endl;
+        tracer_ = nullptr;
+    }
+    else {
+        pid = matches[1].str();
+
+        // Loads up a crash.json file for taint info
+        dirPath_ = fs::path(minidumpPath_);
+        dirPath_ = dirPath_.parent_path();
+        fs::path jsonPath(dirPath_.string());
+
+        ostringstream jsonFile;
+        jsonFile << "crash." << pid << ".json";
+        jsonPath.append(jsonFile.str());
+
+        if (!fs::exists(jsonPath)) {
+            cerr << "Warning: Couldn't find crash JSON: " << jsonPath << endl;
+        }
+
+        tracer_  = make_unique<XploitabilityTracer>( &dump_, &state_, jsonPath.string());
+    }
 
     // There is a bug in Visual Studio that doesn't let you do this the sane way...
     vector< unique_ptr<Xploitability> > engine;
@@ -106,8 +130,9 @@ StatusCode Triage::process() {
     // Tracer is a special engine, since it uses our taint information from tracer.cpp
     // We also need a single Xploitability module to get more minidump information so
     // might as well use this one with a longer scope
-    tracer_  = make_unique<XploitabilityTracer>( &dump_, &state_, jsonPath.string());
-    processEngine(*tracer_);
+    if (tracer_) {
+        processEngine(*tracer_);
+    }
 
     // Write the final triage information to the triage.json file
     fs::path outminidumpPath(dirPath_.string());

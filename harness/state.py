@@ -17,6 +17,7 @@ from . import config
 
 uuid_regex = re.compile("[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}")
 
+
 class InvocationState(NamedTuple):
     """
     Represents the state created by a call to
@@ -214,6 +215,15 @@ def get_path_to_run_file(run_id, filename):
     return os.path.join(config.sl2_runs_dir, str(run_id), filename)
 
 
+def get_paths_to_run_file(run_id, pattern):
+    """
+    Returns all paths under the given run's directory
+    that match the given pattern glob.
+    """
+    pattern = os.path.join(config.sl2_runs_dir, str(run_id), pattern)
+    return glob.glob(pattern)
+
+
 def write_output_files(run, run_id, stage_name):
     """
     Writes the PRNG seed, stdout, and stderr buffers for a particular stage
@@ -237,22 +247,24 @@ def parse_triage_output(run_id):
     Parses the results of a triage run and prints them in
     human-readable form.
     """
-    try:
-        crash_file = get_path_to_run_file(run_id, 'crash.json')
-        with open(crash_file, 'r') as crash_json:
-            results = json.loads(crash_json.read())
-            results['run_id'] = run_id
-            results['crash_file'] = crash_file
-            formatted = "Triage ({score}): {reason} in run {run_id} caused {exception}".format(**results)
-            formatted += ("\n\t0x{location:02x}: {instruction}".format(**results))
-            return formatted, results
-    except FileNotFoundError:
+    crash_files = get_paths_to_run_file(run_id, 'crash.*.json')
+
+    if not crash_files:
         message = "The triage tool exited improperly during run {}, \
-but no crash file could be found. It may have timed out. \
+but no crash files could be found. It may have timed out. \
 To retry it manually, run \
 `python harness.py -v -e TRIAGE -p {} --run_id {}`"
-
         return message.format(run_id, config.profile, run_id), None
+
+    # TODO(ww): Parse all crash files, not just the first.
+    crash_file = crash_files[0]
+    with open(crash_file, 'r') as crash_json:
+        results = json.loads(crash_json.read())
+        results['run_id'] = run_id
+        results['crash_file'] = crash_file
+        formatted = "Triage ({score}): {reason} in run {run_id} caused {exception}".format(**results)
+        formatted += ("\n\t0x{location:02x}: {instruction}".format(**results))
+        return formatted, results
 
 
 def export_crash_data_to_csv(crashes, csv_filename):
