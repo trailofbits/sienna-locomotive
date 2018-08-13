@@ -1,6 +1,22 @@
-from PySide2.QtWidgets import QTreeView
+from PySide2.QtWidgets import QTreeView, QComboBox, QStyledItemDelegate, QItemDelegate
 from PySide2.QtGui import QStandardItem, QStandardItemModel
 from PySide2.QtCore import Signal, Qt, QSortFilterProxyModel
+
+mode_labels = {1: "Nth Call", 2: "Return Address", 4: "Argument Hash", 8: "Argument Comparison"}
+
+
+class ComboboxTreeItemDelegate(QStyledItemDelegate):
+
+    def createEditor(self, parent, option, index):
+        self.combobox = QComboBox(parent)
+        for key in sorted(mode_labels.keys()):
+            self.combobox.addItem(mode_labels[key])
+
+        return self.combobox
+
+    def setEditorData(self, editor, index):
+        val = index.model().data(index)
+        self.combobox.setCurrentText(val)
 
 
 class CheckboxTreeWidgetItem(QStandardItem):
