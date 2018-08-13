@@ -59,6 +59,7 @@ public:
     vector<XploitabilityRank>   ranks()                     const;
     void                        persist(const string path)  const;
     json                        tracerJson()                const;
+    void                        processEngine(Xploitability& x);
 
 private:
 

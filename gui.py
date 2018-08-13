@@ -38,13 +38,18 @@ class Triager:
 
 
     def __repr__(self):
-        return "Crashash %s: %s exploitability, %s at pc 0x%x, memory address 0x%x, stack address 0x%x" % (
+        ret = "<ERROR PROCESSING>"
+        try:
+            ret = "Crashash %s: %s exploitability, %s at pc 0x%x, memory address 0x%x, stack address 0x%x" % (
                 self.json['crashash'],
                 self.json['exploitability'],
                 self.json['crashReason'],
                 self.json['instructionPointer'],
                 self.json['crashAddress'],
                 self.json['stackPointer'] )
+        except KeyError:
+            pass
+        return ret
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -149,6 +154,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.triage_timeout_box.setValue(config.config['triage_timeout'])
         self.triage_timeout_box.setSpecialValueText("None")
         self.triage_timeout_box.setSingleStep(10)
+        self.verboseCheckBox = QtWidgets.QCheckBox()
+        self.verboseCheckBox.clicked.connect(self.verboseCheckBox_clicked)
 
         # Create spinbox for controlling simultaneous fuzzing instances
         self.thread_count = QtWidgets.QSpinBox()
@@ -171,6 +178,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.fuzz_controls_inner_left = QtWidgets.QVBoxLayout()
         self.fuzz_controls_inner_right = QtWidgets.QVBoxLayout()
 
+
         # Add widgets to left, right, and expanded layouts
         self.fuzz_controls_inner_left.addLayout(self.filter_layout)
         self.fuzz_controls_inner_left.addWidget(self.extension_widget)
@@ -184,6 +192,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.extension_layout.addWidget(self.triage_timeout_box, 1, 2, 1, 1, Qt.AlignLeft)
         self.extension_layout.addWidget(QtWidgets.QLabel("Simultaneous fuzzing threads:"), 0, 3, 1, 1, Qt.AlignRight)
         self.extension_layout.addWidget(self.thread_count, 0, 4, 1, 1, Qt.AlignLeft)
+
+        self.extension_layout.addWidget(QtWidgets.QLabel("Verbose:"), 1, 3, 1, 1, Qt.AlignRight)
+        self.extension_layout.addWidget(self.verboseCheckBox, 1, 4, 1, 1, Qt.AlignLeft)
+
+
         self.fuzz_controls_inner_right.addWidget(self.expand_button)
 
         # Compose layouts
@@ -344,8 +357,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         print(crash)
         if crash:
-            triager = Triager(crash['crash_file'])
-            self.triage_output.append(str(triager))
+            try:
+                triager = Triager(crash['crash_file'])
+                self.triage_output.append(str(triager))
+            except:
+                print("Error loading ", crash['crash_file'])
         self.triage_output.append(formatted)
         self.crashes.append(crash)
 
@@ -478,6 +494,11 @@ class MainWindow(QtWidgets.QMainWindow):
             self.extension_widget.hide()
             self.expand_button.setArrowType(Qt.DownArrow)
             self.adjustSize()
+
+    def verboseCheckBox_clicked(self):
+        state = self.verboseCheckBox.isChecked()
+        config.config['verbose'] = state
+        config.config['inline_stdout'] = state
 
 
 if __name__ == '__main__':

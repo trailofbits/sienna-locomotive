@@ -46,6 +46,7 @@ Function DynamioRioInstall {
 
 
 Function Build {
+    taskkill.exe /IM fuzzgoat.exe /F
     taskkill.exe /IM test_application.exe /F
     Push-Location
     InstallDependencies

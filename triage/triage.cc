@@ -88,28 +88,51 @@ StatusCode Triage::process() {
     cout << minidumpPath_ << endl;
     cout << "Crashash: " << crashash() << endl;
 
-    // Loads up a crash.json file for taint info
-    dirPath_ = fs::path(minidumpPath_);
-    dirPath_ = dirPath_.parent_path();
-    fs::path jsonPath(dirPath_.string());
-    jsonPath.append("crash.json");
+
+    string pid;
+    regex pidExpr { ".*\\.(\\d+)\\.dmp$" };
+    smatch matches;
+
+    regex_search(minidumpPath_, matches, pidExpr);
+
+    if (matches.empty()) {
+        cerr << "Couldn't extract PID from dumpfile name?" << endl;
+        tracer_ = nullptr;
+    }
+    else {
+        pid = matches[1].str();
+
+        // Loads up a crash.json file for taint info
+        dirPath_ = fs::path(minidumpPath_);
+        dirPath_ = dirPath_.parent_path();
+        fs::path jsonPath(dirPath_.string());
+
+        ostringstream jsonFile;
+        jsonFile << "crash." << pid << ".json";
+        jsonPath.append(jsonFile.str());
+
+        if (!fs::exists(jsonPath)) {
+            cerr << "Warning: Couldn't find crash JSON: " << jsonPath << endl;
+        }
+
+        tracer_  = make_unique<XploitabilityTracer>( &dump_, &state_, jsonPath.string());
+    }
 
     // There is a bug in Visual Studio that doesn't let you do this the sane way...
     vector< unique_ptr<Xploitability> > engine;
     engine.push_back( make_unique<XploitabilityBreakpad>( &dump_, &state_) );
     engine.push_back( make_unique<XploitabilityBangExploitable>( &dump_, &state_) );
 
-    for( const auto& mod : engine ) {
-        const auto result   = mod->process();
-        results_.push_back( result );
+    for( const unique_ptr<Xploitability>& mod : engine ) {
+        processEngine(*mod);
     }
 
     // Tracer is a special engine, since it uses our taint information from tracer.cpp
     // We also need a single Xploitability module to get more minidump information so
     // might as well use this one with a longer scope
-    tracer_  = make_unique<XploitabilityTracer>( &dump_, &state_, jsonPath.string());
-    const auto result   = tracer_->process();
-    results_.push_back( result );
+    if (tracer_) {
+        processEngine(*tracer_);
+    }
 
     // Write the final triage information to the triage.json file
     fs::path outminidumpPath(dirPath_.string());
@@ -118,6 +141,24 @@ StatusCode Triage::process() {
 
     // It's all good.
     return StatusCode::GOOD;
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+// processEngine()
+//      process a single exploitability engine
+void Triage::processEngine(Xploitability& x) {
+    try {
+        cout << "Processing engine: " << x.name() << endl;
+        const auto result   = x.process();
+        results_.push_back( result );
+    } catch( string& x1 ) {
+        cerr << x1 << endl;
+    } catch( exception& x2 ) {
+        cerr << x2.what() << endl;
+    } catch(...) {
+        cerr << "processEngine() error" << endl;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////

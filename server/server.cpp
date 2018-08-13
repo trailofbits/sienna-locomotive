@@ -2,8 +2,8 @@
 #include <map>
 #include <cstdlib>
 #include <unordered_map>
-#include <string.h>
-#include <stdio.h>
+#include <cstring>
+#include <cstdio>
 
 #define NOMINMAX
 #include <Windows.h>
@@ -513,8 +513,9 @@ static void handle_crash_paths(HANDLE pipe)
     DWORD txsize;
     UUID run_id;
     wchar_t *run_id_s;
+    uint64_t pid;
 
-    if (!ReadFile(pipe, &run_id, sizeof(UUID), &txsize, NULL)) {
+    if (!ReadFile(pipe, &run_id, sizeof(run_id), &txsize, NULL)) {
         SL2_SERVER_LOG_FATAL("failed to read UUID");
     }
 
@@ -522,45 +523,55 @@ static void handle_crash_paths(HANDLE pipe)
         SL2_SERVER_LOG_FATAL("couldn't stringify UUID");
     }
 
+    if (!ReadFile(pipe, &pid, sizeof(pid), &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("failed to read PID");
+    }
+
     wchar_t run_dir[MAX_PATH + 1] = {0};
     wchar_t target_file[MAX_PATH + 1] = {0};
+    wchar_t target_path[MAX_PATH + 1] = {0};
 
     PathCchCombine(run_dir, MAX_PATH, FUZZ_WORKING_PATH, run_id_s);
-    PathCchCombine(target_file, MAX_PATH, run_dir, FUZZ_RUN_CRASH_JSON);
+    StringCchPrintfW(target_file, MAX_PATH, FUZZ_RUN_CRASH_JSON_FMT, pid);
+    PathCchCombine(target_path, MAX_PATH, run_dir, target_file);
 
-    size_t size = lstrlen(target_file) * sizeof(wchar_t);
+    size_t size = wcsnlen_s(target_path, MAX_PATH + 1) * sizeof(wchar_t);
 
     if (!WriteFile(pipe, &size, sizeof(size), &txsize, NULL)) {
         SL2_SERVER_LOG_FATAL("failed to write length of crash.json to pipe");
     }
 
-    if (!WriteFile(pipe, &target_file, (DWORD)size, &txsize, NULL)) {
+    if (!WriteFile(pipe, &target_path, (DWORD)size, &txsize, NULL)) {
         SL2_SERVER_LOG_FATAL("failed to write crash.json path to pipe");
     }
 
     memset(target_file, 0, (MAX_PATH + 1) * sizeof(wchar_t));
-    PathCchCombine(target_file, MAX_PATH, run_dir, FUZZ_RUN_MEM_DMP);
+    memset(target_path, 0, (MAX_PATH + 1) * sizeof(wchar_t));
+    StringCchPrintfW(target_file, MAX_PATH, FUZZ_RUN_MEM_DMP_FMT, pid);
+    PathCchCombine(target_path, MAX_PATH, run_dir, target_file);
 
-    size = lstrlen(target_file) * sizeof(wchar_t);
+    size = wcsnlen_s(target_path, MAX_PATH + 1) * sizeof(wchar_t);
 
     if (!WriteFile(pipe, &size, sizeof(size), &txsize, NULL)) {
         SL2_SERVER_LOG_FATAL("failed to write length of mem.dmp path to pipe");
     }
 
-    if (!WriteFile(pipe, &target_file, (DWORD)size, &txsize, NULL)) {
+    if (!WriteFile(pipe, &target_path, (DWORD)size, &txsize, NULL)) {
         SL2_SERVER_LOG_FATAL("failed to write mem.dmp path to pipe");
     }
 
     memset(target_file, 0, (MAX_PATH + 1) * sizeof(wchar_t));
-    PathCchCombine(target_file, MAX_PATH, run_dir, FUZZ_RUN_INITIAL_DMP);
+    memset(target_path, 0, (MAX_PATH + 1) * sizeof(wchar_t));
+    StringCchPrintfW(target_file, MAX_PATH, FUZZ_RUN_INITIAL_DMP_FMT, pid);
+    PathCchCombine(target_path, MAX_PATH, run_dir, target_file);
 
-    size = lstrlen(target_file) * sizeof(wchar_t);
+    size = wcsnlen_s(target_path, MAX_PATH + 1) * sizeof(wchar_t);
 
     if (!WriteFile(pipe, &size, sizeof(size), &txsize, NULL)) {
         SL2_SERVER_LOG_FATAL("failed to write length of initial.dmp path to pipe");
     }
 
-    if (!WriteFile(pipe, &target_file, (DWORD)size, &txsize, NULL)) {
+    if (!WriteFile(pipe, &target_path, (DWORD)size, &txsize, NULL)) {
         SL2_SERVER_LOG_FATAL("failed to write initial.dmp path to pipe");
     }
 
@@ -585,7 +596,7 @@ static void handle_register_pid(HANDLE pipe)
     UUID run_id;
     wchar_t *run_id_s;
     bool tracing;
-    uint32_t pid;
+    uint64_t pid;
 
     SL2_SERVER_LOG_INFO("received pid registration request");
 
@@ -601,6 +612,8 @@ static void handle_register_pid(HANDLE pipe)
         SL2_SERVER_LOG_FATAL("failed to read pid");
     }
 
+    SL2_SERVER_LOG_INFO("got pid=%lu", pid);
+
     if (UuidToString(&run_id, (RPC_WSTR *)&run_id_s) != RPC_S_OK) {
         SL2_SERVER_LOG_FATAL("couldn't stringify UUID");
     }
@@ -609,7 +622,7 @@ static void handle_register_pid(HANDLE pipe)
     wchar_t pids_file[MAX_PATH + 1] = {0};
     wchar_t pid_s[64] = {0};
 
-    swprintf_s(pid_s, sizeof(pid_s) - 1, L"%lu\n", pid);
+    _ui64tow_s(pid, pid_s, sizeof(pid_s) - 1, 10);
 
     PathCchCombine(run_dir, MAX_PATH, FUZZ_WORKING_PATH, run_id_s);
     PathCchCombine(pids_file, MAX_PATH, run_dir, tracing ? FUZZ_RUN_TRACER_PIDS
@@ -628,7 +641,7 @@ static void handle_register_pid(HANDLE pipe)
         NULL);
 
     if (file != INVALID_HANDLE_VALUE) {
-        if (!WriteFile(file, pid_s, lstrlen(pid_s) * sizeof(wchar_t), &txsize, NULL)) {
+        if (!WriteFile(file, pid_s, wcsnlen_s(pid_s, sizeof(pid_s)) * sizeof(wchar_t), &txsize, NULL)) {
             SL2_SERVER_LOG_ERROR("failed to write pid (pid=%lu, pids_file=%S)", pid, pids_file);
         }
 

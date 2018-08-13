@@ -74,7 +74,7 @@ SL2Response sl2_conn_request_replay(sl2_conn *conn, uint32_t mut_count, size_t b
 // Requests information about a run's crash from the SL2 server.
 // Stores crash information within a `sl2_crash_paths` structure.
 SL2_EXPORT
-SL2Response sl2_conn_request_crash_paths(sl2_conn *conn, sl2_crash_paths *paths);
+SL2Response sl2_conn_request_crash_paths(sl2_conn *conn, uint64_t pid, sl2_crash_paths *paths);
 
 // Requests a coverage arena from the SL2 server.
 // `arena` is a pointer to an allocated (but potentially uninitialized) `sl2_arena`.
@@ -96,6 +96,6 @@ SL2Response sl2_conn_ping(sl2_conn *conn, uint8_t *ok);
 // `tracing` indicates whether the `pid` belongs to a tracer process (true) or a fuzzer
 // process (false).
 SL2_EXPORT
-SL2Response sl2_conn_register_pid(sl2_conn *conn, uint32_t pid, bool tracing);
+SL2Response sl2_conn_register_pid(sl2_conn *conn, uint64_t pid, bool tracing);
 
 #endif

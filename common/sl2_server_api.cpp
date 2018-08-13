@@ -175,7 +175,7 @@ SL2Response sl2_conn_request_replay(
 }
 
 SL2_EXPORT
-SL2Response sl2_conn_request_crash_paths(sl2_conn *conn, sl2_crash_paths *paths)
+SL2Response sl2_conn_request_crash_paths(sl2_conn *conn, uint64_t pid, sl2_crash_paths *paths)
 {
     DWORD txsize;
 
@@ -189,6 +189,9 @@ SL2Response sl2_conn_request_crash_paths(sl2_conn *conn, sl2_crash_paths *paths)
 
     // Then, tell the server which run we're requesting crash paths for.
     SL2_CONN_WRITE(&(conn->run_id), sizeof(conn->run_id));
+
+    // Then, tell the server which process is crashing (so that we get unique crash paths).
+    SL2_CONN_WRITE(&pid, sizeof(pid));
 
     // Finally, read the actual crash paths from the server.
     sl2_conn_read_prefixed_string(conn, paths->crash_path, MAX_PATH);
@@ -256,7 +259,7 @@ SL2Response sl2_conn_ping(sl2_conn *conn, uint8_t *ok)
 }
 
 SL2_EXPORT
-SL2Response sl2_conn_register_pid(sl2_conn *conn, uint32_t pid, bool tracing)
+SL2Response sl2_conn_register_pid(sl2_conn *conn, uint64_t pid, bool tracing)
 {
     DWORD txsize;
 

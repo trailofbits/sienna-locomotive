@@ -37,6 +37,7 @@ XploitabilityTracer::XploitabilityTracer(
 XploitabilityResult XploitabilityTracer::process() {
     XploitabilityResult ret(name());
 
+
     // If we can't open the crash.json file, we return XPLOITABILITY_NONE
     uint32_t score  = 0;
     try {
