@@ -1507,8 +1507,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     // NOTE(ww): I haven't seen these in the wild, but WinAFL wraps
     // VerifierStopMessage and VerifierStopMessageEx is probably
     // just a newer version of the former.
-    if (STREQ(mod_name, "VERIFIER.DLL"))
-    {
+    if (STREQ(mod_name, "VERIFIER.DLL")) {
         SL2_DR_DEBUG("loading Application Verifier mitigations\n");
 
         towrap = (app_pc) dr_get_proc_address(mod->handle, "VerifierStopMessage");
@@ -1517,6 +1516,13 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
         towrap = (app_pc) dr_get_proc_address(mod->handle, "VerifierStopMessageEx");
         drwrap_wrap(towrap, wrap_pre_VerifierStopMessage, NULL);
     }
+
+    // TODO(ww): Wrap DllDebugObjectRpcHook.
+    if (STREQ(mod_name, "OLE32.DLL")) {
+        SL2_DR_DEBUG("OLE32.DLL loaded, but we don't have an DllDebugObjectRpcHook mitigation yet!\n");
+    }
+
+    // TODO(ww): Wrap and mitigate whatever functions WER uses.
 
     /* assume our target executable is an exe */
     if (strstr(mod_name, ".exe") != NULL) {
