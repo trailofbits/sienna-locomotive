@@ -117,7 +117,27 @@ def sanity_checks():
             # OSError means the key doesn't exist, which is what we want.
             pass
         except Exception as e:
-            print_l("[+] Unexpected exception:", e)
+            print_l("[+] Unexpected exception during sanity checks:", e)
+
+    try:
+        reg = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
+        key = winreg.OpenKey(reg, "SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting", 0, (winreg.KEY_WOW64_64KEY + winreg.KEY_READ))
+        disabled = winreg.QueryValueEx(key, "Disabled")[0]
+
+        if disabled != 1:
+            print_l("[+] Fatal: Cowardly refusing to run with WER enabled.")
+            print_l("[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue.")
+            sys.exit()
+
+        winreg.CloseKey(key)
+    except OSError as e:
+        # OSError here means that we *haven't* disabled WER, which is a problem.
+        print_l("[+] Fatal: Cowardly refusing to run with WER enabled.")
+        print_l("[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue.")
+        sys.exit()
+        pass
+    except Exception as e:
+        print_l("[+] Unexpected exception during sanity checks:", e)
 
 
 def main():
