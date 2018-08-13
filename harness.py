@@ -62,6 +62,10 @@ def select_from_range(max_range, message):
 
 
 def select_and_dump_wizard_findings(wizard_findings, target_file):
+    if len(wizard_findings) == 0:
+        print_l("[!] No wizard findings!")
+        return wizard_findings
+
     """ Print and select findings, then write to disk """
     print_l("Functions found:")
     for i, finding in enumerate(wizard_findings):
