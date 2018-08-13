@@ -116,6 +116,7 @@ static void write_fkt(wchar_t *target_file, uint32_t type, uint32_t mutation_typ
 
     HANDLE fkt = CreateFile(target_file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
+    // TODO(ww): These fatals should be errors.
     if (fkt == INVALID_HANDLE_VALUE) {
         SL2_SERVER_LOG_FATAL("write_fkt: failed to create FTK: %S", target_file);
     }
