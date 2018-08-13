@@ -198,7 +198,7 @@ parser.add_argument(
     action='store',
     dest='stage',
     type=str,
-    choices=['WIZARD', 'FUZZER', 'TRIAGE'],
+    choices=['WIZARD', 'FUZZER', 'TRACER'],
     help="Synchronously re-run a single stage (for debugging purposes)")
 
 parser.add_argument(
