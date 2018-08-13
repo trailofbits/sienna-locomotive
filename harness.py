@@ -10,6 +10,8 @@ import concurrent.futures
 import msgpack
 import atexit
 import signal
+import winreg
+import sys
 
 import harness.config
 import harness.statz
@@ -93,7 +95,34 @@ def hexdump(buffer, lines=4, line_len=16):
         print_l("%08X:  %s  | %s" % (address, hexstr + " "*(line_len*3 - len(hexstr)), asciistr))
 
 
+def sanity_checks():
+    """
+    Make sure the system is in a state that's nominally ready for fuzzing.
+    Exits loudly if a check fails.
+    """
+    bad_keys = [
+        'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\DebugObjectRPCEnabled',
+        'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AeDebug\\Auto',
+    ]
+
+    for bad_key in bad_keys:
+        try:
+            reg = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
+            key = reg.OpenKey(reg, bad_key)
+            reg.CloseKey(key)
+
+            print_l("[+] Fatal: Found a registry key that will interfere with fuzzing/triaging:", bad_key)
+            sys.exit()
+        except OSError:
+            # OSError means the key doesn't exist, which is what we want.
+            pass
+        except Exception as e:
+            print_l("[+] Unexpected exception:", e)
+
+
 def main():
+    sanity_checks()
+
     config = harness.config.config
 
     start_server()
