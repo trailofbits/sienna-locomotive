@@ -108,7 +108,7 @@ def sanity_checks():
     for bad_key in bad_keys:
         try:
             reg = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
-            key = reg.OpenKey(reg, bad_key)
+            key = winreg.OpenKey(reg, bad_key)
             reg.CloseKey(key)
 
             print_l("[+] Fatal: Found a registry key that will interfere with fuzzing/triaging:", bad_key)
