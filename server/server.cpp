@@ -535,7 +535,7 @@ static void handle_crash_paths(HANDLE pipe)
     StringCchPrintfW(target_file, MAX_PATH, FUZZ_RUN_CRASH_JSON_FMT, pid);
     PathCchCombine(target_path, MAX_PATH, run_dir, target_file);
 
-    size_t size = lstrlen(target_path) * sizeof(wchar_t);
+    size_t size = wcsnlen_s(target_path, MAX_PATH + 1) * sizeof(wchar_t);
 
     if (!WriteFile(pipe, &size, sizeof(size), &txsize, NULL)) {
         SL2_SERVER_LOG_FATAL("failed to write length of crash.json to pipe");
@@ -550,7 +550,7 @@ static void handle_crash_paths(HANDLE pipe)
     StringCchPrintfW(target_file, MAX_PATH, FUZZ_RUN_MEM_DMP_FMT, pid);
     PathCchCombine(target_path, MAX_PATH, run_dir, target_file);
 
-    size = lstrlen(target_path) * sizeof(wchar_t);
+    size = wcsnlen_s(target_path, MAX_PATH + 1) * sizeof(wchar_t);
 
     if (!WriteFile(pipe, &size, sizeof(size), &txsize, NULL)) {
         SL2_SERVER_LOG_FATAL("failed to write length of mem.dmp path to pipe");
@@ -565,7 +565,7 @@ static void handle_crash_paths(HANDLE pipe)
     StringCchPrintfW(target_file, MAX_PATH, FUZZ_RUN_INITIAL_DMP_FMT, pid);
     PathCchCombine(target_path, MAX_PATH, run_dir, target_file);
 
-    size = lstrlen(target_path) * sizeof(wchar_t);
+    size = wcsnlen_s(target_path, MAX_PATH + 1) * sizeof(wchar_t);
 
     if (!WriteFile(pipe, &size, sizeof(size), &txsize, NULL)) {
         SL2_SERVER_LOG_FATAL("failed to write length of initial.dmp path to pipe");
@@ -641,7 +641,7 @@ static void handle_register_pid(HANDLE pipe)
         NULL);
 
     if (file != INVALID_HANDLE_VALUE) {
-        if (!WriteFile(file, pid_s, lstrlen(pid_s) * sizeof(wchar_t), &txsize, NULL)) {
+        if (!WriteFile(file, pid_s, wcsnlen_s(pid_s, sizeof(pid_s)) * sizeof(wchar_t), &txsize, NULL)) {
             SL2_SERVER_LOG_ERROR("failed to write pid (pid=%lu, pids_file=%S)", pid, pids_file);
         }
 
