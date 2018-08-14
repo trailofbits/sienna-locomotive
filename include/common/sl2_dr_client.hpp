@@ -108,13 +108,14 @@ typedef struct targetFunction {
 
 // Information for read in fuzzer and tracer clients
 struct client_read_info {
-    uint64_t    position;
-    uint64_t    retAddrOffset;
+    size_t      position;
+    size_t      retAddrOffset;
     Function    function;
     HANDLE      hFile;
     DWORD       *lpNumberOfBytesRead;
     void        *lpBuffer;
-    char        *argHash;
+    char        *argHash;  // TODO(ww): Make this a wchar_t * for consistency.
+    wchar_t     *source;
     size_t      nNumberOfBytesToRead;
 };
 

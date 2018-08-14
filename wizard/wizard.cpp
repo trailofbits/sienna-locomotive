@@ -25,19 +25,6 @@
 #include "vendor/picosha2.h"
 using namespace std;
 
-// function metadata structure
-struct wizard_read_info {
-    void *lpBuffer;
-    size_t nNumberOfBytesToRead;
-    LPDWORD lpNumberOfBytesRead;
-    Function function;
-    wchar_t *source;
-    size_t position;
-    size_t retAddrOffset;
-    // TODO(ww): Make this a wchar_t * for consistency.
-    char *argHash;
-};
-
 static size_t baseAddr;
 static std::map<Function, uint64_t, std::less<Function>, sl2_dr_allocator<std::pair<const Function, uint64_t>>> call_counts;
 
@@ -80,8 +67,8 @@ Below we have a number of functions that instrument metadata retrieval for the i
 static void
 wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
 {
-    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
-    wizard_read_info *info = (wizard_read_info *) *user_data;
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     HANDLE hEventLog                 = (HANDLE) drwrap_get_arg(wrapcxt, 0);
     #pragma warning(suppress: 4311 4302)
@@ -126,8 +113,8 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
     // get registry key path (maybe hook open key?)
 
     if (lpData != NULL && lpcbData != NULL) {
-        *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
-        wizard_read_info *info = (wizard_read_info *) *user_data;
+        *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+        client_read_info *info = (client_read_info *) *user_data;
 
         info->lpBuffer             = lpData;
         info->nNumberOfBytesToRead = *lpcbData;
@@ -152,8 +139,8 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
 {
-    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
-    wizard_read_info *info = (wizard_read_info *) *user_data;
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     HINTERNET hRequest                          = (HINTERNET) drwrap_get_arg(wrapcxt, 0);
     void *pvBuffer                              = drwrap_get_arg(wrapcxt, 1);
@@ -185,8 +172,8 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
 {
-    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
-    wizard_read_info *info = (wizard_read_info *) *user_data;
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     HINTERNET hFile            = (HINTERNET) drwrap_get_arg(wrapcxt, 0);
     void *lpBuffer             = drwrap_get_arg(wrapcxt, 1);
@@ -217,8 +204,8 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
 {
-    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
-    wizard_read_info *info = (wizard_read_info *) *user_data;
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     HINTERNET hRequest         = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
     void *lpBuffer             = drwrap_get_arg(wrapcxt, 1);
@@ -249,8 +236,8 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_recv(void *wrapcxt, OUT void **user_data)
 {
-    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
-    wizard_read_info *info = (wizard_read_info *) *user_data;
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     SOCKET s  = (SOCKET)drwrap_get_arg(wrapcxt, 0);
     char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
@@ -306,8 +293,8 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     fStruct.position = position.QuadPart;
     fStruct.readSize = nNumberOfBytesToRead;
 
-    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
-    wizard_read_info *info = (wizard_read_info *) *user_data;
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
@@ -326,8 +313,8 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_fread(void *wrapcxt, OUT void **user_data)
 {
-    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
-    wizard_read_info *info = (wizard_read_info *) *user_data;
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 1);
@@ -357,8 +344,8 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
 {
-    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
-    wizard_read_info *info = (wizard_read_info *) *user_data;
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
     size_t bufsize = (size_t)drwrap_get_arg(wrapcxt, 1);
@@ -394,8 +381,8 @@ wrap_pre__read(void *wrapcxt, OUT void **user_data)
     #pragma warning(suppress: 4311 4302)
     unsigned int count = (unsigned int) drwrap_get_arg(wrapcxt, 2);
 
-    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
-    wizard_read_info *info = (wizard_read_info *) *user_data;
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
 
     info->lpBuffer             = buffer;
     info->nNumberOfBytesToRead = count;
@@ -434,7 +421,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 
     wstring_convert<std::codecvt_utf8<wchar_t>> utf8Converter;
 
-    wizard_read_info *info   = ((wizard_read_info *)user_data);
+    client_read_info *info   = ((client_read_info *)user_data);
     const char *func_name = function_to_string(info->function);
 
     json j;
@@ -482,7 +469,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
         dr_thread_free(drcontext, info->argHash, SL2_HASH_LEN + 1);
     }
 
-    dr_thread_free(drcontext, info, sizeof(wizard_read_info));
+    dr_thread_free(drcontext, info, sizeof(client_read_info));
 }
 
 /* Runs every time we load a new module. Wraps functions we can target. See fuzzer.cpp for a more-detailed version */
