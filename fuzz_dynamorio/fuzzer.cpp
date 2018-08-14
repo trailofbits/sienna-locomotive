@@ -209,10 +209,9 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
     };
 
     if (coverage_guided) {
-        // sl2_mutation_advice advice;
-        // sl2_conn_advise_mutation(&sl2_conn, &arena, &advice);
-        // mutate_buffer_arena(mutation.buffer, mutation.bufsize, &advice);
-        do_mutation(&mutation);
+        sl2_mutation_advice advice;
+        sl2_conn_advise_mutation(&sl2_conn, &arena, &advice);
+        do_mutation_custom(&mutation, advice.strategy);
     }
     else {
         do_mutation(&mutation);

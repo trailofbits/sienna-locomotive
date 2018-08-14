@@ -2,6 +2,7 @@
 #define SL2_SERVER_API
 
 #include "common/util.h"
+#include "common/mutation.hpp"
 #include "server.hpp"
 #include <Rpc.h>
 
@@ -32,6 +33,8 @@ enum class SL2Response {
     MissingArenaID,
     // We sent a request to the server, and the server failed to fulfill it.
     ServerError,
+    // We sent a request to the server, and got a bad/nonsensical response back.
+    BadValue,
 };
 
 // A structure representing an active connection between a
@@ -40,6 +43,13 @@ struct sl2_conn {
     HANDLE pipe;
     UUID run_id;
     bool has_run_id;
+};
+
+// Represents the advice given to a fuzzer by the server, for coverage
+// guided fuzzing.
+struct sl2_mutation_advice {
+    sl2_strategy_t strategy;
+    uint32_t table_idx;
 };
 
 // Opens a new connection to the SL2 server.
@@ -100,5 +110,10 @@ SL2Response sl2_conn_ping(sl2_conn *conn, uint8_t *ok);
 // process (false).
 SL2_EXPORT
 SL2Response sl2_conn_register_pid(sl2_conn *conn, uint64_t pid, bool tracing);
+
+// Requests advice about mutation strategies from the server, based on previous
+// code coverage statistics.
+SL2_EXPORT
+SL2Response sl2_conn_advise_mutation(sl2_conn *conn, sl2_arena *arena, sl2_mutation_advice *advice);
 
 #endif
