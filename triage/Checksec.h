@@ -4,6 +4,8 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include "vendor/json.hpp"
+using json = nlohmann::json;
 
 
 using namespace std;
@@ -28,12 +30,15 @@ public:
 
 
 
+    json toJson() const;
+
     const bool isDynamicBase()      const;
     const bool isForceIntegrity()   const;
     const bool isNX()               const;
     const bool isIsolation()        const;
     const bool isSEH()              const;
 
+    operator json() const;
     friend ostream& operator<<( ostream& os, Checksec& );
 
 

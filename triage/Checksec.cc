@@ -5,6 +5,9 @@
 
 using namespace std;
 
+#include "vendor/json.hpp"
+using json = nlohmann::json;
+
 namespace sl2 {
 
 void Checksec::process() {
@@ -40,6 +43,22 @@ void Checksec::process() {
 
 }
 
+
+json Checksec::toJson()     const  {
+    return this->operator json();
+}
+
+Checksec::operator json() const {
+    return json {
+        { "dynamicBase",    isDynamicBase() },
+        { "forceIntegrity", isForceIntegrity() },
+        { "isolation",      isIsolation() },
+        { "nx",             isNX() },
+        { "seh",            isSEH() },
+        { "crashReason",    filepath_ },
+    };
+}
+
 const bool Checksec::isDynamicBase()      const  {
     return dllCharacteristics_ & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE;
 }
@@ -60,10 +79,11 @@ const bool Checksec::isSEH()              const {
 
 
 ostream& operator<<( ostream& os, Checksec& self ) {
-    os << "Dyanmic Base   : " << self.isDynamicBase() << endl;
+    //json j = self.operator json();
+    os << "Dyanmic Base  -: " <<  self.isDynamicBase() << endl;
     os << "Force Integrity: " << self.isForceIntegrity() << endl;
-    os << "NX             : " << self.isNX() << endl;
     os << "Isolation      : " << self.isIsolation() << endl;
+    os << "NX             : " << self.isNX() << endl;
     os << "SEH            : " << self.isSEH() << endl;
     return os;
 }
