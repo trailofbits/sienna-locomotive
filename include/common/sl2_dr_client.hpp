@@ -90,6 +90,7 @@ enum {
 // See `MATCH_ARG_HASH`.
 struct fileArgHash {
   wchar_t fileName[MAX_PATH + 1];
+  size_t count;
   size_t position;
   size_t readSize;
 };

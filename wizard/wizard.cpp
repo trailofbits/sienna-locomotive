@@ -70,12 +70,22 @@ on_dr_exit(void)
     drmgr_exit();
 }
 
+static void
+hash_args(char * argHash, fileArgHash * fStruct){
+    std::vector<unsigned char> blob_vec((unsigned char *) fStruct,
+        ((unsigned char *) fStruct) + sizeof(fileArgHash));
+    std::string hash_str;
+    picosha2::hash256_hex_string(blob_vec, hash_str);
+    argHash[SL2_HASH_LEN] = 0;
+    memcpy((void *) argHash, hash_str.c_str(), SL2_HASH_LEN);
+}
+
 /*
-Below we have a number of functions that instrument metadata retreival for the individual functions we can hook.
+Below we have a number of functions that instrument metadata retrieval for the individual functions we can hook.
 */
 
 // TODO: hook functions that open the handles for these
-//       so we can track the names of the resources geing read
+//       so we can track the names of the resources getting read
 
 static void
 wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
@@ -100,7 +110,16 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
     info->source               = NULL;
     info->position             = NULL;
     info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+
+    fileArgHash fStruct = {0};
+
+    GetFinalPathNameByHandle(hEventLog, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
+    fStruct.position = dwRecordOffset;
+    fStruct.readSize = nNumberOfBytesToRead;
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
+
 }
 
 
@@ -123,10 +142,17 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
         info->lpBuffer             = lpData;
         info->nNumberOfBytesToRead = *lpcbData;
         info->function             = Function::RegQueryValueEx;
-        info->source               = NULL;
+        mbstowcs(info->source, lpValueName, MAX_PATH);
         info->position             = NULL;
         info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-        info->argHash              = NULL;
+
+        fileArgHash fStruct = {0};
+
+        mbstowcs(fStruct.fileName, lpValueName, MAX_PATH);
+        fStruct.readSize = *lpcbData;
+
+        info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+        hash_args(info->argHash, &fStruct);
     }
     else {
         *user_data = NULL;
@@ -156,7 +182,14 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
     info->source               = NULL;
     info->position             = NULL;
     info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+
+    fileArgHash fStruct = {0};
+
+//    fStruct.fileName[0] = (wchar_t) s;
+    fStruct.readSize = dwBufferLength;
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
 }
 
 static void
@@ -181,7 +214,14 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
     info->source               = NULL;
     info->position             = NULL;
     info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+
+    fileArgHash fStruct = {0};
+
+//    fStruct.fileName[0] = (wchar_t) s;
+    fStruct.readSize = nNumberOfBytesToRead;
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
 }
 
 static void
@@ -206,7 +246,14 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
     info->source               = NULL;
     info->position             = NULL;
     info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+
+    fileArgHash fStruct = {0};
+
+//    fStruct.fileName[0] = (wchar_t) s;
+    fStruct.readSize = nNumberOfBytesToRead;
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
 }
 
 static void
@@ -231,7 +278,14 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data)
     info->source               = NULL;
     info->position             = NULL;
     info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+
+    fileArgHash fStruct = {0};
+
+    fStruct.fileName[0] = (wchar_t) s;
+    fStruct.readSize = len;
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
 
     // get peer name doesn't work
     // https://github.com/DynamoRIO/dynamorio/issues/1883
@@ -262,11 +316,6 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     fStruct.position = position.QuadPart;
     fStruct.readSize = nNumberOfBytesToRead;
 
-    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct,
-        ((unsigned char *) &fStruct) + sizeof(fileArgHash));
-    std::string hash_str;
-    picosha2::hash256_hex_string(blob_vec, hash_str);
-
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(wizard_read_info));
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
@@ -281,8 +330,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     memcpy(info->source, fStruct.fileName, sizeof(fStruct.fileName));
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    info->argHash[SL2_HASH_LEN] = 0;
-    memcpy(info->argHash, hash_str.c_str(), SL2_HASH_LEN);
+    hash_args(info->argHash, &fStruct);
 }
 
 static void
@@ -309,16 +357,11 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data)
     fStruct.fileName[0] = (wchar_t) _fileno(fpointer);
 
 //    fStruct.position = ftell(fpointer);  // This instantly crashes DynamoRIO
-    fStruct.position = size; // Field names don't actually matter
-    fStruct.readSize = count;
+    fStruct.readSize = size;
+    fStruct.count = count;
 
-    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct,
-        ((unsigned char *) &fStruct) + sizeof(fileArgHash));
-    std::string hash_str;
-    picosha2::hash256_hex_string(blob_vec, hash_str);
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    info->argHash[SL2_HASH_LEN] = 0;
-    memcpy(info->argHash, hash_str.c_str(), SL2_HASH_LEN);
+    hash_args(info->argHash, &fStruct);
 }
 
 static void
@@ -328,6 +371,7 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
     wizard_read_info *info = (wizard_read_info *) *user_data;
 
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
+    size_t bufsize = (size_t)drwrap_get_arg(wrapcxt, 1);
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 2);
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 3);
     FILE * fpointer = (FILE *)drwrap_get_arg(wrapcxt, 4);
@@ -343,16 +387,12 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
 
     fStruct.fileName[0] = (wchar_t) _fileno(fpointer);
 
-    fStruct.position = size; // Field names don't actually matter
-    fStruct.readSize = count;
+    fStruct.position = bufsize;  // Field names don't actually matter
+    fStruct.readSize = size;
+    fStruct.count = count;
 
-    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct,
-        ((unsigned char *) &fStruct) + sizeof(fileArgHash));
-    std::string hash_str;
-    picosha2::hash256_hex_string(blob_vec, hash_str);
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    info->argHash[SL2_HASH_LEN] = 0;
-    memcpy(info->argHash, hash_str.c_str(), SL2_HASH_LEN);
+    hash_args(info->argHash, &fStruct);
 }
 
 static void
@@ -377,15 +417,10 @@ wrap_pre__read(void *wrapcxt, OUT void **user_data)
     fileArgHash fStruct = {0};
 
     fStruct.fileName[0] = (wchar_t) fd;
-    fStruct.readSize = count;
+    fStruct.count= count;
 
-    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct,
-        ((unsigned char *) &fStruct) + sizeof(fileArgHash));
-    std::string hash_str;
-    picosha2::hash256_hex_string(blob_vec, hash_str);
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    info->argHash[SL2_HASH_LEN] = 0;
-    memcpy(info->argHash, hash_str.c_str(), SL2_HASH_LEN);
+    hash_args(info->argHash, &fStruct);
 }
 
 /* prints information about the function call to stderr so the harness can ingest it */
@@ -437,6 +472,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
 
     if (info->function == Function::_read){
+        #pragma warning(suppress: 4311 4302)
         nNumberOfBytesToRead = min(nNumberOfBytesToRead, (int) drwrap_get_retval(wrapcxt));
     }
 
