@@ -1379,7 +1379,6 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
 
     fileArgHash fStruct = {0};
 
-    SL2_DR_DEBUG("1\n");
     fStruct.fileName[0] = (wchar_t) _fileno(file);
 
     fStruct.position = bufsize;  // Field names don't actually matter
@@ -1399,7 +1398,6 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data)
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 1);
     #pragma warning(suppress: 4311 4302)
     size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
-    FILE *file   = (FILE *)drwrap_get_arg(wrapcxt, 4);
 
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
