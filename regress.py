@@ -127,9 +127,11 @@ class TestWizard(unittest.TestCase):
 
 def main():
 
+    global DEBUG
     if len(sys.argv)==1:
         clazz = TestWizard
     else:
+        DEBUG=True
         clazz = getattr(sys.modules[__name__], sys.argv[1] )
 
     print("clazz", clazz)

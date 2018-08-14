@@ -170,12 +170,15 @@ def triager_run(run_id):
         print_l("[!] No initial minidumps to triage!")
         return None
 
+    ret = []
     for dmpfile in dmpfiles:
         cmd = [config.config['triager_path'], dmpfile]
         out = subprocess.check_output(cmd, shell=False)
+        ret.append(out)
         if config.config["verbose"]:
             print_l(repr(out))
-        yield out
+
+    return ret
 
 
 def wizard_run(config_dict):
