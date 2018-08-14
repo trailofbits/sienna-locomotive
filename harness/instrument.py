@@ -264,18 +264,16 @@ def fuzzer_run(config_dict):
             if config_dict['verbose']:
                 print_l("[!] Not UTF-8:", repr(line))
 
-    write_output_files(run, run_id, 'fuzz')
-
     if crashed:
         print_l('Fuzzing run %s returned %s after raising %s'
                 % (run_id, run.process.returncode, exception))
+        write_output_files(run, run_id, 'fuzz')
+    elif config_dict['preserve_runs']:
+        print_l('Preserving run %s without a crash (requested)' % run_id)
+        write_output_files(run, run_id, 'fuzz')
     else:
         if config_dict['verbose']:
             print_l("Run %s did not find a crash" % run_id)
-
-        if config_dict['preserve_runs']:
-            print_l('Preserving run %s without a crash (requested)' % run_id)
-        else:
             shutil.rmtree(os.path.join(config.sl2_runs_dir, str(run_id)), ignore_errors=True)
 
     return crashed, run_id
