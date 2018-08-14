@@ -143,10 +143,10 @@ SL2Response sl2_conn_register_mutation(sl2_conn *conn, sl2_mutation *mutation)
     SL2_CONN_READ(&status, sizeof(status));
 
     if (!status) {
-        return SL2Response::ServerError;
+        return SL2Response::OK;
     }
     else {
-        return SL2Response::OK;
+        return SL2Response::ServerError;
     }
 }
 
