@@ -1,5 +1,5 @@
 from PySide2.QtCore import QThread, Signal, Qt
-from .instrument import wizard_run, fuzzer_run, triage_run, start_server
+from .instrument import wizard_run, fuzzer_run, tracer_run, start_server
 
 
 class WizardThread(QThread):
@@ -51,7 +51,7 @@ class FuzzerThread(QThread):
                 if self.config_dict['exit_early']:
                     self.pause()
 
-                formatted, raw = triage_run(self.config_dict, run_id)
+                formatted, raw = tracer_run(self.config_dict, run_id)
                 self.foundCrash.emit(self, formatted, raw)
 
             if not self.config_dict['continuous']:

@@ -108,8 +108,9 @@ static void init_working_paths()
 }
 
 /* Writes the fkt file in the event we found a crash. Stores information about the mutation that caused it */
-static void write_fkt(wchar_t *target_file, uint32_t type, uint32_t mutation_type, size_t resource_size, wchar_t *resource_path, size_t position, size_t size, uint8_t* buf)
+static uint8_t write_fkt(wchar_t *target_file, uint32_t type, uint32_t mutation_type, size_t resource_size, wchar_t *resource_path, size_t position, size_t size, uint8_t* buf)
 {
+    uint8_t rc = 0;
     DWORD txsize;
 
     EnterCriticalSection(&fkt_lock);
@@ -117,46 +118,69 @@ static void write_fkt(wchar_t *target_file, uint32_t type, uint32_t mutation_typ
     HANDLE fkt = CreateFile(target_file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
     if (fkt == INVALID_HANDLE_VALUE) {
-        SL2_SERVER_LOG_FATAL("write_fkt: failed to create FTK: %S", target_file);
+        SL2_SERVER_LOG_ERROR("failed to create FTK: %S", target_file);
+        rc = 1;
+        goto cleanup;
     }
 
     if (!WriteFile(fkt, "FKT\0", 4, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("write_fkt: failed to write FKT header");
+        SL2_SERVER_LOG_ERROR("failed to write FKT header");
+        rc = 1;
+        goto cleanup;
     }
 
     if (!WriteFile(fkt, &type, sizeof(type), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("write_fkt: failed to write type");
+        SL2_SERVER_LOG_ERROR("failed to write type");
+        rc = 1;
+        goto cleanup;
     }
 
     if (!WriteFile(fkt, &mutation_type, sizeof(mutation_type), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("write_fkt: failed to write mutation type");
+        SL2_SERVER_LOG_ERROR("failed to write mutation type");
+        rc = 1;
+        goto cleanup;
     }
 
     if (!WriteFile(fkt, &resource_size, sizeof(resource_size), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("write_fkt: failed to write path size");
+        SL2_SERVER_LOG_ERROR("failed to write path size");
+        rc = 1;
+        goto cleanup;
     }
 
     if (!WriteFile(fkt, resource_path, (DWORD) (resource_size * sizeof(wchar_t)), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("write_fkt: failed to write path");
+        SL2_SERVER_LOG_ERROR("failed to write path");
+        rc = 1;
+        goto cleanup;
     }
 
     if (!WriteFile(fkt, &position, sizeof(position), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("write_fkt: failed to write offset");
+        SL2_SERVER_LOG_ERROR("failed to write offset");
+        rc = 1;
+        goto cleanup;
     }
 
     if (!WriteFile(fkt, &size, sizeof(size_t), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("write_fkt: failed to write buffer size");
+        SL2_SERVER_LOG_ERROR("failed to write buffer size");
+        rc = 1;
+        goto cleanup;
     }
 
     if (!WriteFile(fkt, buf, (DWORD)size, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("write_fkt: failed to write buffer");
+        SL2_SERVER_LOG_ERROR("failed to write buffer");
+        rc = 1;
+        goto cleanup;
     }
 
     if (!CloseHandle(fkt)) {
-        SL2_SERVER_LOG_FATAL("write_fkt: failed to close FKT");
+        SL2_SERVER_LOG_ERROR("failed to close FKT");
+        rc = 1;
+        goto cleanup;
     }
 
+    cleanup:
+
     LeaveCriticalSection(&fkt_lock);
+    return rc;
 }
 
 /* Gets the mutated bytes stored in the FKT file for mutation replay */
@@ -282,6 +306,7 @@ static void handle_register_mutation(HANDLE pipe)
     DWORD txsize;
     UUID run_id;
     wchar_t *run_id_s;
+    uint8_t status = 0;
 
     SL2_SERVER_LOG_INFO("starting mutation registration");
 
@@ -368,10 +393,14 @@ static void handle_register_mutation(HANDLE pipe)
         PathCchCombine(run_dir, MAX_PATH, FUZZ_WORKING_PATH, run_id_s);
         PathCchCombine(target_file, MAX_PATH, run_dir, mutate_fname);
 
-        write_fkt(target_file, type, mutation_type, resource_size, resource_path, position, size, buf);
+        status = write_fkt(target_file, type, mutation_type, resource_size, resource_path, position, size, buf);
     }
     else {
         SL2_SERVER_LOG_WARN("got size=%lu, skipping registration", size);
+    }
+
+    if (!WriteFile(pipe, &status, sizeof(status), &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("failed to write server status");
     }
 
     RpcStringFree((RPC_WSTR *)&run_id_s);
@@ -502,10 +531,11 @@ static void handle_set_arena(HANDLE pipe)
     PathCchCombine(arena_path, MAX_PATH, FUZZ_ARENAS_PATH, arena.id);
 
     if (!ReadFile(pipe, arena.map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to read arena");
+        SL2_SERVER_LOG_ERROR("failed to read arena");
     }
-
-    dump_arena(arena_path, &arena);
+    else {
+        dump_arena(arena_path, &arena);
+    }
 }
 
 static void handle_crash_paths(HANDLE pipe)

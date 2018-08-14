@@ -274,18 +274,16 @@ def fuzzer_run(config_dict):
             if config_dict['verbose']:
                 print_l("[!] Not UTF-8:", repr(line))
 
-    write_output_files(run, run_id, 'fuzz')
-
     if crashed:
         print_l('Fuzzing run %s returned %s after raising %s'
                 % (run_id, run.process.returncode, exception))
+        write_output_files(run, run_id, 'fuzz')
+    elif config_dict['preserve_runs']:
+        print_l('Preserving run %s without a crash (requested)' % run_id)
+        write_output_files(run, run_id, 'fuzz')
     else:
         if config_dict['verbose']:
             print_l("Run %s did not find a crash" % run_id)
-
-        if config_dict['preserve_runs']:
-            print_l('Preserving run %s without a crash (requested)' % run_id)
-        else:
             shutil.rmtree(os.path.join(config.sl2_runs_dir, str(run_id)), ignore_errors=True)
 
     return crashed, run.run_id
@@ -294,7 +292,7 @@ def fuzzer_run(config_dict):
 # TODO(ww): Rename this to "tracer_run" or something similar,
 # and break the internal triager_run call into another method
 # (trace_and_triage, maybe?)
-def triage_run(config_dict, run_id):
+def tracer_run(config_dict, run_id):
     """ Runs the triaging tool """
     run = run_dr(
         {
@@ -319,10 +317,10 @@ def triage_run(config_dict, run_id):
     return formatted, raw
 
 
-def fuzz_and_triage(config_dict):
+def fuzz_and_trace(config_dict):
     """
     Runs the fuzzer (in a loop if continuous is true), then runs the triage
-    tools (DR and breakpad) if a crash is found.
+    tools (DR tracer and breakpad) if a crash is found.
     """
     global can_fuzz
     # TODO: Move try/except so we can start new runs after an exception
@@ -330,7 +328,7 @@ def fuzz_and_triage(config_dict):
         while can_fuzz:
             crashed, run_id = fuzzer_run(config_dict)
             if crashed:
-                formatted, _ = triage_run(config_dict, run_id)
+                formatted, _ = tracer_run(config_dict, run_id)
                 print_l(formatted)
 
                 if config_dict['exit_early']:

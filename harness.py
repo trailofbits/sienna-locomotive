@@ -27,9 +27,9 @@ from harness.instrument import (
     print_l,
     wizard_run,
     fuzzer_run,
-    triage_run,
+    tracer_run,
     start_server,
-    fuzz_and_triage,
+    fuzz_and_trace,
     kill
 )
 
@@ -62,6 +62,10 @@ def select_from_range(max_range, message):
 
 
 def select_and_dump_wizard_findings(wizard_findings, target_file):
+    if len(wizard_findings) == 0:
+        print_l("[!] No wizard findings!")
+        return wizard_findings
+
     """ Print and select findings, then write to disk """
     print_l("Functions found:")
     for i, finding in enumerate(wizard_findings):
@@ -108,7 +112,7 @@ def sanity_checks():
     for bad_key in bad_keys:
         try:
             reg = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
-            key = winreg.OpenKey(reg, bad_key)
+            key = winreg.OpenKey(reg, bad_key, 0, (winreg.KEY_WOW64_64KEY + winreg.KEY_READ))
             reg.CloseKey(key)
 
             print_l("[+] Fatal: Found a registry key that will interfere with fuzzing/triaging:", bad_key)
@@ -172,7 +176,7 @@ def main():
             fuzzer_run(config)
 
         # Parse the list of run ID's and select one to triage
-        if config['stage'] == 'TRIAGE':
+        if config['stage'] == 'TRACER':
             if 'run_id' in config:
                 run_id = config['run_id']
                 runs = get_runs(run_id)
@@ -190,8 +194,8 @@ def main():
             config['target_application_path'], config['target_args'] = runs[run_id]
             config['client_args'].append('-t')
             config['client_args'].append(target_file)
-            triageResults = triage_run(config, run_id[-36:])[0]
-            print(triageResults)
+            tracerResults = tracer_run(config, run_id[-36:])[0]
+            print(tracerResults)
 
     else:
         # Run the wizard to select a target function if we don't have one saved
@@ -205,7 +209,7 @@ def main():
         with concurrent.futures.ThreadPoolExecutor(max_workers=config['simultaneous']) as executor:
             # If we're in continuous mode, spawn as many futures as we can run simultaneously.
             # Otherwise, spawn as many as we want to run in total
-            fuzz_futures = [executor.submit(fuzz_and_triage, config)
+            fuzz_futures = [executor.submit(fuzz_and_trace, config)
                             for _ in range(config['runs'] if not config['continuous'] else config['simultaneous'])]
 
             # Wait for exit
