@@ -137,14 +137,16 @@ on_dr_exit(void)
         sl2_crash_paths crash_paths = {0};
         sl2_conn_request_crash_paths(&sl2_conn, dr_get_process_id(), &crash_paths);
 
-        HANDLE hDumpFile = CreateFile(crash_paths.initial_dump_path,
+        // NOTE(ww): `dr_open_file` et al. don't work here, presumably because we explicitly
+        // switch to the target app state to perform the actual minidump write.
+        HANDLE dump_file = CreateFile(crash_paths.initial_dump_path,
             GENERIC_WRITE,
             NULL, NULL,
             CREATE_ALWAYS,
             FILE_ATTRIBUTE_NORMAL,
             NULL);
 
-        if (hDumpFile == INVALID_HANDLE_VALUE) {
+        if (dump_file == INVALID_HANDLE_VALUE) {
             SL2_DR_DEBUG("fuzzer#on_dr_exit: could not open the initial dump file (0x%x)\n", GetLastError());
         }
 
@@ -165,14 +167,14 @@ on_dr_exit(void)
         MiniDumpWriteDump(
             GetCurrentProcess(),
             GetCurrentProcessId(),
-            hDumpFile,
+            dump_file,
             MiniDumpNormal,
             &mdump_info,
             NULL, NULL);
 
         dr_switch_to_dr_state(dr_get_current_drcontext());
 
-        CloseHandle(hDumpFile);
+        CloseHandle(dump_file);
     }
 
     if (coverage_guided) {
