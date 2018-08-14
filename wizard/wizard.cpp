@@ -142,13 +142,13 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
         info->lpBuffer             = lpData;
         info->nNumberOfBytesToRead = *lpcbData;
         info->function             = Function::RegQueryValueEx;
-        mbstowcs(info->source, lpValueName, MAX_PATH);
+        info->source               = NULL;
         info->position             = NULL;
         info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
         fileArgHash fStruct = {0};
 
-        mbstowcs(fStruct.fileName, lpValueName, MAX_PATH);
+//        mbstowcs_s(fStruct.fileName, , lpValueName, MAX_PATH);
         fStruct.readSize = *lpcbData;
 
         info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
