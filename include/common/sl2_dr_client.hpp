@@ -171,6 +171,9 @@ void from_json(const json& j, targetFunction& t);
 SL2_EXPORT
 const char *function_to_string(Function function);
 
+// Builds a hash from an fStruct
+void hash_args(char * argHash, fileArgHash * fStruct);
+
 // Returns a C-string corresponding to the given `exception_code`.
 SL2_EXPORT
 const char *exception_to_string(DWORD exception_code);

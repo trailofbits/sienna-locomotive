@@ -70,16 +70,6 @@ on_dr_exit(void)
     drmgr_exit();
 }
 
-static void
-hash_args(char * argHash, fileArgHash * fStruct){
-    std::vector<unsigned char> blob_vec((unsigned char *) fStruct,
-        ((unsigned char *) fStruct) + sizeof(fileArgHash));
-    std::string hash_str;
-    picosha2::hash256_hex_string(blob_vec, hash_str);
-    argHash[SL2_HASH_LEN] = 0;
-    memcpy((void *) argHash, hash_str.c_str(), SL2_HASH_LEN);
-}
-
 /*
 Below we have a number of functions that instrument metadata retrieval for the individual functions we can hook.
 */
