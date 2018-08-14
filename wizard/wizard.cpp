@@ -29,6 +29,7 @@ using namespace std;
 struct wizard_read_info {
     void *lpBuffer;
     size_t nNumberOfBytesToRead;
+    LPDWORD lpNumberOfBytesRead;
     Function function;
     wchar_t *source;
     size_t position;
@@ -168,13 +169,14 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
     void *lpBuffer             = drwrap_get_arg(wrapcxt, 1);
     #pragma warning(suppress: 4311 4302)
     DWORD nNumberOfBytesToRead = (DWORD) drwrap_get_arg(wrapcxt, 2);
-    DWORD *lpNumberOfBytesRead = (DWORD *) drwrap_get_arg(wrapcxt, 3);
+    LPDWORD lpNumberOfBytesRead = (LPDWORD) drwrap_get_arg(wrapcxt, 3);
 
     // get url
     // InternetQueryOption
 
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
+    info->lpNumberOfBytesRead  = lpNumberOfBytesRead;
     info->function             = Function::InternetReadFile;
     info->source               = NULL;
     info->position             = NULL;
@@ -192,13 +194,14 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
     void *lpBuffer             = drwrap_get_arg(wrapcxt, 1);
     #pragma warning(suppress: 4311 4302)
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
-    DWORD *lpNumberOfBytesRead = (DWORD*)drwrap_get_arg(wrapcxt, 3);
+    LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
 
     // get url
     // InternetQueryOption
 
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
+    info->lpNumberOfBytesRead  = lpNumberOfBytesRead;
     info->function             = Function::WinHttpReadData;
     info->source               = NULL;
     info->position             = NULL;
@@ -247,7 +250,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     void *lpBuffer             = drwrap_get_arg(wrapcxt, 1);
     #pragma warning(suppress: 4311 4302)
     DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
-    DWORD *lpNumberOfBytesRead = (DWORD *)drwrap_get_arg(wrapcxt, 3);
+    LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
 
     LARGE_INTEGER offset = {0};
     LARGE_INTEGER position = {0};
@@ -272,6 +275,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     info->function             = Function::ReadFile;
     info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->position             = fStruct.position;
+    info->lpNumberOfBytesRead = lpNumberOfBytesRead;
 
     info->source = (wchar_t *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(fStruct.fileName));
     memcpy(info->source, fStruct.fileName, sizeof(fStruct.fileName));
@@ -434,6 +438,10 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 
     if (info->function == Function::_read){
         nNumberOfBytesToRead = min(nNumberOfBytesToRead, (int) drwrap_get_retval(wrapcxt));
+    }
+
+    if ((long long) info->lpNumberOfBytesRead & 0xffffffff){
+        nNumberOfBytesToRead = min(nNumberOfBytesToRead, (int) *(info->lpNumberOfBytesRead));
     }
 
     vector<unsigned char> x(lpBuffer, lpBuffer + min(nNumberOfBytesToRead, 64));
