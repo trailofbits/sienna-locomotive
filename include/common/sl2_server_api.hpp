@@ -29,6 +29,8 @@ enum class SL2Response {
     AlreadyHasRunID,
     // We tried to perform an action on the server without an arena ID.
     MissingArenaID,
+    // We sent a request to the server, and the server failed to fulfill it.
+    ServerError,
 };
 
 // A structure representing an active connection between a

@@ -114,6 +114,7 @@ SL2Response sl2_conn_assign_run_id(sl2_conn *conn, UUID run_id)
 SL2_EXPORT
 SL2Response sl2_conn_register_mutation(sl2_conn *conn, sl2_mutation *mutation)
 {
+    uint8_t status;
     DWORD txsize;
 
     if (!conn->has_run_id) {
@@ -139,7 +140,14 @@ SL2Response sl2_conn_register_mutation(sl2_conn *conn, sl2_mutation *mutation)
         SL2_CONN_WRITE(mutation->buffer, mutation->bufsize);
     }
 
-    return SL2Response::OK;
+    SL2_CONN_READ(&status, sizeof(status));
+
+    if (!status) {
+        return SL2Response::ServerError;
+    }
+    else {
+        return SL2Response::OK;
+    }
 }
 
 SL2_EXPORT
