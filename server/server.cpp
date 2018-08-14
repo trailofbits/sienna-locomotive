@@ -531,10 +531,11 @@ static void handle_set_arena(HANDLE pipe)
     PathCchCombine(arena_path, MAX_PATH, FUZZ_ARENAS_PATH, arena.id);
 
     if (!ReadFile(pipe, arena.map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to read arena");
+        SL2_SERVER_LOG_ERROR("failed to read arena");
     }
-
-    dump_arena(arena_path, &arena);
+    else {
+        dump_arena(arena_path, &arena);
+    }
 }
 
 static void handle_crash_paths(HANDLE pipe)
