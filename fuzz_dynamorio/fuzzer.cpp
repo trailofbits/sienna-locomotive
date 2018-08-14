@@ -349,7 +349,15 @@ wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
     info->lpNumberOfBytesRead  = pnBytesRead;
     info->position             = 0;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+
+    fileArgHash fStruct = {0};
+
+    GetFinalPathNameByHandle(hEventLog, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
+    fStruct.position = dwRecordOffset;
+    fStruct.readSize = nNumberOfBytesToRead;
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
 }
 
 
@@ -388,7 +396,14 @@ wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
         info->lpNumberOfBytesRead  = lpcbData;
         info->position             = 0;
         info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-        info->argHash              = NULL;
+
+        fileArgHash fStruct = {0};
+
+//        mbstowcs_s(fStruct.fileName, , lpValueName, MAX_PATH);
+        fStruct.readSize = *lpcbData;
+
+        info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+        hash_args(info->argHash, &fStruct);
     } else {
         *user_data = NULL;
     }
@@ -433,7 +448,14 @@ wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
     info->lpNumberOfBytesRead  = pdwBytesRead;
     info->position             = 0;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+
+    fileArgHash fStruct = {0};
+
+//    fStruct.fileName[0] = (wchar_t) s;
+    fStruct.readSize = dwBufferLength;
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
 }
 
 /*
@@ -470,7 +492,14 @@ wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
     info->lpNumberOfBytesRead  = lpNumberOfBytesRead;
     info->position             = 0;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+
+    fileArgHash fStruct = {0};
+
+//    fStruct.fileName[0] = (wchar_t) s;
+    fStruct.readSize = nNumberOfBytesToRead;
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
 }
 
 /*
@@ -507,7 +536,14 @@ wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
     info->lpNumberOfBytesRead  = lpNumberOfBytesRead;
     info->position             = 0;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+
+    fileArgHash fStruct = {0};
+
+//    fStruct.fileName[0] = (wchar_t) s;
+    fStruct.readSize = nNumberOfBytesToRead;
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
 }
 
 
@@ -542,7 +578,14 @@ wrap_pre_recv(void *wrapcxt, OUT void **user_data)
     info->lpNumberOfBytesRead  = NULL;
     info->position             = 0;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+
+    fileArgHash fStruct = {0};
+
+    fStruct.fileName[0] = (wchar_t) s;
+    fStruct.readSize = len;
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
 }
 
 /*
@@ -576,11 +619,6 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     fStruct.position = position.QuadPart;
     fStruct.readSize = nNumberOfBytesToRead;
 
-    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct,
-        ((unsigned char *) &fStruct) + sizeof(fileArgHash));
-    std::string hash_str;
-    picosha2::hash256_hex_string(blob_vec, hash_str);
-
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
 
@@ -593,8 +631,7 @@ wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    info->argHash[SL2_HASH_LEN] = 0;
-    memcpy(info->argHash, hash_str.c_str(), SL2_HASH_LEN);
+    hash_args(info->argHash, &fStruct);
 }
 
 static void
@@ -602,6 +639,7 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
 {
     SL2_DR_DEBUG("<in wrap_pre_fread_s>\n");
     void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
+    size_t bufsize = (size_t)drwrap_get_arg(wrapcxt, 1);
     #pragma warning(suppress: 4311 4302)
     size_t size  = (size_t)drwrap_get_arg(wrapcxt, 2);
     #pragma warning(suppress: 4311 4302)
@@ -619,7 +657,17 @@ wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
     info->nNumberOfBytesToRead = size * count;
     info->lpNumberOfBytesRead  = NULL;
     info->position             = NULL;
-    info->argHash              = NULL;
+
+    fileArgHash fStruct = {0};
+
+    fStruct.fileName[0] = (wchar_t) _fileno(file);
+
+    fStruct.position = bufsize;  // Field names don't actually matter
+    fStruct.readSize = size;
+    fStruct.count = count;
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
 }
 
 static void
@@ -646,7 +694,17 @@ wrap_pre_fread(void *wrapcxt, OUT void **user_data)
     info->lpNumberOfBytesRead  = NULL;
     info->position             = NULL;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+
+    fileArgHash fStruct = {0};
+
+    fStruct.fileName[0] = (wchar_t) _fileno(file);
+
+//    fStruct.position = ftell(fpointer);  // This instantly crashes DynamoRIO
+    fStruct.readSize = size;
+    fStruct.count = count;
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
 }
 
 static void
@@ -672,7 +730,14 @@ wrap_pre__read(void *wrapcxt, OUT void **user_data)
     info->lpNumberOfBytesRead  = NULL;
     info->position             = NULL;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+
+    fileArgHash fStruct = {0};
+
+    fStruct.fileName[0] = (wchar_t) fd;
+    fStruct.count= count;
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
 }
 
 
