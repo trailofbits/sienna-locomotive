@@ -52,10 +52,6 @@ static wchar_t FUZZ_LOG[MAX_PATH] = L"";
 static std::shared_mutex strategy_mutex;
 static std::map<std::wstring, strategy_state> strategy_map;
 
-// after set_arena, check if our coverage has improved
-// if so, repeat the current strategy
-// if not, randomly choose a new strategy
-
 static uint16_t coverage_count(sl2_arena *arena)
 {
     uint16_t count = 0;
