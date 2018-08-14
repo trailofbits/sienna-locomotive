@@ -3,18 +3,6 @@
 #include <set>
 #include <fstream>
 
-#include <Windows.h>
-#include <Dbghelp.h>
-#include <winhttp.h>
-#include <Rpc.h>
-
-#include "dr_api.h"
-#include "drmgr.h"
-#include "drreg.h"
-#include "drwrap.h"
-#include "dr_ir_instr.h"
-#include "droption.h"
-
 #include "vendor/picosha2.h"
 
 extern "C" {
@@ -26,6 +14,8 @@ extern "C" {
 #include "common/sl2_server_api.hpp"
 #include "common/sl2_dr_client.hpp"
 #include "common/sl2_dr_client_options.hpp"
+
+#include "dr_ir_instr.h"
 
 static SL2Client client;
 static sl2_conn sl2_conn;

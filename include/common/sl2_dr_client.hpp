@@ -1,10 +1,25 @@
 #ifndef SL2_DR_CLIENT_H
 #define SL2_DR_CLIENT_H
 
+#include <winsock2.h>
+#include <winhttp.h>
+#include <Windows.h>
+#include <Winternl.h>
+#include <Rpc.h>
+#include <io.h>
+#include <Dbghelp.h>
+
+
+#include "vendor/json.hpp"
+#include "dr_api.h"
+#include "drmgr.h"
+#include "drwrap.h"
+#include "droption.h"
+#include "drreg.h"
+
 #include <string>
 #include <fstream>
 
-#include "vendor/json.hpp"
 using namespace std;
 
 extern "C" {
@@ -153,10 +168,21 @@ public:
     // TODO(ww): Subsume sl2_conn under SL2Client.
     map<Function, uint64_t>     call_counts;
     json                        parsedJson;
+    uint64_t                    baseAddr;
 
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Methods
     bool        isFunctionTargeted(Function function,  client_read_info* info);
+    void        wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data);
+    void        wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data);
+    void        wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data);
+    void        wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data);
+    void        wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data);
+    void        wrap_pre_recv(void *wrapcxt, OUT void **user_data);
+    void        wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data);
+    void        wrap_pre_fread(void *wrapcxt, OUT void **user_data);
+    void        wrap_pre_fread_s(void *wrapcxt, OUT void **user_data);
+    void        wrap_pre__read(void *wrapcxt, OUT void **user_data);
     bool        areTargetsArenaCompatible();
     void        generateArenaId(wchar_t *id);
     bool        loadJson(string json);

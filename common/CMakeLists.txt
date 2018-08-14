@@ -9,4 +9,9 @@ endif(NOT DynamoRIO_FOUND)
 add_library(slcommon uuid.c sl2_dr_client.cpp sl2_server_api.cpp)
 configure_DynamoRIO_client(slcommon)
 
+use_DynamoRIO_extension(slcommon drmgr)
+use_DynamoRIO_extension(slcommon drreg)
+use_DynamoRIO_extension(slcommon drwrap)
+use_DynamoRIO_extension(slcommon droption)
+
 target_compile_definitions(slcommon PRIVATE -DUNICODE)
