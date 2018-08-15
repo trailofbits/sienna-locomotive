@@ -361,7 +361,6 @@ static void handle_register_mutation(HANDLE pipe)
     }
     StringCchPrintfW(mutate_fname, MAX_PATH, FUZZ_RUN_FKT_FMT, mutate_count);
 
-    // TODO(ww): Add this to the FKT.
     uint32_t mutation_type = 0;
     if (!ReadFile(pipe, &mutation_type, sizeof(mutation_type), &txsize, NULL)) {
         SL2_SERVER_LOG_FATAL("failed to read mutation type");
