@@ -926,11 +926,11 @@ int main(int argvc, char **argv)
 
     std::atexit(server_cleanup);
 
+    lock_process();
+
     init_working_paths();
 
     SL2_SERVER_LOG_INFO("server started!");
-
-    lock_process();
 
     InitializeCriticalSection(&pid_lock);
     InitializeCriticalSection(&fkt_lock);
