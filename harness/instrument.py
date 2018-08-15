@@ -28,6 +28,7 @@ from .state import (
 )
 
 from . import config
+from . import named_mutex
 
 print_lock = threading.Lock()
 can_fuzz = True
@@ -72,9 +73,10 @@ def start_server():
     """
     Start the server, if it's not already running.
     """
-    while not os.path.isfile(config.sl2_server_pipe_path):
+    # NOTE(ww): This is technically a TOCTOU, but it's probably reliable enough for our purposes.
+    if named_mutex.test_named_mutex('fuzz_server_mutex'):
         ps_run(config.config['server_path'])
-        time.sleep(2)
+    named_mutex.spin_named_mutex('fuzz_server_mutex')
 
 
 def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False):
