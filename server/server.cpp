@@ -40,6 +40,9 @@ struct strategy_state {
     uint32_t strategy;
 };
 
+typedef std::map<std::wstring, strategy_state> sl2_strategy_map_t;
+
+// TODO(ww): Replace these with std::shared_mutex.
 static CRITICAL_SECTION pid_lock;
 static CRITICAL_SECTION fkt_lock;
 static CRITICAL_SECTION arena_lock;
@@ -52,14 +55,14 @@ static wchar_t FUZZ_LOG[MAX_PATH] = L"";
 static std::shared_mutex strategy_mutex;
 static std::unique_lock<std::shared_mutex> wlock(strategy_mutex, std::defer_lock);
 static std::shared_lock<std::shared_mutex> rlock(strategy_mutex, std::defer_lock);
-static std::map<std::wstring, strategy_state> strategy_map;
+static sl2_strategy_map_t strategy_map;
 
 static uint16_t coverage_count(sl2_arena *arena)
 {
     uint16_t count = 0;
 
-    // TODO(ww): Perform bucketing here, instead of a just a dumb
-    // coverage count.
+    // TODO(ww): Perform bucketing here, instead of a just a dumb hit count.
+    // TODO(ww): This can be trivally unrolled/vectorized for a performance boost.
     for (int i = 0; i < FUZZ_ARENA_SIZE; ++i) {
         if (arena->map[i]) {
             count++;
@@ -514,7 +517,7 @@ static void handle_get_arena(HANDLE pipe)
     // Otherwise, we attempt to load the arena from disk, creating it if we don't
     // have one, and then add it to our strategy map.
     rlock.lock();
-    std::map<std::wstring, strategy_state>::iterator it = strategy_map.find(std::wstring(arena.id));
+    sl2_strategy_map_t::iterator it = strategy_map.find(arena.id);
     rlock.unlock();
     if (it != strategy_map.end()) {
         memcpy_s(arena.map, FUZZ_ARENA_SIZE, it->second.arena.map, FUZZ_ARENA_SIZE);
@@ -547,7 +550,7 @@ static void handle_get_arena(HANDLE pipe)
         // In the future, we should grab the last strategy tried
         // from the FKT and start with that.
         wlock.lock();
-        strategy_map[std::wstring(arena.id)] = { arena, cov_count, 0 };
+        strategy_map[arena.id] = { arena, cov_count, 0 };
         wlock.unlock();
     }
 
@@ -585,7 +588,7 @@ static void handle_set_arena(HANDLE pipe)
     }
 
     rlock.lock();
-    std::map<std::wstring, strategy_state>::iterator it = strategy_map.find(std::wstring(arena.id));
+    sl2_strategy_map_t::iterator it = strategy_map.find(arena.id);
     rlock.unlock();
 
     // This should never happen, as the fuzzer always requests an arena before sending one back.
@@ -604,7 +607,7 @@ static void handle_set_arena(HANDLE pipe)
     if (cov_count > prior.cov_count) {
         SL2_SERVER_LOG_INFO("coverage increased, continuing with strategy=%d", prior.strategy);
         wlock.lock();
-        strategy_map[std::wstring(arena.id)] = { arena, cov_count, prior.strategy };
+        strategy_map[arena.id] = { arena, cov_count, prior.strategy };
         wlock.unlock();
     }
     else {
@@ -615,10 +618,11 @@ static void handle_set_arena(HANDLE pipe)
         // coverage fails to increase, since a single run on a strategy doesn't
         // tell us all that much. What we need is a "stickiness" factor here.
         wlock.lock();
-        strategy_map[std::wstring(arena.id)] = { arena, cov_count, prior.strategy + 1 };
+        strategy_map[arena.id] = { arena, cov_count, prior.strategy + 1 };
         wlock.unlock();
     }
 
+    // TODO(ww): We should try to avoid/minimize dumping the arena to disk.
     dump_arena_to_disk(arena_path, &arena);
 }
 
@@ -792,7 +796,7 @@ static void handle_advise_mutation(HANDLE pipe)
     SL2_SERVER_LOG_INFO("got arena ID: %S", arena_id);
 
     rlock.lock();
-    std::map<std::wstring, strategy_state>::iterator it = strategy_map.find(std::wstring(arena_id));
+    sl2_strategy_map_t::iterator it = strategy_map.find(arena_id);
     rlock.unlock();
     if (it == strategy_map.end()) {
         SL2_SERVER_LOG_FATAL("arena ID missing from strategy_map? (map size=%d)", strategy_map.size());
