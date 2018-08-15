@@ -741,6 +741,7 @@ static void handle_register_pid(HANDLE pipe)
     wchar_t pid_s[64] = {0};
 
     _ui64tow_s(pid, pid_s, sizeof(pid_s) - 1, 10);
+    pid_s[wcsnlen_s(pid_s, sizeof(pid_s))] = '\n';
 
     PathCchCombine(run_dir, MAX_PATH, FUZZ_WORKING_PATH, run_id_s);
     PathCchCombine(pids_file, MAX_PATH, run_dir, tracing ? FUZZ_RUN_TRACER_PIDS
