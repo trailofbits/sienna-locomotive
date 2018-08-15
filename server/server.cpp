@@ -80,7 +80,8 @@ static void lock_process()
         SL2_SERVER_LOG_FATAL("could not create process lock");
     }
 
-    DWORD result = WaitForSingleObject(process_mutex, 0);
+    // Give ourselves a few milliseconds to acquire the mutex from the harness.
+    DWORD result = WaitForSingleObject(process_mutex, 10);
     if (result != WAIT_OBJECT_0) {
         SL2_SERVER_LOG_FATAL("could not obtain process lock");
     }
