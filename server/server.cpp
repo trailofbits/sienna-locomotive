@@ -1,7 +1,8 @@
 #include <set>
 #include <map>
 #include <cstdlib>
-#include <unordered_map>
+#include <mutex>
+#include <shared_mutex>
 #include <cstring>
 #include <cstdio>
 
@@ -33,6 +34,15 @@
 #define SL2_SERVER_LOG_ERROR(fmt, ...) SL2_SERVER_LOG_GLE(ERROR, fmt, __VA_ARGS__)
 #define SL2_SERVER_LOG_FATAL(fmt, ...) SL2_SERVER_LOG_GLE(FATAL, fmt, __VA_ARGS__)
 
+struct strategy_state {
+    sl2_arena arena;
+    uint16_t cov_count;
+    uint32_t strategy;
+};
+
+typedef std::map<std::wstring, strategy_state> sl2_strategy_map_t;
+
+// TODO(ww): Replace these with std::shared_mutex.
 static CRITICAL_SECTION pid_lock;
 static CRITICAL_SECTION fkt_lock;
 static CRITICAL_SECTION arena_lock;
@@ -41,6 +51,26 @@ static HANDLE process_mutex = INVALID_HANDLE_VALUE;
 static wchar_t FUZZ_WORKING_PATH[MAX_PATH] = L"";
 static wchar_t FUZZ_ARENAS_PATH[MAX_PATH] = L"";
 static wchar_t FUZZ_LOG[MAX_PATH] = L"";
+
+static std::shared_mutex strategy_mutex;
+static std::unique_lock<std::shared_mutex> wlock(strategy_mutex, std::defer_lock);
+static std::shared_lock<std::shared_mutex> rlock(strategy_mutex, std::defer_lock);
+static sl2_strategy_map_t strategy_map;
+
+static uint16_t coverage_count(sl2_arena *arena)
+{
+    uint16_t count = 0;
+
+    // TODO(ww): Perform bucketing here, instead of a just a dumb hit count.
+    // TODO(ww): This can be trivally unrolled/vectorized for a performance boost.
+    for (int i = 0; i < FUZZ_ARENA_SIZE; ++i) {
+        if (arena->map[i]) {
+            count++;
+        }
+    }
+
+    return count;
+}
 
 /* concurrency protection */
 static void lock_process()
@@ -222,7 +252,7 @@ static void get_bytes_fkt(wchar_t *target_file, uint8_t *buf, size_t size)
     LeaveCriticalSection(&fkt_lock);
 }
 
-static void dump_arena(wchar_t *arena_path, sl2_arena *arena)
+static void dump_arena_to_disk(wchar_t *arena_path, sl2_arena *arena)
 {
     EnterCriticalSection(&arena_lock);
 
@@ -255,7 +285,7 @@ static void dump_arena(wchar_t *arena_path, sl2_arena *arena)
     LeaveCriticalSection(&arena_lock);
 }
 
-static bool load_arena(wchar_t *arena_path, sl2_arena *arena)
+static bool load_arena_from_disk(wchar_t *arena_path, sl2_arena *arena)
 {
     bool rc = true;
     DWORD txsize;
@@ -482,27 +512,50 @@ static void handle_get_arena(HANDLE pipe)
 
     SL2_SERVER_LOG_INFO("got arena ID: %S", arena.id);
 
-    wchar_t arena_path[MAX_PATH + 1] = {0};
-
-    PathCchCombine(arena_path, MAX_PATH, FUZZ_ARENAS_PATH, arena.id);
-
-    DWORD attrs = GetFileAttributes(arena_path);
-
-    if (attrs == INVALID_FILE_ATTRIBUTES) {
-        SL2_SERVER_LOG_INFO("no arena found, creating one");
-        dump_arena(arena_path, &arena);
+    // If we already have the arena in our strategy map, then we don't
+    // need to load it from disk again.
+    // Otherwise, we attempt to load the arena from disk, creating it if we don't
+    // have one, and then add it to our strategy map.
+    rlock.lock();
+    sl2_strategy_map_t::iterator it = strategy_map.find(arena.id);
+    rlock.unlock();
+    if (it != strategy_map.end()) {
+        memcpy_s(arena.map, FUZZ_ARENA_SIZE, it->second.arena.map, FUZZ_ARENA_SIZE);
     }
     else {
-        SL2_SERVER_LOG_INFO("arena found, loading from disk");
+        wchar_t arena_path[MAX_PATH + 1] = {0};
 
-        if (!load_arena(arena_path, &arena)) {
-            SL2_SERVER_LOG_ERROR("load_arena failed, resetting the arena");
-            dump_arena(arena_path, &arena);
+        PathCchCombine(arena_path, MAX_PATH, FUZZ_ARENAS_PATH, arena.id);
+
+        DWORD attrs = GetFileAttributes(arena_path);
+
+        if (attrs == INVALID_FILE_ATTRIBUTES) {
+            SL2_SERVER_LOG_INFO("no arena found, creating one");
+            dump_arena_to_disk(arena_path, &arena);
         }
+        else {
+            SL2_SERVER_LOG_INFO("arena found, loading from disk");
+
+            if (!load_arena_from_disk(arena_path, &arena)) {
+                SL2_SERVER_LOG_ERROR("load_arena_from_disk failed, resetting the arena");
+                dump_arena_to_disk(arena_path, &arena);
+            }
+        }
+
+        uint16_t cov_count = coverage_count(&arena);
+
+        SL2_SERVER_LOG_INFO("cov_count=%d", cov_count);
+
+        // NOTE(ww): Start at strategy #0, because why not.
+        // In the future, we should grab the last strategy tried
+        // from the FKT and start with that.
+        wlock.lock();
+        strategy_map[arena.id] = { arena, cov_count, 0 };
+        wlock.unlock();
     }
 
     if (!WriteFile(pipe, arena.map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to write arena");
+        SL2_SERVER_LOG_FATAL("failed to write arena to pipe");
     }
 }
 
@@ -531,11 +584,46 @@ static void handle_set_arena(HANDLE pipe)
     PathCchCombine(arena_path, MAX_PATH, FUZZ_ARENAS_PATH, arena.id);
 
     if (!ReadFile(pipe, arena.map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
-        SL2_SERVER_LOG_ERROR("failed to read arena");
+        SL2_SERVER_LOG_FATAL("failed to read arena");
+    }
+
+    rlock.lock();
+    sl2_strategy_map_t::iterator it = strategy_map.find(arena.id);
+    rlock.unlock();
+
+    // This should never happen, as the fuzzer always requests an arena before sending one back.
+    if (it == strategy_map.end()) {
+        SL2_SERVER_LOG_FATAL("no prior arena to compare against! fuzzer didn't request an initial arena?");
+    }
+
+    strategy_state prior = it->second;
+
+    uint16_t cov_count = coverage_count(&arena);
+
+    SL2_SERVER_LOG_INFO("cov_count=%d, prior.cov_count=%d", cov_count, prior.cov_count);
+
+    // If coverage has increased, continue with the current strategy.
+    // Otherwise, try a new strategy.
+    if (cov_count > prior.cov_count) {
+        SL2_SERVER_LOG_INFO("coverage increased, continuing with strategy=%d", prior.strategy);
+        wlock.lock();
+        strategy_map[arena.id] = { arena, cov_count, prior.strategy };
+        wlock.unlock();
     }
     else {
-        dump_arena(arena_path, &arena);
+        SL2_SERVER_LOG_INFO("coverage did NOT increase, changing strategies!");
+        // NOTE(ww): We just increment the prior strategy, since each fuzzer
+        // will modulus its suggested strategy with the number of total strategies.
+        // TODO(ww): We probably don't want to change strategies immediately after
+        // coverage fails to increase, since a single run on a strategy doesn't
+        // tell us all that much. What we need is a "stickiness" factor here.
+        wlock.lock();
+        strategy_map[arena.id] = { arena, cov_count, prior.strategy + 1 };
+        wlock.unlock();
     }
+
+    // TODO(ww): We should try to avoid/minimize dumping the arena to disk.
+    dump_arena_to_disk(arena_path, &arena);
 }
 
 static void handle_crash_paths(HANDLE pipe)
@@ -686,6 +774,41 @@ static void handle_register_pid(HANDLE pipe)
     LeaveCriticalSection(&pid_lock);
 }
 
+static void handle_advise_mutation(HANDLE pipe)
+{
+    DWORD txsize;
+    size_t size;
+    wchar_t arena_id[SL2_HASH_LEN + 1] = {0};
+    uint32_t table_idx = 0;
+
+    if (!ReadFile(pipe, &size, sizeof(size), &txsize, NULL))  {
+        SL2_SERVER_LOG_FATAL("failed to read arena ID size");
+    }
+
+    if (size != SL2_HASH_LEN * sizeof(wchar_t)) {
+        SL2_SERVER_LOG_FATAL("wrong arena ID size %lu != %lu", size, SL2_HASH_LEN * sizeof(wchar_t));
+    }
+
+    if (!ReadFile(pipe, &arena_id, (DWORD) size, &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("failed to read arena ID");
+    }
+
+    SL2_SERVER_LOG_INFO("got arena ID: %S", arena_id);
+
+    rlock.lock();
+    sl2_strategy_map_t::iterator it = strategy_map.find(arena_id);
+    rlock.unlock();
+    if (it == strategy_map.end()) {
+        SL2_SERVER_LOG_FATAL("arena ID missing from strategy_map? (map size=%d)", strategy_map.size());
+    }
+
+    table_idx = it->second.strategy;
+
+    if (!WriteFile(pipe, &table_idx, sizeof(table_idx), &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("failed to write strategy advice");
+    }
+}
+
 static void destroy_pipe(HANDLE pipe)
 {
     if (!FlushFileBuffers(pipe)) {
@@ -761,6 +884,9 @@ static DWORD WINAPI thread_handler(void *data)
                 break;
             case EVT_REGISTER_PID:
                 handle_register_pid(pipe);
+                break;
+            case EVT_ADVISE_MUTATION:
+                handle_advise_mutation(pipe);
                 break;
             case EVT_SESSION_TEARDOWN:
                 SL2_SERVER_LOG_INFO("ending a client's session with the server.");
