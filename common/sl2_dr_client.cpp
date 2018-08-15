@@ -25,8 +25,8 @@ sl2_funcmod SL2_FUNCMOD_TABLE[] = {
     {"_read", "UCRTBASED.DLL"},
 };
 
-void
-hash_args(char * argHash, fileArgHash * fStruct){
+SL2_EXPORT
+void hash_args(char * argHash, fileArgHash * fStruct){
     std::vector<unsigned char> blob_vec((unsigned char *) fStruct,
         ((unsigned char *) fStruct) + sizeof(fileArgHash));
     std::string hash_str;

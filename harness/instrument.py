@@ -284,7 +284,7 @@ def fuzzer_run(config_dict):
     else:
         if config_dict['verbose']:
             print_l("Run %s did not find a crash" % run_id)
-            shutil.rmtree(os.path.join(config.sl2_runs_dir, str(run_id)), ignore_errors=True)
+        shutil.rmtree(os.path.join(config.sl2_runs_dir, str(run_id)), ignore_errors=True)
 
     return crashed, run.run_id
 

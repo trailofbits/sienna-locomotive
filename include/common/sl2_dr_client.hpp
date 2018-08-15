@@ -199,6 +199,7 @@ SL2_EXPORT
 const char *function_to_string(Function function);
 
 // Builds a hash from an fStruct
+SL2_EXPORT
 void hash_args(char * argHash, fileArgHash * fStruct);
 
 // Returns a C-string corresponding to the given `exception_code`.
