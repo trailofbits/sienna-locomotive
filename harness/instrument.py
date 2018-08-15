@@ -50,6 +50,7 @@ class DRRun(NamedTuple):
     """
     process: subprocess.Popen
     seed: str
+    run_id: str
 
 
 def print_l(*args):
@@ -71,10 +72,9 @@ def start_server():
     """
     Start the server, if it's not already running.
     """
-    if not os.path.isfile(config.sl2_server_pipe_path):
-        ps_run(config.config['server_path'])
     while not os.path.isfile(config.sl2_server_pipe_path):
-        time.sleep(1)
+        ps_run(config.config['server_path'])
+        time.sleep(2)
 
 
 def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False):
@@ -110,7 +110,12 @@ def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False)
         popen_obj.stderr = stderr
         popen_obj.timed_out = False
 
-        return DRRun(popen_obj, invoke.seed)
+        # If the server wasn't running
+        if b'ERROR' in popen_obj.stderr and b'connection' in popen_obj.stderr:
+            print_l("Lost connection to server! Restarting...")
+            run_id = -1
+
+        return DRRun(popen_obj, invoke.seed, run_id)
 
     # Handle cases where the program didn't exit in time
     except subprocess.TimeoutExpired:
@@ -120,19 +125,24 @@ def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False)
         if run_id:
             pids_file = get_path_to_run_file(run_id, "trace.pids" if tracing else "fuzz.pids")
 
-            with open(pids_file, 'rb') as pids_contents:
-                for line in pids_contents.read().decode('utf-16').split('\n'):
-                    if line:
-                        # TODO(ww): We probably want to call finalize() once per pid here,
-                        # since each pid has its own session/thread on the server.
-                        pid = int(line)
-                        if verbose:
-                            print_l("Killing child process:", pid)
-                        try:
-                            os.kill(pid, signal.SIGTERM)
-                        except (PermissionError, OSError) as e:
-                            print_l("WARNING: Couldn't kill child process:", e)
-                            print_l("Try running the harness as an Administrator.")
+            try:
+                with open(pids_file, 'rb') as pids_contents:
+                    for line in pids_contents.read().decode('utf-16').split('\n'):
+                        if line:
+                            # TODO(ww): We probably want to call finalize() once per pid here,
+                            # since each pid has its own session/thread on the server.
+                            pid = int(line)
+                            if verbose:
+                                print_l("Killing child process:", pid)
+                            try:
+                                os.kill(pid, signal.SIGTERM)
+                            except (PermissionError, OSError) as e:
+                                print_l("WARNING: Couldn't kill child process:", e)
+                                print_l("Try running the harness as an Administrator.")
+            except FileNotFoundError:
+                print_l("The PID file was missing so we couldn't kill the child process.")
+                print_l("Most likely this is due to a server crash.")
+                run_id = -1
         else:
             print_l("WARNING: No run ID, so not looking for PIDs to kill.")
 
@@ -154,7 +164,7 @@ def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False)
 
         popen_obj.timed_out = True
 
-    return DRRun(popen_obj, invoke.seed)
+    return DRRun(popen_obj, invoke.seed, run_id)
 
 
 def triager_run(run_id):
@@ -277,9 +287,9 @@ def fuzzer_run(config_dict):
     else:
         if config_dict['verbose']:
             print_l("Run %s did not find a crash" % run_id)
-            shutil.rmtree(os.path.join(config.sl2_runs_dir, str(run_id)), ignore_errors=True)
+        shutil.rmtree(os.path.join(config.sl2_runs_dir, str(run_id)), ignore_errors=True)
 
-    return crashed, run_id
+    return crashed, run.run_id
 
 
 # TODO(ww): Rename this to "tracer_run" or something similar,

@@ -55,11 +55,11 @@ class ConfigWindow(QtWidgets.QDialog):
         self.target_args = QtWidgets.QLineEdit()
 
         self.profile_name.setPlaceholderText("Profile Name")
-        #self.drrun_path.setPlaceholderText("Path to drrun.exe")
+        # self.drrun_path.setPlaceholderText("Path to drrun.exe")
         self.drrun_path.setText(config._config['DEFAULT']['drrun_path'])
 
-        #self.build_dir.setPlaceholderText("Path to SL2 build directory")
-        self.build_dir.setText("build")
+        # self.build_dir.setPlaceholderText("Path to SL2 build directory")
+        self.build_dir.setText(os.path.join(os.path.dirname(os.path.realpath(__file__)), "build"))
 
         self.target_path.setPlaceholderText("Path to target application")
         self.target_args.setPlaceholderText("Target arguments")
@@ -117,6 +117,8 @@ class ConfigWindow(QtWidgets.QDialog):
         self.build_dir.textChanged.connect(self.validate_build_path)
 
         self.show()
+        if config.profile != 'DEFAULT':
+            self.profiles.setCurrentText(config.profile)
 
     def add_config(self, *_args):
         name = self.profile_name.text()
@@ -184,7 +186,6 @@ class ConfigWindow(QtWidgets.QDialog):
             self.bad_build_dir_warning.setToolTip("This build root is missing some expected child paths: " + '\n'.join(missing))
         else:
             self.bad_build_dir_warning.hide()
-
 
     def toggle_expansion(self):
         if not self.extension_widget.isVisible():

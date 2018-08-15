@@ -3,6 +3,7 @@
 
 #include "common/util.h"
 #include "server.hpp"
+#include <Rpc.h>
 
 // An enum of response codes used by the calls below to indicate
 // their success or failure.

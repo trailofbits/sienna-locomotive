@@ -1,7 +1,6 @@
 #include "vendor/picosha2.h"
 
 #include "common/sl2_dr_client.hpp"
-#include "dr_api.h"
 
 using namespace std;
 
@@ -25,6 +24,16 @@ sl2_funcmod SL2_FUNCMOD_TABLE[] = {
     {"_read", "UCRTBASE.DLL"},
     {"_read", "UCRTBASED.DLL"},
 };
+
+SL2_EXPORT
+void hash_args(char * argHash, fileArgHash * fStruct){
+    std::vector<unsigned char> blob_vec((unsigned char *) fStruct,
+        ((unsigned char *) fStruct) + sizeof(fileArgHash));
+    std::string hash_str;
+    picosha2::hash256_hex_string(blob_vec, hash_str);
+    argHash[SL2_HASH_LEN] = 0;
+    memcpy((void *) argHash, hash_str.c_str(), SL2_HASH_LEN);
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // SL2Client
@@ -81,7 +90,7 @@ isFunctionTargeted(Function function, client_read_info* info)
 // a coverage arena.
 //
 // NOTE(ww): Eventually, this should always be true. However, for the time being,
-// we're using the "index" targetting mode to create a stable identifier for a
+// we're using the "index" targeting mode to create a stable identifier for a
 // coverage arena. As such, only function targets that were created with that
 // mode are currently arena-compatible.
 bool SL2Client::
@@ -164,6 +173,445 @@ loadJson(string path)
 
     return parsedJson.is_array();
 }
+
+/*
+  The next several functions are wrappers that DynamoRIO calls before each of the targeted functions runs. Each of them
+  records metadata about the target function call for use later.
+*/
+
+/*
+    bool ReadEventLog(
+      _In_  HANDLE hEventLog,
+      _In_  DWORD  dwReadFlags,
+      _In_  DWORD  dwRecordOffset,
+      _Out_ LPVOID lpBuffer,
+      _In_  DWORD  nNumberOfBytesToRead,
+      _Out_ DWORD  *pnBytesRead,
+      _Out_ DWORD  *pnMinNumberOfBytesNeeded
+    );
+
+    Return: If the function succeeds, the return value is nonzero.
+*/
+void
+SL2Client::wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
+{
+    SL2_DR_DEBUG("<in wrap_pre_ReadEventLog>\n");
+    HANDLE hEventLog = (HANDLE)drwrap_get_arg(wrapcxt, 0);
+    #pragma warning(suppress: 4311 4302)
+    DWORD  dwReadFlags = (DWORD)drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
+    DWORD  dwRecordOffset = (DWORD)drwrap_get_arg(wrapcxt, 2);
+    void *lpBuffer = (void *)drwrap_get_arg(wrapcxt, 3);
+    #pragma warning(suppress: 4311 4302)
+    DWORD  nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 4);
+    DWORD  *pnBytesRead = (DWORD *)drwrap_get_arg(wrapcxt, 5);
+    DWORD  *pnMinNumberOfBytesNeeded = (DWORD *)drwrap_get_arg(wrapcxt, 6);
+
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
+
+    info->function             = Function::ReadEventLog;
+    info->hFile                = hEventLog;
+    info->lpBuffer             = lpBuffer;
+    info->nNumberOfBytesToRead = nNumberOfBytesToRead;
+    info->lpNumberOfBytesRead  = pnBytesRead;
+    info->position             = 0;
+    info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+
+    fileArgHash fStruct = {0};
+
+    GetFinalPathNameByHandle(hEventLog, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
+    fStruct.position = dwRecordOffset;
+    fStruct.readSize = nNumberOfBytesToRead;
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
+}
+
+
+/*
+    LONG WINAPI RegQueryValueEx(
+      _In_        HKEY    hKey,
+      _In_opt_    LPCTSTR lpValueName,
+      _Reserved_  LPDWORD lpReserved,
+      _Out_opt_   LPDWORD lpType,
+      _Out_opt_   LPBYTE  lpData,
+      _Inout_opt_ LPDWORD lpcbData
+    );
+
+    Return: If the function succeeds, the return value is ERROR_SUCCESS.
+*/
+void
+SL2Client::wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
+{
+    SL2_DR_DEBUG("<in wrap_pre_RegQueryValueEx>\n");
+    HKEY    hKey = (HKEY)drwrap_get_arg(wrapcxt, 0);
+    LPCTSTR lpValueName = (LPCTSTR)drwrap_get_arg(wrapcxt, 1);
+    LPDWORD lpReserved = (LPDWORD)drwrap_get_arg(wrapcxt, 2);
+    LPDWORD lpType = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
+    LPBYTE  lpData = (LPBYTE)drwrap_get_arg(wrapcxt, 4);
+    LPDWORD lpcbData = (LPDWORD)drwrap_get_arg(wrapcxt, 5);
+
+    if (lpData != NULL && lpcbData != NULL) {
+        *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+        client_read_info *info = (client_read_info *) *user_data;
+
+
+        info->function             = Function::RegQueryValueEx;
+        info->hFile                = hKey;
+        info->lpBuffer             = lpData;
+        info->nNumberOfBytesToRead = *lpcbData;
+        info->lpNumberOfBytesRead  = lpcbData;
+        info->position             = 0;
+        info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+
+        fileArgHash fStruct = {0};
+
+//        mbstowcs_s(fStruct.fileName, , lpValueName, MAX_PATH);
+        fStruct.readSize = *lpcbData;
+
+        info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+        hash_args(info->argHash, &fStruct);
+    } else {
+        *user_data = NULL;
+    }
+}
+
+
+/*
+    DWORD WINAPI WinHttpWebSocketReceive(
+      _In_  HINTERNET                      hWebSocket,
+      _Out_ PVOID                          pvBuffer,
+      _In_  DWORD                          dwBufferLength,
+      _Out_ DWORD                          *pdwBytesRead,
+      _Out_ WINHTTP_WEB_SOCKET_BUFFER_TYPE *peBufferType
+    );
+
+    Return: NO_ERROR on success. Otherwise an error code.
+*/
+void
+SL2Client::wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
+{
+    SL2_DR_DEBUG("<in wrap_pre_WinHttpWebSocketReceive>\n");
+    HINTERNET hRequest = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
+    PVOID pvBuffer = drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
+    DWORD dwBufferLength = (DWORD)drwrap_get_arg(wrapcxt, 2);
+    PDWORD pdwBytesRead = (PDWORD)drwrap_get_arg(wrapcxt, 3);
+    #pragma warning(suppress: 4311 4302)
+    WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE)(int)drwrap_get_arg(wrapcxt, 3);
+
+    // TODO: put this in another file cause you can't import wininet and winhttp
+    // LONG positionHigh = 0;
+    // DWORD positionLow = InternetSetFilePointer(hRequest, 0, &positionHigh, FILE_CURRENT);
+    // uint64_t position = positionHigh;
+
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
+
+    info->function             = Function::WinHttpWebSocketReceive;
+    info->hFile                = hRequest;
+    info->lpBuffer             = pvBuffer;
+    info->nNumberOfBytesToRead = dwBufferLength;
+    info->lpNumberOfBytesRead  = pdwBytesRead;
+    info->position             = 0;
+    info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+
+    fileArgHash fStruct = {0};
+
+//    fStruct.fileName[0] = (wchar_t) s;
+    fStruct.readSize = dwBufferLength;
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
+}
+
+/*
+    bool InternetReadFile(
+      _In_  HINTERNET hFile,
+      _Out_ LPVOID    lpBuffer,
+      _In_  DWORD     dwNumberOfBytesToRead,
+      _Out_ LPDWORD   lpdwNumberOfBytesRead
+    );
+
+    Return: Returns TRUE if successful
+*/
+void
+SL2Client::wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
+{
+    SL2_DR_DEBUG("<in wrap_pre_InternetReadFile>\n");
+    HINTERNET hFile = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
+    void *lpBuffer = drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
+    DWORD nNumberOfBytesToRead = (DWORD)drwrap_get_arg(wrapcxt, 2);
+    LPDWORD lpNumberOfBytesRead = (LPDWORD)drwrap_get_arg(wrapcxt, 3);
+
+    // LONG positionHigh = 0;
+    // DWORD positionLow = InternetSetFilePointer(hFile, 0, &positionHigh, FILE_CURRENT);
+    // uint64_t position = positionHigh;
+
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
+
+    info->function             = Function::InternetReadFile;
+    info->hFile                = hFile;
+    info->lpBuffer             = lpBuffer;
+    info->nNumberOfBytesToRead = nNumberOfBytesToRead;
+    info->lpNumberOfBytesRead  = lpNumberOfBytesRead;
+    info->position             = 0;
+    info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+
+    fileArgHash fStruct = {0};
+
+//    fStruct.fileName[0] = (wchar_t) s;
+    fStruct.readSize = nNumberOfBytesToRead;
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
+}
+
+/*
+    bool WINAPI WinHttpReadData(
+      _In_  HINTERNET hRequest,
+      _Out_ LPVOID    lpBuffer,
+      _In_  DWORD     dwNumberOfBytesToRead,
+      _Out_ LPDWORD   lpdwNumberOfBytesRead
+    );
+
+    Return: Returns TRUE if successful
+*/
+void
+SL2Client::wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
+{
+    SL2_DR_DEBUG("<in wrap_pre_WinHttpReadData>\n");
+    HINTERNET hRequest = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
+    void *lpBuffer = drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
+    DWORD nNumberOfBytesToRead = (DWORD) drwrap_get_arg(wrapcxt, 2);
+    DWORD *lpNumberOfBytesRead = (DWORD *) drwrap_get_arg(wrapcxt, 3);
+
+    // LONG positionHigh = 0;
+    // DWORD positionLow = InternetSetFilePointer(hRequest, 0, &positionHigh, FILE_CURRENT);
+    // uint64_t position = positionHigh;
+
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
+
+    info->function             = Function::WinHttpReadData;
+    info->hFile                = hRequest;
+    info->lpBuffer             = lpBuffer;
+    info->nNumberOfBytesToRead = nNumberOfBytesToRead;
+    info->lpNumberOfBytesRead  = lpNumberOfBytesRead;
+    info->position             = 0;
+    info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+
+    fileArgHash fStruct = {0};
+
+//    fStruct.fileName[0] = (wchar_t) s;
+    fStruct.readSize = nNumberOfBytesToRead;
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
+}
+
+
+/*
+    int recv(
+      _In_  SOCKET s,
+      _Out_ char   *buf,
+      _In_  int    len,
+      _In_  int    flags
+    );
+
+    Return: recv returns the number of bytes received
+*/
+void
+SL2Client::wrap_pre_recv(void *wrapcxt, OUT void **user_data)
+{
+    SL2_DR_DEBUG("<in wrap_pre_recv>\n");
+    SOCKET s  = (SOCKET)drwrap_get_arg(wrapcxt, 0);
+    char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
+    int len   = (int)drwrap_get_arg(wrapcxt, 2);
+    #pragma warning(suppress: 4311 4302)
+    int flags = (int)drwrap_get_arg(wrapcxt, 3);
+
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
+
+    info->function             = Function::recv;
+    info->hFile                = NULL;
+    info->lpBuffer             = buf;
+    info->nNumberOfBytesToRead = len;
+    info->lpNumberOfBytesRead  = NULL;
+    info->position             = 0;
+    info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+
+    fileArgHash fStruct = {0};
+
+    fStruct.fileName[0] = (wchar_t) s;
+    fStruct.readSize = len;
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
+}
+
+/*
+    bool WINAPI ReadFile(
+      _In_        HANDLE       hFile,
+      _Out_       LPVOID       lpBuffer,
+      _In_        DWORD        nNumberOfBytesToRead,
+      _Out_opt_   LPDWORD      lpNumberOfBytesRead,
+      _Inout_opt_ LPOVERLAPPED lpOverlapped
+    );
+
+    Return: If the function succeeds, the return value is nonzero (TRUE).
+*/
+void
+SL2Client::wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
+{
+    SL2_DR_DEBUG("<in wrap_pre_ReadFile>\n");
+    HANDLE hFile                = drwrap_get_arg(wrapcxt, 0);
+    void *lpBuffer             = drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
+    DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
+    DWORD *lpNumberOfBytesRead = (DWORD*)drwrap_get_arg(wrapcxt, 3);
+
+    fileArgHash fStruct = {0};
+
+    LARGE_INTEGER offset = {0};
+    LARGE_INTEGER position = {0};
+    SetFilePointerEx(hFile, offset, &position, FILE_CURRENT);
+
+    GetFinalPathNameByHandle(hFile, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
+    fStruct.position = position.QuadPart;
+    fStruct.readSize = nNumberOfBytesToRead;
+
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
+
+    info->function             = Function::ReadFile;
+    info->hFile                = hFile;
+    info->lpBuffer             = lpBuffer;
+    info->nNumberOfBytesToRead = nNumberOfBytesToRead;
+    info->lpNumberOfBytesRead  = lpNumberOfBytesRead;
+    info->position             = fStruct.position;
+    info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+
+    info->source = (wchar_t *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(fStruct.fileName));
+    memcpy(info->source, fStruct.fileName, sizeof(fStruct.fileName));
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
+}
+
+void
+SL2Client::wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
+{
+    SL2_DR_DEBUG("<in wrap_pre_fread_s>\n");
+    void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
+    size_t bufsize = (size_t)drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
+    size_t size  = (size_t)drwrap_get_arg(wrapcxt, 2);
+    #pragma warning(suppress: 4311 4302)
+    size_t count = (size_t)drwrap_get_arg(wrapcxt, 3);
+    FILE *file   = (FILE *)drwrap_get_arg(wrapcxt, 4);
+
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
+
+    info->function             = Function::fread_s;
+    // TODO(ww): Figure out why _get_osfhandle breaks DR.
+    // info->hFile             = (HANDLE) _get_osfhandle(_fileno(file));
+    info->hFile                = NULL;
+    info->lpBuffer             = buffer;
+    info->nNumberOfBytesToRead = size * count;
+    info->lpNumberOfBytesRead  = NULL;
+    info->position             = NULL;
+    info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+
+    fileArgHash fStruct = {0};
+
+    fStruct.fileName[0] = (wchar_t) _fileno(file);
+
+    fStruct.position = bufsize;  // Field names don't actually matter
+    fStruct.readSize = size;
+    fStruct.count = count;
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
+}
+
+void
+SL2Client::wrap_pre_fread(void *wrapcxt, OUT void **user_data)
+{
+    SL2_DR_DEBUG("<in wrap_pre_fread>\n");
+
+    void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
+    #pragma warning(suppress: 4311 4302)
+    size_t size  = (size_t)drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
+    size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
+    FILE *file   = (FILE *)drwrap_get_arg(wrapcxt, 3);
+
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
+
+    info->function             = Function::fread;
+    // TODO(ww): Figure out why _get_osfhandle breaks DR.
+    // info->hFile             = (HANDLE) _get_osfhandle(_fileno(file));
+    info->hFile                = NULL;
+    info->lpBuffer             = buffer;
+    info->nNumberOfBytesToRead = size * count;
+    info->lpNumberOfBytesRead  = NULL;
+    info->position             = NULL;
+    info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+
+    fileArgHash fStruct = {0};
+
+    fStruct.fileName[0] = (wchar_t) _fileno(file);
+
+//    fStruct.position = ftell(fpointer);  // This instantly crashes DynamoRIO
+    fStruct.readSize = size;
+    fStruct.count = count;
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
+}
+
+void
+SL2Client::wrap_pre__read(void *wrapcxt, OUT void **user_data)
+{
+    SL2_DR_DEBUG("<in wrap_pre__read>\n");
+
+    #pragma warning(suppress: 4311 4302)
+    int fd = (int) drwrap_get_arg(wrapcxt, 0);
+    void *buffer = drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
+    unsigned int count = (unsigned int) drwrap_get_arg(wrapcxt, 2);
+
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
+
+    info->function             = Function::_read;
+    // TODO(ww): Figure out why _get_osfhandle breaks DR.
+    // info->hFile             = (HANDLE) _get_osfhandle(fd);
+    info->hFile                = NULL;
+    info->lpBuffer             = buffer;
+    info->nNumberOfBytesToRead = count;
+    info->lpNumberOfBytesRead  = NULL;
+    info->position             = NULL;
+    info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+
+    fileArgHash fStruct = {0};
+
+    fStruct.fileName[0] = (wchar_t) fd;
+    fStruct.count= count;
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
+}
+
 
 // TODO(ww): Document the fallback values here.
 SL2_EXPORT

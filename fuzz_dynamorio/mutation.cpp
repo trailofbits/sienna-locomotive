@@ -1,12 +1,8 @@
 #include <stdint.h>
 #include <random>
 
-#include <Windows.h>
-
-#include "dr_api.h"
-
-#include "common/mutation.hpp"
 #include "common/sl2_dr_client.hpp"
+#include "common/mutation.hpp"
 
 // TODO(ww): Additional strategies:
 // insert bytes

@@ -1,10 +1,25 @@
 #ifndef SL2_DR_CLIENT_H
 #define SL2_DR_CLIENT_H
 
+#include <winsock2.h>
+#include <winhttp.h>
+#include <Windows.h>
+#include <Winternl.h>
+#include <Rpc.h>
+#include <io.h>
+#include <Dbghelp.h>
+
+
+#include "vendor/json.hpp"
+#include "dr_api.h"
+#include "drmgr.h"
+#include "drwrap.h"
+#include "droption.h"
+#include "drreg.h"
+
 #include <string>
 #include <fstream>
 
-#include "vendor/json.hpp"
 using namespace std;
 
 extern "C" {
@@ -90,6 +105,7 @@ enum {
 // See `MATCH_ARG_HASH`.
 struct fileArgHash {
   wchar_t fileName[MAX_PATH + 1];
+  size_t count;
   size_t position;
   size_t readSize;
 };
@@ -107,13 +123,14 @@ typedef struct targetFunction {
 
 // Information for read in fuzzer and tracer clients
 struct client_read_info {
-    uint64_t    position;
-    uint64_t    retAddrOffset;
+    size_t      position;
+    size_t      retAddrOffset;
     Function    function;
     HANDLE      hFile;
     DWORD       *lpNumberOfBytesRead;
     void        *lpBuffer;
-    char        *argHash;
+    char        *argHash;  // TODO(ww): Make this a wchar_t * for consistency.
+    wchar_t     *source;
     size_t      nNumberOfBytesToRead;
 };
 
@@ -151,10 +168,21 @@ public:
     // TODO(ww): Subsume sl2_conn under SL2Client.
     map<Function, uint64_t>     call_counts;
     json                        parsedJson;
+    uint64_t                    baseAddr;
 
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Methods
     bool        isFunctionTargeted(Function function,  client_read_info* info);
+    void        wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data);
+    void        wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data);
+    void        wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data);
+    void        wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data);
+    void        wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data);
+    void        wrap_pre_recv(void *wrapcxt, OUT void **user_data);
+    void        wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data);
+    void        wrap_pre_fread(void *wrapcxt, OUT void **user_data);
+    void        wrap_pre_fread_s(void *wrapcxt, OUT void **user_data);
+    void        wrap_pre__read(void *wrapcxt, OUT void **user_data);
     bool        areTargetsArenaCompatible();
     void        generateArenaId(wchar_t *id);
     bool        loadJson(string json);
@@ -169,6 +197,10 @@ void from_json(const json& j, targetFunction& t);
 // Returns a C-string corresponding to the requested `function`.
 SL2_EXPORT
 const char *function_to_string(Function function);
+
+// Builds a hash from an fStruct
+SL2_EXPORT
+void hash_args(char * argHash, fileArgHash * fStruct);
 
 // Returns a C-string corresponding to the given `exception_code`.
 SL2_EXPORT

@@ -3,18 +3,6 @@
 #include <set>
 #include <fstream>
 
-#include <Windows.h>
-#include <Dbghelp.h>
-#include <winhttp.h>
-#include <Rpc.h>
-
-#include "dr_api.h"
-#include "drmgr.h"
-#include "drreg.h"
-#include "drwrap.h"
-#include "dr_ir_instr.h"
-#include "droption.h"
-
 #include "vendor/picosha2.h"
 
 extern "C" {
@@ -26,6 +14,8 @@ extern "C" {
 #include "common/sl2_server_api.hpp"
 #include "common/sl2_dr_client.hpp"
 #include "common/sl2_dr_client_options.hpp"
+
+#include "dr_ir_instr.h"
 
 static SL2Client client;
 static sl2_conn sl2_conn;
@@ -1151,236 +1141,61 @@ static void wrap_pre_VerifierStopMessage(void *wrapcxt, OUT void **user_data)
 static void
 wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
 {
-    SL2_DR_DEBUG("<in wrap_pre_ReadEventLog>\n");
-    HANDLE hEventLog                 = (HANDLE)drwrap_get_arg(wrapcxt, 0);
-    #pragma warning(suppress: 4311 4302)
-    DWORD  dwReadFlags               = (DWORD)drwrap_get_arg(wrapcxt, 1);
-    #pragma warning(suppress: 4311 4302)
-    DWORD  dwRecordOffset            = (DWORD)drwrap_get_arg(wrapcxt, 2);
-    void   *lpBuffer                 = (void *)drwrap_get_arg(wrapcxt, 3);
-    #pragma warning(suppress: 4311 4302)
-    DWORD  nNumberOfBytesToRead      = (DWORD)drwrap_get_arg(wrapcxt, 4);
-    DWORD  *pnBytesRead              = (DWORD *)drwrap_get_arg(wrapcxt, 5);
-    DWORD  *pnMinNumberOfBytesNeeded = (DWORD *)drwrap_get_arg(wrapcxt, 6);
-
-    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
-    client_read_info *info = (client_read_info *) *user_data;
-
-    info->lpBuffer             = lpBuffer;
-    info->nNumberOfBytesToRead = nNumberOfBytesToRead;
-    info->function             = Function::ReadEventLog;
-    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+    client.wrap_pre_ReadEventLog(wrapcxt, user_data);
 }
 
 static void
 wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
 {
-    SL2_DR_DEBUG("<in wrap_pre_RegQueryValueEx>\n");
-    HKEY hKey         = (HKEY)drwrap_get_arg(wrapcxt, 0);
-    char *lpValueName = (char *)drwrap_get_arg(wrapcxt, 1);
-    DWORD *lpReserved = (DWORD *)drwrap_get_arg(wrapcxt, 2);
-    DWORD *lpType     = (DWORD *)drwrap_get_arg(wrapcxt, 3);
-    BYTE *lpData      = (BYTE *)drwrap_get_arg(wrapcxt, 4);
-    DWORD *lpcbData   = (DWORD *)drwrap_get_arg(wrapcxt, 5);
-
-    if (lpData != NULL && lpcbData != NULL) {
-        *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
-        client_read_info *info = (client_read_info *) *user_data;
-
-        info->lpBuffer             = lpData;
-        info->nNumberOfBytesToRead = *lpcbData;
-        info->function             = Function::RegQueryValueEx;
-        info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-        info->argHash              = NULL;
-    }
-    else {
-        *user_data = NULL;
-    }
+    client.wrap_pre_RegQueryValueEx(wrapcxt, user_data);
 }
 
 static void
 wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
 {
-    SL2_DR_DEBUG("<in wrap_pre_WinHttpWebSocketReceive>\n");
-    HINTERNET hRequest                          = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
-    void *pvBuffer                              = drwrap_get_arg(wrapcxt, 1);
-    #pragma warning(suppress: 4311 4302)
-    DWORD dwBufferLength                        = (DWORD)drwrap_get_arg(wrapcxt, 2);
-    DWORD *pdwBytesRead                         = (DWORD *)drwrap_get_arg(wrapcxt, 3);
-    #pragma warning(suppress: 4311 4302)
-    WINHTTP_WEB_SOCKET_BUFFER_TYPE peBufferType = (WINHTTP_WEB_SOCKET_BUFFER_TYPE)(int)drwrap_get_arg(wrapcxt, 3);
-
-    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
-    client_read_info *info = (client_read_info *) *user_data;
-
-    info->lpBuffer = pvBuffer;
-    info->nNumberOfBytesToRead = dwBufferLength;
-    info->function = Function::WinHttpWebSocketReceive;
-    info->retAddrOffset = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+    client.wrap_pre_WinHttpWebSocketReceive(wrapcxt, user_data);
 }
 
 static void
 wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
 {
-    SL2_DR_DEBUG("<in wrap_pre_InternetReadFile>\n");
-    HINTERNET hFile             = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
-    void *lpBuffer              = drwrap_get_arg(wrapcxt, 1);
-    #pragma warning(suppress: 4311 4302)
-    DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
-    DWORD *lpNumberOfBytesRead  = (DWORD*)drwrap_get_arg(wrapcxt, 3);
-
-    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
-    client_read_info *info = (client_read_info *) *user_data;
-
-    info->lpBuffer             = lpBuffer;
-    info->nNumberOfBytesToRead = nNumberOfBytesToRead;
-    info->function             = Function::InternetReadFile;
-    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+    client.wrap_pre_InternetReadFile(wrapcxt, user_data);
 }
 
 static void
 wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
 {
-    SL2_DR_DEBUG("<in wrap_pre_WinHttpReadData>\n");
-    HINTERNET hRequest          = (HINTERNET)drwrap_get_arg(wrapcxt, 0);
-    void *lpBuffer              = drwrap_get_arg(wrapcxt, 1);
-    #pragma warning(suppress: 4311 4302)
-    DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
-    DWORD *lpNumberOfBytesRead  = (DWORD*)drwrap_get_arg(wrapcxt, 3);
-
-    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
-    client_read_info *info = (client_read_info *) *user_data;
-
-    info->lpBuffer             = lpBuffer;
-    info->nNumberOfBytesToRead = nNumberOfBytesToRead;
-    info->function             = Function::WinHttpReadData;
-    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+    client.wrap_pre_WinHttpReadData(wrapcxt, user_data);
 }
 
 static void
 wrap_pre_recv(void *wrapcxt, OUT void **user_data)
 {
-    SL2_DR_DEBUG("<in wrap_pre_recv>\n");
-    SOCKET s  = (SOCKET)drwrap_get_arg(wrapcxt, 0);
-    char *buf = (char *)drwrap_get_arg(wrapcxt, 1);
-    #pragma warning(suppress: 4311 4302)
-    int len   = (int)drwrap_get_arg(wrapcxt, 2);
-    #pragma warning(suppress: 4311 4302)
-    int flags = (int)drwrap_get_arg(wrapcxt, 3);
-
-    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
-    client_read_info *info = (client_read_info *) *user_data;
-
-    info->lpBuffer             = buf;
-    info->nNumberOfBytesToRead = len;
-    info->function             = Function::recv;
-    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+    client.wrap_pre_recv(wrapcxt, user_data);
 }
 
 static void
 wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
 {
-    SL2_DR_DEBUG("<in wrap_pre_ReadFile>\n");
-    HANDLE hFile                = drwrap_get_arg(wrapcxt, 0);
-    void *lpBuffer              = drwrap_get_arg(wrapcxt, 1);
-    #pragma warning(suppress: 4311 4302)
-    DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
-    DWORD *lpNumberOfBytesRead  = (DWORD*)drwrap_get_arg(wrapcxt, 3);
-
-    fileArgHash fStruct = {0};
-
-    LARGE_INTEGER offset = {0};
-    LARGE_INTEGER position = {0};
-    SetFilePointerEx(hFile, offset, &position, FILE_CURRENT);
-
-    GetFinalPathNameByHandle(hFile, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
-    fStruct.position = position.QuadPart;
-    fStruct.readSize = nNumberOfBytesToRead;
-
-    std::vector<unsigned char> blob_vec((unsigned char *) &fStruct,
-        ((unsigned char *) &fStruct) + sizeof(fileArgHash));
-    std::string hash_str;
-    picosha2::hash256_hex_string(blob_vec, hash_str);
-
-    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
-    client_read_info *info = (client_read_info *) *user_data;
-
-    info->lpBuffer             = lpBuffer;
-    info->nNumberOfBytesToRead = nNumberOfBytesToRead;
-    info->function             = Function::ReadFile;
-    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-
-    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    info->argHash[SL2_HASH_LEN] = 0;
-    memcpy(info->argHash, hash_str.c_str(), SL2_HASH_LEN);
+    client.wrap_pre_ReadFile(wrapcxt, user_data);
 }
 
 static void
 wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
 {
-    SL2_DR_DEBUG("<in wrap_pre_fread_s>\n");
-    void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
-    #pragma warning(suppress: 4311 4302)
-    size_t size  = (size_t)drwrap_get_arg(wrapcxt, 2);
-    #pragma warning(suppress: 4311 4302)
-    size_t count = (size_t)drwrap_get_arg(wrapcxt, 3);
-
-    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
-    client_read_info *info = (client_read_info *) *user_data;
-
-    info->function             = Function::fread_s;
-    info->lpBuffer             = buffer;
-    info->nNumberOfBytesToRead = size * count;
-    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+    client.wrap_pre_fread_s(wrapcxt, user_data);
 }
 
 static void
 wrap_pre_fread(void *wrapcxt, OUT void **user_data)
 {
-    SL2_DR_DEBUG("<in wrap_pre_fread>\n");
-    void *buffer = (void *)drwrap_get_arg(wrapcxt, 0);
-    #pragma warning(suppress: 4311 4302)
-    size_t size  = (size_t)drwrap_get_arg(wrapcxt, 1);
-    #pragma warning(suppress: 4311 4302)
-    size_t count = (size_t)drwrap_get_arg(wrapcxt, 2);
-
-    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
-    client_read_info *info = (client_read_info *) *user_data;
-
-    info->function             = Function::fread;
-    info->lpBuffer             = buffer;
-    info->nNumberOfBytesToRead = size * count;
-    info->retAddrOffset        = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+    client.wrap_pre_fread(wrapcxt, user_data);
 }
 
 static void
 wrap_pre__read(void *wrapcxt, OUT void **user_data)
 {
-    SL2_DR_DEBUG("<in wrap_pre__read>\n");
-
-    #pragma warning(suppress: 4311 4302)
-    int fd = (int) drwrap_get_arg(wrapcxt, 0);
-    void *buffer = drwrap_get_arg(wrapcxt, 1);
-    #pragma warning(suppress: 4311 4302)
-    unsigned int count = (unsigned int) drwrap_get_arg(wrapcxt, 2);
-
-    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
-    client_read_info *info = (client_read_info *) *user_data;
-
-    info->function             = Function::_read;
-    info->lpBuffer             = buffer;
-    info->nNumberOfBytesToRead = count;
-    info->lpNumberOfBytesRead  = NULL;
-    info->position             = NULL;
-    info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-    info->argHash              = NULL;
+    client.wrap_pre__read(wrapcxt, user_data);
 }
 
 /* Called after each targeted function to replay mutation and mark bytes as tainted */
