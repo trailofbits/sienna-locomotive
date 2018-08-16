@@ -108,20 +108,21 @@ bool SL2Client::compare_arg_hashes(targetFunction &t, client_read_info* info){
 }
 
 bool SL2Client::compare_arg_buffers(targetFunction &t, client_read_info* info){ // Not working
-    size_t  minimum = 16;
-
-    minimum = min( minimum, t.buffer.size() );
+    size_t minimum = min(16, t.buffer.size());
     if( info->lpNumberOfBytesRead ) {
         minimum = min( minimum, *info->lpNumberOfBytesRead) ;
     }
 
-    uint8_t* buf = (uint8_t*)info->lpBuffer;
-    int comp = memcmp( &t.buffer[0], buf, minimum );
-    SL2_DR_DEBUG("Comparing Argument Buffers (%s)\n", comp==0 ? "True" : "False");
-    if(comp==0) {
-        return true;
+
+    string left = "#[";
+    string right = "#[";
+    for(int i = 0; i < minimum; i++){
+        left += to_string(t.buffer[i]) + ((i < minimum - 1) ? ", " : "");
+        right += to_string(((uint8_t *) info->lpBuffer)[i]) + ((i < minimum - 1) ? ", " : "");
     }
-    return false;
+    SL2_DR_DEBUG("Comparing Argument Buffers (%s)\n%s]\n%s]\n", (memcmp(t.buffer.data(), info->lpBuffer, minimum) ? "False" : "True"), left.c_str(), right.c_str());
+
+    return !memcmp(t.buffer.data(), info->lpBuffer, minimum);
 }
 
 // Returns true if the function targets identified by the client can be used with
