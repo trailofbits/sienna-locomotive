@@ -94,9 +94,13 @@ bool SL2Client::compare_index_at_retaddr(targetFunction &t, client_read_info* in
     return ret_addr_counts[info->retAddrOffset] == t.retAddrCount;
 }
 
-bool SL2Client::compare_return_addresses(targetFunction &t, client_read_info* info){ // Not Working
-    SL2_DR_DEBUG("Comparing 0x%llx to 0x%llx (%s)\n", t.retAddrOffset, info->retAddrOffset, t.retAddrOffset == info->retAddrOffset ? "True" : "False");
-    return t.retAddrOffset == info->retAddrOffset;
+bool SL2Client::compare_return_addresses(targetFunction &t, client_read_info* info){
+    // Get around ASLR by only examining the bottom bits. This is something of a cheap hack and we should
+    // ideally store a copy of the memory map in every run
+    uint64_t left = t.retAddrOffset & SUB_ASLR_BITS;
+    uint64_t right = info->retAddrOffset & SUB_ASLR_BITS;
+    // SL2_DR_DEBUG("Comparing 0x%llx to 0x%llx (%s)\n", left, right, left == right ? "True" : "False");
+    return left == right;
 }
 
 bool SL2Client::compare_arg_hashes(targetFunction &t, client_read_info* info){

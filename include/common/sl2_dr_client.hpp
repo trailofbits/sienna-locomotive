@@ -47,6 +47,8 @@ extern "C" {
     dr_fprintf(STDERR, "\n");                                        \
 } while(0)
 
+#define SUB_ASLR_BITS 0xffff
+
 // Macros for the function prototypes passed to pre- and post-function hooks.
 
 

@@ -1225,8 +1225,6 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     void *lpBuffer              = info->lpBuffer;
     size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
     Function function           = info->function;
-    info->retAddrOffset         = (size_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-
 
     // Identify whether this is the function we want to target
     bool targeted = client.isFunctionTargeted( function, info );
