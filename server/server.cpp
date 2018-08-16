@@ -674,12 +674,8 @@ static void handle_set_arena(HANDLE pipe)
         if (prior.tries_remaining <= 0) {
             SL2_SERVER_LOG_INFO("no tries left, changing strategy (%d)!", prior.strategy + 1);
 
-            // NOTE(ww): We just increment the prior strategy, since each fuzzer
-            // will modulus its suggested strategy with the number of total strategies.
-            // This makes our log output a little bit harder to read, but keeps the implementation
-            // simple.
             wlock.lock();
-            strategy_map[arena.id] = { arena, score, prior.strategy + 1, opts.stickiness };
+            strategy_map[arena.id] = { arena, score, (prior.strategy + 1) % SL2_NUM_STRATEGIES, opts.stickiness };
             wlock.unlock();
         }
         else {
