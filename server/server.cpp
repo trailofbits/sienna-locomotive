@@ -41,7 +41,13 @@ struct strategy_state {
     uint32_t tries_remaining;
 };
 
+struct server_opts {
+    uint32_t stickiness;
+};
+
 typedef std::map<std::wstring, strategy_state> sl2_strategy_map_t;
+
+static server_opts opts = {0};
 
 // TODO(ww): Replace these with std::shared_mutex.
 static CRITICAL_SECTION pid_lock;
@@ -52,8 +58,6 @@ static HANDLE process_mutex = INVALID_HANDLE_VALUE;
 static wchar_t FUZZ_WORKING_PATH[MAX_PATH] = L"";
 static wchar_t FUZZ_ARENAS_PATH[MAX_PATH] = L"";
 static wchar_t FUZZ_LOG[MAX_PATH] = L"";
-
-static uint32_t FUZZ_STRATEGY_STICKINESS = 0;
 
 static std::shared_mutex strategy_mutex;
 static std::unique_lock<std::shared_mutex> wlock(strategy_mutex, std::defer_lock);
@@ -553,7 +557,7 @@ static void handle_get_arena(HANDLE pipe)
         // In the future, we should grab the last strategy tried
         // from the FKT and start with that.
         wlock.lock();
-        strategy_map[arena.id] = { arena, cov_count, 0, FUZZ_STRATEGY_STICKINESS };
+        strategy_map[arena.id] = { arena, cov_count, 0, opts.stickiness };
         wlock.unlock();
     }
 
@@ -612,7 +616,7 @@ static void handle_set_arena(HANDLE pipe)
     if (cov_count > prior.cov_count) {
         SL2_SERVER_LOG_INFO("coverage increased, continuing with strategy=%d", prior.strategy);
         wlock.lock();
-        strategy_map[arena.id] = { arena, cov_count, prior.strategy, FUZZ_STRATEGY_STICKINESS };
+        strategy_map[arena.id] = { arena, cov_count, prior.strategy, opts.stickiness };
         wlock.unlock();
     }
     else {
@@ -630,7 +634,7 @@ static void handle_set_arena(HANDLE pipe)
             // This makes our log output a little bit harder to read, but keeps the implementation
             // simple.
             wlock.lock();
-            strategy_map[arena.id] = { arena, cov_count, prior.strategy + 1, FUZZ_STRATEGY_STICKINESS };
+            strategy_map[arena.id] = { arena, cov_count, prior.strategy + 1, opts.stickiness };
             wlock.unlock();
         }
         else {
@@ -950,13 +954,13 @@ int main(int argc, char **argv)
 
     for (int i = 0; i < argc - 1; ++i) {
         if (STREQ(argv[i], "-s")) {
-            FUZZ_STRATEGY_STICKINESS = atoi(argv[i + 1]);
+            opts.stickiness = atoi(argv[i + 1]);
         }
     }
 
     init_working_paths();
 
-    SL2_SERVER_LOG_INFO("server started! FUZZ_STRATEGY_STICKINESS=%d", FUZZ_STRATEGY_STICKINESS);
+    SL2_SERVER_LOG_INFO("server started! stickiness=%d", opts.stickiness);
 
     InitializeCriticalSection(&pid_lock);
     InitializeCriticalSection(&fkt_lock);
