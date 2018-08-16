@@ -112,6 +112,9 @@ bool SL2Client::compare_arg_buffers(targetFunction &t, client_read_info* info){ 
     if( info->lpNumberOfBytesRead ) {
         minimum = min( minimum, *info->lpNumberOfBytesRead) ;
     }
+    else{
+        SL2_DR_DEBUG("[!] Couldn't get the size of the buffer! There's a small chance this could cause a segfault\n");
+    }
 
     return !memcmp(t.buffer.data(), info->lpBuffer, minimum);
 }
