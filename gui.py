@@ -497,7 +497,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def verboseCheckBox_clicked(self):
         state = self.verboseCheckBox.isChecked()
-        config.config['verbose'] = 1 if state else False
+        config.config['verbose'] = 2 if state else False
 
 
 if __name__ == '__main__':
