@@ -5,6 +5,11 @@
 
 #define SL2_EXPORT __declspec(dllexport)
 
+// The number of mutation strategies currently implemented by SL2.
+// NOTE(ww): This MUST be kept up-to-date with the size of SL2_STRATEGY_TABLE in mutation.(cpp|hpp).
+// We define it here so that other (non-DR) components can us it (e.g., the server).
+#define SL2_NUM_STRATEGIES 9
+
 // The size of a SHA256 hash.
 #define SL2_HASH_LEN 64
 
