@@ -38,6 +38,7 @@ struct strategy_state {
     sl2_arena arena;
     uint16_t cov_count;
     uint32_t strategy;
+    uint32_t tries_remaining;
 };
 
 typedef std::map<std::wstring, strategy_state> sl2_strategy_map_t;
@@ -51,6 +52,8 @@ static HANDLE process_mutex = INVALID_HANDLE_VALUE;
 static wchar_t FUZZ_WORKING_PATH[MAX_PATH] = L"";
 static wchar_t FUZZ_ARENAS_PATH[MAX_PATH] = L"";
 static wchar_t FUZZ_LOG[MAX_PATH] = L"";
+
+static uint32_t FUZZ_STRATEGY_STICKINESS = 0;
 
 static std::shared_mutex strategy_mutex;
 static std::unique_lock<std::shared_mutex> wlock(strategy_mutex, std::defer_lock);
@@ -550,7 +553,7 @@ static void handle_get_arena(HANDLE pipe)
         // In the future, we should grab the last strategy tried
         // from the FKT and start with that.
         wlock.lock();
-        strategy_map[arena.id] = { arena, cov_count, 0 };
+        strategy_map[arena.id] = { arena, cov_count, 0, FUZZ_STRATEGY_STICKINESS };
         wlock.unlock();
     }
 
@@ -602,24 +605,41 @@ static void handle_set_arena(HANDLE pipe)
 
     SL2_SERVER_LOG_INFO("cov_count=%d, prior.cov_count=%d", cov_count, prior.cov_count);
 
-    // If coverage has increased, continue with the current strategy.
+    // If coverage has increased, continue with the current strategy
+    // and reset the number of remaining tries.
+    //
     // Otherwise, try a new strategy.
     if (cov_count > prior.cov_count) {
         SL2_SERVER_LOG_INFO("coverage increased, continuing with strategy=%d", prior.strategy);
         wlock.lock();
-        strategy_map[arena.id] = { arena, cov_count, prior.strategy };
+        strategy_map[arena.id] = { arena, cov_count, prior.strategy, FUZZ_STRATEGY_STICKINESS };
         wlock.unlock();
     }
     else {
-        SL2_SERVER_LOG_INFO("coverage did NOT increase, changing strategies!");
-        // NOTE(ww): We just increment the prior strategy, since each fuzzer
-        // will modulus its suggested strategy with the number of total strategies.
-        // TODO(ww): We probably don't want to change strategies immediately after
-        // coverage fails to increase, since a single run on a strategy doesn't
-        // tell us all that much. What we need is a "stickiness" factor here.
-        wlock.lock();
-        strategy_map[arena.id] = { arena, cov_count, prior.strategy + 1 };
-        wlock.unlock();
+        SL2_SERVER_LOG_INFO("coverage did NOT increase!");
+
+        // If we've run out of tries for this strategy, move to a new one
+        // (and reset the number of tries).
+        //
+        // Otherwise, try again, and decrement the number of tries remaining.
+        if (prior.tries_remaining <= 0) {
+            SL2_SERVER_LOG_INFO("no tries left, changing strategy (%d)!", prior.strategy + 1);
+
+            // NOTE(ww): We just increment the prior strategy, since each fuzzer
+            // will modulus its suggested strategy with the number of total strategies.
+            // This makes our log output a little bit harder to read, but keeps the implementation
+            // simple.
+            wlock.lock();
+            strategy_map[arena.id] = { arena, cov_count, prior.strategy + 1, FUZZ_STRATEGY_STICKINESS };
+            wlock.unlock();
+        }
+        else {
+            SL2_SERVER_LOG_INFO("%d tries for strategy %d left", prior.tries_remaining - 1, prior.strategy);
+
+            wlock.lock();
+            strategy_map[arena.id] = { arena, cov_count, prior.strategy, prior.tries_remaining - 1 };
+            wlock.unlock();
+        }
     }
 
     // TODO(ww): We should try to avoid/minimize dumping the arena to disk.
@@ -917,21 +937,26 @@ static DWORD WINAPI thread_handler(void *data)
 }
 
 // Init dirs and create a new thread to handle input from the named pipe
-int main(int argvc, char **argv)
+int main(int argc, char **argv)
 {
     init_logging_path();
-    loguru::init(argvc, argv);
+    loguru::init(argc, argv);
     char log_path_mbs[MAX_PATH + 1]= {0};
     wcstombs_s(NULL, log_path_mbs, MAX_PATH, FUZZ_LOG, MAX_PATH);
     loguru::add_file(log_path_mbs, loguru::Append, loguru::Verbosity_MAX);
 
+    lock_process();
     std::atexit(server_cleanup);
 
-    lock_process();
+    for (int i = 0; i < argc - 1; ++i) {
+        if (STREQ(argv[i], "-s")) {
+            FUZZ_STRATEGY_STICKINESS = atoi(argv[i + 1]);
+        }
+    }
 
     init_working_paths();
 
-    SL2_SERVER_LOG_INFO("server started!");
+    SL2_SERVER_LOG_INFO("server started! FUZZ_STRATEGY_STICKINESS=%d", FUZZ_STRATEGY_STICKINESS);
 
     InitializeCriticalSection(&pid_lock);
     InitializeCriticalSection(&fkt_lock);
