@@ -217,7 +217,7 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
         do_mutation(&mutation);
     }
 
-    SL2_DR_DEBUG("mutate: %.*s\n", mutation.bufsize, mutation.buffer);
+//    SL2_DR_DEBUG("mutate: %.*s\n", mutation.bufsize, mutation.buffer);
 
     // Tell the server about our mutation.
     if (sl2_conn_register_mutation(&sl2_conn, &mutation) != SL2Response::OK) {
@@ -381,7 +381,6 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     // Grab stored metadata
     size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
     Function function           = info->function;
-    info->retAddrOffset         = (size_t) drwrap_get_retaddr(wrapcxt) - client.baseAddr;
 
     // Identify whether this is the function we want to target
     bool targeted = client.isFunctionTargeted(function, info);

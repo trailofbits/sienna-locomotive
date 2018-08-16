@@ -57,33 +57,66 @@ isFunctionTargeted(Function function, client_read_info* info)
 
     for (targetFunction t : parsedJson){
         if (t.selected && STREQ(t.functionName.c_str(), func_name)) {
-            if (t.mode & MATCH_INDEX && call_counts[function] == t.index) {
-                return true;
-            }
-            else if (t.mode & MATCH_RETN_ADDRESS && t.retAddrOffset == info->retAddrOffset) {
-                return true;
-            }
-            else if (t.mode & MATCH_ARG_HASH && !strcmp(t.argHash.c_str(), info->argHash)) {
-                return true;
-            }
-            else if( t.mode & MATCH_ARG_COMPARE ) {
-                size_t  minimum = 16;
-                int     comp;
-
-                minimum = min( minimum, t.buffer.size() );
-                if( info->lpNumberOfBytesRead ) {
-                    minimum = min( minimum, *info->lpNumberOfBytesRead) ;
+                if (t.mode & MATCH_INDEX)           { if (compare_indices(t, function)) {return true;}}
+                if (t.mode & MATCH_RETN_ADDRESS)    { if (compare_return_addresses(t, info)) {return true;}}
+                if (t.mode & MATCH_ARG_HASH)        { if (compare_arg_hashes(t, info)) {return true;}}
+                if (t.mode & MATCH_ARG_COMPARE)     { if (compare_arg_buffers(t, info)) {return true;}}
+                if (t.mode & MATCH_FILENAMES)       { if (compare_filenames(t, info)) {return true;}}
+                if (t.mode & MATCH_RETN_COUNT)      { if (compare_index_at_retaddr(t, info)) {return true;}}
+                if (t.mode & LOW_PRECISION) {
+                    if (info->source) { // if filename is available
+                        if (compare_filenames(t, info)) {return true;}
+                    } else {
+                        if (compare_return_addresses(t, info) && compare_arg_buffers(t, info)) {return true;}
+                    }
                 }
-
-                uint8_t* buf = (uint8_t*)info->lpBuffer;
-                comp = memcmp( &t.buffer[0], buf, minimum );
-                if(comp==0) {
-                    return true;
+                if (t.mode & MEDIUM_PRECISION) {
+                    if (compare_arg_hashes(t, info) && compare_return_addresses(t, info)) {return true;}
                 }
-            }
+                if (t.mode & HIGH_PRECISION) {
+                    if (compare_arg_hashes(t, info) && compare_index_at_retaddr(t, info)) {return true;}
+                }
+                else {return false;}
         }
     }
     return false;
+}
+
+bool SL2Client::compare_filenames(targetFunction &t, client_read_info* info){
+    return !wcscmp(t.source.c_str(), info->source);
+}
+
+bool SL2Client::compare_indices(targetFunction &t, Function &function){
+    return call_counts[function] == t.index;
+}
+
+bool SL2Client::compare_index_at_retaddr(targetFunction &t, client_read_info* info){
+    return ret_addr_counts[info->retAddrOffset] == t.retAddrCount;
+}
+
+bool SL2Client::compare_return_addresses(targetFunction &t, client_read_info* info){
+    // Get around ASLR by only examining the bottom bits. This is something of a cheap hack and we should
+    // ideally store a copy of the memory map in every run
+    uint64_t left = t.retAddrOffset & SUB_ASLR_BITS;
+    uint64_t right = info->retAddrOffset & SUB_ASLR_BITS;
+    // SL2_DR_DEBUG("Comparing 0x%llx to 0x%llx (%s)\n", left, right, left == right ? "True" : "False");
+    return left == right;
+}
+
+bool SL2Client::compare_arg_hashes(targetFunction &t, client_read_info* info){
+    return STREQ(t.argHash.c_str(), info->argHash);
+}
+
+bool SL2Client::compare_arg_buffers(targetFunction &t, client_read_info* info){ // Not working
+    size_t minimum = min(16, t.buffer.size());
+    if( info->lpNumberOfBytesRead ) {
+        minimum = min( minimum, *info->lpNumberOfBytesRead) ;
+    }
+    else{
+        SL2_DR_DEBUG("[!] Couldn't get the size of the buffer! There's a small chance this could cause a segfault\n");
+    }
+
+    return !memcmp(t.buffer.data(), info->lpBuffer, minimum);
 }
 
 // Returns true if the function targets identified by the client can be used with
@@ -139,6 +172,11 @@ generateArenaId(wchar_t *id)
 uint64_t    SL2Client::
 incrementCallCountForFunction(Function function) {
     return call_counts[function]++;
+}
+
+uint64_t    SL2Client::
+incrementRetAddrCount(uint64_t retAddr) {
+    return ret_addr_counts[retAddr]++;
 }
 
 
@@ -619,11 +657,17 @@ void from_json(const json& j, targetFunction& t)
 {
     t.selected      = j.value("selected", false);
     t.index         = j.value("callCount", -1);
-    t.mode          = j.value("mode", MATCH_INDEX);
+    t.retAddrCount  = j.value("retAddrCount", -1);
+    t.mode          = j.value("mode", MATCH_INDEX); // TODO - might want to chose a more sensible default
     t.retAddrOffset = j.value("retAddrOffset", -1);
     t.functionName  = j.value("func_name", "");
     t.argHash       = j.value("argHash", "");
     t.buffer        = j["buffer"].get<vector<uint8_t>>();
+
+    string source        = j.value("source", "");
+    wstring wsource;
+    wsource.assign(source.begin(), source.end());
+    t.source = wsource;
 }
 
 SL2_EXPORT

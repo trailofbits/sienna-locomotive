@@ -835,7 +835,7 @@ static void handle_register_pid(HANDLE pipe)
         }
     }
     else {
-        SL2_SERVER_LOG_ERROR("failed to open pids_file=%S, not recording pid!");
+        SL2_SERVER_LOG_ERROR("failed to open pids_file=%S, not recording pid!", pids_file);
     }
 
     LeaveCriticalSection(&pid_lock);

@@ -23,15 +23,15 @@ CONFIG_SCHEMA = {}
 
 PATH_KEYS = ['drrun_path', 'client_path', 'server_path', 'wizard_path', 'tracer_path', 'triager_path']
 ARGS_KEYS = ['drrun_args', 'client_args', 'server_args', 'target_args']
-INT_KEYS = ['runs', 'simultaneous', 'fuzz_timeout', 'triage_timeout', 'seed']
-FLAG_KEYS = ['verbose', 'debug', 'nopersist', 'continuous', 'exit_early', 'inline_stdout', 'preserve_runs']
+INT_KEYS = ['runs', 'simultaneous', 'fuzz_timeout', 'triage_timeout', 'seed', 'verbose']
+FLAG_KEYS = ['debug', 'nopersist', 'continuous', 'exit_early', 'inline_stdout', 'preserve_runs']
 
 profile = 'DEFAULT'
 
 for path in PATH_KEYS:
     CONFIG_SCHEMA[path] = {
         'test': os.path.isfile,
-        'expected': 'path to a extant file',
+        'expected': 'path to an existing file',
         'required': True,
     }
 
@@ -44,7 +44,7 @@ for args in ARGS_KEYS:
 
 for num in INT_KEYS:
     CONFIG_SCHEMA[num] = {
-        'test': lambda x: type(x) is int and x > 0,
+        'test': lambda x: type(x) is int and x >= 0,
         'expected': 'nonnegative integer',
         'required': False,
     }
@@ -109,9 +109,9 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument(
     '-v', '--verbose',
-    action='store_true',
+    action='count',
+    default=0,
     dest='verbose',
-    default=False,
     help="Tell drrun to run in verbose mode")
 
 parser.add_argument(
@@ -273,7 +273,6 @@ def create_new_profile(name, dynamorio_exe, build_dir, target_path, target_args)
         'runs': 1,
         'simultaneous': 1,
         'inline_stdout': False,
-        'preserve_runs': False,
     }
 
     with open(sl2_config_path, 'w') as configfile:

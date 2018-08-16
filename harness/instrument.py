@@ -43,6 +43,11 @@ class Mode(IntEnum):
     MATCH_RETN_ADDRESS = 1 << 1
     MATCH_ARG_HASH = 1 << 2
     MATCH_ARG_COMPARE = 1 << 3
+    LOW_PRECISION = 1 << 4
+    MEDIUM_PRECISION = 1 << 5
+    HIGH_PRECISION = 1 << 6
+    MATCH_FILENAMES = 1 << 7
+    MATCH_RETN_COUNT = 1 << 8
 
 
 class DRRun(NamedTuple):
@@ -80,7 +85,7 @@ def start_server():
     named_mutex.spin_named_mutex('fuzz_server_mutex')
 
 
-def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False):
+def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
     """
     Runs dynamorio with the given config.
     Clobbers console output if save_stderr/stdout are true.
@@ -95,7 +100,7 @@ def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False)
     # Run client on target application
     started = time.time()
 
-    stdout = sys.stdout if config_dict['inline_stdout'] else subprocess.PIPE
+    stdout = sys.stdout if (verbose > 1) or config_dict['inline_stdout'] else subprocess.PIPE
     stderr = subprocess.PIPE
     popen_obj = subprocess.Popen(invoke.cmd_arr,
                                  stdout=stdout,
@@ -112,6 +117,12 @@ def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False)
         popen_obj.stdout = stdout
         popen_obj.stderr = stderr
         popen_obj.timed_out = False
+
+        if verbose > 1:
+            try:
+                print_l(popen_obj.stderr.decode(sys.stderr.encoding))
+            except UnicodeDecodeError:
+                pass
 
         # If the server wasn't running
         if b'ERROR' in popen_obj.stderr and b'connection' in popen_obj.stderr:
@@ -140,7 +151,7 @@ def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False)
                             try:
                                 os.kill(pid, signal.SIGTERM)
                             except (PermissionError, OSError) as e:
-                                print_l("WARNING: Couldn't kill child proces (maybe already dead?):", e)
+                                print_l("WARNING: Couldn't kill child process (maybe already dead?):", e)
                                 print_l("Try running the harness as an Administrator.")
             except FileNotFoundError:
                 print_l("The PID file was missing so we couldn't kill the child process.")
@@ -225,7 +236,7 @@ def wizard_run(config_dict):
                 if ".exe" in obj["mod_name"]:
                     base_addr = obj["start"]
             elif "id" == obj["type"]:
-                obj['mode'] = Mode.MATCH_INDEX
+                obj['mode'] = Mode.HIGH_PRECISION
                 obj['selected'] = False
                 ret_addr = obj["retAddrOffset"] + base_addr
                 for addrs in mem_map.keys():
