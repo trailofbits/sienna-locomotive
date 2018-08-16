@@ -85,7 +85,7 @@ def start_server():
     named_mutex.spin_named_mutex('fuzz_server_mutex')
 
 
-def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False):
+def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
     """
     Runs dynamorio with the given config.
     Clobbers console output if save_stderr/stdout are true.
@@ -100,7 +100,7 @@ def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False)
     # Run client on target application
     started = time.time()
 
-    stdout = sys.stdout if config_dict['inline_stdout'] else subprocess.PIPE
+    stdout = sys.stdout if (verbose > 1) or config_dict['inline_stdout'] else subprocess.PIPE
     stderr = subprocess.PIPE
     popen_obj = subprocess.Popen(invoke.cmd_arr,
                                  stdout=stdout,
@@ -117,6 +117,12 @@ def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False)
         popen_obj.stdout = stdout
         popen_obj.stderr = stderr
         popen_obj.timed_out = False
+
+        if verbose > 1:
+            try:
+                print_l(popen_obj.stderr.decode(sys.stderr.encoding))
+            except UnicodeDecodeError:
+                pass
 
         # If the server wasn't running
         if b'ERROR' in popen_obj.stderr and b'connection' in popen_obj.stderr:
