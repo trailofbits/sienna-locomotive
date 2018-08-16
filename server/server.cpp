@@ -664,6 +664,8 @@ static void handle_set_arena(HANDLE pipe)
         wlock.lock();
         strategy_map[arena.id] = { arena, score, prior.strategy, opts.stickiness };
         wlock.unlock();
+
+        // TODO(ww): Update the success_map here.
     }
     else {
         SL2_SERVER_LOG_INFO("coverage score did NOT increase!");
@@ -673,6 +675,7 @@ static void handle_set_arena(HANDLE pipe)
         //
         // Otherwise, try again, and decrement the number of tries remaining.
         if (prior.tries_remaining <= 0) {
+            // TODO(ww): Retrieve a new strategy from the success_map map.
             uint32_t strategy = (prior.strategy + 1) % SL2_NUM_STRATEGIES;
             SL2_SERVER_LOG_INFO("no tries left, changing strategy (%d)!", strategy);
 
