@@ -42,6 +42,9 @@ class Mode(IntEnum):
     MATCH_RETN_ADDRESS = 1 << 1
     MATCH_ARG_HASH = 1 << 2
     MATCH_ARG_COMPARE = 1 << 3
+    LOW_PRECISION = 1 << 4
+    MEDIUM_PRECISION = 1 << 5
+    HIGH_PRECISION = 1 << 6
 
 
 class DRRun(NamedTuple):
@@ -109,6 +112,8 @@ def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False)
         popen_obj.stdout = stdout
         popen_obj.stderr = stderr
         popen_obj.timed_out = False
+
+        print(popen_obj.stderr.decode('utf-8'))
 
         # If the server wasn't running
         if b'ERROR' in popen_obj.stderr and b'connection' in popen_obj.stderr:
@@ -219,7 +224,7 @@ def wizard_run(config_dict):
                 if ".exe" in obj["mod_name"]:
                     base_addr = obj["start"]
             elif "id" == obj["type"]:
-                obj['mode'] = Mode.MATCH_INDEX
+                obj['mode'] = Mode.HIGH_PRECISION
                 obj['selected'] = False
                 ret_addr = obj["retAddrOffset"] + base_addr
                 for addrs in mem_map.keys():

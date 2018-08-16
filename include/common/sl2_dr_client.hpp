@@ -85,19 +85,22 @@ enum class Function {
     _read,
 };
 
-// The set of supported function targetting techniques.
+// The set of supported function targeting techniques.
 enum {
     // Target a function by its index, e.g. the 5th `fread` call
-    MATCH_INDEX = 1 << 0,
-
+    MATCH_INDEX         = 1 << 0,
     // Target a function by its address, e.g. the `fread` at address 0x0000000a
-    MATCH_RETN_ADDRESS = 1 << 1,
-
+    MATCH_RETN_ADDRESS  = 1 << 1,
     // Target a function by a hash calculated from its arguments
-    MATCH_ARG_HASH = 1 << 2,
-
+    MATCH_ARG_HASH      = 1 << 2,
     // Target a function by contents of argument buffer
-    MATCH_ARG_COMPARE = 1 << 3,
+    MATCH_ARG_COMPARE   = 1 << 3,
+    // Target a single file across multiple reads
+    LOW_PRECISION       = 1 << 4,
+    // Target a single buffer across multiple reads
+    MEDIUM_PRECISION    = 1 << 5,
+    // Target a single read from a single buffer
+    HIGH_PRECISION      = 1 << 6,
 
 };
 
@@ -116,8 +119,10 @@ typedef struct targetFunction {
     uint64_t                index;
     uint64_t                mode;
     uint64_t                retAddrOffset;
+    uint64_t                retAddrCount;
     string                  functionName;
     string                  argHash;
+    wstring                  source;
     vector<uint8_t>         buffer;
 } TargetFunction;
 
@@ -167,12 +172,19 @@ public:
     // Variables
     // TODO(ww): Subsume sl2_conn under SL2Client.
     map<Function, uint64_t>     call_counts;
+    map<uint64_t, uint64_t>     ret_addr_counts;
     json                        parsedJson;
     uint64_t                    baseAddr;
 
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Methods
     bool        isFunctionTargeted(Function function,  client_read_info* info);
+    bool        compare_filenames(targetFunction &t, client_read_info* info);
+    bool        compare_indices(targetFunction &t, Function &function);
+    bool        compare_index_at_retaddr(targetFunction &t, client_read_info* info);
+    bool        compare_return_addresses(targetFunction &t, client_read_info* info);
+    bool        compare_arg_hashes(targetFunction &t, client_read_info* info);
+    bool        compare_arg_buffers(targetFunction &t, client_read_info* info);
     void        wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data);
     void        wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data);
     void        wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data);
@@ -187,6 +199,7 @@ public:
     void        generateArenaId(wchar_t *id);
     bool        loadJson(string json);
     uint64_t    incrementCallCountForFunction(Function function);
+    uint64_t    incrementRetAddrCount(uint64_t retAddr);
 
 };
 

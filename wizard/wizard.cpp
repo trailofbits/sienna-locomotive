@@ -14,8 +14,6 @@
 using namespace std;
 
 static SL2Client client;
-static std::map<Function, uint64_t, std::less<Function>, sl2_dr_allocator<std::pair<const Function, uint64_t>>> call_counts;
-
 /* Run whenever a thread inits/exits */
 static void
 on_thread_init(void *drcontext)
@@ -138,11 +136,12 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 
     json j;
     j["type"]               = "id";
-    j["callCount"]          = call_counts[info->function];
+    j["callCount"]          = client.incrementCallCountForFunction(info->function);
+    j["retAddrCount"]       = client.incrementRetAddrCount(info->retAddrOffset);
     j["retAddrOffset"]      = (uint64_t) info->retAddrOffset;
     j["func_name"]          = func_name;
 
-    call_counts[info->function]++;
+
 
     if(info->source != NULL) {
         wstring wsource =  wstring(info->source);

@@ -57,31 +57,64 @@ isFunctionTargeted(Function function, client_read_info* info)
 
     for (targetFunction t : parsedJson){
         if (t.selected && STREQ(t.functionName.c_str(), func_name)) {
-            if (t.mode & MATCH_INDEX && call_counts[function] == t.index) {
-                return true;
-            }
-            else if (t.mode & MATCH_RETN_ADDRESS && t.retAddrOffset == info->retAddrOffset) {
-                return true;
-            }
-            else if (t.mode & MATCH_ARG_HASH && !strcmp(t.argHash.c_str(), info->argHash)) {
-                return true;
-            }
-            else if( t.mode & MATCH_ARG_COMPARE ) {
-                size_t  minimum = 16;
-                int     comp;
-
-                minimum = min( minimum, t.buffer.size() );
-                if( info->lpNumberOfBytesRead ) {
-                    minimum = min( minimum, *info->lpNumberOfBytesRead) ;
+                if (t.mode & MATCH_INDEX)           { if (compare_indices(t, function)) {return true;}}
+                if (t.mode & MATCH_RETN_ADDRESS)    { if (compare_return_addresses(t, info)) {return true;}}
+                if (t.mode & MATCH_ARG_HASH)        { if (compare_arg_hashes(t, info)) {return true;}}
+                if (t.mode & MATCH_ARG_COMPARE)     { if (compare_arg_buffers(t, info)) {return true;}}
+                if (t.mode & LOW_PRECISION) {
+                    if (info->source) { // if filename is available
+                        if (compare_filenames(t, info)) {return true;}
+                    } else {
+                        if (compare_return_addresses(t, info) && compare_arg_buffers(t, info)) {return true;}
+                    }
                 }
-
-                uint8_t* buf = (uint8_t*)info->lpBuffer;
-                comp = memcmp( &t.buffer[0], buf, minimum );
-                if(comp==0) {
-                    return true;
+                if (t.mode & MEDIUM_PRECISION) {
+                    if (compare_arg_hashes(t, info) && compare_return_addresses(t, info)) {return true;}
                 }
-            }
+                if (t.mode & HIGH_PRECISION) {
+                    if (compare_arg_hashes(t, info) && compare_index_at_retaddr(t, info)) {return true;}
+                }
+                else {return false;}
         }
+    }
+    return false;
+}
+
+bool SL2Client::compare_filenames(targetFunction &t, client_read_info* info){
+    return !wcscmp(t.source.c_str(), info->source);
+}
+
+bool SL2Client::compare_indices(targetFunction &t, Function &function){
+    return call_counts[function] == t.index;
+}
+
+bool SL2Client::compare_index_at_retaddr(targetFunction &t, client_read_info* info){
+    return ret_addr_counts[info->retAddrOffset] == t.retAddrCount;
+}
+
+bool SL2Client::compare_return_addresses(targetFunction &t, client_read_info* info){ // Not Working
+    SL2_DR_DEBUG("Comparing 0x%llx to 0x%llx (%s)\n", t.retAddrOffset, info->retAddrOffset, t.retAddrOffset == info->retAddrOffset ? "True" : "False");
+    return t.retAddrOffset == info->retAddrOffset;
+}
+
+bool SL2Client::compare_arg_hashes(targetFunction &t, client_read_info* info){
+    return STREQ(t.argHash.c_str(), info->argHash);
+}
+
+bool SL2Client::compare_arg_buffers(targetFunction &t, client_read_info* info){ // Not working
+    size_t  minimum = 16;
+    int     comp;
+
+    minimum = min( minimum, t.buffer.size() );
+    if( info->lpNumberOfBytesRead ) {
+        minimum = min( minimum, *info->lpNumberOfBytesRead) ;
+    }
+
+    uint8_t* buf = (uint8_t*)info->lpBuffer;
+    comp = memcmp( &t.buffer[0], buf, minimum );
+    SL2_DR_DEBUG("Comparing Argument Buffers (%s)\n", comp==0 ? "True" : "False");
+    if(comp==0) {
+        return true;
     }
     return false;
 }
@@ -139,6 +172,11 @@ generateArenaId(wchar_t *id)
 uint64_t    SL2Client::
 incrementCallCountForFunction(Function function) {
     return call_counts[function]++;
+}
+
+uint64_t    SL2Client::
+incrementRetAddrCount(uint64_t retAddr) {
+    return ret_addr_counts[retAddr]++;
 }
 
 
@@ -619,11 +657,17 @@ void from_json(const json& j, targetFunction& t)
 {
     t.selected      = j.value("selected", false);
     t.index         = j.value("callCount", -1);
-    t.mode          = j.value("mode", MATCH_INDEX);
+    t.retAddrCount  = j.value("retAddrCount", -1);
+    t.mode          = j.value("mode", MATCH_INDEX); // TODO - might want to chose a more sensible default
     t.retAddrOffset = j.value("retAddrOffset", -1);
     t.functionName  = j.value("func_name", "");
     t.argHash       = j.value("argHash", "");
     t.buffer        = j["buffer"].get<vector<uint8_t>>();
+
+    string source        = j.value("source", "");
+    wstring wsource;
+    wsource.assign(source.begin(), source.end());
+    t.source = wsource;
 }
 
 SL2_EXPORT

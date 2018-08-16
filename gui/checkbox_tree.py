@@ -2,7 +2,13 @@ from PySide2.QtWidgets import QTreeView, QComboBox, QStyledItemDelegate, QItemDe
 from PySide2.QtGui import QStandardItem, QStandardItemModel
 from PySide2.QtCore import Signal, Qt, QSortFilterProxyModel
 
-mode_labels = {1: "Nth Call", 2: "Return Address", 4: "Argument Hash", 8: "Argument Comparison"}
+mode_labels = {1: "Nth Call",
+               2: "Return Address",
+               4: "Argument Hash",
+               8: "Argument Comparison",
+               16: "Fuzzy",
+               32: "Medium Precision",
+               64: "High Precision"}
 
 
 class ComboboxTreeItemDelegate(QStyledItemDelegate):
