@@ -39,6 +39,7 @@ struct strategy_state {
     uint32_t score;
     uint32_t strategy;
     uint32_t tries_remaining;
+    std::map<uint32_t, uint32_t> success_map;
 };
 
 struct server_opts {
