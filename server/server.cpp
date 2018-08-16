@@ -36,7 +36,7 @@
 
 struct strategy_state {
     sl2_arena arena;
-    uint16_t cov_count;
+    uint32_t score;
     uint32_t strategy;
     uint32_t tries_remaining;
 };
@@ -65,19 +65,63 @@ static std::unique_lock<std::shared_mutex> wlock(strategy_mutex, std::defer_lock
 static std::shared_lock<std::shared_mutex> rlock(strategy_mutex, std::defer_lock);
 static sl2_strategy_map_t strategy_map;
 
-static uint16_t coverage_count(sl2_arena *arena)
-{
-    uint16_t count = 0;
+// Scores the coverage of the given arena by placing
+// hit counts into buckets: higher scores are given
+// for relatively small counts, while large counts
+// are given lower scores.
+static uint32_t bucket_score(sl2_arena *arena) {
+    uint32_t score = 0;
 
-    // TODO(ww): Perform bucketing here, instead of a just a dumb hit count.
-    // TODO(ww): This can be trivally unrolled/vectorized for a performance boost.
     for (int i = 0; i < FUZZ_ARENA_SIZE; ++i) {
-        if (arena->map[i]) {
-            count++;
+        if (!arena->map[i]) {
+            continue;
+        }
+
+        if (arena->map[i] <= 3) {
+            score += 32;
+        }
+        else if (arena->map[i] <= 7) {
+            score += 16;
+        }
+        else if (arena->map[i] <= 15) {
+            score += 8;
+        }
+        else if (arena->map[i] <= 31) {
+            score += 4;
+        }
+        else if (arena->map[i] <= 127) {
+            score += 2;
+        }
+        else {
+            score += 1;
         }
     }
 
-    return count;
+    return score;
+}
+
+// Scores the coverage of the given arena with
+// a dumb hit counter: the ultimate score
+// is the number of nonzero cells in the arena.
+static uint32_t coverage_count(sl2_arena *arena) {
+    uint32_t score = 0;
+
+    for (int i = 0; i < FUZZ_ARENA_SIZE; ++i) {
+        if (arena->map[i]) {
+            score++;
+        }
+    }
+
+    return score;
+}
+
+static uint32_t coverage_score(sl2_arena *arena)
+{
+    if (opts.bucketing) {
+        return bucket_score(arena);
+    }
+
+    return coverage_count(arena);
 }
 
 /* concurrency protection */
@@ -550,15 +594,15 @@ static void handle_get_arena(HANDLE pipe)
             }
         }
 
-        uint16_t cov_count = coverage_count(&arena);
+        uint32_t score = coverage_score(&arena);
 
-        SL2_SERVER_LOG_INFO("cov_count=%d", cov_count);
+        SL2_SERVER_LOG_INFO("score=%d", score);
 
         // NOTE(ww): Start at strategy #0, because why not.
         // In the future, we should grab the last strategy tried
         // from the FKT and start with that.
         wlock.lock();
-        strategy_map[arena.id] = { arena, cov_count, 0, opts.stickiness };
+        strategy_map[arena.id] = { arena, score, 0, opts.stickiness };
         wlock.unlock();
     }
 
@@ -606,22 +650,22 @@ static void handle_set_arena(HANDLE pipe)
 
     strategy_state prior = it->second;
 
-    uint16_t cov_count = coverage_count(&arena);
+    uint32_t score = coverage_score(&arena);
 
-    SL2_SERVER_LOG_INFO("cov_count=%d, prior.cov_count=%d", cov_count, prior.cov_count);
+    SL2_SERVER_LOG_INFO("score=%d, prior.score=%d", score, prior.score);
 
     // If coverage has increased, continue with the current strategy
     // and reset the number of remaining tries.
     //
     // Otherwise, try a new strategy.
-    if (cov_count > prior.cov_count) {
-        SL2_SERVER_LOG_INFO("coverage increased, continuing with strategy=%d", prior.strategy);
+    if (score > prior.score) {
+        SL2_SERVER_LOG_INFO("coverage score increased, continuing with strategy=%d", prior.strategy);
         wlock.lock();
-        strategy_map[arena.id] = { arena, cov_count, prior.strategy, opts.stickiness };
+        strategy_map[arena.id] = { arena, score, prior.strategy, opts.stickiness };
         wlock.unlock();
     }
     else {
-        SL2_SERVER_LOG_INFO("coverage did NOT increase!");
+        SL2_SERVER_LOG_INFO("coverage score did NOT increase!");
 
         // If we've run out of tries for this strategy, move to a new one
         // (and reset the number of tries).
@@ -635,14 +679,14 @@ static void handle_set_arena(HANDLE pipe)
             // This makes our log output a little bit harder to read, but keeps the implementation
             // simple.
             wlock.lock();
-            strategy_map[arena.id] = { arena, cov_count, prior.strategy + 1, opts.stickiness };
+            strategy_map[arena.id] = { arena, score, prior.strategy + 1, opts.stickiness };
             wlock.unlock();
         }
         else {
             SL2_SERVER_LOG_INFO("%d tries for strategy %d left", prior.tries_remaining - 1, prior.strategy);
 
             wlock.lock();
-            strategy_map[arena.id] = { arena, cov_count, prior.strategy, prior.tries_remaining - 1 };
+            strategy_map[arena.id] = { arena, score, prior.strategy, prior.tries_remaining - 1 };
             wlock.unlock();
         }
     }
