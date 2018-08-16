@@ -997,9 +997,14 @@ int main(int argc, char **argv)
     lock_process();
     std::atexit(server_cleanup);
 
-    for (int i = 0; i < argc - 1; ++i) {
+    for (int i = 0; i < argc; ++i) {
         if (STREQ(argv[i], "-s")) {
-            opts.stickiness = atoi(argv[i + 1]);
+            if (i < argc - 1) {
+                opts.stickiness = atoi(argv[i + 1]);
+            }
+            else {
+                SL2_SERVER_LOG_WARN("expected number after -s, none given?");
+            }
         }
         else if (STREQ(argv[i], "-b")) {
             opts.bucketing = true;
