@@ -42,6 +42,7 @@ struct strategy_state {
 };
 
 struct server_opts {
+    bool bucketing;
     uint32_t stickiness;
 };
 
@@ -956,11 +957,15 @@ int main(int argc, char **argv)
         if (STREQ(argv[i], "-s")) {
             opts.stickiness = atoi(argv[i + 1]);
         }
+        else if (STREQ(argv[i], "-b")) {
+            opts.bucketing = true;
+        }
     }
 
     init_working_paths();
 
-    SL2_SERVER_LOG_INFO("server started! stickiness=%d", opts.stickiness);
+    SL2_SERVER_LOG_INFO("server started!");
+    SL2_SERVER_LOG_INFO("bucketing=%d, stickiness=%d", opts.bucketing, opts.stickiness);
 
     InitializeCriticalSection(&pid_lock);
     InitializeCriticalSection(&fkt_lock);
