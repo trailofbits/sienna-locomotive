@@ -45,6 +45,8 @@ class Mode(IntEnum):
     LOW_PRECISION = 1 << 4
     MEDIUM_PRECISION = 1 << 5
     HIGH_PRECISION = 1 << 6
+    MATCH_FILENAMES = 1 << 7
+    MATCH_RETN_COUNT = 1 << 8
 
 
 class DRRun(NamedTuple):

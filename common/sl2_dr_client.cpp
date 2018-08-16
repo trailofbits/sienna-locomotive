@@ -61,6 +61,8 @@ isFunctionTargeted(Function function, client_read_info* info)
                 if (t.mode & MATCH_RETN_ADDRESS)    { if (compare_return_addresses(t, info)) {return true;}}
                 if (t.mode & MATCH_ARG_HASH)        { if (compare_arg_hashes(t, info)) {return true;}}
                 if (t.mode & MATCH_ARG_COMPARE)     { if (compare_arg_buffers(t, info)) {return true;}}
+                if (t.mode & MATCH_FILENAMES)       { if (compare_filenames(t, info)) {return true;}}
+                if (t.mode & MATCH_RETN_COUNT)      { if (compare_index_at_retaddr(t, info)) {return true;}}
                 if (t.mode & LOW_PRECISION) {
                     if (info->source) { // if filename is available
                         if (compare_filenames(t, info)) {return true;}

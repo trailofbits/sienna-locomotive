@@ -101,6 +101,10 @@ enum {
     MEDIUM_PRECISION    = 1 << 5,
     // Target a single read from a single buffer
     HIGH_PRECISION      = 1 << 6,
+    // Target a byte-for-byte filename
+    MATCH_FILENAMES     = 1 << 7,
+    // Target call counts by return address
+    MATCH_RETN_COUNT    = 1 << 8,
 
 };
 
