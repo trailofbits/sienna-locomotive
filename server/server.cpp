@@ -672,10 +672,11 @@ static void handle_set_arena(HANDLE pipe)
         //
         // Otherwise, try again, and decrement the number of tries remaining.
         if (prior.tries_remaining <= 0) {
-            SL2_SERVER_LOG_INFO("no tries left, changing strategy (%d)!", prior.strategy + 1);
+            uint32_t strategy = (prior.strategy + 1) % SL2_NUM_STRATEGIES;
+            SL2_SERVER_LOG_INFO("no tries left, changing strategy (%d)!", strategy);
 
             wlock.lock();
-            strategy_map[arena.id] = { arena, score, (prior.strategy + 1) % SL2_NUM_STRATEGIES, opts.stickiness };
+            strategy_map[arena.id] = { arena, score, strategy, opts.stickiness };
             wlock.unlock();
         }
         else {
