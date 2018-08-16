@@ -22,7 +22,7 @@ import shlex
 CONFIG_SCHEMA = {}
 
 PATH_KEYS = ['drrun_path', 'client_path', 'server_path', 'wizard_path', 'tracer_path', 'triager_path']
-ARGS_KEYS = ['drrun_args', 'client_args', 'target_args']
+ARGS_KEYS = ['drrun_args', 'client_args', 'server_args', 'target_args']
 INT_KEYS = ['runs', 'simultaneous', 'fuzz_timeout', 'triage_timeout', 'seed']
 FLAG_KEYS = ['verbose', 'debug', 'nopersist', 'continuous', 'exit_early', 'inline_stdout', 'preserve_runs']
 
@@ -79,6 +79,7 @@ if not os.path.exists(sl2_config_path):
         'client_path': 'build\\fuzz_dynamorio\\Debug\\fuzzer.dll',
         'client_args': '',
         'server_path': 'build\\server\\Debug\\server.exe',
+        'server_args': '',
         'wizard_path': 'build\\wizard\\Debug\\wizard.dll',
         'tracer_path': 'build\\triage_dynamorio\\Debug\\tracer.dll',
         'triager_path': 'build\\triage\\Debug\\triager.exe',
@@ -263,6 +264,7 @@ def create_new_profile(name, dynamorio_exe, build_dir, target_path, target_args)
         'client_path': os.path.join(build_dir, 'fuzz_dynamorio\\Debug\\fuzzer.dll'),
         'client_args': '',
         'server_path': os.path.join(build_dir, 'server\\Debug\\server.exe'),
+        'server_args': '',
         'wizard_path': os.path.join(build_dir, 'wizard\\Debug\\wizard.dll'),
         'tracer_path': os.path.join(build_dir, 'triage_dynamorio\\Debug\\tracer.dll'),
         'triager_path': os.path.join(build_dir, 'triage\\Debug\\triager.exe'),

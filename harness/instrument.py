@@ -74,8 +74,9 @@ def start_server():
     Start the server, if it's not already running.
     """
     # NOTE(ww): This is technically a TOCTOU, but it's probably reliable enough for our purposes.
+    server_cmd = ' '.join([config.config['server_path'], *config.config['server_args']])
     if named_mutex.test_named_mutex('fuzz_server_mutex'):
-        ps_run(config.config['server_path'])
+        ps_run(server_cmd)
     named_mutex.spin_named_mutex('fuzz_server_mutex')
 
 
