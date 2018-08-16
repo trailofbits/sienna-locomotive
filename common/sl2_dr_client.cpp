@@ -113,15 +113,6 @@ bool SL2Client::compare_arg_buffers(targetFunction &t, client_read_info* info){ 
         minimum = min( minimum, *info->lpNumberOfBytesRead) ;
     }
 
-
-    string left = "#[";
-    string right = "#[";
-    for(int i = 0; i < minimum; i++){
-        left += to_string(t.buffer[i]) + ((i < minimum - 1) ? ", " : "");
-        right += to_string(((uint8_t *) info->lpBuffer)[i]) + ((i < minimum - 1) ? ", " : "");
-    }
-    SL2_DR_DEBUG("Comparing Argument Buffers (%s)\n%s]\n%s]\n", (memcmp(t.buffer.data(), info->lpBuffer, minimum) ? "False" : "True"), left.c_str(), right.c_str());
-
     return !memcmp(t.buffer.data(), info->lpBuffer, minimum);
 }
 
