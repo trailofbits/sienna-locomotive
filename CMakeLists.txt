@@ -58,5 +58,6 @@ add_subdirectory(wizard)
 add_subdirectory(corpus/test_application)
 add_subdirectory(triage)
 add_subdirectory(fuzzgoat)
+add_subdirectory(winchecksec)
 
 target_compile_definitions(server PRIVATE -DUNICODE)

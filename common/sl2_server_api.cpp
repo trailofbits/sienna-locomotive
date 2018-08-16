@@ -290,3 +290,29 @@ SL2Response sl2_conn_register_pid(sl2_conn *conn, uint64_t pid, bool tracing)
     return SL2Response::OK;
 }
 
+SL2_EXPORT
+SL2Response sl2_conn_advise_mutation(sl2_conn *conn, sl2_arena *arena, sl2_mutation_advice *advice)
+{
+    DWORD txsize;
+
+    if (!arena->id) {
+        return SL2Response::MissingArenaID;
+    }
+
+    // First, tell the server that we want mutation advice.
+    SL2_CONN_EVT(EVT_ADVISE_MUTATION);
+
+    // Then, tell the server which arena we want it to base advice on.
+    sl2_conn_write_prefixed_string(conn, arena->id);
+
+    // Then, read the index of the next strategy from the server.
+    SL2_CONN_READ(&(advice->table_idx), sizeof(advice->table_idx));
+
+    // The server doesn't actually know how many strategies we have;
+    // it just knows whether or not it wants to move on to a new one.
+    advice->table_idx %= SL2_NUM_STRATEGIES;
+
+    advice->strategy = SL2_STRATEGY_TABLE[advice->table_idx];
+
+    return SL2Response::OK;
+}

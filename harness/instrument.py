@@ -28,6 +28,7 @@ from .state import (
 )
 
 from . import config
+from . import named_mutex
 
 print_lock = threading.Lock()
 can_fuzz = True
@@ -77,9 +78,11 @@ def start_server():
     """
     Start the server, if it's not already running.
     """
-    while not os.path.isfile(config.sl2_server_pipe_path):
-        ps_run(config.config['server_path'])
-        time.sleep(2)
+    # NOTE(ww): This is technically a TOCTOU, but it's probably reliable enough for our purposes.
+    server_cmd = ' '.join([config.config['server_path'], *config.config['server_args']])
+    if named_mutex.test_named_mutex('fuzz_server_mutex'):
+        ps_run(server_cmd)
+    named_mutex.spin_named_mutex('fuzz_server_mutex')
 
 
 def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False):
@@ -144,7 +147,7 @@ def run_dr(config_dict, verbose=False, timeout=None, run_id=None, tracing=False)
                             try:
                                 os.kill(pid, signal.SIGTERM)
                             except (PermissionError, OSError) as e:
-                                print_l("WARNING: Couldn't kill child process:", e)
+                                print_l("WARNING: Couldn't kill child proces (maybe already dead?):", e)
                                 print_l("Try running the harness as an Administrator.")
             except FileNotFoundError:
                 print_l("The PID file was missing so we couldn't kill the child process.")
@@ -187,12 +190,15 @@ def triager_run(run_id):
         print_l("[!] No initial minidumps to triage!")
         return None
 
+    ret = []
     for dmpfile in dmpfiles:
         cmd = [config.config['triager_path'], dmpfile]
         out = subprocess.check_output(cmd, shell=False)
+        ret.append(out)
         if config.config["verbose"]:
             print_l(repr(out))
-        yield out
+
+    return ret
 
 
 def wizard_run(config_dict):
