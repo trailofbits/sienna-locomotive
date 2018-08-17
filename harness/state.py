@@ -12,7 +12,7 @@ import random
 from hashlib import sha1
 from csv import DictWriter
 from typing import NamedTuple
-
+import db
 from . import config
 
 uuid_regex = re.compile("[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}")
@@ -127,6 +127,9 @@ def get_target_dir(_config):
     if not os.path.exists(arg_file):
         with open(arg_file, 'w') as argfile:
             argfile.write(stringify_program_array(_config['target_application_path'], _config['target_args']))
+
+    # Primes the db for checksec for this target if it doesn't already exist
+    db.Checksec.byExecutable(_config['target_application_path']  )
     return dir_name
 
 

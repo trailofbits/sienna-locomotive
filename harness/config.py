@@ -13,6 +13,7 @@ import argparse
 import configparser
 import shlex
 
+
 # Schematizes the SL2 configuration.
 # Every configuration key has a 'test' function, an 'expected'
 # string that explains the result of a failed test, and a 'required'
@@ -65,6 +66,9 @@ sl2_log_dir = os.path.join(sl2_dir, 'log')
 sl2_targets_dir = os.path.join(sl2_dir, 'targets')
 sl2_config_path = os.path.join(sl2_dir, 'config.ini')
 
+# This is a pointer to the current db session for convience
+session = None
+
 os.makedirs(sl2_runs_dir, exist_ok=True)
 os.makedirs(sl2_arenas_dir, exist_ok=True)
 os.makedirs(sl2_log_dir, exist_ok=True)
@@ -83,6 +87,7 @@ if not os.path.exists(sl2_config_path):
         'wizard_path': 'build\\wizard\\Debug\\wizard.dll',
         'tracer_path': 'build\\triage_dynamorio\\Debug\\tracer.dll',
         'triager_path': 'build\\triage\\Debug\\triager.exe',
+        'checksec_path': r'build\winchecksec\Debug\winchecksec.exe',
         'target_application_path': 'build\\corpus\\test_application\\Debug\\test_application.exe',
         'target_args': '0 -f',
         'runs': 1,
@@ -268,6 +273,7 @@ def create_new_profile(name, dynamorio_exe, build_dir, target_path, target_args)
         'wizard_path': os.path.join(build_dir, 'wizard\\Debug\\wizard.dll'),
         'tracer_path': os.path.join(build_dir, 'triage_dynamorio\\Debug\\tracer.dll'),
         'triager_path': os.path.join(build_dir, 'triage\\Debug\\triager.exe'),
+        'checksec_path': os.path.join(build_dir, r'winchecksec\Debug\winchecksec.exe' ),
         'target_application_path': target_path,
         'target_args': target_args,
         'runs': 1,
