@@ -1,28 +1,43 @@
-from PySide2.QtWidgets import QTreeView, QComboBox, QStyledItemDelegate, QItemDelegate
+from PySide2.QtWidgets import QTreeView, QComboBox, QStyledItemDelegate
 from PySide2.QtGui import QStandardItem, QStandardItemModel
 from PySide2.QtCore import Signal, Qt, QSortFilterProxyModel
 
-mode_labels = {1: "Nth Call",
-               2: "Return Address",
-               4: "Argument Hash",
-               8: "Argument Comparison",
-               16: "Fuzzy",
-               32: "Medium Precision",
-               64: "High Precision"}
+mode_labels = {1 << 0: "Nth Call",
+               1 << 1: "Return Address",
+               1 << 2: "Argument Hash",
+               1 << 3: "Argument Comparison",
+               1 << 4: "Fuzzy",
+               1 << 5: "Hybrid",
+               1 << 6: "High Precision",
+               1 << 7: "Filename Comparison",
+               1 << 8: "Nth Call @ Address"}
+
+# Inverse mapping so we can cheaply get bit flags out of text labels
+# mode_labels.update(dict(reversed(item) for item in mode_labels.items()))
 
 
 class ComboboxTreeItemDelegate(QStyledItemDelegate):
 
+    def __init__(self, adapter, *args):
+        super().__init__(*args)
+        self.adapter = adapter
+        self.combobox = None
+
     def createEditor(self, parent, option, index):
         self.combobox = QComboBox(parent)
-        for key in sorted(mode_labels.keys()):
-            self.combobox.addItem(mode_labels[key])
+        for sft in [4, 5, 6]:
+            self.combobox.addItem(mode_labels[1 << sft], 1 << sft)
 
         return self.combobox
 
     def setEditorData(self, editor, index):
-        val = index.model().data(index)
-        self.combobox.setCurrentText(val)
+        val = index.model().data(index, role=Qt.UserRole)
+        self.combobox.setCurrentText(mode_labels[val])
+
+    def setModelData(self, editor, model, index):
+        model.setData(index, self.combobox.currentData(), role=Qt.UserRole)
+        model.setData(index, self.combobox.currentText())
+        self.adapter.update(model.data(index, role=Qt.UserRole + 1), mode=self.combobox.currentData())
 
 
 class CheckboxTreeWidgetItem(QStandardItem):
