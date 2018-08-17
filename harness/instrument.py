@@ -268,7 +268,7 @@ def fuzzer_run(config_dict, targets_file):
     with open(targets_file, 'rb') as targets_msg:
         targets = msgpack.load(targets_msg)
 
-    hasher = hashlib.sha1()
+    hasher = hashlib.sha256()
     hasher.update(targets_file.encode('utf-8'))
 
     for target in targets:
