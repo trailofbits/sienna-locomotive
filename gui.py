@@ -3,6 +3,7 @@ import time
 from multiprocessing import cpu_count
 import os
 import json
+import db
 
 from PySide2.QtWidgets import QFileDialog, QMenu, QAction
 from PySide2 import QtWidgets
@@ -80,7 +81,21 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # CREATE WIDGETS #
 
+
+        # Target info
+        self.targetStatus = QtWidgets.QStatusBar()
+
+        targetPath = config.config['target_application_path']
+        checksec = db.Checksec.byExecutable( targetPath )
+        targetString = "Target: {}\t Protections: {}".format( targetPath, checksec.shortString()  )
+
+        self.targetLabel =  QtWidgets.QLabel(targetString)
+        self.targetStatus.addWidget(self.targetLabel)
+        self._layout.addWidget(self.targetStatus)
+
         # Create wizard button
+
+
         self.wizard_button = QtWidgets.QPushButton("Run Wizard")
         self._layout.addWidget(self.wizard_button)
 
