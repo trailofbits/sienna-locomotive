@@ -66,7 +66,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Set up basic window
         self.setWindowTitle("Sienna Locomotive 2")
-        self.setMinimumSize(QSize(1600, 1200))
+        self.setMinimumSize(QSize(1800, 1300))
 
         _central_widget = QtWidgets.QWidget(self)
         self.setCentralWidget(_central_widget)
@@ -102,7 +102,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.module_proxy_model.setFilterKeyColumn(4)
         self.build_func_tree()
         self._func_tree.setModel(self.module_proxy_model)
-        self._func_tree.setItemDelegate(ComboboxTreeItemDelegate())
+        self._func_tree.setItemDelegate(ComboboxTreeItemDelegate(self.target_data))
 
         # These need to happen after we set the model
         self._func_tree.expandAll()
@@ -374,14 +374,20 @@ class MainWindow(QtWidgets.QMainWindow):
         """ Build the function target display tree """
         self._func_tree.setSortingEnabled(False)
         self.model.clear()
-        self.model.setHorizontalHeaderLabels(["Function Name", "File", "File Offset", "Order Seen", "Calling Module", "Return Address"])  # , "Targeting Mode"])
+        self.model.setHorizontalHeaderLabels(["Function Name",
+                                              "File",
+                                              "File Offset",
+                                              "Order Seen",
+                                              "Calling Module",
+                                              # "Return Address",
+                                              "Targeting Mode"])
+
         self.model.horizontalHeaderItem(0).setToolTip("The name of a fuzzable function")
         self.model.horizontalHeaderItem(1).setToolTip("The name of the file (if any) the function tried to read")
         self.model.horizontalHeaderItem(2).setToolTip("The bytes in the file that the program tried to read (if available)")
         self.model.horizontalHeaderItem(3).setToolTip("The order in which the wizard encountered this function")
         self.model.horizontalHeaderItem(4).setToolTip("Which part of the program called this function. .exe modules are generally the most promising")
-        self.model.horizontalHeaderItem(5).setToolTip("How far from the start of the program this function's return address is")
-        # self.model.horizontalHeaderItem(6).setToolTip("How we re-identify whether we're calling this function again")
+        self.model.horizontalHeaderItem(5).setToolTip("How we re-identify whether we're calling this function again")
 
         for index, option in enumerate(self.target_data):
             funcname_widget = CheckboxTreeWidgetItem(self._func_tree, index, "{func_name}".format(**option))
@@ -422,12 +428,17 @@ class MainWindow(QtWidgets.QMainWindow):
             addr_widget.setEditable(False)
 
             mode_widget = QStandardItem(mode_labels[option.get('mode')])
+            mode_widget.setData(option.get('mode'), role=Qt.UserRole)
+            mode_widget.setData(index, role=Qt.UserRole + 1)
 
             self.model.appendRow([funcname_widget,
                                   filename_widget,
                                   offset_widget,
                                   idx_widget,
-                                  mod_widget, addr_widget])  # , mode_widget])
+                                  mod_widget,
+                                  # addr_widget,
+                                  mode_widget])
+            # self._func_tree.edit(self.model.indexFromItem(mode_widget))
 
         self._func_tree.expandAll()
         self._func_tree.resizeColumnToContents(0)
