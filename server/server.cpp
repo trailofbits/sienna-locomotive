@@ -39,7 +39,7 @@ struct strategy_state {
     uint32_t score;
     uint32_t strategy;
     uint32_t tries_remaining;
-    std::map<uint32_t, uint32_t> success_map;
+    std::map<uint32_t, int64_t> success_map;
 };
 
 struct server_opts {
@@ -661,11 +661,11 @@ static void handle_set_arena(HANDLE pipe)
     // Otherwise, try a new strategy.
     if (score > prior.score) {
         SL2_SERVER_LOG_INFO("coverage score increased, continuing with strategy=%d", prior.strategy);
-        wlock.lock();
-        strategy_map[arena.id] = { arena, score, prior.strategy, opts.stickiness };
-        wlock.unlock();
 
-        // TODO(ww): Update the success_map here.
+        wlock.lock();
+        prior.success_map[prior.strategy]++;
+        strategy_map[arena.id] = { arena, score, prior.strategy, opts.stickiness, prior.success_map };
+        wlock.unlock();
     }
     else {
         SL2_SERVER_LOG_INFO("coverage score did NOT increase!");
@@ -675,19 +675,42 @@ static void handle_set_arena(HANDLE pipe)
         //
         // Otherwise, try again, and decrement the number of tries remaining.
         if (prior.tries_remaining <= 0) {
-            // TODO(ww): Retrieve a new strategy from the success_map map.
-            uint32_t strategy = (prior.strategy + 1) % SL2_NUM_STRATEGIES;
+            uint32_t strategy;
+
+            // Ignore the success map about 20% of the time, to make sure that
+            // we're not digging ourselves into a hole.
+            //
+            // Otherwise, grab the best strategy from the strategy map.
+            if (!(rand() % 5)) {
+                strategy = (prior.strategy + 1) % SL2_NUM_STRATEGIES;
+            }
+            else {
+                strategy = 0;
+
+                for (int i = 1; i < SL2_NUM_STRATEGIES - 1; ++i) {
+                    if (prior.success_map[i] > prior.success_map[i + 1]) {
+                        strategy = i;
+                    }
+                }
+
+                // Fallback: We've seen no successful strategies, so just move on.
+                if (!strategy) {
+                    strategy = (prior.strategy + 1) % SL2_NUM_STRATEGIES;
+                }
+            }
+
             SL2_SERVER_LOG_INFO("no tries left, changing strategy (%d)!", strategy);
 
             wlock.lock();
-            strategy_map[arena.id] = { arena, score, strategy, opts.stickiness };
+            prior.success_map[prior.strategy]--;
+            strategy_map[arena.id] = { arena, score, strategy, opts.stickiness, prior.success_map };
             wlock.unlock();
         }
         else {
             SL2_SERVER_LOG_INFO("%d tries for strategy %d left", prior.tries_remaining - 1, prior.strategy);
 
             wlock.lock();
-            strategy_map[arena.id] = { arena, score, prior.strategy, prior.tries_remaining - 1 };
+            strategy_map[arena.id] = { arena, score, prior.strategy, prior.tries_remaining - 1, prior.success_map };
             wlock.unlock();
         }
     }
