@@ -7,7 +7,7 @@ import json
 from PySide2.QtWidgets import QFileDialog, QMenu, QAction
 from PySide2 import QtWidgets
 from PySide2.QtCore import Qt, QSize
-from PySide2.QtGui import QFontDatabase, QMovie, QStandardItem
+from PySide2.QtGui import QFontDatabase, QMovie, QStandardItem, QBrush, QColor
 
 from gui.checkbox_tree import (
     CheckboxTreeWidget,
@@ -430,6 +430,7 @@ class MainWindow(QtWidgets.QMainWindow):
             mode_widget = QStandardItem(mode_labels[option.get('mode')])
             mode_widget.setData(option.get('mode'), role=Qt.UserRole)
             mode_widget.setData(index, role=Qt.UserRole + 1)
+            mode_widget.setData(QBrush(QColor(0, 0, 0, 16)), role=Qt.BackgroundRole)
 
             self.model.appendRow([funcname_widget,
                                   filename_widget,
