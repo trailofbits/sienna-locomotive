@@ -45,7 +45,7 @@ class FuzzerThread(QThread):
         self.should_fuzz = True
 
         while self.should_fuzz:
-            crashed, run_id = fuzzer_run(self.config_dict)
+            crashed, run_id = fuzzer_run(self.config_dict, self.target_file)
 
             if crashed:
                 if self.config_dict['exit_early']:

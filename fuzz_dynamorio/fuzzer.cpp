@@ -38,6 +38,13 @@ static droption_t<std::string> op_run_id(
     "run_id",
     "specify the run ID for this fuzzer instance");
 
+static droption_t<std::string> op_arena_id(
+    DROPTION_SCOPE_CLIENT,
+    "a",
+    "",
+    "arena_id",
+    "specify the arena ID for coverage guidance");
+
 
 // TODO(ww): Add options here for edge/bb coverage,
 // if we decided to support edge as well.
@@ -563,6 +570,7 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     bool no_coverage = op_no_coverage.get_value();
 
     std::string run_id_s = op_run_id.get_value();
+    std::string arena_id_s = op_arena_id.get_value();
 
     if (run_id_s == "") {
         SL2_DR_DEBUG("ERROR: arg -r required\n");
@@ -600,20 +608,20 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     drreg_init(&opts);
 
     // Check whether we can use coverage on this fuzzing run
-    coverage_guided = client.areTargetsArenaCompatible() && !no_coverage;
+    coverage_guided = (arena_id_s != "") && !no_coverage;
 
     // Cache our main module, so that we don't have to retrieve it during each
     // basic block event.
     target_mod = dr_get_main_module();
 
     if (coverage_guided) {
-        SL2_DR_DEBUG("dr_client_main: targets are arena compatible!\n");
-        client.generateArenaId(arena.id);
+        SL2_DR_DEBUG("dr_client_main: arena given, instrumenting BBs!\n");
+        mbstowcs_s(NULL, arena.id, SL2_HASH_LEN + 1, arena_id_s.c_str(), SL2_HASH_LEN);
         sl2_conn_request_arena(&sl2_conn, &arena);
         drmgr_register_bb_instrumentation_event(NULL, on_bb_instrument, NULL);
     }
     else {
-        SL2_DR_DEBUG("dr_client_main: targets are NOT arena compatible OR user has requested dumb fuzzing!\n");
+        SL2_DR_DEBUG("dr_client_main: no arena given OR user requested dumb fuzzing!\n");
     }
 
     drmgr_register_exception_event(on_exception);

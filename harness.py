@@ -172,8 +172,9 @@ def main():
             target_id = mapping[select_from_range(len(mapping), "Select a target to fuzz> ")]
             config['target_application_path'], config['target_args'] = targets[target_id]
             config['client_args'].append('-t')
-            config['client_args'].append(os.path.join(target_id, 'targets.msg'))
-            fuzzer_run(config)
+            targets_file = os.path.join(target_id, 'targets.msg')
+            config['client_args'].append(targets_file)
+            fuzzer_run(config, targets_file)
 
         # Parse the list of run ID's and select one to triage
         if config['stage'] == 'TRACER':
