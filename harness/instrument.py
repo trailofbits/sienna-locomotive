@@ -292,7 +292,7 @@ def fuzzer_run(config_dict, targets_file):
             'drrun_path': config_dict['drrun_path'],
             'drrun_args': config_dict['drrun_args'],
             'client_path': config_dict['client_path'],
-            'client_args': [*config_dict['client_args'], '-r', str(run_id)],
+            'client_args': [*config_dict['client_args'], '-r', str(run_id), '-a', arena_id],
             'target_application_path': config_dict['target_application_path'],
             'target_args': config_dict['target_args'],
             'inline_stdout': config_dict['inline_stdout']
