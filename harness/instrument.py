@@ -282,8 +282,6 @@ def fuzzer_run(config_dict, targets_file):
 
     arena_id = hasher.hexdigest()
 
-    print_l("arena_id:", arena_id)
-
     # Generate a run ID and hand it to the fuzzer.
     run_id = generate_run_id(config_dict)
 

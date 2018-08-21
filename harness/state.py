@@ -129,7 +129,7 @@ def get_target_dir(_config):
             argfile.write(stringify_program_array(_config['target_application_path'], _config['target_args']))
 
     # Primes the db for checksec for this target if it doesn't already exist
-    db.Checksec.byExecutable(_config['target_application_path']  )
+    db.Checksec.byExecutable(_config['target_application_path'])
     return dir_name
 
 
