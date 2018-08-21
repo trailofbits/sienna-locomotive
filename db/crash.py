@@ -5,20 +5,25 @@
 # info in the database
 
 from sqlalchemy import *
-import os
-import harness.config
+from sqlalchemy import ForeignKey
+from sqlalchemy.orm import relationship
 import glob
-import subprocess
+import harness.config
 import json
+import os
 import re
+import subprocess
+
 from db.base import Base
 import db
+
 
 class Crash(Base):
 
     __tablename__ = "crash"
 
-    runid                   = Column( String(40), primary_key=True )
+    id                      = Column( Integer, primary_key=True )
+    runid                   = Column( String(40)  )
     callStackJson           = Column( String )
     crashAddress            = Column( String(20) )
     crashReason             = Column( String(270) )
@@ -30,10 +35,12 @@ class Crash(Base):
     ranksJson               = Column( String )
     stackPointer            = Column( String(20) )
     tag                     = Column( String(128) )
+    tracer                  = relationship(  "Tracer", order_by=db.Tracer.runid, back_populates="crash", uselist=False)
 
     def __init__(self, j, runid=None):
         try:
             self.runid                  = runid
+            self.crashJson              = j
             self.callStackJson          = str(j["callStack"])
             self.crashAddress           = hex(j["crashAddress"])
             self.crashReason            = j["crashReason"]
@@ -48,31 +55,7 @@ class Crash(Base):
         except KeyError:
             raise "Was unable to parse crash json from triager"
 
-    @staticmethod
-    def dumpPathToRunid( dmpPath ):
-        """
-        Converts the full path to an sl2 minidump to a runid
-        """
-        runid = None
-        m = re.match(r".*\\runs\\([a-fA-F0-9-]+)\\.*", dmpPath)
-        if m:
-            runid = m.group(1)
-        return runid
 
-
-    @staticmethod
-    def runidToDumpPath( runid ):
-        """
-        Converts an sl2 runid into a minidump path
-        """
-        dumpPath = None
-        cfg = harness.config
-
-        dumpsGlob = os.path.join( cfg.sl2_runs_dir, runid,  'initial.*.dmp' )
-        for dumpPath in glob.glob( dumpsGlob ):
-            return dumpPath
-
-        return dumpPath
 
     @staticmethod
     def factory( runid, dmpPath=None ):
@@ -88,7 +71,7 @@ class Crash(Base):
             return ret
 
         if not dmpPath:
-            dmpPath = Crash.runidToDumpPath(runid)
+            dmpPath = db.utilz.runidToDumpPath(runid)
 
         if not dmpPath:
             print("Unable to find dumpfile for runid %s" % runid)
@@ -114,12 +97,18 @@ class Crash(Base):
             print("Unable to process cras json")
             return None
 
+        # See if there is a tracer result for this runid
+        ret.tracer = db.Tracer.factory(runid)
         session.add(ret)
         session.commit()
         return ret
 
     def __repr__(self):
-        return """Exploitability: %s   Crash Reason: %s   Crash Address: %s    Crashash: %s    Tag: %s""" % (self.exploitability, self.crashReason, self.crashAddress, self.crashash, self.tag )
+        tracerInfo = "None"
+        if self.tracer:
+            tracerInfo = self.tracer.tracerFormatted
+        return """Exploitability: %s   Crash Reason: %s   Crash Address: %s    Crashash: %s    Tag: %s    Tracer: %s""" % (
+            self.exploitability, self.crashReason, self.crashAddress, self.crashash, self.tag, tracerInfo )
 
 # Example json
 # {'callStack': [
