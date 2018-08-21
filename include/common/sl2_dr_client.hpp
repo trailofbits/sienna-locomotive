@@ -201,8 +201,6 @@ public:
     void        wrap_pre_fread(void *wrapcxt, OUT void **user_data);
     void        wrap_pre_fread_s(void *wrapcxt, OUT void **user_data);
     void        wrap_pre__read(void *wrapcxt, OUT void **user_data);
-    bool        areTargetsArenaCompatible();
-    void        generateArenaId(wchar_t *id);
     bool        loadJson(string json);
     uint64_t    incrementCallCountForFunction(Function function);
     uint64_t    incrementRetAddrCount(uint64_t retAddr);

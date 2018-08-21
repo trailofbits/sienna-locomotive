@@ -14,7 +14,9 @@ import json
 import traceback
 import sys
 import shutil
-
+import msgpack
+import hashlib
+import array
 from enum import IntEnum
 from typing import NamedTuple
 
@@ -26,6 +28,7 @@ from .state import (
     check_fuzz_line_for_crash,
     get_path_to_run_file,
     get_paths_to_run_file,
+    get_target_dir,
 )
 
 from . import config
@@ -250,8 +253,28 @@ def wizard_run(config_dict):
     return wizard_findings
 
 
-def fuzzer_run(config_dict):
+def fuzzer_run(config_dict, targets_file):
     """ Runs the fuzzer """
+
+    if not os.path.isfile(targets_file):
+        print_l('[!] Nonexistent targets file:', targets_file)
+
+    with open(targets_file, 'rb') as targets_msg:
+        targets = msgpack.load(targets_msg)
+
+    hasher = hashlib.sha256()
+    hasher.update(targets_file.encode('utf-8'))
+
+    for target in targets:
+        if not target[b'selected']:
+            pass
+        # Together with the semiunique targets_file name above, this should
+        # be enough entropy to avoid arena collisions.
+        hasher.update(target[b'argHash'])
+        hasher.update(array.array('B', target[b'buffer']))
+        hasher.update(target[b'func_name'])
+
+    arena_id = hasher.hexdigest()
 
     # Generate a run ID and hand it to the fuzzer.
     run_id = generate_run_id(config_dict)
@@ -261,7 +284,7 @@ def fuzzer_run(config_dict):
             'drrun_path': config_dict['drrun_path'],
             'drrun_args': config_dict['drrun_args'],
             'client_path': config_dict['client_path'],
-            'client_args': [*config_dict['client_args'], '-r', str(run_id)],
+            'client_args': [*config_dict['client_args'], '-r', str(run_id), '-a', arena_id],
             'target_application_path': config_dict['target_application_path'],
             'target_args': config_dict['target_args'],
             'inline_stdout': config_dict['inline_stdout']
@@ -334,10 +357,13 @@ def fuzz_and_triage(config_dict):
     tools (DR tracer and breakpad) if a crash is found.
     """
     global can_fuzz
+
+    targets_file = os.path.join(get_target_dir(config_dict), "targets.msg")
+
     # TODO: Move try/except so we can start new runs after an exception
     try:
         while can_fuzz:
-            crashed, run_id = fuzzer_run(config_dict)
+            crashed, run_id = fuzzer_run(config_dict, targets_file)
             if crashed:
 
                 triagerInfo = triagerRun(config_dict, run_id)
