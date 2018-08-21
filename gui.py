@@ -27,32 +27,6 @@ from functools import partial
 from config_window import ConfigWindow
 
 
-class Triager:
-
-    def __init__(self, crashpath):
-        triagepath = os.path.join( os.path.dirname(crashpath),
-            "triage.json" )
-        self.json = {}
-
-        with open(triagepath) as f:
-            self.json = json.load(f)
-
-
-    def __repr__(self):
-        ret = "<ERROR PROCESSING>"
-        try:
-            ret = "Crashash %s: %s exploitability, %s at pc 0x%x, memory address 0x%x, stack address 0x%x" % (
-                self.json['crashash'],
-                self.json['exploitability'],
-                self.json['crashReason'],
-                self.json['instructionPointer'],
-                self.json['crashAddress'],
-                self.json['stackPointer'] )
-        except KeyError:
-            pass
-        return ret
-
-
 class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self):
@@ -162,13 +136,13 @@ class MainWindow(QtWidgets.QMainWindow):
         if 'fuzz_timeout' in config.config:
             self.fuzz_timeout_box.setValue(config.config['fuzz_timeout'])
         self.fuzz_timeout_box.setSpecialValueText("None")
-        self.triage_timeout_box = QtWidgets.QSpinBox()
-        self.triage_timeout_box.setSuffix(" seconds")
-        self.triage_timeout_box.setMaximum(2400)
-        if 'triage_timeout' in config.config:
-            self.triage_timeout_box.setValue(config.config['triage_timeout'])
-        self.triage_timeout_box.setSpecialValueText("None")
-        self.triage_timeout_box.setSingleStep(10)
+        self.tracer_timeout_box = QtWidgets.QSpinBox()
+        self.tracer_timeout_box.setSuffix(" seconds")
+        self.tracer_timeout_box.setMaximum(2400)
+        if 'tracer_timeout' in config.config:
+            self.tracer_timeout_box.setValue(config.config['tracer_timeout'])
+        self.tracer_timeout_box.setSpecialValueText("None")
+        self.tracer_timeout_box.setSingleStep(10)
         self.verboseCheckBox = QtWidgets.QCheckBox()
         self.verboseCheckBox.clicked.connect(self.verboseCheckBox_clicked)
 
@@ -204,7 +178,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.extension_layout.addWidget(QtWidgets.QLabel("Fuzz timeout:"), 0, 1, 1, 1, Qt.AlignRight)
         self.extension_layout.addWidget(self.fuzz_timeout_box, 0, 2, 1, 1, Qt.AlignLeft)
         self.extension_layout.addWidget(QtWidgets.QLabel("Triage Timeout:"), 1, 1, 1, 1, Qt.AlignRight)
-        self.extension_layout.addWidget(self.triage_timeout_box, 1, 2, 1, 1, Qt.AlignLeft)
+        self.extension_layout.addWidget(self.tracer_timeout_box, 1, 2, 1, 1, Qt.AlignLeft)
         self.extension_layout.addWidget(QtWidgets.QLabel("Simultaneous fuzzing threads:"), 0, 3, 1, 1, Qt.AlignRight)
         self.extension_layout.addWidget(self.thread_count, 0, 4, 1, 1, Qt.AlignLeft)
 
@@ -349,7 +323,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.continuous_mode_cbox.stateChanged.connect(fuzzer_thread.continuous_state_changed)
         self.pause_mode_cbox.stateChanged.connect(fuzzer_thread.pause_state_changed)
         self.fuzz_timeout_box.valueChanged.connect(fuzzer_thread.fuzz_timeout_changed)
-        self.triage_timeout_box.valueChanged.connect(fuzzer_thread.triage_timeout_changed)
+        self.tracer_timeout_box.valueChanged.connect(fuzzer_thread.tracer_timeout_changed)
 
     def check_for_completion(self):
         """ Filters the threads and checks if any are still running """
@@ -362,22 +336,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.runs.increment()
         self.throughput.update(self.runs.value / float(time.time() - self.start_time))
 
-    def handle_new_crash(self, thread, formatted, crash):
+    def handle_new_crash(self, thread, run_id):
         """ Updates the crash counter and pauses other threads if specified """
         self.crash_counter.increment()
-        # self.triage_output.append(formatted)
+        crash = db.Crash.factory(run_id)
+        if not crash:
+            return None
         self.crashes.append(crash)
         if not thread.should_fuzz:
             self.pause_all_threads()
-
-        print(crash)
-        if crash:
-            try:
-                triager = Triager(crash['crash_file'])
-                self.triage_output.append(str(triager))
-            except:
-                print("Error loading ", crash['crash_file'])
-        self.triage_output.append(formatted)
+        self.triage_output.append(str(crash))
         self.crashes.append(crash)
 
     def handle_server_crash(self):
