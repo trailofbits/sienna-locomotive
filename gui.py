@@ -362,26 +362,38 @@ class MainWindow(QtWidgets.QMainWindow):
         self.runs.increment()
         self.throughput.update(self.runs.value / float(time.time() - self.start_time))
 
-    def handle_new_crash(self, thread, triagerInfo):
+    def handle_new_crash(self, thread, run_id):
         """ Updates the crash counter and pauses other threads if specified """
-        crash = triagerInfo["crashInfo"]
         self.crash_counter.increment()
-        # self.triage_output.append(formatted)
+        crash = db.Crash.factory(run_id)
+        if not crash:
+            return None
         self.crashes.append(crash)
         if not thread.should_fuzz:
             self.pause_all_threads()
-
-        if crash:
-            print("crash", crash)
-            runid = str(triagerInfo["run_id"])
-            try:
-                crashTriage = db.Crash.factory(runid)
-                self.triage_output.append(str(crashTriage))
-            except:
-                print("Error loading ", crash )
-
-        #self.triage_output.append(formatted)
+        self.triage_output.append(str(crash))
         self.crashes.append(crash)
+
+    # def handle_new_crash(self, thread, triagerInfo):
+    #     """ Updates the crash counter and pauses other threads if specified """
+    #     crash = triagerInfo["crashInfo"]
+    #     self.crash_counter.increment()
+    #     # self.triage_output.append(formatted)
+    #     self.crashes.append(crash)
+    #     if not thread.should_fuzz:
+    #         self.pause_all_threads()
+
+    #     if crash:
+    #         print("crash", crash)
+    #         runid = str(triagerInfo["run_id"])
+    #         try:
+    #             crashTriage = db.Crash.factory(runid)
+    #             self.triage_output.append(str(crashTriage))
+    #         except:
+    #             print("Error loading ", crash )
+
+    #     #self.triage_output.append(formatted)
+    #     self.crashes.append(crash)
 
     def handle_server_crash(self):
         """ Pauses fuzzing threads and attempts to restart the server if it crashes """

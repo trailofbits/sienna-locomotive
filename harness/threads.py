@@ -20,7 +20,7 @@ class ServerThread(QThread):
 
 
 class FuzzerThread(QThread):
-    foundCrash = Signal(QThread, object)
+    foundCrash = Signal(QThread, str)
     runComplete = Signal()
     paused = Signal()
     server_crashed = Signal()
@@ -52,8 +52,8 @@ class FuzzerThread(QThread):
                     self.pause()
                 #formatted, raw = tracer_run(self.config_dict, run_id)
                 triagerInfo = triagerRun(self.config_dict, run_id)
-                triagerInfo = copy.deepcopy(triagerInfo)
-                self.foundCrash.emit(self, triagerInfo)
+                run_id = str(run_id)
+                self.foundCrash.emit(self, run_id)
 
             if not self.config_dict['continuous']:
                 self.pause()

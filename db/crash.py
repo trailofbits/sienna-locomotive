@@ -104,11 +104,7 @@ class Crash(Base):
         return ret
 
     def __repr__(self):
-        return """Exploitability: %s
-Crash Reason: %s
-Crash Address: %s
-Crashash: %s
-Tag: %s""" % (self.exploitability, self.crashReason, self.crashAddress, self.crashash, self.tag )
+        return """Exploitability: %s   Crash Reason: %s   Crash Address: %s    Crashash: %s    Tag: %s""" % (self.exploitability, self.crashReason, self.crashAddress, self.crashash, self.tag )
 
 # Example json
 # {'callStack': [
