@@ -40,7 +40,7 @@ class Checksec(Base):
 
         checker = cfg.config['checksec_path']
         cmd = [ checker, "-j", path ]
-        out = subprocess.getoutput(cmd)
+        out = subprocess.check_output(cmd)
         ret = json.loads(out)
         ret = Checksec(ret)
 
