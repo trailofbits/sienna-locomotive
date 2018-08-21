@@ -1,6 +1,6 @@
 from PySide2.QtCore import QThread, Signal, Qt
-from .instrument import wizard_run, fuzzer_run, tracer_run, start_server, triagerRun
-import copy
+from .instrument import wizard_run, fuzzer_run, start_server, triagerRun
+
 
 class WizardThread(QThread):
     resultReady = Signal(list)
