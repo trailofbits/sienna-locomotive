@@ -71,7 +71,6 @@ static sl2_strategy_map_t strategy_map;
 static bool get_process_affinity(uint32_t pid, uint64_t *mask)
 {
     HANDLE handle;
-    uint64_t process_affinity;
     uint64_t system_affinity;
 
     if (!(handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid))) {
@@ -99,7 +98,7 @@ static bool find_free_processor(uint64_t *mask)
     PROCESSENTRY32 process_entry;
     HANDLE snapshot;
 
-    CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 
     if (snapshot == INVALID_HANDLE_VALUE) {
         SL2_SERVER_LOG_FATAL("failed to snapshot process!");
@@ -1125,6 +1124,8 @@ int main(int argc, char **argv)
     lock_process();
     std::atexit(server_cleanup);
 
+    SL2_SERVER_LOG_INFO("server started!");
+
     if (!pin_to_free_processor()) {
         SL2_SERVER_LOG_WARN("failed to pin server to a free processor, too many jobs already pinned?");
     }
@@ -1145,7 +1146,6 @@ int main(int argc, char **argv)
 
     init_working_paths();
 
-    SL2_SERVER_LOG_INFO("server started!");
     SL2_SERVER_LOG_INFO("bucketing=%d, stickiness=%d", opts.bucketing, opts.stickiness);
 
     InitializeCriticalSection(&pid_lock);
