@@ -12,9 +12,11 @@ import db.base
 
 dburl = os.path.join( 'sqlite:///%s/%s'% ( config.sl2_dir, 'sl2.db' ) )
 engine = create_engine(dburl, poolclass=NullPool )
-
+from .tracer import Tracer
 from .checksec import Checksec
 from .crash import Crash
+
+from . import utilz
 
 db.base.Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)

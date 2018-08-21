@@ -7,7 +7,7 @@ import glob
 import os
 import codecs
 
-DEBUG=False
+DEBUG=True
 
 
 TEST_APPLICATION='build/corpus/test_application/Debug/test_application.exe'
