@@ -24,7 +24,7 @@ CONFIG_SCHEMA = {}
 
 PATH_KEYS = ['drrun_path', 'client_path', 'server_path', 'wizard_path', 'tracer_path', 'triager_path']
 ARGS_KEYS = ['drrun_args', 'client_args', 'server_args', 'target_args']
-INT_KEYS = ['runs', 'simultaneous', 'fuzz_timeout', 'triage_timeout', 'seed', 'verbose']
+INT_KEYS = ['runs', 'simultaneous', 'fuzz_timeout', 'tracer_timeout', 'seed', 'verbose']
 FLAG_KEYS = ['debug', 'nopersist', 'continuous', 'exit_early', 'inline_stdout', 'preserve_runs']
 
 profile = 'DEFAULT'
@@ -67,7 +67,6 @@ sl2_targets_dir = os.path.join(sl2_dir, 'targets')
 sl2_config_path = os.path.join(sl2_dir, 'config.ini')
 
 # This is a pointer to the current db session for convience
-session = None
 
 os.makedirs(sl2_runs_dir, exist_ok=True)
 os.makedirs(sl2_arenas_dir, exist_ok=True)
@@ -172,7 +171,7 @@ parser.add_argument(
 parser.add_argument(
     '-i', '--triagetimeout',
     action='store',
-    dest='triage_timeout',
+    dest='tracer_timeout',
     type=int,
     help="Timeout (seconds) after which triage runs should be killed. \
     By default, runs are not killed.")

@@ -1,6 +1,6 @@
 from PySide2.QtCore import QThread, Signal, Qt
-from .instrument import wizard_run, fuzzer_run, tracer_run, start_server
-
+from .instrument import wizard_run, fuzzer_run, tracer_run, start_server, triagerRun
+import copy
 
 class WizardThread(QThread):
     resultReady = Signal(list)
@@ -20,7 +20,7 @@ class ServerThread(QThread):
 
 
 class FuzzerThread(QThread):
-    foundCrash = Signal(QThread, str, object)
+    foundCrash = Signal(QThread, object)
     runComplete = Signal()
     paused = Signal()
     server_crashed = Signal()
@@ -50,9 +50,10 @@ class FuzzerThread(QThread):
             if crashed:
                 if self.config_dict['exit_early']:
                     self.pause()
-
-                formatted, raw = tracer_run(self.config_dict, run_id)
-                self.foundCrash.emit(self, formatted, raw)
+                #formatted, raw = tracer_run(self.config_dict, run_id)
+                triagerInfo = triagerRun(self.config_dict, run_id)
+                triagerInfo = copy.deepcopy(triagerInfo)
+                self.foundCrash.emit(self, triagerInfo)
 
             if not self.config_dict['continuous']:
                 self.pause()
@@ -71,5 +72,5 @@ class FuzzerThread(QThread):
     def fuzz_timeout_changed(self, new_timeout):
         self.config_dict['fuzz_timeout'] = None if int(new_timeout) == 0 else int(new_timeout)
 
-    def triage_timeout_changed(self, new_timeout):
-        self.config_dict['triage_timeout'] = None if int(new_timeout) == 0 else int(new_timeout)
+    def tracer_timeout_changed(self, new_timeout):
+        self.config_dict['tracer_timeout'] = None if int(new_timeout) == 0 else int(new_timeout)

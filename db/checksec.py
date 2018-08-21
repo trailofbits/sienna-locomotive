@@ -4,6 +4,7 @@ import harness.config
 import subprocess
 import json
 
+import db
 from db.base import Base
 
 
@@ -33,8 +34,9 @@ class Checksec(Base):
         Gets checksec information for dll or exe
         """
         cfg = harness.config
+        session =  db.getSession()
 
-        ret = cfg.session.query( Checksec ).filter( Checksec.path==path ).first()
+        ret = session.query( Checksec ).filter( Checksec.path==path ).first()
         if ret:
             return ret
 
@@ -44,8 +46,9 @@ class Checksec(Base):
         ret = json.loads(out)
         ret = Checksec(ret)
 
-        cfg.session.add(ret)
-        cfg.session.commit()
+        session.add(ret)
+        session.commit()
+        #session.close()
         return ret
 
 
@@ -64,3 +67,10 @@ class Checksec(Base):
             t.append("Isolation")
         return ' | '.join(t)
 
+
+
+def main():
+    print("ok")
+
+if __name__ == '__main__':
+    main()

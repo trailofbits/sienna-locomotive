@@ -14,11 +14,12 @@ import json
 import traceback
 import sys
 import shutil
+
 from enum import IntEnum
 from typing import NamedTuple
 
 from .state import (
-    parse_triage_output,
+    parse_tracer_output,
     generate_run_id,
     write_output_files,
     create_invocation_statement,
@@ -29,6 +30,7 @@ from .state import (
 
 from . import config
 from . import named_mutex
+import db
 
 print_lock = threading.Lock()
 can_fuzz = True
@@ -181,28 +183,46 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
     return DRRun(popen_obj, invoke.seed, run_id)
 
 
-def triager_run(run_id):
+def triagerRun( cfg, run_id ):
     """
-    Runs the (breakpad-based) triager on each of the minidumps generated
+    Runs the sl2 triager on each of the minidumps generated
     by a fuzzing run.
 
-    Yields the output of each triaging run.
     """
-    dmpfiles = get_paths_to_run_file(run_id, "initial.*.dmp")
 
-    if not dmpfiles:
-        print_l("[!] No initial minidumps to triage!")
-        return None
+    ret = {}
+    ret["run_id"] = run_id
 
-    ret = []
-    for dmpfile in dmpfiles:
-        cmd = [config.config['triager_path'], dmpfile]
-        out = subprocess.check_output(cmd, shell=False)
-        ret.append(out)
-        if config.config["verbose"]:
-            print_l(repr(out))
+    tracerOutput, _ = tracer_run(cfg, run_id)
+    ret["tracerOutput"] = tracerOutput
+    crashInfo = db.Crash.factory( run_id )
+    ret["crashInfo"] = crashInfo
 
     return ret
+
+    # dmpfiles = get_paths_to_run_file(run_id, "initial.*.dmp")
+
+    # if not dmpfiles:
+    #     print_l("[!] No initial minidumps to triage!")
+    #     return None
+
+    # ret = []
+
+    # # Prime the db for crashes
+    # for dmpfile in dmpfiles:
+    #     try:
+    #         crash = db.Crash.factory( run_id, dmpfile)
+    #         if not crash:
+    #             print_l('[!] Unable to process crash %s' % dmpfile )
+    #         else:
+    #             ret.append(repr(crash))
+    #             if config.config["verbose"]:
+    #                 print_l(repr(crash))
+    #     except:
+    #         traceback.print_exc()
+    #         print_l("Error with dmpfile %s"%dmpfile)
+
+    # return ret
 
 
 def wizard_run(config_dict):
@@ -307,7 +327,7 @@ def fuzzer_run(config_dict):
 
 
 # TODO(ww): Rename this to "tracer_run" or something similar,
-# and break the internal triager_run call into another method
+# and break the internal triagerRun call into another method
 # (trace_and_triage, maybe?)
 def tracer_run(config_dict, run_id):
     """ Runs the triaging tool """
@@ -322,19 +342,18 @@ def tracer_run(config_dict, run_id):
             'inline_stdout': config_dict['inline_stdout']
         },
         config_dict['verbose'],
-        config_dict.get('triage_timeout', None),
+        config_dict.get('tracer_timeout', None),
         run_id=run_id
     )
 
     # Write stdout and stderr to files
     write_output_files(run, run_id, 'triage')
 
-    formatted, raw = parse_triage_output(run_id)
-    triager_run(run_id)
+    formatted, raw = parse_tracer_output(run_id)
     return formatted, raw
 
 
-def fuzz_and_trace(config_dict):
+def fuzz_and_triage(config_dict):
     """
     Runs the fuzzer (in a loop if continuous is true), then runs the triage
     tools (DR tracer and breakpad) if a crash is found.
@@ -345,8 +364,9 @@ def fuzz_and_trace(config_dict):
         while can_fuzz:
             crashed, run_id = fuzzer_run(config_dict)
             if crashed:
-                formatted, _ = tracer_run(config_dict, run_id)
-                print_l(formatted)
+
+                triagerInfo = triagerRun(config_dict, run_id)
+                print_l(triagerInfo)
 
                 if config_dict['exit_early']:
                     # Prevent other threads from starting new fuzzing runs

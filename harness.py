@@ -29,7 +29,7 @@ from harness.instrument import (
     fuzzer_run,
     tracer_run,
     start_server,
-    fuzz_and_trace,
+    fuzz_and_triage,
     kill
 )
 
@@ -209,7 +209,7 @@ def main():
         with concurrent.futures.ThreadPoolExecutor(max_workers=config['simultaneous']) as executor:
             # If we're in continuous mode, spawn as many futures as we can run simultaneously.
             # Otherwise, spawn as many as we want to run in total
-            fuzz_futures = [executor.submit(fuzz_and_trace, config)
+            fuzz_futures = [executor.submit(fuzz_and_triage, config)
                             for _ in range(config['runs'] if not config['continuous'] else config['simultaneous'])]
 
             # Wait for exit

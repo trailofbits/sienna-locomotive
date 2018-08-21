@@ -245,15 +245,15 @@ def write_output_files(run, run_id, stage_name):
         print("Couldn't find an output directory for run %s" % run_id)
 
 
-def parse_triage_output(run_id):
+def parse_tracer_output(run_id):
     """
-    Parses the results of a triage run and prints them in
+    Parses the results of a tracer run and prints them in
     human-readable form.
     """
     crash_files = get_paths_to_run_file(run_id, 'crash.*.json')
 
     if not crash_files:
-        message = "The triage tool exited improperly during run {}, \
+        message = "The tracer tool exited improperly during run {}, \
 but no crash files could be found. It may have timed out. \
 To retry it manually, run \
 `python harness.py -v -e TRIAGE -p {} --run_id {}`"
@@ -265,7 +265,7 @@ To retry it manually, run \
         results = json.loads(crash_json.read())
         results['run_id'] = run_id
         results['crash_file'] = crash_file
-        formatted = "Triage ({score}): {reason} in run {run_id} caused {exception}".format(**results)
+        formatted = "Tracer ({score}): {reason} in run {run_id} caused {exception}".format(**results)
         formatted += ("\n\t0x{location:02x}: {instruction}".format(**results))
         return formatted, results
 

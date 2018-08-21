@@ -9,7 +9,6 @@
 #define Triage_H
 
 #include "Xploitability.h"
-#include "XploitabilityTracer.h"
 #include "google_breakpad/processor/basic_source_line_resolver.h"
 #include "google_breakpad/processor/minidump_processor.h"
 #include "google_breakpad/processor/process_state.h"
@@ -58,7 +57,6 @@ public:
     static double               normalize(double x);
     vector<XploitabilityRank>   ranks()                     const;
     void                        persist(const string path)  const;
-    json                        tracerJson()                const;
     void                        processEngine(Xploitability& x);
 
 private:
@@ -70,8 +68,8 @@ private:
     SimpleSymbolSupplier            symbolSupplier_;
     const string                    minidumpPath_;
     fs::path                        dirPath_;
-    unique_ptr<XploitabilityTracer> tracer_;
     vector<XploitabilityResult>     results_;
+    Xploitability*                  xploitabilityEngine_;
 
 };
 
