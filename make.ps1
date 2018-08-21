@@ -80,7 +80,7 @@ Function Reconfig {
 Function Test {
     python harness.py  -v -r10  -t build\corpus\test_application\Debug\test_application -a 8
     #python harness.py  -v -r10 -e FUZZER -t build\corpus\test_application\Debug\test_application -a 8
-    #dynamorio\bin64\drrun.exe -pidfile pidfile -verbose -persist -c build\triage_dynamorio\Debug\tracer.dll -t "C:\Users\IEUser\AppData\Roaming\Trail of Bits\fuzzkit\targets\TEST_APPLICATION_acfa4ea300cade2f47bc7f8ab4502453a7fe774b\targets.json" -r d3e03566-8db8-4c94-bb69-353008abae49 -- build\corpus\test_application\Debug\test_application.exe "0 -f"
+    #dynamorio\bin64\drrun.exe -pidfile pidfile -verbose -persist -c build\tracer_dynamorio\Debug\tracer.dll -t "C:\Users\IEUser\AppData\Roaming\Trail of Bits\fuzzkit\targets\TEST_APPLICATION_acfa4ea300cade2f47bc7f8ab4502453a7fe774b\targets.json" -r d3e03566-8db8-4c94-bb69-353008abae49 -- build\corpus\test_application\Debug\test_application.exe "0 -f"
 }
 
 

@@ -176,7 +176,7 @@ class ConfigWindow(QtWidgets.QDialog):
         paths = ['server\\Debug\\server.exe',
                  'fuzz_dynamorio\\Debug\\fuzzer.dll',
                  'wizard\\Debug\\wizard.dll',
-                 'triage_dynamorio\\Debug\\tracer.dll']
+                 'tracer_dynamorio\\Debug\\tracer.dll']
         missing = []
         for path in paths:
             if not os.path.isfile(os.path.join(new_path, path)):
