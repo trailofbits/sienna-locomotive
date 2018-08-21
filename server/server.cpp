@@ -44,6 +44,7 @@ struct strategy_state {
 };
 
 struct server_opts {
+    bool pinned;
     bool bucketing;
     uint32_t stickiness;
 };
@@ -1126,9 +1127,7 @@ int main(int argc, char **argv)
 
     SL2_SERVER_LOG_INFO("server started!");
 
-    if (!pin_to_free_processor()) {
-        SL2_SERVER_LOG_WARN("failed to pin server to a free processor, too many jobs already pinned?");
-    }
+
 
     for (int i = 0; i < argc; ++i) {
         if (STREQ(argv[i], "-s")) {
@@ -1142,11 +1141,18 @@ int main(int argc, char **argv)
         else if (STREQ(argv[i], "-b")) {
             opts.bucketing = true;
         }
+        else if (STREQ(argv[i], "-p")) {
+            opts.pinned = true;
+        }
+    }
+
+    if (opts.pinned && !pin_to_free_processor()) {
+        SL2_SERVER_LOG_WARN("failed to pin server to a free processor, too many jobs already pinned?");
     }
 
     init_working_paths();
 
-    SL2_SERVER_LOG_INFO("bucketing=%d, stickiness=%d", opts.bucketing, opts.stickiness);
+    SL2_SERVER_LOG_INFO("pinned=%d, bucketing=%d, stickiness=%d", opts.pinned, opts.bucketing, opts.stickiness);
 
     InitializeCriticalSection(&pid_lock);
     InitializeCriticalSection(&fkt_lock);
