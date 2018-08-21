@@ -8,6 +8,7 @@
 
 #define NOMINMAX
 #include <Windows.h>
+#include <Tlhelp32.h>
 #include <ShlObj.h>
 #include <PathCch.h>
 #include <Rpc.h>
@@ -43,6 +44,7 @@ struct strategy_state {
 };
 
 struct server_opts {
+    bool pinned;
     bool bucketing;
     uint32_t stickiness;
 };
@@ -66,11 +68,112 @@ static std::unique_lock<std::shared_mutex> wlock(strategy_mutex, std::defer_lock
 static std::shared_lock<std::shared_mutex> rlock(strategy_mutex, std::defer_lock);
 static sl2_strategy_map_t strategy_map;
 
+// Gets the processor affinity mask for the given process ID.
+static bool get_process_affinity(uint32_t pid, uint64_t *mask)
+{
+    HANDLE handle;
+    uint64_t system_affinity;
+
+    if (!(handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid))) {
+        SL2_SERVER_LOG_WARN("couldn't open process for pid=%d", pid);
+        *mask = -1;
+        return false;
+    }
+
+    if (!GetProcessAffinityMask(handle, mask, &system_affinity)) {
+        SL2_SERVER_LOG_WARN("couldn't get process affinity for pid=%d", pid);
+        *mask = -1;
+        return false;
+    }
+
+    CloseHandle(handle);
+
+    return true;
+}
+
+// Finds the first free processor, i.e. the first processor
+// that doesn't already have a process pinned to it.
+static bool find_free_processor(uint64_t *mask)
+{
+    uint64_t cpu_mask = 0;
+    PROCESSENTRY32 process_entry;
+    HANDLE snapshot;
+
+    snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+
+    if (snapshot == INVALID_HANDLE_VALUE) {
+        SL2_SERVER_LOG_FATAL("failed to snapshot process!");
+    }
+
+    process_entry.dwSize = sizeof(PROCESSENTRY32);
+
+    if (!Process32First(snapshot, &process_entry)) {
+        CloseHandle(snapshot);
+        SL2_SERVER_LOG_FATAL("failed to enumerate processes!");
+    }
+
+    do {
+        uint64_t affinity;
+
+        // If we weren't able to get the process's affinity, keep looking.
+        if (!get_process_affinity(process_entry.th32ProcessID, &affinity)) {
+            continue;
+        }
+
+        // NOTE(ww): WinAFL discards masks that have more than two processors set,
+        // which doesn't make sense to me.
+        cpu_mask |= affinity;
+    } while (Process32Next(snapshot, &process_entry));
+
+    for (int i = 0; i < 64; ++i) {
+        if (!((cpu_mask >> i) & 1)) {
+            *mask = 0;
+            *mask |= (1 << i);
+            return true;
+        }
+    }
+
+    return false;
+
+    CloseHandle(snapshot);
+}
+
+// Pins the server's process to the first free processor.
+static bool pin_to_free_processor()
+{
+    SYSTEM_INFO info = {0};
+    uint64_t free_mask;
+
+    GetSystemInfo(&info);
+
+    if (info.dwNumberOfProcessors < 2) {
+        SL2_SERVER_LOG_INFO("nprocessors=%d < 2, not bothing to pin to a processor", info.dwNumberOfProcessors);
+        return true;
+    }
+
+    if (info.dwNumberOfProcessors > 64) {
+        SL2_SERVER_LOG_WARN("nprocessors=%d > 64, processor pinning not supported!", info.dwNumberOfProcessors);
+        return false;
+    }
+
+    if (!find_free_processor(&free_mask)) {
+        SL2_SERVER_LOG_WARN("couldn't find a free processor!");
+        return false;
+    }
+
+    if (!SetProcessAffinityMask(GetCurrentProcess(), free_mask)) {
+        return false;
+    }
+
+    return true;
+}
+
 // Scores the coverage of the given arena by placing
 // hit counts into buckets: higher scores are given
 // for relatively small counts, while large counts
 // are given lower scores.
-static uint32_t bucket_score(sl2_arena *arena) {
+static uint32_t bucket_score(sl2_arena *arena)
+{
     uint32_t score = 0;
 
     for (int i = 0; i < FUZZ_ARENA_SIZE; ++i) {
@@ -104,7 +207,8 @@ static uint32_t bucket_score(sl2_arena *arena) {
 // Scores the coverage of the given arena with
 // a dumb hit counter: the ultimate score
 // is the number of nonzero cells in the arena.
-static uint32_t coverage_count(sl2_arena *arena) {
+static uint32_t coverage_count(sl2_arena *arena)
+{
     uint32_t score = 0;
 
     for (int i = 0; i < FUZZ_ARENA_SIZE; ++i) {
@@ -1021,6 +1125,10 @@ int main(int argc, char **argv)
     lock_process();
     std::atexit(server_cleanup);
 
+    SL2_SERVER_LOG_INFO("server started!");
+
+
+
     for (int i = 0; i < argc; ++i) {
         if (STREQ(argv[i], "-s")) {
             if (i < argc - 1) {
@@ -1033,12 +1141,18 @@ int main(int argc, char **argv)
         else if (STREQ(argv[i], "-b")) {
             opts.bucketing = true;
         }
+        else if (STREQ(argv[i], "-p")) {
+            opts.pinned = true;
+        }
+    }
+
+    if (opts.pinned && !pin_to_free_processor()) {
+        SL2_SERVER_LOG_WARN("failed to pin server to a free processor, too many jobs already pinned?");
     }
 
     init_working_paths();
 
-    SL2_SERVER_LOG_INFO("server started!");
-    SL2_SERVER_LOG_INFO("bucketing=%d, stickiness=%d", opts.bucketing, opts.stickiness);
+    SL2_SERVER_LOG_INFO("pinned=%d, bucketing=%d, stickiness=%d", opts.pinned, opts.bucketing, opts.stickiness);
 
     InitializeCriticalSection(&pid_lock);
     InitializeCriticalSection(&fkt_lock);
