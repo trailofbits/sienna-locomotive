@@ -27,32 +27,6 @@ from functools import partial
 from config_window import ConfigWindow
 
 
-# class Triager:
-
-#     def __init__(self, crashpath):
-#         triagepath = os.path.join( os.path.dirname(crashpath),
-#             "triage.json" )
-#         self.json = {}
-
-#         with open(triagepath) as f:
-#             self.json = json.load(f)
-
-
-#     def __repr__(self):
-#         ret = "<ERROR PROCESSING>"
-#         try:
-#             ret = "Crashash %s: %s exploitability, %s at pc 0x%x, memory address 0x%x, stack address 0x%x" % (
-#                 self.json['crashash'],
-#                 self.json['exploitability'],
-#                 self.json['crashReason'],
-#                 self.json['instructionPointer'],
-#                 self.json['crashAddress'],
-#                 self.json['stackPointer'] )
-#         except KeyError:
-#             pass
-#         return ret
-
-
 class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self):
@@ -373,27 +347,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.pause_all_threads()
         self.triage_output.append(str(crash))
         self.crashes.append(crash)
-
-    # def handle_new_crash(self, thread, triagerInfo):
-    #     """ Updates the crash counter and pauses other threads if specified """
-    #     crash = triagerInfo["crashInfo"]
-    #     self.crash_counter.increment()
-    #     # self.triage_output.append(formatted)
-    #     self.crashes.append(crash)
-    #     if not thread.should_fuzz:
-    #         self.pause_all_threads()
-
-    #     if crash:
-    #         print("crash", crash)
-    #         runid = str(triagerInfo["run_id"])
-    #         try:
-    #             crashTriage = db.Crash.factory(runid)
-    #             self.triage_output.append(str(crashTriage))
-    #         except:
-    #             print("Error loading ", crash )
-
-    #     #self.triage_output.append(formatted)
-    #     self.crashes.append(crash)
 
     def handle_server_crash(self):
         """ Pauses fuzzing threads and attempts to restart the server if it crashes """

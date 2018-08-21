@@ -50,10 +50,9 @@ class FuzzerThread(QThread):
             if crashed:
                 if self.config_dict['exit_early']:
                     self.pause()
-                #formatted, raw = tracer_run(self.config_dict, run_id)
+                # We can't pass this object to another thread since it's database, so just returning the runid
                 triagerInfo = triagerRun(self.config_dict, run_id)
-                run_id = str(run_id)
-                self.foundCrash.emit(self, run_id)
+                self.foundCrash.emit(self, str(run_id))
 
             if not self.config_dict['continuous']:
                 self.pause()

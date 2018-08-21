@@ -1,3 +1,8 @@
+############################################################################
+# checkseck.py
+#
+# This is the python wrapper around winchecksec, a tool that's basically an
+# equivalent of checksec.sh
 from sqlalchemy import *
 import os
 import harness.config
@@ -11,7 +16,6 @@ from db.base import Base
 class Checksec(Base):
 
     __tablename__ = "checksec"
-
 
     dynamicBase     = Column( String )
     forceIntegrity  = Column( String )
@@ -31,7 +35,8 @@ class Checksec(Base):
     @staticmethod
     def byExecutable( path ):
         """
-        Gets checksec information for dll or exe
+        Gets checksec information for dll or exe. If it already exists in the db, just
+        return the row
         """
         cfg = harness.config
         session =  db.getSession()
@@ -48,13 +53,11 @@ class Checksec(Base):
 
         session.add(ret)
         session.commit()
-        #session.close()
         return ret
 
 
     def shortString(self):
         t = []
-
         if self.nx:
             t.append("NX")
         if self.seh:

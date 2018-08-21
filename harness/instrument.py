@@ -186,43 +186,18 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
 def triagerRun( cfg, run_id ):
     """
     Runs the sl2 triager on each of the minidumps generated
-    by a fuzzing run.
-
+    by a fuzzing run.  The information that gets returned
+    can't be used across threads so we end up fetching it from the db in the gui
     """
 
     ret = {}
     ret["run_id"] = run_id
-
     tracerOutput, _ = tracer_run(cfg, run_id)
     ret["tracerOutput"] = tracerOutput
     crashInfo = db.Crash.factory( run_id )
     ret["crashInfo"] = crashInfo
 
     return ret
-
-    # dmpfiles = get_paths_to_run_file(run_id, "initial.*.dmp")
-
-    # if not dmpfiles:
-    #     print_l("[!] No initial minidumps to triage!")
-    #     return None
-
-    # ret = []
-
-    # # Prime the db for crashes
-    # for dmpfile in dmpfiles:
-    #     try:
-    #         crash = db.Crash.factory( run_id, dmpfile)
-    #         if not crash:
-    #             print_l('[!] Unable to process crash %s' % dmpfile )
-    #         else:
-    #             ret.append(repr(crash))
-    #             if config.config["verbose"]:
-    #                 print_l(repr(crash))
-    #     except:
-    #         traceback.print_exc()
-    #         print_l("Error with dmpfile %s"%dmpfile)
-
-    # return ret
 
 
 def wizard_run(config_dict):

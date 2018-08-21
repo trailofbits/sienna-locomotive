@@ -1,3 +1,9 @@
+############################################################################
+# crash.py
+#
+# Model for crashing runs in sl2.  Puts basic exploitablity and triage
+# info in the database
+
 from sqlalchemy import *
 import os
 import harness.config
@@ -11,7 +17,6 @@ import db
 class Crash(Base):
 
     __tablename__ = "crash"
-
 
     runid                   = Column( String(40), primary_key=True )
     callStackJson           = Column( String )
@@ -45,6 +50,9 @@ class Crash(Base):
 
     @staticmethod
     def dumpPathToRunid( dmpPath ):
+        """
+        Converts the full path to an sl2 minidump to a runid
+        """
         runid = None
         m = re.match(r".*\\runs\\([a-fA-F0-9-]+)\\.*", dmpPath)
         if m:
@@ -54,6 +62,9 @@ class Crash(Base):
 
     @staticmethod
     def runidToDumpPath( runid ):
+        """
+        Converts an sl2 runid into a minidump path
+        """
         dumpPath = None
         cfg = harness.config
 
@@ -65,7 +76,9 @@ class Crash(Base):
 
     @staticmethod
     def factory( runid, dmpPath=None ):
-        """ Factory for generating triage information from a minidump
+        """
+        Factory for generating triage and exploitability information about a minidump. If
+        it already exists in the db, return the row.
         """
         cfg = harness.config
         session = db.getSession()
@@ -81,6 +94,9 @@ class Crash(Base):
             print("Unable to find dumpfile for runid %s" % runid)
             return None
 
+        # Runs triager, which will give us exploitabilty info
+        # using 2 engines: Google's breakpad and an reimplementation of Microsofts
+        # !exploitable
         cmd = [ cfg.config['triager_path'], dmpPath ]
         out = subprocess.check_output(cmd, shell=False)
         out = out.decode('utf8')
@@ -100,7 +116,6 @@ class Crash(Base):
 
         session.add(ret)
         session.commit()
-        #session.close()
         return ret
 
     def __repr__(self):
