@@ -6,6 +6,7 @@
 
 from sqlalchemy import *
 from sqlalchemy import ForeignKey
+from sqlalchemy import orm
 from sqlalchemy.orm import relationship
 import glob
 import harness.config
@@ -13,6 +14,7 @@ import json
 import os
 import re
 import subprocess
+
 
 from db.base import Base
 import db
@@ -22,40 +24,65 @@ class Crash(Base):
 
     __tablename__ = "crash"
 
-    id                      = Column( Integer, primary_key=True )
-    runid                   = Column( String(40)  )
-    callStackJson           = Column( String )
-    crashAddress            = Column( String(20) )
-    crashReason             = Column( String(270) )
-    crashash                = Column( String(64) )
-    exploitability          = Column( String(32) )
-    instructionPointer      = Column( String(20) )
-    minidumpPath            = Column( String(270) )
-    rank                    = Column( Integer  )
-    ranksJson               = Column( String )
-    stackPointer            = Column( String(20) )
-    tag                     = Column( String(128) )
-    tracer                  = relationship(  "Tracer", order_by=db.Tracer.runid, back_populates="crash", uselist=False)
+    id                          = Column( Integer, primary_key=True )
+    runid                       = Column( String(40)  )
+    crashAddressString          = Column( String(20) )
+    crashReason                 = Column( String(270) )
+    crashash                    = Column( String(64) )
+    exploitability              = Column( String(32) )
+    instructionPointerString    = Column( String(20) )
+    minidumpPath                = Column( String(270) )
+    rank                        = Column( Integer  )
+    stackPointerString          = Column( String(20) )
+    tag                         = Column( String(128) )
+    tracer                      = relationship(  "Tracer", order_by=db.Tracer.runid, back_populates="crash", uselist=False)
+    obj                         = Column( PickleType )
+
 
     def __init__(self, j, runid=None):
         try:
-            self.runid                  = runid
-            self.crashJson              = j
-            self.callStackJson          = str(j["callStack"])
-            self.crashAddress           = hex(j["crashAddress"])
-            self.crashReason            = j["crashReason"]
-            self.crashash               = j["crashash"]
-            self.exploitability         = j["exploitability"]
-            self.instructionPointer     = hex(j["instructionPointer"])
-            self.minidumpPath           = j["minidumpPath"]
-            self.rank                   = j["rank"]
-            self.ranksJson              = str(j["ranks"])
-            self.stackPointer           = hex(j["stackPointer"])
-            self.tag                    = j["tag"]
+            self.runid                      = runid
+            self.crashAddressString         = hex(j["crashAddress"])
+            self.crashReason                = j["crashReason"]
+            self.crashash                   = j["crashash"]
+            self.exploitability             = j["exploitability"]
+            self.instructionPointerString   = hex(j["instructionPointer"])
+            self.minidumpPath               = j["minidumpPath"]
+            self.rank                       = j["rank"]
+            self.stackPointerString         = hex(j["stackPointer"])
+            self.tag                        = j["tag"]
+            self.obj                        = j
+
         except KeyError:
             raise "Was unable to parse crash json from triager"
 
 
+    @staticmethod
+    def rankToExploitability(rank):
+        xploitabilities = [ 'None', 'Unknown', 'Low', 'Medium', 'High ']
+        return xploitabilities[rank]
+
+    def mergeTracer( self ):
+        """ See if there is a tracer result for this runid"""
+
+        tracer = db.Tracer.factory(self.runid)
+        if not tracer:
+            self.tracer = None
+            return
+        self.tracer = tracer
+
+    @orm.reconstructor
+    def reconstructor(self):
+        self.stackPointer           = self.obj["stackPointer"]
+        self.ranks                  = self.obj["ranks"]
+        self.crashAddress           = self.obj["crashAddress"]
+        self.instructionPointer     = self.obj["instructionPointer"]
+
+        if self.tracer:
+            self.ranks.append(self.tracer.rank)
+
+        self.rank = max(self.ranks)
+        self.exploitability = Crash.rankToExploitability(self.rank)
 
     @staticmethod
     def factory( runid, dmpPath=None ):
@@ -97,18 +124,29 @@ class Crash(Base):
             print("Unable to process cras json")
             return None
 
-        # See if there is a tracer result for this runid
-        ret.tracer = db.Tracer.factory(runid)
+        ret.mergeTracer()
+        ret.reconstructor()
         session.add(ret)
         session.commit()
         return ret
 
+    def ranksString(self):
+        tmp = [ str(_) for _ in self.ranks ]
+        return "-".join(tmp)
+
     def __repr__(self):
         tracerInfo = "None"
         if self.tracer:
-            tracerInfo = self.tracer.tracerFormatted
-        return """Exploitability: %s   Crash Reason: %s   Crash Address: %s    Crashash: %s    Tag: %s    Tracer: %s""" % (
-            self.exploitability, self.crashReason, self.crashAddress, self.crashash, self.tag, tracerInfo )
+            tracerInfo = self.tracer.formatted
+        return """Exploitability: %s (%s)   Crash Reason: %s   Crash Address: %X    Instruction: %X   Crashash: %s    Tag: %s    Tracer: %s""" % (
+            self.exploitability,
+            self.ranksString(),
+            self.crashReason,
+            self.crashAddress,
+            self.instructionPointer,
+            self.crashash,
+            self.tag,
+            tracerInfo )
 
 # Example json
 # {'callStack': [
