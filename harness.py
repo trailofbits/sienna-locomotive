@@ -62,9 +62,12 @@ def select_from_range(max_range, message):
 
 
 def select_and_dump_wizard_findings(wizard_findings, target_file):
+    # This will happen if there weren't any hookable functions in the target,
+    # OR if the target's architecture isn't supported.
+    # Either way there isn't much we can do, so exit.
     if len(wizard_findings) == 0:
         print_l("[!] No wizard findings!")
-        return wizard_findings
+        sys.exit()
 
     """ Print and select findings, then write to disk """
     print_l("Functions found:")
