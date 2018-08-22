@@ -17,6 +17,7 @@ import shutil
 import msgpack
 import hashlib
 import array
+import re
 from enum import IntEnum
 from typing import NamedTuple
 
@@ -27,7 +28,6 @@ from .state import (
     create_invocation_statement,
     check_fuzz_line_for_crash,
     get_path_to_run_file,
-    get_paths_to_run_file,
     get_target_dir,
 )
 
@@ -227,6 +227,11 @@ def wizard_run(config_dict):
     for line in run.process.stderr.split(b'\n'):
         try:
             line = line.decode('utf-8')
+
+            if re.match(r'ERROR: Target process .* is for the wrong architecture', line):
+                print_l("[!] Bad architecute for target application:", config_dict['target_application_path'])
+                return []
+
             obj = json.loads(line)
 
             if "map" == obj["type"]:
