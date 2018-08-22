@@ -20,15 +20,17 @@ class Tracer(Base):
 
     runid               = Column( String(40), primary_key=True )
 
-    tracerJson          = Column( PickleType )
-    tracerFormatted     = Column( String )
+    obj                 = Column( PickleType )
+    formatted           = Column( String )
     crash               = relationship( "Crash", back_populates="tracer", uselist=False )
     crashId             = Column(Integer, ForeignKey('crash.id'))
+    rank                = Column( Integer )
 
     def __init__(self, runid, formatted, rawJson):
-        self.runid              = runid
-        self.tracerFormatted    = formatted
-        self.tracerJson         = rawJson
+        self.runid          = runid
+        self.formatted      = formatted
+        self.obj            = rawJson
+        self.rank           = self.obj["score"]/25
 
     @staticmethod
     def factory( runid, formatted=None, raw=None ):
@@ -44,10 +46,9 @@ class Tracer(Base):
             return None
 
         ret = Tracer( runid, formatted, raw )
+
         session.add(ret)
         session.commit()
-        #session.close()
-
 
 
 #     "exception": "EXCEPTION_BREAKPOINT",
