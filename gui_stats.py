@@ -1,15 +1,14 @@
-#
-import sys
-import postprocess
 from PySide2 import QtWidgets
-from PySide2.QtCore import Qt, QSize, QModelIndex
-from PySide2.QtCore import QThread, Signal, Qt
+from PySide2.QtCore import *
+from PySide2.QtWidgets import *
 from functools import partial
+import postprocess
 import statistics
+import sys
 
-from PySide2.QtWidgets import QTableWidget, QVBoxLayout, QApplication, QTableWidgetItem
-from PySide2.QtCore import QAbstractTableModel
+import alchemical_model
 
+import db
 
 class PostprocThread(QThread):
     resultReady = Signal(list)
@@ -20,35 +19,40 @@ class PostprocThread(QThread):
         self.callback = callback
 
     def run(self):
-        rollup = postprocess.Rollup()
-        rollup.process(self.callback)
-        self.resultReady.emit(rollup)
+        # rollup = postprocess.Rollup()
+        # rollup.process(self.callback)
+        crashes = db.Crash.getAll()
+
+        self.resultReady.emit(crashes)
+
 
 class RollupModel(QAbstractTableModel):
 
 
-    def attachModel(self, rollup):
-        self.rollup = rollup
+    def attachModel(self, crashes):
+        self.crashes = crashes
 
 
     def horizontalHeaderItem(self, col):
-        ret = self.rollup.cols()[col]
+        ret = "TODO"
         return ret
 
     def rowCount(self, parent=None):
-        return self.rollup.rowCount()
+        return len(self.crashes)
 
     def cols(self):
         return self.rollup.cols()
 
     def columnCount( self, parent=None ):
-        return len(self.rollup.cols())
+        if len(self.crashes) == 0:
+            return 0
+        return len(self.crashes[0])
 
     # def data(self, index, role):
     #     return self.dataCell( index.row(), index.column() )
 
     def dataCell(self, row, col ):
-        return self.rollup.toCSV()[row][col]
+        return self.crashes[row][col]
 
     def item( self, row, col ):
         data = self.dataCell( row, col )
@@ -117,10 +121,34 @@ class MainWin(QtWidgets.QMainWindow):
         self.layout.addWidget(self.web)
 
         # table
-        self.tableModel = RollupModel()
-        self.table = QTableWidget()
+        # self.tableModel = RollupModel()
+        # self.table = QTableWidget()
+        # self.table.show()
+        # self.layout.addWidget(self.table)
+
+        session = db.getSession()
+        self.tableModel = alchemical_model.SqlAlchemyTableModel(
+            session,
+            db.Crash,
+            [
+                ('RunID', db.Crash.runid, 'runid', {} ),
+                ('Reason', db.Crash.crashReason, 'crashReason', {})
+            ] )
+        self.table = QTableView()
+        self.table.setModel(self.tableModel)
+
         self.table.show()
         self.layout.addWidget(self.table)
+        self.table.horizontalHeader().setDefaultSectionSize(300)
+
+        # self.table.horizontalHeader().setStretchLastSection(True)
+        # self.table.setVisible(False)
+        # self.table.resizeColumnsToContents()
+        # self.table.setVisible(True)
+        #self.table.resizeColumnToContents(1)
+
+        #self.table.resizeColumnToContents(col)
+
 
 
         #Postproc thread
@@ -142,6 +170,9 @@ class MainWin(QtWidgets.QMainWindow):
         self.layout.addWidget(self.statusBar)
 
     def postprocFinished(self, rollup):
+
+        return
+        # XXX
         m = self.tableModel
         m.attachModel(rollup)
         colLabels = m.cols()

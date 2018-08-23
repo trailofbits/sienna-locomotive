@@ -85,6 +85,11 @@ class Crash(Base):
         self.exploitability = Crash.rankToExploitability(self.rank)
 
     @staticmethod
+    def getAll():
+        session = db.getSession()
+        return session.query( Crash ).all()
+
+    @staticmethod
     def factory( runid, dmpPath=None ):
         """
         Factory for generating triage and exploitability information about a minidump. If
