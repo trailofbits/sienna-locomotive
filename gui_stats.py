@@ -6,7 +6,7 @@ import postprocess
 import statistics
 import sys
 
-import alchemical_model
+from gui import sqlalchemy_model
 
 import db
 
@@ -127,7 +127,7 @@ class MainWin(QtWidgets.QMainWindow):
         # self.layout.addWidget(self.table)
 
         session = db.getSession()
-        self.tableModel = alchemical_model.SqlAlchemyTableModel(
+        self.tableModel = sqlalchemy_model.SqlalchemyModel(
             session,
             db.Crash,
             [
