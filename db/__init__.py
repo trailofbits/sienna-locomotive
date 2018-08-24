@@ -24,7 +24,6 @@ def checkVersionNumber():
     versionNow = config.VERSION
     confVersion = db.Conf.factory('version')
     if not confVersion:
-        print("There is no existing version. adding")
         db.Conf.factory( "version", versionNow )
         return
 
@@ -41,8 +40,6 @@ Options include:
         xception = BaseException(msg)
         raise( xception )
 
-    else:
-        print("Versions match!", versionNow )
 
 
 

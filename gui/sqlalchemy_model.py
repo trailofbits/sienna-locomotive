@@ -3,7 +3,7 @@ from PySide2.QtCore import  Qt
 
 class SqlalchemyModel(QSqlTableModel):
 
-    def __init__(self, session, clazz, cols, orderBy=None, sort=(0,0) ):
+    def __init__(self, session, clazz, cols, orderBy, sort=(0,0) ):
         super().__init__()
 
         self.session        = session
@@ -34,10 +34,10 @@ class SqlalchemyModel(QSqlTableModel):
 
     def update(self):
         self.layoutAboutToBeChanged.emit()
-        self.rows = self.session.query( self.clazz )
-        if self.orderBy:
-            self.rows = self.rows.order_by(self.orderBy)
-        self.rows = self.rows.all()
+
+        self.rows = self.session.query( self.clazz ).\
+            order_by(self.orderBy).\
+            all()
         self.layoutChanged.emit()
 
     def rowCount(self, parent):
@@ -58,9 +58,10 @@ class SqlalchemyModel(QSqlTableModel):
         name = self.cols[ index.column() ][2]
 
         ret = getattr(  row, name )
+        ret = str(ret)
         return ret
 
-        return None
+
 
 
     def sort( self, col, order ):

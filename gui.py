@@ -10,6 +10,7 @@ from PySide2.QtCore import *
 from PySide2.QtGui import QFontDatabase, QMovie, QStandardItem, QBrush, QColor
 from PySide2.QtWidgets import *
 
+from sqlalchemy import desc
 
 from gui.checkbox_tree import (
     CheckboxTreeWidget,
@@ -201,6 +202,7 @@ class MainWindow(QtWidgets.QMainWindow):
             session,
             db.Crash,
             [
+                ('Time',            db.Crash.timestamp,                 'timestamp', {}),
                 ('RunID',           db.Crash.runid,                     'runid', {} ),
                 ('Reason',          db.Crash.crashReason,               'crashReason', {}),
                 ('Exploitability',  db.Crash.exploitability,            'exploitability', {}),
@@ -210,7 +212,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 ('IP',              db.Crash.instructionPointerString,  'instructionPointerString', {}),
                 ('Stack Pointer',   db.Crash.stackPointerString,        'stackPointerString', {}),
             ],
-            orderBy='timestamp desc' )
+            orderBy=desc(db.Crash.timestamp) )
         self.crashesTable = QTableView()
         self.crashesTable.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self.crashesTable.setModel(self.crashesModel)
@@ -360,6 +362,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def handle_new_crash(self, thread, run_id):
         """ Updates the crash counter and pauses other threads if specified """
         self.crashesModel.update()
+        self.crashesTable.resizeColumnsToContents()
         self.crash_counter.increment()
         crash = db.Crash.factory(run_id)
         if not crash:
