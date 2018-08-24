@@ -7,25 +7,22 @@ import glob
 import os
 import codecs
 
-DEBUG=True
-
+DEBUG=False
 
 TEST_APPLICATION='build/corpus/test_application/Debug/test_application.exe'
 TRIAGER=r'build\triage\Debug\triager.exe'
 
 
-
 def runAndCaptureOutput( cmd ):
-    # This is to fix utf8 encoding issues and makes out streams 8bit clean
-    for _ in [sys.stdout, sys.stderr ]:
-        _ = codecs.getwriter("iso8859")
 
     if type(cmd) == type([]):
         cmd = " ".join(cmd)
 
     if DEBUG:
         print( '\n[%s]' % cmd)
-    out =  subprocess.getoutput(cmd)
+    out =  subprocess.run( cmd, text=True, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, encoding='iso8859' )
+    out = out.stdout + out.stderr
+
     if DEBUG:
         print( "\n<%s>" % out )
     return str(out)
