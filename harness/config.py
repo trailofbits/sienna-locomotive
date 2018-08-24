@@ -22,6 +22,10 @@ import shlex
 # TODO(ww): Add conversion to the schema as well?
 CONFIG_SCHEMA = {}
 
+# Increment this version number for any changes that might break backwards compatibilty.
+# This could be database schema changes, paths, file glob patterns, etc..
+VERSION=2
+
 PATH_KEYS = ['drrun_path', 'client_path', 'server_path', 'wizard_path', 'tracer_path', 'triager_path']
 ARGS_KEYS = ['drrun_args', 'client_args', 'server_args', 'target_args']
 INT_KEYS = ['runs', 'simultaneous', 'fuzz_timeout', 'tracer_timeout', 'seed', 'verbose']
