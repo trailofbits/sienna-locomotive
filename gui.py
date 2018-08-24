@@ -27,6 +27,8 @@ from harness.threads import WizardThread, FuzzerThread, ServerThread
 from functools import partial
 from gui import sqlalchemy_model
 
+import gui.stats
+
 from config_window import ConfigWindow
 
 
@@ -222,6 +224,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.crashesTable.show()
 
 
+        self.statsWidget = gui.stats.StatsWidget()
+        self._layout.addWidget(self.statsWidget)
+
+
+
         # Set up stop button (and hide it)
         self.stop_button = QtWidgets.QPushButton("Stop Fuzzing")
         self.stop_button.hide()
@@ -363,6 +370,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """ Updates the crash counter and pauses other threads if specified """
         self.crashesModel.update()
         self.crashesTable.resizeColumnsToContents()
+        self.statsWidget.update()
         self.crash_counter.increment()
         crash = db.Crash.factory(run_id)
         if not crash:
