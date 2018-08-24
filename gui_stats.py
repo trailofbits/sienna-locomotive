@@ -131,25 +131,21 @@ class MainWin(QtWidgets.QMainWindow):
             session,
             db.Crash,
             [
-                ('RunID', db.Crash.runid, 'runid', {} ),
-                ('Reason', db.Crash.crashReason, 'crashReason', {})
+                ('RunID',           db.Crash.runid,                     'runid', {} ),
+                ('Reason',          db.Crash.crashReason,               'crashReason', {}),
+                ('Exploitability',  db.Crash.exploitability,            'exploitability', {}),
+                ('Ranks',           db.Crash.ranksString,               'ranksString', {}),
+                ('Crashash',        db.Crash.crashash,                  'crashash', {}),
+                ('Crash Address',   db.Crash.crashAddressString,        'crashAddressString', {}),
+                ('IP',              db.Crash.instructionPointerString,  'instructionPointerString', {}),
+                ('Stack Pointer',   db.Crash.stackPointerString,        'stackPointerString', {}),
             ] )
         self.table = QTableView()
         self.table.setModel(self.tableModel)
-
-        self.table.show()
         self.layout.addWidget(self.table)
-        self.table.horizontalHeader().setDefaultSectionSize(300)
-
-        # self.table.horizontalHeader().setStretchLastSection(True)
-        # self.table.setVisible(False)
-        # self.table.resizeColumnsToContents()
-        # self.table.setVisible(True)
-        #self.table.resizeColumnToContents(1)
-
-        #self.table.resizeColumnToContents(col)
-
-
+        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.resizeColumnsToContents()
+        self.table.show()
 
         #Postproc thread
         self.postprocThread = PostprocThread({}, self.postprocCallback)
@@ -170,8 +166,10 @@ class MainWin(QtWidgets.QMainWindow):
         self.layout.addWidget(self.statusBar)
 
     def postprocFinished(self, rollup):
-
+        print("UPdating...")
+        self.tableModel.update()
         return
+
         # XXX
         m = self.tableModel
         m.attachModel(rollup)

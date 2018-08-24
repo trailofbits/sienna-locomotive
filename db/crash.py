@@ -33,6 +33,7 @@ class Crash(Base):
     instructionPointerString    = Column( String(20) )
     minidumpPath                = Column( String(270) )
     rank                        = Column( Integer  )
+    ranksString                 = Column( String(8)  )
     stackPointerString          = Column( String(20) )
     tag                         = Column( String(128) )
     tracer                      = relationship(  "Tracer", order_by=db.Tracer.runid, back_populates="crash", uselist=False)
@@ -42,6 +43,7 @@ class Crash(Base):
     def __init__(self, j, runid=None):
         try:
             self.runid                      = runid
+            self.obj                        = j
             self.crashAddressString         = hex(j["crashAddress"])
             self.crashReason                = j["crashReason"]
             self.crashash                   = j["crashash"]
@@ -51,7 +53,9 @@ class Crash(Base):
             self.rank                       = j["rank"]
             self.stackPointerString         = hex(j["stackPointer"])
             self.tag                        = j["tag"]
-            self.obj                        = j
+            self.ranks                      = self.obj["ranks"]
+            self.ranksString                = self.ranksStringGenerate()
+
 
         except KeyError:
             raise "Was unable to parse crash json from triager"
@@ -74,15 +78,16 @@ class Crash(Base):
     @orm.reconstructor
     def reconstructor(self):
         self.stackPointer           = self.obj["stackPointer"]
-        self.ranks                  = self.obj["ranks"]
         self.crashAddress           = self.obj["crashAddress"]
         self.instructionPointer     = self.obj["instructionPointer"]
 
-        if self.tracer:
-            self.ranks.append(self.tracer.rank)
+        if hasattr(self, 'ranks'):
+            if self.tracer:
+                self.ranks.append(self.tracer.rank)
 
-        self.rank = max(self.ranks)
-        self.exploitability = Crash.rankToExploitability(self.rank)
+            self.rank = max(self.ranks)
+            self.exploitability = Crash.rankToExploitability(self.rank)
+            self.ranksString                = self.ranksStringGenerate()
 
     @staticmethod
     def getAll():
@@ -135,9 +140,9 @@ class Crash(Base):
         session.commit()
         return ret
 
-    def ranksString(self):
+    def ranksStringGenerate(self):
         tmp = [ str(_) for _ in self.ranks ]
-        return "-".join(tmp)
+        return ":".join(tmp)
 
     def __repr__(self):
         tracerInfo = "None"
@@ -145,7 +150,7 @@ class Crash(Base):
             tracerInfo = self.tracer.formatted
         return """Exploitability: %s (%s)   Crash Reason: %s   Crash Address: %X    Instruction: %X   Crashash: %s    Tag: %s    Tracer: %s""" % (
             self.exploitability,
-            self.ranksString(),
+            self.ranksString,
             self.crashReason,
             self.crashAddress,
             self.instructionPointer,
