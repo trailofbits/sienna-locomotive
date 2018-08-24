@@ -291,4 +291,4 @@ Changed passing of arguments to clients and target applications from using comma
 
 # Developer Information
 
-If you change anything that would break backwards compatility, increment  `harness.config.VERSION`.  This includes any database changes, formats, directory structures, filenames etc..
+If you change anything that would break backwards compatibility, increment  `harness.config.VERSION`.  This includes any database changes, formats, directory structures, filenames etc..
