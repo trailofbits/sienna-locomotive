@@ -15,11 +15,15 @@ class SqlalchemyModel(QSqlTableModel):
 
     def headerData( self, section, orientation, role ):
         try:
-            return self.cols[section][0]
+            ret = self.cols[section][0]
         except:
             print("No header data for section", section, role)
+            return None
 
-        return "<ERROR>"
+        if role!=Qt.DisplayRole or orientation!=Qt.Horizontal:
+            return None
+
+        return ret
 
 
     def flags(self, i):
