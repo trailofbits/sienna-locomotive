@@ -287,3 +287,8 @@ You can safely ignore most of the stuff in `corpus/asm` and `electriage`
 
 ## 20180808
 Changed passing of arguments to clients and target applications from using comma separated to just normally how it would appear on the command line. The `shlex.split()` function will split them up appropriately
+
+
+# Developer Information
+
+If you change anything that would break backwards compatility, increment  `harness.config.VERSION`.  This includes any database changes, formats, directory structures, filenames etc..
