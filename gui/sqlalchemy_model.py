@@ -3,13 +3,16 @@ from PySide2.QtCore import  Qt
 
 class SqlalchemyModel(QSqlTableModel):
 
-    def __init__(self, session, clazz, cols):
+    def __init__(self, session, clazz, cols, orderBy=None, sort=(0,0) ):
         super().__init__()
 
         self.session        = session
         self.clazz          = clazz
         self.cols           = cols
         self.rows           = None
+        # sort is (column, order )
+        self.sort           = sort
+        self.orderBy        = orderBy
         self.update()
 
 
@@ -17,7 +20,6 @@ class SqlalchemyModel(QSqlTableModel):
         try:
             ret = self.cols[section][0]
         except:
-            print("No header data for section", section, role)
             return None
 
         if role!=Qt.DisplayRole or orientation!=Qt.Horizontal:
@@ -32,7 +34,10 @@ class SqlalchemyModel(QSqlTableModel):
 
     def update(self):
         self.layoutAboutToBeChanged.emit()
-        self.rows = self.session.query( self.clazz ).all()
+        self.rows = self.session.query( self.clazz )
+        if self.orderBy:
+            self.rows = self.rows.order_by(self.orderBy)
+        self.rows = self.rows.all()
         self.layoutChanged.emit()
 
     def rowCount(self, parent):
@@ -56,6 +61,12 @@ class SqlalchemyModel(QSqlTableModel):
         return ret
 
         return None
+
+
+    def sort( self, col, order ):
+        self.sort = (col, order)
+        print("sort", sort)
+        self.update()
 
     def setData( self, index, value, role ):
         pass
