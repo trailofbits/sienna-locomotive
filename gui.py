@@ -5,10 +5,11 @@ import os
 import json
 import db
 
-from PySide2.QtWidgets import QFileDialog, QMenu, QAction
 from PySide2 import QtWidgets
-from PySide2.QtCore import Qt, QSize
+from PySide2.QtCore import *
 from PySide2.QtGui import QFontDatabase, QMovie, QStandardItem, QBrush, QColor
+from PySide2.QtWidgets import *
+
 
 from gui.checkbox_tree import (
     CheckboxTreeWidget,
@@ -23,6 +24,7 @@ from harness import config
 from harness.state import get_target, export_crash_data_to_csv
 from harness.threads import WizardThread, FuzzerThread, ServerThread
 from functools import partial
+from gui import sqlalchemy_model
 
 from config_window import ConfigWindow
 
@@ -193,11 +195,30 @@ class MainWindow(QtWidgets.QMainWindow):
         self.fuzz_controls_outer_layout.addLayout(self.fuzz_controls_inner_right)
         self._layout.addLayout(self.fuzz_controls_outer_layout)
 
-        # Set up text window displaying triage output
-        self.triage_output = QtWidgets.QTextBrowser()
-        self.triage_output.setOpenLinks(False)
-        self.triage_output.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
-        self._layout.addWidget(self.triage_output)
+        # Crashes table
+        session = db.getSession()
+        self.crashesModel = sqlalchemy_model.SqlalchemyModel(
+            session,
+            db.Crash,
+            [
+                ('RunID',           db.Crash.runid,                     'runid', {} ),
+                ('Reason',          db.Crash.crashReason,               'crashReason', {}),
+                ('Exploitability',  db.Crash.exploitability,            'exploitability', {}),
+                ('Ranks',           db.Crash.ranksString,               'ranksString', {}),
+                ('Crashash',        db.Crash.crashash,                  'crashash', {}),
+                ('Crash Address',   db.Crash.crashAddressString,        'crashAddressString', {}),
+                ('IP',              db.Crash.instructionPointerString,  'instructionPointerString', {}),
+                ('Stack Pointer',   db.Crash.stackPointerString,        'stackPointerString', {}),
+            ],
+            orderBy='timestamp desc' )
+        self.crashesTable = QTableView()
+        self.crashesTable.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+        self.crashesTable.setModel(self.crashesModel)
+        self._layout.addWidget(self.crashesTable)
+        self.crashesTable.horizontalHeader().setStretchLastSection(True)
+        self.crashesTable.resizeColumnsToContents()
+        self.crashesTable.show()
+
 
         # Set up stop button (and hide it)
         self.stop_button = QtWidgets.QPushButton("Stop Fuzzing")
@@ -338,6 +359,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def handle_new_crash(self, thread, run_id):
         """ Updates the crash counter and pauses other threads if specified """
+        self.crashesModel.update()
         self.crash_counter.increment()
         crash = db.Crash.factory(run_id)
         if not crash:
@@ -345,7 +367,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.crashes.append(crash)
         if not thread.should_fuzz:
             self.pause_all_threads()
-        self.triage_output.append(str(crash))
+        #self.triage_output.append(str(crash))
         self.crashes.append(crash)
 
     def handle_server_crash(self):
@@ -475,6 +497,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def save_crashes(self):
         """ Saves a csv of crash data """
+        self.crashesModel.update()
         savefile, not_canceled = QFileDialog.getSaveFileName(self, filter="*.csv")
         if not_canceled:
             export_crash_data_to_csv(self.crashes, savefile)

@@ -14,6 +14,8 @@ import json
 import os
 import re
 import subprocess
+from sqlalchemy.sql.expression import func
+
 
 
 from db.base import Base
@@ -38,7 +40,7 @@ class Crash(Base):
     tag                         = Column( String(128) )
     tracer                      = relationship(  "Tracer", order_by=db.Tracer.runid, back_populates="crash", uselist=False)
     obj                         = Column( PickleType )
-
+    timestamp                   = Column( DateTime, default=func.now() )
 
     def __init__(self, j, runid=None):
         try:
