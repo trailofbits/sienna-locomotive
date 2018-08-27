@@ -169,16 +169,16 @@ const string Triage::crashash() const {
     auto last  = unique(calls.begin(), calls.end());
     calls.erase(last, calls.end());
 
-    RC4x rc4(true);
-
     for( uint64_t addr : calls ) {
         // We only want the 12 bits of the offset to ignore aslr
         addr &= 0xFFF;
-        rc4.encrypt( (uint8_t*)&addr, (uint8_t*)&stackhash,  (size_t)sizeof(stackhash) );
+        if( stackhash==0 )
+            stackhash = addr<<12;
+        stackhash ^= addr;
     }
 
     ostringstream oss;
-    oss << setfill('0') << setw(sizeof(stackhash)/4) << hex << stackhash;
+    oss << setfill('0') << setw(6) << hex << stackhash;
     return oss.str();
 }
 
