@@ -16,8 +16,6 @@ import re
 import subprocess
 from sqlalchemy.sql.expression import func
 
-
-
 from db.base import Base
 import db
 
