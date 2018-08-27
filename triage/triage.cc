@@ -161,7 +161,10 @@ const vector<uint64_t> Triage::callStack() const {
 // crashash()
 //      Returns the hash of the callstack.  This should uniquely identifiy
 // a crash (even with ASLR) by using the last 3 nibbles of the offset for
-// each call in the callstack
+// each call in the callstack.
+// The format is a 6 nibble hex value.  The top 12 bits are the major hash,
+// the bottom 12 bits are the minor hash.  The major hash relates to where
+// it crashes, and the minor is of the callstack
 const string Triage::crashash() const {
     uint64_t    stackhash = 0;
     auto calls = callStack();
@@ -169,16 +172,16 @@ const string Triage::crashash() const {
     auto last  = unique(calls.begin(), calls.end());
     calls.erase(last, calls.end());
 
-    RC4x rc4(true);
-
     for( uint64_t addr : calls ) {
         // We only want the 12 bits of the offset to ignore aslr
         addr &= 0xFFF;
-        rc4.encrypt( (uint8_t*)&addr, (uint8_t*)&stackhash,  (size_t)sizeof(stackhash) );
+        if( stackhash==0 )
+            stackhash = addr<<12;
+        stackhash ^= addr;
     }
 
     ostringstream oss;
-    oss << setfill('0') << setw(sizeof(stackhash)/4) << hex << stackhash;
+    oss << setfill('0') << setw(6) << hex << stackhash;
     return oss.str();
 }
 

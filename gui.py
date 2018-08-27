@@ -30,6 +30,7 @@ from gui import sqlalchemy_model
 import gui.stats
 
 from config_window import ConfigWindow
+import triage
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -43,6 +44,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Select config profile before starting
         self.cfg = ConfigWindow()
         self.cfg.exec()
+
 
         # Set up basic window
         self.setWindowTitle("Sienna Locomotive 2")
@@ -234,8 +236,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stop_button.hide()
         self._layout.addWidget(self.stop_button)
 
-        self.save_button = QtWidgets.QPushButton("Save Triage Results")
-        self._layout.addWidget(self.save_button)
+        self.triageExport = QtWidgets.QPushButton("Export Triage")
+        self._layout.addWidget(self.triageExport)
 
         # Set up status bar
         self.status_bar = QtWidgets.QStatusBar()
@@ -297,7 +299,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Handle checks/unchecks in the target tree
         self._func_tree.itemCheckedStateChanged.connect(self.tree_changed)
 
-        self.save_button.clicked.connect(self.save_crashes)
+        self.triageExport.clicked.connect(self.triageExportGui)
 
         # Fuzzer controll buttons for showing the panel and starting a run
         self.expand_button.clicked.connect(self.toggle_expansion)
@@ -527,6 +529,15 @@ class MainWindow(QtWidgets.QMainWindow):
     def verboseCheckBox_clicked(self):
         state = self.verboseCheckBox.isChecked()
         config.config['verbose'] = 2 if state else False
+
+    def triageExportGui(self):
+
+        path = QFileDialog.getExistingDirectory(dir=".")
+        if len(path)==0:
+            return
+        triageExporter = triage.TriageExport(path)
+        triageExporter.export()
+        os.startfile(path)
 
 
 if __name__ == '__main__':

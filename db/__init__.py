@@ -43,8 +43,8 @@ Options include:
 
 
 
-
-dburl = os.path.join( 'sqlite:///%s/%s'% ( config.sl2_dir, 'sl2.db' ) )
+dbpath = '%s/%s' % ( config.sl2_dir, 'sl2.db' )
+dburl = os.path.join( 'sqlite:///%s' % dbpath )
 engine = create_engine(dburl, poolclass=NullPool )
 from .conf import Conf
 from .tracer import Tracer
