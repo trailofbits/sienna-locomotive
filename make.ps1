@@ -43,7 +43,12 @@ Function DynamioRioInstall {
     mv $dynamorioBase $dynamorioDir
 }
 
+Function Doc {
+    $url="http://ftp.stack.nl/pub/users/dimitri/doxygen-1.8.14-setup.exe"
+    "Install doxygen from ${url}"
+    doxygen Doxyfile.in
 
+}
 
 Function Build {
     taskkill.exe /IM fuzzgoat.exe /F
@@ -131,5 +136,6 @@ switch( $cmd ) {
     "regress"           { Regress }
     "help"              { Help }
     "test"              { Test }
+    "doc"               { Doc }
     default             { Build }
 }
