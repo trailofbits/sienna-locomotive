@@ -20,7 +20,9 @@ def runAndCaptureOutput( cmd ):
 
     if DEBUG:
         print( '\n[%s]' % cmd)
-    out =  subprocess.run( cmd, text=True, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, encoding='iso8859' )
+    # Modify the next line at your own risk. There are subtle char encoding issues than can arise.  We did pass `text=True` early but this
+    # is only supported in >= Python 3.7
+    out = subprocess.run( cmd, universal_newlines=True, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, encoding='iso8859' )
     out = out.stdout + out.stderr
 
     if DEBUG:
