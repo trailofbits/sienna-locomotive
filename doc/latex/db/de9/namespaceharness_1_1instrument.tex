@@ -1,0 +1,137 @@
+\hypertarget{namespaceharness_1_1instrument}{}\section{harness.\+instrument Namespace Reference}
+\label{namespaceharness_1_1instrument}\index{harness.\+instrument@{harness.\+instrument}}
+\subsection*{Classes}
+\begin{DoxyCompactItemize}
+\item 
+class \mbox{\hyperlink{classharness_1_1instrument_1_1_d_r_run}{D\+R\+Run}}
+\item 
+class \mbox{\hyperlink{classharness_1_1instrument_1_1_mode}{Mode}}
+\end{DoxyCompactItemize}
+\subsection*{Functions}
+\begin{DoxyCompactItemize}
+\item 
+def \mbox{\hyperlink{namespaceharness_1_1instrument_aac6f9293f336546e35af93b6d96fc7c4}{print\+\_\+l}} (args)
+\item 
+def \mbox{\hyperlink{namespaceharness_1_1instrument_a2b147d723167f36660b9082c2bf03e5e}{ps\+\_\+run}} (command)
+\item 
+def \mbox{\hyperlink{namespaceharness_1_1instrument_adef55a7d4ac78f33cd8b5d58abd85526}{start\+\_\+server}} ()
+\item 
+def \mbox{\hyperlink{namespaceharness_1_1instrument_a486d30f5beb02c7c2c8ec8c354641e7d}{run\+\_\+dr}} (config\+\_\+dict, verbose=0, timeout=None, run\+\_\+id=None, tracing=False)
+\item 
+def \mbox{\hyperlink{namespaceharness_1_1instrument_ad576104062a2c6e6f4b91dda2f251ff6}{triager\+Run}} (cfg, run\+\_\+id)
+\item 
+def \mbox{\hyperlink{namespaceharness_1_1instrument_ac0548bd2e016703207460bfe843d18a0}{wizard\+\_\+run}} (config\+\_\+dict)
+\item 
+def \mbox{\hyperlink{namespaceharness_1_1instrument_a3eb5109ad7e514685a2ac0f83ca2b0f3}{fuzzer\+\_\+run}} (config\+\_\+dict, targets\+\_\+file)
+\item 
+def \mbox{\hyperlink{namespaceharness_1_1instrument_a2fcc8f7617315b5c4dbefe413d3c49e4}{tracer\+\_\+run}} (config\+\_\+dict, run\+\_\+id)
+\item 
+def \mbox{\hyperlink{namespaceharness_1_1instrument_ab4d1c49a240e5857d912c00e526a4167}{fuzz\+\_\+and\+\_\+triage}} (config\+\_\+dict)
+\item 
+def \mbox{\hyperlink{namespaceharness_1_1instrument_a55e75cb64e281c06b6d8d63d62bae2a4}{kill}} ()
+\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{namespaceharness_1_1instrument_a54da41ab26868762f3f61cd60eadeb10}\label{namespaceharness_1_1instrument_a54da41ab26868762f3f61cd60eadeb10}} 
+{\bfseries print\+\_\+lock} = threading.\+Lock()
+\item 
+\mbox{\Hypertarget{namespaceharness_1_1instrument_a0f445df3317f413a786bf5bccecd3026}\label{namespaceharness_1_1instrument_a0f445df3317f413a786bf5bccecd3026}} 
+bool {\bfseries can\+\_\+fuzz} = True
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+\begin{DoxyVerb}Instrumentation functions for running DynamoRIO client & the fuzzing server
+Imports harness/config.py for argument and config file handling.
+Imports harness/state.py for fuzzing lifecycle management
+Imports harness/enums.py for the targeting mode enum
+\end{DoxyVerb}
+ 
+
+\subsection{Function Documentation}
+\mbox{\Hypertarget{namespaceharness_1_1instrument_ab4d1c49a240e5857d912c00e526a4167}\label{namespaceharness_1_1instrument_ab4d1c49a240e5857d912c00e526a4167}} 
+\index{harness\+::instrument@{harness\+::instrument}!fuzz\+\_\+and\+\_\+triage@{fuzz\+\_\+and\+\_\+triage}}
+\index{fuzz\+\_\+and\+\_\+triage@{fuzz\+\_\+and\+\_\+triage}!harness\+::instrument@{harness\+::instrument}}
+\subsubsection{\texorpdfstring{fuzz\+\_\+and\+\_\+triage()}{fuzz\_and\_triage()}}
+{\footnotesize\ttfamily def harness.\+instrument.\+fuzz\+\_\+and\+\_\+triage (\begin{DoxyParamCaption}\item[{}]{config\+\_\+dict }\end{DoxyParamCaption})}
+
+\begin{DoxyVerb}Runs the fuzzer (in a loop if continuous is true), then runs the triage
+tools (DR tracer and breakpad) if a crash is found.
+\end{DoxyVerb}
+ \mbox{\Hypertarget{namespaceharness_1_1instrument_a3eb5109ad7e514685a2ac0f83ca2b0f3}\label{namespaceharness_1_1instrument_a3eb5109ad7e514685a2ac0f83ca2b0f3}} 
+\index{harness\+::instrument@{harness\+::instrument}!fuzzer\+\_\+run@{fuzzer\+\_\+run}}
+\index{fuzzer\+\_\+run@{fuzzer\+\_\+run}!harness\+::instrument@{harness\+::instrument}}
+\subsubsection{\texorpdfstring{fuzzer\+\_\+run()}{fuzzer\_run()}}
+{\footnotesize\ttfamily def harness.\+instrument.\+fuzzer\+\_\+run (\begin{DoxyParamCaption}\item[{}]{config\+\_\+dict,  }\item[{}]{targets\+\_\+file }\end{DoxyParamCaption})}
+
+\begin{DoxyVerb}Runs the fuzzer \end{DoxyVerb}
+ \mbox{\Hypertarget{namespaceharness_1_1instrument_a55e75cb64e281c06b6d8d63d62bae2a4}\label{namespaceharness_1_1instrument_a55e75cb64e281c06b6d8d63d62bae2a4}} 
+\index{harness\+::instrument@{harness\+::instrument}!kill@{kill}}
+\index{kill@{kill}!harness\+::instrument@{harness\+::instrument}}
+\subsubsection{\texorpdfstring{kill()}{kill()}}
+{\footnotesize\ttfamily def harness.\+instrument.\+kill (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+\begin{DoxyVerb}Ends a sequence of fuzzing runs.
+\end{DoxyVerb}
+ \mbox{\Hypertarget{namespaceharness_1_1instrument_aac6f9293f336546e35af93b6d96fc7c4}\label{namespaceharness_1_1instrument_aac6f9293f336546e35af93b6d96fc7c4}} 
+\index{harness\+::instrument@{harness\+::instrument}!print\+\_\+l@{print\+\_\+l}}
+\index{print\+\_\+l@{print\+\_\+l}!harness\+::instrument@{harness\+::instrument}}
+\subsubsection{\texorpdfstring{print\+\_\+l()}{print\_l()}}
+{\footnotesize\ttfamily def harness.\+instrument.\+print\+\_\+l (\begin{DoxyParamCaption}\item[{}]{args }\end{DoxyParamCaption})}
+
+\begin{DoxyVerb}Prints the given arguments in a thread-safe manner.
+\end{DoxyVerb}
+ \mbox{\Hypertarget{namespaceharness_1_1instrument_a2b147d723167f36660b9082c2bf03e5e}\label{namespaceharness_1_1instrument_a2b147d723167f36660b9082c2bf03e5e}} 
+\index{harness\+::instrument@{harness\+::instrument}!ps\+\_\+run@{ps\+\_\+run}}
+\index{ps\+\_\+run@{ps\+\_\+run}!harness\+::instrument@{harness\+::instrument}}
+\subsubsection{\texorpdfstring{ps\+\_\+run()}{ps\_run()}}
+{\footnotesize\ttfamily def harness.\+instrument.\+ps\+\_\+run (\begin{DoxyParamCaption}\item[{}]{command }\end{DoxyParamCaption})}
+
+\begin{DoxyVerb}Runs the given command in a new PowerShell session.
+\end{DoxyVerb}
+ \mbox{\Hypertarget{namespaceharness_1_1instrument_a486d30f5beb02c7c2c8ec8c354641e7d}\label{namespaceharness_1_1instrument_a486d30f5beb02c7c2c8ec8c354641e7d}} 
+\index{harness\+::instrument@{harness\+::instrument}!run\+\_\+dr@{run\+\_\+dr}}
+\index{run\+\_\+dr@{run\+\_\+dr}!harness\+::instrument@{harness\+::instrument}}
+\subsubsection{\texorpdfstring{run\+\_\+dr()}{run\_dr()}}
+{\footnotesize\ttfamily def harness.\+instrument.\+run\+\_\+dr (\begin{DoxyParamCaption}\item[{}]{config\+\_\+dict,  }\item[{}]{verbose = {\ttfamily 0},  }\item[{}]{timeout = {\ttfamily None},  }\item[{}]{run\+\_\+id = {\ttfamily None},  }\item[{}]{tracing = {\ttfamily False} }\end{DoxyParamCaption})}
+
+\begin{DoxyVerb}Runs dynamorio with the given config.
+Clobbers console output if save_stderr/stdout are true.
+Returns a DRRun instance containing the popen object and PRNG seed
+used during the run.
+\end{DoxyVerb}
+ \mbox{\Hypertarget{namespaceharness_1_1instrument_adef55a7d4ac78f33cd8b5d58abd85526}\label{namespaceharness_1_1instrument_adef55a7d4ac78f33cd8b5d58abd85526}} 
+\index{harness\+::instrument@{harness\+::instrument}!start\+\_\+server@{start\+\_\+server}}
+\index{start\+\_\+server@{start\+\_\+server}!harness\+::instrument@{harness\+::instrument}}
+\subsubsection{\texorpdfstring{start\+\_\+server()}{start\_server()}}
+{\footnotesize\ttfamily def harness.\+instrument.\+start\+\_\+server (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+\begin{DoxyVerb}Start the server, if it's not already running.
+\end{DoxyVerb}
+ \mbox{\Hypertarget{namespaceharness_1_1instrument_a2fcc8f7617315b5c4dbefe413d3c49e4}\label{namespaceharness_1_1instrument_a2fcc8f7617315b5c4dbefe413d3c49e4}} 
+\index{harness\+::instrument@{harness\+::instrument}!tracer\+\_\+run@{tracer\+\_\+run}}
+\index{tracer\+\_\+run@{tracer\+\_\+run}!harness\+::instrument@{harness\+::instrument}}
+\subsubsection{\texorpdfstring{tracer\+\_\+run()}{tracer\_run()}}
+{\footnotesize\ttfamily def harness.\+instrument.\+tracer\+\_\+run (\begin{DoxyParamCaption}\item[{}]{config\+\_\+dict,  }\item[{}]{run\+\_\+id }\end{DoxyParamCaption})}
+
+\begin{DoxyVerb}Runs the triaging tool \end{DoxyVerb}
+ \mbox{\Hypertarget{namespaceharness_1_1instrument_ad576104062a2c6e6f4b91dda2f251ff6}\label{namespaceharness_1_1instrument_ad576104062a2c6e6f4b91dda2f251ff6}} 
+\index{harness\+::instrument@{harness\+::instrument}!triager\+Run@{triager\+Run}}
+\index{triager\+Run@{triager\+Run}!harness\+::instrument@{harness\+::instrument}}
+\subsubsection{\texorpdfstring{triager\+Run()}{triagerRun()}}
+{\footnotesize\ttfamily def harness.\+instrument.\+triager\+Run (\begin{DoxyParamCaption}\item[{}]{cfg,  }\item[{}]{run\+\_\+id }\end{DoxyParamCaption})}
+
+\begin{DoxyVerb}Runs the sl2 triager on each of the minidumps generated
+by a fuzzing run.  The information that gets returned
+can't be used across threads so we end up fetching it from the db in the gui
+\end{DoxyVerb}
+ \mbox{\Hypertarget{namespaceharness_1_1instrument_ac0548bd2e016703207460bfe843d18a0}\label{namespaceharness_1_1instrument_ac0548bd2e016703207460bfe843d18a0}} 
+\index{harness\+::instrument@{harness\+::instrument}!wizard\+\_\+run@{wizard\+\_\+run}}
+\index{wizard\+\_\+run@{wizard\+\_\+run}!harness\+::instrument@{harness\+::instrument}}
+\subsubsection{\texorpdfstring{wizard\+\_\+run()}{wizard\_run()}}
+{\footnotesize\ttfamily def harness.\+instrument.\+wizard\+\_\+run (\begin{DoxyParamCaption}\item[{}]{config\+\_\+dict }\end{DoxyParamCaption})}
+
+\begin{DoxyVerb}Runs the wizard and lets the user select a target function.
+\end{DoxyVerb}
+ 
