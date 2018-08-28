@@ -89,6 +89,12 @@ help
     This info
 ```
 
+#### Documents
+If you want to build the doxygen documents.
+  1. Install doxygen from http://ftp.stack.nl/pub/users/dimitri/doxygen-1.8.14-setup.exe
+  1. `./make doc`
+  1. Look in `doc/html/index.html`
+
 ### Configuring
 Open up powershell in the project root and run harness.py for the first time.
 
