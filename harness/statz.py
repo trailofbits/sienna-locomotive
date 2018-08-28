@@ -1,5 +1,8 @@
+## @package statz
+
 import time
 
+## Simple class to generate statics for the run including total seconds run and runs/s
 class Statz:
 
     def __init__(self):
