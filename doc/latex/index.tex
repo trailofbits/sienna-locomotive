@@ -1,0 +1,321 @@
+Sienna Locomotive is a fuzzing and crash triage system with usability features that are intended to attract a wider user base than conventional fuzzing tools. The goal is to bring all the power that software fuzzing has to offer into the hands of less-\/experienced users. Focusing on ease of use won\textquotesingle{}t stop us from trying to make it smarter and faster than the competition.
+
+\subsection*{Getting Started}
+
+\subsubsection*{The project}
+
+Skim the following documents to familiarize yourself with the project\+:
+\begin{DoxyItemize}
+\item Watch the \href{https://drive.google.com/open?id=1njGgRrrfNanYSuaMy5nwLi1rw2bS1rMt}{\tt Demo video}
+\item \href{https://docs.google.com/document/d/1zTUHlu-y_ZLT08saJp0qguYXC69F6CskMPZVLs48IVc/edit}{\tt Interim Technical Report}
+\item \href{https://docs.google.com/document/d/1RwvknJk9PPgecLcsQI1SiXje9SdKB3OuOoSniIDvy68/edit}{\tt S\+L2 Reinception Doc}
+\item harness.\+py (if you\textquotesingle{}re familiar with Python)
+\item Read through the \href{https://github.com/trailofbits/sienna-locomotive/projects/6}{\tt Projects} and \href{https://github.com/trailofbits/sienna-locomotive/issues}{\tt Issues} pages on Git\+Hub
+\end{DoxyItemize}
+
+\subsection*{High level architecture}
+
+
+\begin{DoxyCode}
+Wizard
+  Run the target program once
+  Find all the functions the fuzzer can target
+  Return a list the user can select from
+
+Fuzzing harness
+  Run the target program
+  Hook attack surface functions
+  Execute program with mutated inputs
+  Catch crashes for tracer
+
+Triage
+  Traces and performs taint tracking on a crashing execution
+  Combines data about crash, inputs, and taint
+  Output score and JSON info about crash
+
+Mutation Server
+  Sent bytes by fuzzing harness
+  Figures out mutations for bytes
+  Sends back mutations
+  Responsible for logging information about corrupted inputs
+
+Python harness
+  Handles user input and configuration
+  Runs all the other components
+\end{DoxyCode}
+
+
+\subsubsection*{Building}
+
+First, clone the repository\+: {\ttfamily git clone \href{https://github.com/trailofbits/sienna-locomotive.git}{\tt https\+://github.\+com/trailofbits/sienna-\/locomotive.\+git}} (or download a zip)
+
+\paragraph*{Dependencies}
+
+Next, install the following dependencies
+\begin{DoxyItemize}
+\item \href{https://cmake.org/download/}{\tt C\+Make}
+\item Visual Studio 2017 (Install components for Windows Console dev)
+\item Dynamo\+R\+IO (Automatically installed with make.\+ps1)
+\item Python (3.\+6+)
+\end{DoxyItemize}
+
+\paragraph*{Build Commands}
+
+Then, from the root of the Sienna Locomotive repository\+: In powershell, run make.\+ps1\+:
+
+{\ttfamily PS C\+:\textbackslash{}proj\textbackslash{}sl2\textbackslash{}sienna-\/locomotive$>$ .\textbackslash{}make.\+ps1}
+
+This should download and install Dynamo\+R\+IO in the sienna-\/locomotive directive if it does not already exist. It will then compile the project.
+
+If you\textquotesingle{}re not familiar with cmake -\/ the first invocation configures it, the second compiles the project. To recompile, just run the final command again.
+
+You might need to use the Visual Studio Developer Command Prompt in order for cmake to be able to see the VS compiler.
+
+Use {\ttfamily .\textbackslash{}make.\+ps1 clean} for a clean build .
+
+Usage {\ttfamily make.\+ps1 help} for more info.
+
+
+\begin{DoxyCode}
+PS C:\(\backslash\)proj\(\backslash\)sl2\(\backslash\)sienna-locomotive> .\(\backslash\)make.ps1 help
+Usage: make1.ps [clean|dep|reconfig|help]
+
+make1.ps without any options will build
+
+clean
+    Cleans build directory and configuration (reconfigs)
+
+dep
+    Rebuild dependencies
+
+reconfig
+    Deletes fuzzkit directory with run configuration
+
+help
+    This info
+\end{DoxyCode}
+
+
+\subsubsection*{Configuring}
+
+Open up powershell in the project root and run harness.\+py for the first time.
+
+{\ttfamily PS C\+:\textbackslash{}proj\textbackslash{}sl2\textbackslash{}sienna-\/locomotive$>$ python .\textbackslash{}harness.\+py}
+
+\+:warning\+: Python version 3 is required, although on some systems this could be {\ttfamily python.\+exe} or {\ttfamily python3.\+exe} .
+
+It\textquotesingle{}ll create a default configuration file in {\ttfamily A\+P\+P\+D\+A\+TA\textbackslash{}Trail of Bits\textbackslash{}fuzzkit\textbackslash{}}. You can leave everything in there and it will work, but you might want to update the file paths to be relative to C\+: so that you can invoke it from anywhere. If you want to create a new profile, just copy the default one and change the name. Then you can use the {\ttfamily -\/p} flag to harness.\+py to change which profile it pulls settings from.
+
+Using -\/h on the harness will print out the list of command line options it supports. You can set a number of things permanently by adding lines to the configuration file. As a general rule though, the command line parameters will overwrite what\textquotesingle{}s in the config file if you explicitly pass them in. This isn\textquotesingle{}t the case for everything, so if a command isn\textquotesingle{}t working the way you expect, run fuzzer\+\_\+config.\+py with the same arguments to see exactly what settings are getting passed to the harness.
+
+\subsubsection*{Running}
+
+\paragraph*{Via the G\+UI}
+
+{\ttfamily python3 gui.\+py} will run the Qt frontend for the fuzzer. While it provides a convenient way of invoking the components, it doesn\textquotesingle{}t provide as many configuration options. Fortunately, it accepts most of the same command line arguments as the harness, so you can simply pass these in when you invoke the G\+UI. For example\+: {\ttfamily python3 gui.\+py -\/f 15 -\/i 360} will run the gui such that it invokes the fuzzer with a timeout of 15 seconds for each fuzzing run and a timeout of 360 seconds for each triage run. However, it does N\+OT respect the -\/e flag, nor any of the flags that would be overwritten from the config file if invoked on the harness.
+
+\paragraph*{Via the harness}
+
+{\ttfamily python3 harness.\+py} will run the test application in fuzzing mode. By default, the test application will crash after a few fuzzing attempts, so if it doesn\textquotesingle{}t do so when you need it to, you can pass {\ttfamily -\/a 0} to the harness (as the last argument) and it will crash every time. Play around with the command flags to see what else you can do.
+
+\paragraph*{To run individual components manually}
+
+From the root of the project -\/ 
+\begin{DoxyCode}
+# General Pattern:
+.\(\backslash\)dynamorio\(\backslash\)bin64\(\backslash\)drrun.exe -c build\(\backslash\)client\_name\(\backslash\)Debug\(\backslash\)client.dll [client\_args] --
+       C:\(\backslash\)path\(\backslash\)to\(\backslash\)target\_application [target\_args]
+
+# triage
+.\(\backslash\)dynamorio\(\backslash\)bin64\(\backslash\)drrun.exe -c build\(\backslash\)tracer\_dynamorio\(\backslash\)Debug\(\backslash\)tracer.dll -- corpus\(\backslash\)win\_asm\(\backslash\)crashes.exe 7
+
+# wizard
+.\(\backslash\)dynamorio\(\backslash\)bin64\(\backslash\)drrun.exe -c build\(\backslash\)wizard\(\backslash\)Debug\(\backslash\)wizard.dll --
+       build\(\backslash\)corpus\(\backslash\)test\_application\(\backslash\)Debug\(\backslash\)test\_application.exe 0
+
+# server
+build\(\backslash\)server\(\backslash\)Debug\(\backslash\)server.exe
+
+# fuzzer
+.\(\backslash\)dynamorio\(\backslash\)bin64\(\backslash\)drrun.exe -c build\(\backslash\)fuzz\_dynamorio\(\backslash\)Debug\(\backslash\)fuzzer.dll --
+       build\(\backslash\)corpus\(\backslash\)test\_application\(\backslash\)Debug\(\backslash\)test\_application.exe 0 -f
+
+# triage crash
+.\(\backslash\)dynamorio\(\backslash\)bin64\(\backslash\)drrun.exe -c sienna-locomotive\(\backslash\)build\(\backslash\)tracer\_dynamorio\(\backslash\)Debug\(\backslash\)tracer.dll -r [RUN\_ID] --
+       build\(\backslash\)corpus\(\backslash\)test\_application\(\backslash\)Debug\(\backslash\)test\_application.exe 0 -f
+
+# targeting
+.\(\backslash\)dynamorio\(\backslash\)bin64\(\backslash\)drrun.exe -c build\(\backslash\)fuzz\_dynamorio\(\backslash\)Debug\(\backslash\)fuzzer.dll -t 0,ReadFile --
+       build\(\backslash\)corpus\(\backslash\)test\_application\(\backslash\)Debug\(\backslash\)test\_application.exe 0 -f
+
+.\(\backslash\)dynamorio\(\backslash\)bin64\(\backslash\)drrun.exe -c build\(\backslash\)tracer\_dynamorio\(\backslash\)Debug\(\backslash\)tracer.dll -r [RUN\_ID] -t 0,ReadFile --
+       build\(\backslash\)corpus\(\backslash\)test\_application\(\backslash\)Debug\(\backslash\)test\_application.exe 0 -f
+\end{DoxyCode}
+
+
+\#\#\#\# Regression Test 
+\begin{DoxyCode}
+python.exe .\(\backslash\)regress.py
+test\_main (\_\_main\_\_.Test1) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.906s
+
+OK
+\end{DoxyCode}
+
+
+\subsection*{Triage}
+
+The triage system is a separate executable, {\ttfamily triager.\+exe} that is run by the harness. It takes care of ranking exploitability, uniqueness, and binning of crashes.
+
+\subsubsection*{Exploitability}
+
+The Exploitability ranking is a score for the potential ability to exploit a crash based on 3 engines. The ranks, ranging from High (4) to None (0), in order of likelyhood are\+:
+
+
+\begin{DoxyItemize}
+\item {\bfseries High} (4)\+: The mostly likely case of a crash being exploitable.
+\item {\bfseries Medium} (3)\+: Between High and Low.
+\item {\bfseries Low} (2)\+: At or above the cutoff for low exploitability.
+\item {\bfseries Unknown} (1)\+: Unknown cases are below the cutoff for low, but still have the potential to be of interest.
+\item {\bfseries None} (0)\+: Very unlikely the crash is exploitable.
+\end{DoxyItemize}
+
+\paragraph*{Engines}
+
+
+\begin{DoxyItemize}
+\item {\bfseries Google\textquotesingle{}s Breakpad}\+: This engine uses Google\textquotesingle{}s Breakpad library, which parses minidump files and return an exploitability between High and None as well.
+\item {\bfseries Microsoft\textquotesingle{}s {\ttfamily !exploitable}}\+: A reimplementation and approxmiation of the {\ttfamily !exploitable} command for {\ttfamily windbg}, built on top of breakpad.
+\item {\bfseries S\+L2 Tracer}\+: Uses the score from our own S\+L2 tracer, which takes taint information into consideration.
+\end{DoxyItemize}
+
+\subsubsection*{triage.\+json}
+
+After the tracer has been run, {\ttfamily triager.\+exe} is run on the minidump file. It also loads any information generated by the tracer, and outputs the following json\+:
+
+
+\begin{DoxyCode}
+\{
+    \textcolor{comment}{// This is the called functions before the crash}
+    \textcolor{stringliteral}{"callStack"}: [
+        140699242310037,
+        140718144357416,
+        140718144581792,
+        140718144447545
+    ],
+
+    \textcolor{comment}{// The offending memory address}
+    \textcolor{stringliteral}{"crashAddress"}: 140699242310037,
+
+    \textcolor{comment}{// The reason of exception type}
+    \textcolor{stringliteral}{"crashReason"}: \textcolor{stringliteral}{"EXCEPTION\_BREAKPOINT"},
+
+    \textcolor{comment}{// Exploitability from High to None}
+    \textcolor{stringliteral}{"exploitability"}: \textcolor{stringliteral}{"Unknown"},
+
+    \textcolor{comment}{// The instruction pointer at the time of the crash}
+    \textcolor{stringliteral}{"instructionPointer"}: 14757395258967641292,
+
+    \textcolor{comment}{// Path to the minidump analyzed}
+    \textcolor{stringliteral}{"minidumpPath"}: \textcolor{stringliteral}{"C:\(\backslash\)\(\backslash\)Users\(\backslash\)\(\backslash\)IEUser\(\backslash\)\(\backslash\)AppData\(\backslash\)\(\backslash\)Roaming\(\backslash\)\(\backslash\)Trail of Bits\(\backslash\)\(\backslash\)fuzzkit\(\backslash\)\(\backslash\)runs\(\backslash\)\(\backslash\)
+      78f20c60-eb12-410a-8378-342c3afec986\(\backslash\)\(\backslash\)initial.dmp"},
+
+    \textcolor{comment}{// Rank, or numeric version of exploitability from 0-4}
+    \textcolor{stringliteral}{"rank"}: 1,
+
+    \textcolor{comment}{// The ranks generated by each of the 3 engines}
+    \textcolor{stringliteral}{"ranks"}: [
+        0,
+        0,
+        1
+    ],
+
+    \textcolor{comment}{// A unique identifier for the crash. The algorithm uses 12 bits from the called functions,}
+    \textcolor{comment}{// and is unaffected by ASLR, function call order, or function call count}
+    \textcolor{stringliteral}{"crashash"}: \textcolor{stringliteral}{"f96808cfc4798256"},
+
+    \textcolor{comment}{// Stack pointer at time of crash}
+    \textcolor{stringliteral}{"stackPointer"}: 14757395258967641292,
+
+    \textcolor{comment}{// Unique tag for the crash for binning purposes}
+    \textcolor{stringliteral}{"tag"}: \textcolor{stringliteral}{"Unknown/EXCEPTION\_BREAKPOINT/f96808cfc4798256"},
+
+    \textcolor{comment}{// Complete output from the tracer run}
+    \textcolor{stringliteral}{"tracer"}: \{
+        \textcolor{stringliteral}{"exception"}: \textcolor{stringliteral}{"EXCEPTION\_BREAKPOINT"},
+        \textcolor{stringliteral}{"instruction"}: \textcolor{stringliteral}{"int3"},
+        \textcolor{stringliteral}{"last\_calls"}: [
+            140699242861232,
+            140699242861064,
+            140699242861064,
+            140699242861056,
+            140699242861184
+        ],
+        \textcolor{stringliteral}{"last\_insns"}: [
+            140699242309722,
+            140699242309725,
+            140699242309727,
+            140699242309730,
+            140699242310037
+        ],
+        \textcolor{stringliteral}{"location"}: 140699242310037,
+        \textcolor{stringliteral}{"reason"}: \textcolor{stringliteral}{"breakpoint"},
+        \textcolor{stringliteral}{"regs"}: [
+            \{
+                \textcolor{stringliteral}{"reg"}: \textcolor{stringliteral}{"rax"},
+                \textcolor{stringliteral}{"tainted"}: \textcolor{keyword}{false},
+                \textcolor{stringliteral}{"value"}: 1080890113
+            \},
+            \textcolor{comment}{//...............................................}
+        ],
+        \textcolor{stringliteral}{"score"}: 25,
+        \textcolor{stringliteral}{"tainted\_addrs"}: [
+            \{
+                \textcolor{stringliteral}{"size"}: 8,
+                \textcolor{stringliteral}{"start"}: 2645403054665
+            \}
+        ]
+    \}
+\}
+\end{DoxyCode}
+
+
+\subsection*{File Formats}
+
+\subsubsection*{F\+KT Format}
+
+This format is for recording mutation events for later replay.
+
+`char magic\mbox{[}4\mbox{]} == \textquotesingle{}F\+KT'\`{}
+
+{\ttfamily uint type}, {\ttfamily 1 == file}
+
+Variable based on type.
+
+{\ttfamily uint file\+\_\+size}
+
+{\ttfamily wchar\+\_\+t path\mbox{[}file\+\_\+size\mbox{]}}
+
+{\ttfamily size\+\_\+t position}
+
+{\ttfamily size\+\_\+t size}
+
+{\ttfamily uchar data\mbox{[}size\mbox{]}}
+
+There\textquotesingle{}s a 010 template for this in {\ttfamily misc}
+
+\subsubsection*{Outdated components}
+
+You can safely ignore most of the stuff in {\ttfamily corpus/asm} and {\ttfamily electriage}
+
+\section*{Changes}
+
+\subsection*{20180808}
+
+Changed passing of arguments to clients and target applications from using comma separated to just normally how it would appear on the command line. The {\ttfamily shlex.\+split()} function will split them up appropriately
+
+\section*{Developer Information}
+
+If you change anything that would break backwards compatibility, increment {\ttfamily harness.\+config.\+V\+E\+R\+S\+I\+ON}. This includes any database changes, formats, directory structures, filenames etc.. 

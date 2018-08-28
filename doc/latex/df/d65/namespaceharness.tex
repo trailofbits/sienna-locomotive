@@ -1,0 +1,67 @@
+\hypertarget{namespaceharness}{}\section{harness Namespace Reference}
+\label{namespaceharness}\index{harness@{harness}}
+\subsection*{Namespaces}
+\begin{DoxyCompactItemize}
+\item 
+ \mbox{\hyperlink{namespaceharness_1_1config}{config}}
+\item 
+ \mbox{\hyperlink{namespaceharness_1_1instrument}{instrument}}
+\item 
+ \mbox{\hyperlink{namespaceharness_1_1state}{state}}
+\end{DoxyCompactItemize}
+\subsection*{Functions}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{namespaceharness_a4669cc1b82dee008260878cf36b48416}\label{namespaceharness_a4669cc1b82dee008260878cf36b48416}} 
+def {\bfseries goodbye} ()
+\item 
+\mbox{\Hypertarget{namespaceharness_a4b3aa6951197c5e6e965106ebdd26619}\label{namespaceharness_a4b3aa6951197c5e6e965106ebdd26619}} 
+def {\bfseries interrupted} (\+\_\+signal, \+\_\+frame)
+\item 
+def \mbox{\hyperlink{namespaceharness_a6fcf7f713a4ca2f9d9bf57bc843293e0}{select\+\_\+from\+\_\+range}} (max\+\_\+range, message)
+\item 
+\mbox{\Hypertarget{namespaceharness_adc9713f3a6fd264d91ead482cc9e100e}\label{namespaceharness_adc9713f3a6fd264d91ead482cc9e100e}} 
+def {\bfseries select\+\_\+and\+\_\+dump\+\_\+wizard\+\_\+findings} (wizard\+\_\+findings, target\+\_\+file)
+\item 
+def \mbox{\hyperlink{namespaceharness_a2726adb0b8b48d41458ac8f34d4f17ae}{hexdump}} (buffer, lines=4, line\+\_\+len=16)
+\item 
+def \mbox{\hyperlink{namespaceharness_a00d01b26188a03cc58f7d4c96e92ea11}{sanity\+\_\+checks}} ()
+\item 
+\mbox{\Hypertarget{namespaceharness_a38f488ff979de5178ac79f65e07b5d9c}\label{namespaceharness_a38f488ff979de5178ac79f65e07b5d9c}} 
+def {\bfseries main} ()
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+\begin{DoxyVerb}Driver class for DynamoRIO client.
+Imports harness/config.py for argument and config file handling.
+Imports harness/state.py for managing the fuzzing lifecycle
+Imports harness/instrument.py for running DynamoRIO instrumentation clients.
+\end{DoxyVerb}
+ 
+
+\subsection{Function Documentation}
+\mbox{\Hypertarget{namespaceharness_a2726adb0b8b48d41458ac8f34d4f17ae}\label{namespaceharness_a2726adb0b8b48d41458ac8f34d4f17ae}} 
+\index{harness@{harness}!hexdump@{hexdump}}
+\index{hexdump@{hexdump}!harness@{harness}}
+\subsubsection{\texorpdfstring{hexdump()}{hexdump()}}
+{\footnotesize\ttfamily def harness.\+hexdump (\begin{DoxyParamCaption}\item[{}]{buffer,  }\item[{}]{lines = {\ttfamily 4},  }\item[{}]{line\+\_\+len = {\ttfamily 16} }\end{DoxyParamCaption})}
+
+\begin{DoxyVerb}Dump buffer byte array to stdout \end{DoxyVerb}
+ \mbox{\Hypertarget{namespaceharness_a00d01b26188a03cc58f7d4c96e92ea11}\label{namespaceharness_a00d01b26188a03cc58f7d4c96e92ea11}} 
+\index{harness@{harness}!sanity\+\_\+checks@{sanity\+\_\+checks}}
+\index{sanity\+\_\+checks@{sanity\+\_\+checks}!harness@{harness}}
+\subsubsection{\texorpdfstring{sanity\+\_\+checks()}{sanity\_checks()}}
+{\footnotesize\ttfamily def harness.\+sanity\+\_\+checks (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+\begin{DoxyVerb}Make sure the system is in a state that's nominally ready for fuzzing.
+Exits loudly if a check fails.
+\end{DoxyVerb}
+ \mbox{\Hypertarget{namespaceharness_a6fcf7f713a4ca2f9d9bf57bc843293e0}\label{namespaceharness_a6fcf7f713a4ca2f9d9bf57bc843293e0}} 
+\index{harness@{harness}!select\+\_\+from\+\_\+range@{select\+\_\+from\+\_\+range}}
+\index{select\+\_\+from\+\_\+range@{select\+\_\+from\+\_\+range}!harness@{harness}}
+\subsubsection{\texorpdfstring{select\+\_\+from\+\_\+range()}{select\_from\_range()}}
+{\footnotesize\ttfamily def harness.\+select\+\_\+from\+\_\+range (\begin{DoxyParamCaption}\item[{}]{max\+\_\+range,  }\item[{}]{message }\end{DoxyParamCaption})}
+
+\begin{DoxyVerb}Helper function for selecting an int between 0 and some value \end{DoxyVerb}
+ 

@@ -1,0 +1,30 @@
+\hypertarget{structnlohmann_1_1detail_1_1is__compatible__complete__type}{}\section{nlohmann\+:\+:detail\+:\+:is\+\_\+compatible\+\_\+complete\+\_\+type$<$ Basic\+Json\+Type, Compatible\+Complete\+Type $>$ Struct Template Reference}
+\label{structnlohmann_1_1detail_1_1is__compatible__complete__type}\index{nlohmann\+::detail\+::is\+\_\+compatible\+\_\+complete\+\_\+type$<$ Basic\+Json\+Type, Compatible\+Complete\+Type $>$@{nlohmann\+::detail\+::is\+\_\+compatible\+\_\+complete\+\_\+type$<$ Basic\+Json\+Type, Compatible\+Complete\+Type $>$}}
+\subsection*{Static Public Attributes}
+\begin{DoxyCompactItemize}
+\item 
+static constexpr bool {\bfseries value}
+\end{DoxyCompactItemize}
+
+
+\subsection{Member Data Documentation}
+\mbox{\Hypertarget{structnlohmann_1_1detail_1_1is__compatible__complete__type_a34bed4700a302b79feb045b6bdbda9aa}\label{structnlohmann_1_1detail_1_1is__compatible__complete__type_a34bed4700a302b79feb045b6bdbda9aa}} 
+\index{nlohmann\+::detail\+::is\+\_\+compatible\+\_\+complete\+\_\+type@{nlohmann\+::detail\+::is\+\_\+compatible\+\_\+complete\+\_\+type}!value@{value}}
+\index{value@{value}!nlohmann\+::detail\+::is\+\_\+compatible\+\_\+complete\+\_\+type@{nlohmann\+::detail\+::is\+\_\+compatible\+\_\+complete\+\_\+type}}
+\subsubsection{\texorpdfstring{value}{value}}
+{\footnotesize\ttfamily template$<$typename Basic\+Json\+Type , typename Compatible\+Complete\+Type $>$ \\
+constexpr bool \mbox{\hyperlink{structnlohmann_1_1detail_1_1is__compatible__complete__type}{nlohmann\+::detail\+::is\+\_\+compatible\+\_\+complete\+\_\+type}}$<$ Basic\+Json\+Type, Compatible\+Complete\+Type $>$\+::value\hspace{0.3cm}{\ttfamily [static]}}
+
+{\bfseries Initial value\+:}
+\begin{DoxyCode}
+=
+        not std::is\_base\_of<std::istream, CompatibleCompleteType>::value and
+        not is\_basic\_json<CompatibleCompleteType>::value and
+        not is\_basic\_json\_nested\_type<BasicJsonType, CompatibleCompleteType>::value and
+        has\_to\_json<BasicJsonType, CompatibleCompleteType>::value
+\end{DoxyCode}
+
+
+The documentation for this struct was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+include/vendor/json.\+hpp\end{DoxyCompactItemize}

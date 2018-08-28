@@ -1,0 +1,80 @@
+\hypertarget{classsl2_1_1_triage}{}\section{sl2\+:\+:Triage Class Reference}
+\label{classsl2_1_1_triage}\index{sl2\+::\+Triage@{sl2\+::\+Triage}}
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classsl2_1_1_triage_a365d8058e52e6922f236e866d891ed02}\label{classsl2_1_1_triage_a365d8058e52e6922f236e866d891ed02}} 
+{\bfseries Triage} (const string \&path)
+\item 
+\mbox{\Hypertarget{classsl2_1_1_triage_a78036002d0f6e3802dfa9222e8a00839}\label{classsl2_1_1_triage_a78036002d0f6e3802dfa9222e8a00839}} 
+Status\+Code {\bfseries process} ()
+\item 
+\mbox{\Hypertarget{classsl2_1_1_triage_ad8da0dd37528cb50e59a0ffb94534e11}\label{classsl2_1_1_triage_ad8da0dd37528cb50e59a0ffb94534e11}} 
+Status\+Code {\bfseries pre\+Process} ()
+\item 
+\mbox{\Hypertarget{classsl2_1_1_triage_a91d155dd24490deb19228e8d882b69b9}\label{classsl2_1_1_triage_a91d155dd24490deb19228e8d882b69b9}} 
+Xploitability\+Rank {\bfseries exploitability\+Rank} () const
+\item 
+\mbox{\Hypertarget{classsl2_1_1_triage_a09a613838973301dff22f10f69e299b6}\label{classsl2_1_1_triage_a09a613838973301dff22f10f69e299b6}} 
+const string {\bfseries crash\+Reason} () const
+\item 
+\mbox{\Hypertarget{classsl2_1_1_triage_a9238f1faa5ba63ff6b44930ab0f20c7b}\label{classsl2_1_1_triage_a9238f1faa5ba63ff6b44930ab0f20c7b}} 
+const string {\bfseries exploitability} () const
+\item 
+\mbox{\Hypertarget{classsl2_1_1_triage_a758513f8f56ac0d346f7035525cfe8d3}\label{classsl2_1_1_triage_a758513f8f56ac0d346f7035525cfe8d3}} 
+const string {\bfseries minidump\+Path} () const
+\item 
+\mbox{\Hypertarget{classsl2_1_1_triage_a6d207cb455f10a89bac10ab05b8fc2cd}\label{classsl2_1_1_triage_a6d207cb455f10a89bac10ab05b8fc2cd}} 
+const string {\bfseries ranks\+String} () const
+\item 
+\mbox{\Hypertarget{classsl2_1_1_triage_a9e293a7edbe85a446a76fc67763f063d}\label{classsl2_1_1_triage_a9e293a7edbe85a446a76fc67763f063d}} 
+const string {\bfseries crashash} () const
+\item 
+\mbox{\Hypertarget{classsl2_1_1_triage_ad5782327c97ac20a062688c6fb43eadc}\label{classsl2_1_1_triage_ad5782327c97ac20a062688c6fb43eadc}} 
+const string {\bfseries triage\+Tag} () const
+\item 
+\mbox{\Hypertarget{classsl2_1_1_triage_a7160ecfc3f0b06cf74f68e9e6d1f74f7}\label{classsl2_1_1_triage_a7160ecfc3f0b06cf74f68e9e6d1f74f7}} 
+const uint64\+\_\+t {\bfseries crash\+Address} () const
+\item 
+\mbox{\Hypertarget{classsl2_1_1_triage_aa206d88c999337680a8fb26abd024e5d}\label{classsl2_1_1_triage_aa206d88c999337680a8fb26abd024e5d}} 
+const uint64\+\_\+t {\bfseries instruction\+Pointer} () const
+\item 
+\mbox{\Hypertarget{classsl2_1_1_triage_acd973b42f743335196e8df108580ae54}\label{classsl2_1_1_triage_acd973b42f743335196e8df108580ae54}} 
+const uint64\+\_\+t {\bfseries stack\+Pointer} () const
+\item 
+\mbox{\Hypertarget{classsl2_1_1_triage_a762ce49ae353fcdc96731eddbcd08cb5}\label{classsl2_1_1_triage_a762ce49ae353fcdc96731eddbcd08cb5}} 
+const vector$<$ uint64\+\_\+t $>$ {\bfseries call\+Stack} () const
+\item 
+\mbox{\Hypertarget{classsl2_1_1_triage_a41dd1c06e89d051cbdb70ea6f7599e84}\label{classsl2_1_1_triage_a41dd1c06e89d051cbdb70ea6f7599e84}} 
+int {\bfseries signal\+Type} ()
+\item 
+\mbox{\Hypertarget{classsl2_1_1_triage_a40c223374522702fb6ce3a4951477c39}\label{classsl2_1_1_triage_a40c223374522702fb6ce3a4951477c39}} 
+\mbox{\hyperlink{classnlohmann_1_1basic__json}{json}} {\bfseries to\+Json} () const
+\item 
+\mbox{\Hypertarget{classsl2_1_1_triage_a29c6eb6d45d145313f0aa703e5a080b4}\label{classsl2_1_1_triage_a29c6eb6d45d145313f0aa703e5a080b4}} 
+vector$<$ Xploitability\+Rank $>$ {\bfseries ranks} () const
+\item 
+\mbox{\Hypertarget{classsl2_1_1_triage_aa00d8ed418660e34e5b158c561d39ca3}\label{classsl2_1_1_triage_aa00d8ed418660e34e5b158c561d39ca3}} 
+void {\bfseries persist} (const string path) const
+\item 
+\mbox{\Hypertarget{classsl2_1_1_triage_a1148ea31250d9033ac69cca85b5ee0be}\label{classsl2_1_1_triage_a1148ea31250d9033ac69cca85b5ee0be}} 
+void {\bfseries process\+Engine} (\mbox{\hyperlink{classsl2_1_1_xploitability}{Xploitability}} \&x)
+\end{DoxyCompactItemize}
+\subsection*{Static Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classsl2_1_1_triage_a2b70df328f807842d2c2804d10a05f7f}\label{classsl2_1_1_triage_a2b70df328f807842d2c2804d10a05f7f}} 
+static double {\bfseries normalize} (double x)
+\end{DoxyCompactItemize}
+\subsection*{Friends}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classsl2_1_1_triage_a0301fe6de62346a9a2472b9428f7dfd3}\label{classsl2_1_1_triage_a0301fe6de62346a9a2472b9428f7dfd3}} 
+ostream \& {\bfseries operator$<$$<$} (ostream \&os, \mbox{\hyperlink{classsl2_1_1_triage}{Triage}} \&self)
+\end{DoxyCompactItemize}
+
+
+The documentation for this class was generated from the following files\+:\begin{DoxyCompactItemize}
+\item 
+triage/triage.\+h\item 
+triage/triage.\+cc\end{DoxyCompactItemize}

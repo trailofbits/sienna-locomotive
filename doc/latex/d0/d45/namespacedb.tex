@@ -1,0 +1,58 @@
+\hypertarget{namespacedb}{}\section{db Namespace Reference}
+\label{namespacedb}\index{db@{db}}
+
+
+Main interface for accessing the sl2 database.  
+
+
+\subsection*{Functions}
+\begin{DoxyCompactItemize}
+\item 
+def \mbox{\hyperlink{namespacedb_a530aed4ecf4b7ab965ac1d3a432f1e68}{get\+Session}} ()
+\begin{DoxyCompactList}\small\item\em Gets sqlalchemy database session Used to get a session for db stuff. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{namespacedb_a2c7a16a011e2939fe901022bcc78574d}{check\+Version\+Number}} ()
+\begin{DoxyCompactList}\small\item\em Checks database and A\+BI version number This will check the A\+BI version (config.\+V\+E\+R\+S\+I\+ON) in python against the version number if the database. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{namespacedb_a60759a62cf76651baa120ef1e74b8519}\label{namespacedb_a60759a62cf76651baa120ef1e74b8519}} 
+string \mbox{\hyperlink{namespacedb_a60759a62cf76651baa120ef1e74b8519}{dbpath}} = \textquotesingle{}\%s/\%s\textquotesingle{} \% ( config.\+sl2\+\_\+dir, \textquotesingle{}sl2.\+db\textquotesingle{} )
+\begin{DoxyCompactList}\small\item\em File path to db. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{namespacedb_a966575be1dd488f47e30cb72288566d1}\label{namespacedb_a966575be1dd488f47e30cb72288566d1}} 
+\mbox{\hyperlink{namespacedb_a966575be1dd488f47e30cb72288566d1}{dburl}} = os.\+path.\+join( \textquotesingle{}sqlite\+:///\%s\textquotesingle{} \% \mbox{\hyperlink{namespacedb_a60759a62cf76651baa120ef1e74b8519}{dbpath}} )
+\begin{DoxyCompactList}\small\item\em U\+RL to db for sqlalchemy. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{namespacedb_abb6bc97a20a679336952d2d55c398be5}\label{namespacedb_abb6bc97a20a679336952d2d55c398be5}} 
+\mbox{\hyperlink{namespacedb_abb6bc97a20a679336952d2d55c398be5}{engine}} = create\+\_\+engine(\mbox{\hyperlink{namespacedb_a966575be1dd488f47e30cb72288566d1}{dburl}}, poolclass=Null\+Pool )
+\begin{DoxyCompactList}\small\item\em sqlalchemy database engine \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{namespacedb_a8250147576dfed202ed3a7b7fae6390c}\label{namespacedb_a8250147576dfed202ed3a7b7fae6390c}} 
+{\bfseries Session} = sessionmaker(bind=\mbox{\hyperlink{namespacedb_abb6bc97a20a679336952d2d55c398be5}{engine}})
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+Main interface for accessing the sl2 database. 
+
+\subsection{Function Documentation}
+\mbox{\Hypertarget{namespacedb_a2c7a16a011e2939fe901022bcc78574d}\label{namespacedb_a2c7a16a011e2939fe901022bcc78574d}} 
+\index{db@{db}!check\+Version\+Number@{check\+Version\+Number}}
+\index{check\+Version\+Number@{check\+Version\+Number}!db@{db}}
+\subsubsection{\texorpdfstring{check\+Version\+Number()}{checkVersionNumber()}}
+{\footnotesize\ttfamily def db.\+check\+Version\+Number (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Checks database and A\+BI version number This will check the A\+BI version (config.\+V\+E\+R\+S\+I\+ON) in python against the version number if the database. 
+
+If it\textquotesingle{}s not in the database, we know this is a clean run so we go ahead and store it. If there is a version number in the db, and it\textquotesingle{}s less than the config.\+V\+E\+R\+S\+I\+ON, we know there is mismatch with the A\+BI version and will throw and error to protect the user \mbox{\Hypertarget{namespacedb_a530aed4ecf4b7ab965ac1d3a432f1e68}\label{namespacedb_a530aed4ecf4b7ab965ac1d3a432f1e68}} 
+\index{db@{db}!get\+Session@{get\+Session}}
+\index{get\+Session@{get\+Session}!db@{db}}
+\subsubsection{\texorpdfstring{get\+Session()}{getSession()}}
+{\footnotesize\ttfamily def db.\+get\+Session (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+
+
+Gets sqlalchemy database session Used to get a session for db stuff. 
+
+You can\textquotesingle{}t reuse a session or db objects across \begin{DoxyReturn}{Returns}
+sqlalchemy database session 
+\end{DoxyReturn}

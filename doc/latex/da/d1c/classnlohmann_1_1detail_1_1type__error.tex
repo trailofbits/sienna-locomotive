@@ -1,0 +1,83 @@
+\hypertarget{classnlohmann_1_1detail_1_1type__error}{}\section{nlohmann\+:\+:detail\+:\+:type\+\_\+error Class Reference}
+\label{classnlohmann_1_1detail_1_1type__error}\index{nlohmann\+::detail\+::type\+\_\+error@{nlohmann\+::detail\+::type\+\_\+error}}
+
+
+exception indicating executing a member function with a wrong type  
+
+
+
+
+{\ttfamily \#include $<$json.\+hpp$>$}
+
+Inheritance diagram for nlohmann\+:\+:detail\+:\+:type\+\_\+error\+:\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[height=3.000000cm]{da/d1c/classnlohmann_1_1detail_1_1type__error}
+\end{center}
+\end{figure}
+\subsection*{Static Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classnlohmann_1_1detail_1_1type__error_aecc083aea4b698c33d042670ba50c10f}\label{classnlohmann_1_1detail_1_1type__error_aecc083aea4b698c33d042670ba50c10f}} 
+static \mbox{\hyperlink{classnlohmann_1_1detail_1_1type__error}{type\+\_\+error}} {\bfseries create} (int id\+\_\+, const \mbox{\hyperlink{namespacenlohmann_1_1detail_a1ed8fc6239da25abcaf681d30ace4985ab45cffe084dd3d20d928bee85e7b0f21}{std\+::string}} \&what\+\_\+arg)
+\end{DoxyCompactItemize}
+\subsection*{Additional Inherited Members}
+
+
+\subsection{Detailed Description}
+exception indicating executing a member function with a wrong type 
+
+This exception is thrown in case of a type error; that is, a library function is executed on a J\+S\+ON value whose type does not match the expected semantics.
+
+Exceptions have ids 3xx.
+
+\tabulinesep=1mm
+\begin{longtabu} spread 0pt [c]{*{3}{|X[-1]}|}
+\hline
+\rowcolor{\tableheadbgcolor}\textbf{ name / id  }&\textbf{ example message  }&\textbf{ description -\/-\/-\/-\/-\/-\/-\/-\/-\/-\/---   }\\\cline{1-3}
+\endfirsthead
+\hline
+\endfoot
+\hline
+\rowcolor{\tableheadbgcolor}\textbf{ name / id  }&\textbf{ example message  }&\textbf{ description -\/-\/-\/-\/-\/-\/-\/-\/-\/-\/---   }\\\cline{1-3}
+\endhead
+json.\+exception.\+type\+\_\+error.\+301  &cannot create object from initializer list  &To create an object from an initializer list, the initializer list must consist only of a list of pairs whose first element is a string. When this constraint is violated, an array is created instead.   \\\cline{1-3}
+json.\+exception.\+type\+\_\+error.\+302  &type must be object, but is array  &During implicit or explicit value conversion, the J\+S\+ON type must be compatible to the target type. For instance, a J\+S\+ON string can only be converted into string types, but not into numbers or boolean types.   \\\cline{1-3}
+json.\+exception.\+type\+\_\+error.\+303  &incompatible Reference\+Type for get\+\_\+ref, actual type is object  &To retrieve a reference to a value stored in a \mbox{\hyperlink{classnlohmann_1_1basic__json}{basic\+\_\+json}} object with get\+\_\+ref, the type of the reference must match the value type. For instance, for a J\+S\+ON array, the {\itshape Reference\+Type} must be array\+\_\+t\&.   \\\cline{1-3}
+json.\+exception.\+type\+\_\+error.\+304  &cannot use at() with string  &The at() member functions can only be executed for certain J\+S\+ON types.   \\\cline{1-3}
+json.\+exception.\+type\+\_\+error.\+305  &cannot use operator\mbox{[}\mbox{]} with string  &The operator\mbox{[}\mbox{]} member functions can only be executed for certain J\+S\+ON types.   \\\cline{1-3}
+json.\+exception.\+type\+\_\+error.\+306  &cannot use value() with string  &The value() member functions can only be executed for certain J\+S\+ON types.   \\\cline{1-3}
+json.\+exception.\+type\+\_\+error.\+307  &cannot use erase() with string  &The erase() member functions can only be executed for certain J\+S\+ON types.   \\\cline{1-3}
+json.\+exception.\+type\+\_\+error.\+308  &cannot use push\+\_\+back() with string  &The push\+\_\+back() and operator+= member functions can only be executed for certain J\+S\+ON types.   \\\cline{1-3}
+json.\+exception.\+type\+\_\+error.\+309  &cannot use insert() with  &The insert() member functions can only be executed for certain J\+S\+ON types.   \\\cline{1-3}
+json.\+exception.\+type\+\_\+error.\+310  &cannot use swap() with number  &The swap() member functions can only be executed for certain J\+S\+ON types.   \\\cline{1-3}
+json.\+exception.\+type\+\_\+error.\+311  &cannot use emplace\+\_\+back() with string  &The emplace\+\_\+back() member function can only be executed for certain J\+S\+ON types.   \\\cline{1-3}
+json.\+exception.\+type\+\_\+error.\+312  &cannot use update() with string  &The update() member functions can only be executed for certain J\+S\+ON types.   \\\cline{1-3}
+json.\+exception.\+type\+\_\+error.\+313  &invalid value to unflatten  &The unflatten function converts an object whose keys are J\+S\+ON Pointers back into an arbitrary nested J\+S\+ON value. The J\+S\+ON Pointers must not overlap, because then the resulting value would not be well defined.   \\\cline{1-3}
+json.\+exception.\+type\+\_\+error.\+314  &only objects can be unflattened  &The unflatten function only works for an object whose keys are J\+S\+ON Pointers.   \\\cline{1-3}
+json.\+exception.\+type\+\_\+error.\+315  &values in object must be primitive  &The unflatten function only works for an object whose keys are J\+S\+ON Pointers and whose values are primitive.   \\\cline{1-3}
+json.\+exception.\+type\+\_\+error.\+316  &invalid U\+T\+F-\/8 byte at index 10\+: 0x7E  &The dump function only works with U\+T\+F-\/8 encoded strings; that is, if you assign a {\ttfamily \mbox{\hyperlink{namespacenlohmann_1_1detail_a1ed8fc6239da25abcaf681d30ace4985ab45cffe084dd3d20d928bee85e7b0f21}{std\+::string}}} to a J\+S\+ON value, make sure it is U\+T\+F-\/8 encoded.   \\\cline{1-3}
+\end{longtabu}
+
+
+\{The following code shows how a {\ttfamily \mbox{\hyperlink{classnlohmann_1_1detail_1_1type__error}{type\+\_\+error}}} exception can be caught.,\mbox{\hyperlink{classnlohmann_1_1detail_1_1type__error}{type\+\_\+error}}\}
+
+\begin{DoxySeeAlso}{See also}
+\mbox{\hyperlink{classnlohmann_1_1detail_1_1exception}{exception}} for the \mbox{\hyperlink{namespacebase}{base}} class of the library exceptions 
+
+\mbox{\hyperlink{classnlohmann_1_1detail_1_1parse__error}{parse\+\_\+error}} for exceptions indicating a parse error 
+
+\mbox{\hyperlink{classnlohmann_1_1detail_1_1invalid__iterator}{invalid\+\_\+iterator}} for exceptions indicating errors with iterators 
+
+\mbox{\hyperlink{classnlohmann_1_1detail_1_1out__of__range}{out\+\_\+of\+\_\+range}} for exceptions indicating access out of the defined range 
+
+\mbox{\hyperlink{classnlohmann_1_1detail_1_1other__error}{other\+\_\+error}} for exceptions indicating other library errors
+\end{DoxySeeAlso}
+\begin{DoxySince}{Since}
+version 3.\+0.\+0 
+\end{DoxySince}
+
+
+The documentation for this class was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+include/vendor/json.\+hpp\end{DoxyCompactItemize}

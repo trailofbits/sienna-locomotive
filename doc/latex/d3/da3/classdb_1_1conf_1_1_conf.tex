@@ -1,0 +1,83 @@
+\hypertarget{classdb_1_1conf_1_1_conf}{}\section{db.\+conf.\+Conf Class Reference}
+\label{classdb_1_1conf_1_1_conf}\index{db.\+conf.\+Conf@{db.\+conf.\+Conf}}
+
+
+Configuration key/value pairs currently this is only used for the A\+BI Version (conf.\+V\+E\+R\+S\+I\+ON) but could be used for all kinds of configuration.  
+
+
+Inheritance diagram for db.\+conf.\+Conf\+:\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[height=2.000000cm]{d3/da3/classdb_1_1conf_1_1_conf}
+\end{center}
+\end{figure}
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+def \mbox{\hyperlink{classdb_1_1conf_1_1_conf_a29c1f02ddcf9eb73316bdcde0c654a7d}{\+\_\+\+\_\+init\+\_\+\+\_\+}} (self, key, value)
+\begin{DoxyCompactList}\small\item\em Constructor. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Static Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+def \mbox{\hyperlink{classdb_1_1conf_1_1_conf_a0e5941782c2bc7dea2350b235ba97597}{factory}} (key, value=None)
+\begin{DoxyCompactList}\small\item\em Gets key/value from db. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Static Public Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classdb_1_1conf_1_1_conf_aafc780991f3dbf2b2d9cbc35c7144adb}\label{classdb_1_1conf_1_1_conf_aafc780991f3dbf2b2d9cbc35c7144adb}} 
+{\bfseries key} = Column( String, primary\+\_\+key=True )
+\item 
+\mbox{\Hypertarget{classdb_1_1conf_1_1_conf_a2489f018af56086ef112ddcd3e6719d7}\label{classdb_1_1conf_1_1_conf_a2489f018af56086ef112ddcd3e6719d7}} 
+{\bfseries value} = Column( Integer )
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+Configuration key/value pairs currently this is only used for the A\+BI Version (conf.\+V\+E\+R\+S\+I\+ON) but could be used for all kinds of configuration. 
+
+\subsection{Constructor \& Destructor Documentation}
+\mbox{\Hypertarget{classdb_1_1conf_1_1_conf_a29c1f02ddcf9eb73316bdcde0c654a7d}\label{classdb_1_1conf_1_1_conf_a29c1f02ddcf9eb73316bdcde0c654a7d}} 
+\index{db\+::conf\+::\+Conf@{db\+::conf\+::\+Conf}!\+\_\+\+\_\+init\+\_\+\+\_\+@{\+\_\+\+\_\+init\+\_\+\+\_\+}}
+\index{\+\_\+\+\_\+init\+\_\+\+\_\+@{\+\_\+\+\_\+init\+\_\+\+\_\+}!db\+::conf\+::\+Conf@{db\+::conf\+::\+Conf}}
+\subsubsection{\texorpdfstring{\+\_\+\+\_\+init\+\_\+\+\_\+()}{\_\_init\_\_()}}
+{\footnotesize\ttfamily def db.\+conf.\+Conf.\+\_\+\+\_\+init\+\_\+\+\_\+ (\begin{DoxyParamCaption}\item[{}]{self,  }\item[{}]{key,  }\item[{}]{value }\end{DoxyParamCaption})}
+
+
+
+Constructor. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em key} & key string \\
+\hline
+{\em value} & value string for storage \\
+\hline
+\end{DoxyParams}
+
+
+\subsection{Member Function Documentation}
+\mbox{\Hypertarget{classdb_1_1conf_1_1_conf_a0e5941782c2bc7dea2350b235ba97597}\label{classdb_1_1conf_1_1_conf_a0e5941782c2bc7dea2350b235ba97597}} 
+\index{db\+::conf\+::\+Conf@{db\+::conf\+::\+Conf}!factory@{factory}}
+\index{factory@{factory}!db\+::conf\+::\+Conf@{db\+::conf\+::\+Conf}}
+\subsubsection{\texorpdfstring{factory()}{factory()}}
+{\footnotesize\ttfamily def db.\+conf.\+Conf.\+factory (\begin{DoxyParamCaption}\item[{}]{key,  }\item[{}]{value = {\ttfamily None} }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [static]}}
+
+
+
+Gets key/value from db. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em key} & key string \\
+\hline
+{\em value} & value string for storage \\
+\hline
+\end{DoxyParams}
+\begin{DoxyReturn}{Returns}
+\mbox{\hyperlink{classdb_1_1conf_1_1_conf}{Conf}} object with key/value pair 
+\end{DoxyReturn}
+
+
+The documentation for this class was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+db/conf.\+py\end{DoxyCompactItemize}
