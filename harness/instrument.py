@@ -1,9 +1,9 @@
-"""
-Instrumentation functions for running DynamoRIO client & the fuzzing server
-Imports harness/config.py for argument and config file handling.
-Imports harness/state.py for fuzzing lifecycle management
-Imports harness/enums.py for the targeting mode enum
-"""
+## @package instrument
+# Instrumentation functions for running DynamoRIO client & the fuzzing server
+# Imports harness/config.py for argument and config file handling.
+# Imports harness/state.py for fuzzing lifecycle management
+# Imports harness/enums.py for the targeting mode enum
+
 
 import subprocess
 import time
@@ -185,12 +185,14 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
 
     return DRRun(popen_obj, invoke.seed, run_id)
 
-
+## Executes a Triage run
+# Runs the sl2 triager on each of the minidumps generated
+# by a fuzzing run.  The information that gets returned
+# can't be used across threads so we end up fetching it from the db in the gui
+# @param cfg Configuration context dictionary
+# @param run_id Run ID (guid)
 def triagerRun( cfg, run_id ):
     """
-    Runs the sl2 triager on each of the minidumps generated
-    by a fuzzing run.  The information that gets returned
-    can't be used across threads so we end up fetching it from the db in the gui
     """
 
     ret = {}
@@ -329,11 +331,11 @@ def fuzzer_run(config_dict, targets_file):
     return crashed, run.run_id
 
 
-# TODO(ww): Rename this to "tracer_run" or something similar,
-# and break the internal triagerRun call into another method
-# (trace_and_triage, maybe?)
+## Runs the triaging tool
+# Triage includes the tracer, exploitability, and crashash generation
+# @param config_dict Configuration context dictionary
+# @param run_id Run ID (guid)
 def tracer_run(config_dict, run_id):
-    """ Runs the triaging tool """
     run = run_dr(
         {
             'drrun_path': config_dict['drrun_path'],
@@ -356,12 +358,12 @@ def tracer_run(config_dict, run_id):
     db.Tracer.factory( run_id, formatted, raw )
     return formatted, raw
 
-
+## Fuzzing run followed by triage
+# Runs the fuzzer (in a loop if continuous is true), then runs the triage
+# tools (DR tracer and breakpad) if a crash is found.
+# @param config_dict Configuration context dictionary
+# @param run_id Run ID (guid)
 def fuzz_and_triage(config_dict):
-    """
-    Runs the fuzzer (in a loop if continuous is true), then runs the triage
-    tools (DR tracer and breakpad) if a crash is found.
-    """
     global can_fuzz
 
     targets_file = os.path.join(get_target_dir(config_dict), "targets.msg")
