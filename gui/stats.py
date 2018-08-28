@@ -1,9 +1,14 @@
+## @package stats
+
 from PySide2 import QtWidgets
 import db
 import statistics
 from db import Crash
 
+## Widget for crash statistics
 class StatsWidget(QtWidgets.QWidget):
+
+    ## Constructor for stats widget
     def __init__(self):
         QtWidgets.QWidget.__init__(self)
         self.layout = QtWidgets.QVBoxLayout()
@@ -16,8 +21,7 @@ class StatsWidget(QtWidgets.QWidget):
         self.update()
 
 
-
-
+    ## Returns html string representation of object with # crashes, unique and duplicate crashes and exploitability stats
     def toHTML(self):
         return """
 <html>
@@ -55,6 +59,7 @@ class StatsWidget(QtWidgets.QWidget):
             self.exploitabilityCnts['None']
         )
 
+    ## Requeries the database and updates the table
     def update(self):
         session = db.getSession()
 
