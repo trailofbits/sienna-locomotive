@@ -1,11 +1,11 @@
-"""
-Handles argument and config file parsing for SL2.
+## @package config
+#
+# Handles argument and config file parsing for SL2.
+# 1: Check if the config file exists. If not, create it with sensible defaults.
+# 2: If the config file exists, read in the contents.
+# 3: If the user has provided any arguments that overwrite the values in the
+# config file, use those instead.
 
-1: Check if the config file exists. If not, create it with sensible defaults.
-2: If the config file exists, read in the contents.
-3: If the user has provided any arguments that overwrite the values in the
-config file, use those instead.
-"""
 
 import os
 import sys
@@ -14,7 +14,7 @@ import configparser
 import shlex
 
 
-# Schematizes the SL2 configuration.
+## Schematizes the SL2 configuration.
 # Every configuration key has a 'test' function, an 'expected'
 # string that explains the result of a failed test, and a 'required'
 # bool that indicates whether the harness should continue without its
@@ -63,9 +63,12 @@ for flag in FLAG_KEYS:
 
 # NOTE(ww): Keep these up-to-data with include/server.hpp!
 sl2_server_pipe_path = "\\\\.\\pipe\\fuzz_server"
+## Path to SL2 data and configuration
 sl2_dir = os.path.join(os.getenv('APPDATA', default="."), 'Trail of Bits', 'fuzzkit')
+## Path to runs directory
 sl2_runs_dir = os.path.join(sl2_dir, 'runs')
 sl2_arenas_dir = os.path.join(sl2_dir, 'arenas')
+## Path to log files
 sl2_log_dir = os.path.join(sl2_dir, 'log')
 sl2_targets_dir = os.path.join(sl2_dir, 'targets')
 sl2_config_path = os.path.join(sl2_dir, 'config.ini')
@@ -263,7 +266,12 @@ def set_profile(new_profile):
     update_config_from_args()
     validate_config()
 
-
+## Creates a default profile configuration
+# @param name String name of configuration context
+# @param dynamorio_exe String path to dynamorio executable ddrun
+# @param build_dir CMake build directory
+# @param target_path Path to PUT, target executable we are fuzzing
+# @param target_args Command line arguments to the target executable
 def create_new_profile(name, dynamorio_exe, build_dir, target_path, target_args):
     global _config
     _config[name] = {
@@ -287,7 +295,7 @@ def create_new_profile(name, dynamorio_exe, build_dir, target_path, target_args)
     with open(sl2_config_path, 'w') as configfile:
         _config.write(configfile)
 
-
+## Merges command line arguments into configuration
 def update_config_from_args():
     """
     Supplements the global configuration with command-line arguments
@@ -333,7 +341,7 @@ def update_config_from_args():
             print("WARNING: Replacing UNC Path", config[key], "with", extension)
             config[key] = extension
 
-
+## Sanity check for configuration
 def validate_config():
     """
     Check the (argv-supplanted) configuration, making sure that
