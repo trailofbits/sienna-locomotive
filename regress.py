@@ -22,7 +22,7 @@ def runAndCaptureOutput( cmd ):
         print( '\n[%s]' % cmd)
     # Modify the next line at your own risk. There are subtle char encoding issues than can arise.  We did pass `text=True` early but this
     # is only supported in >= Python 3.7
-    out = subprocess.run( cmd, universal_newlines=True, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, encoding='iso8859' )
+    out = subprocess.run( cmd, universal_newlines=True, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, encoding='iso8859' )
     out = out.stdout + out.stderr
 
     if DEBUG:
@@ -56,39 +56,35 @@ class TestWizard(unittest.TestCase):
         self.assertTrue(  r'[60,104,116,109,108,62,10,32]' in out )
 
     def test_registry(self):
-        cmd = r'echo 0 | python harness.py -g -r3 -l -v -e WIZARD -t '+ TEST_APPLICATION +' -a 4 -f'
-        out = runAndCaptureOutput(cmd)
-        self.assertTrue( '0) RegQueryValueEx' in out )
-        self.assertTrue( 'Process completed after' in out )
-        cmd = r'echo 0 | python harness.py -r3 -l -v -e WIZARD -t '+ TEST_APPLICATION +' -a 4 -f'
+        cmd = r'python harness.py -fn 0 -r3 -l -v -e WIZARD -t '+ TEST_APPLICATION +' -a 4 -f'
         out = runAndCaptureOutput(cmd)
         self.assertFalse( '0) RegQueryValueEx' in out )
-        self.assertTrue( 'Process completed after' in out )
+        self.assertTrue( 'CRASH PTR' in out )
 
 
     def test_captureStdout(self):
 
         targetString = 'XXXWWWXXX'
         # First version have -l, inlining stdout for us to capture.   String "XXXWWWXXX" should appear
-        cmd = r'echo 0 | python harness.py -r3 -l -v -t '+ TEST_APPLICATION +' -a 9 -f'
+        cmd = r'python harness.py -fn 0 -r3 -l -v -t '+ TEST_APPLICATION +' -a 9 -f'
         out = runAndCaptureOutput(cmd)
         self.assertTrue( targetString in out )
 
 
         # This version does not have have -l, so we aren't capturing stdout and String "XXXWWWXXX" should NOT appear
-        cmd = r'echo 0 | python harness.py -r3 -v -t '+ TEST_APPLICATION +' -a 9 -f'
+        cmd = r'python harness.py -fn 0 -r3 -v -t '+ TEST_APPLICATION +' -a 9 -f'
         out = runAndCaptureOutput(cmd)
         self.assertFalse( targetString in out )
 
     def test_TheWiz(self):
-        cmd = r'echo 0 | python harness.py -v'
+        cmd = r'python harness.py -v -fn 0'
         out = runAndCaptureOutput(cmd)
         self.assertTrue( 'Process completed after' in out )
 
 
 
     def test_quickCrash(self):
-        cmd =  r'echo 0 | python harness.py -c -x -l -v -t '+ TEST_APPLICATION +' -a 10 -f'
+        cmd =  r'python harness.py -fn 0 -c -x -l -v -t '+ TEST_APPLICATION +' -a 10 -f'
         out = runAndCaptureOutput(cmd)
         self.assertTrue( 'Process completed after' in out )
         #self.assertRegex(  out, r'Triage .*: breakpoint .*caused EXCEPTION_BREAKPOINT'  )
@@ -107,7 +103,7 @@ class TestWizard(unittest.TestCase):
 
     def test_triage(self):
         for _ in range(3):
-            cmd =  r'echo 0 | python harness.py -c -x -l -v -t '+ TEST_APPLICATION +' -a 10 -f'
+            cmd =  r'python harness.py -fn 0 -c -x -l -v -t '+ TEST_APPLICATION +' -a 10 -f'
             out = runAndCaptureOutput(cmd)
 
         workingdir = os.path.join( os.environ['APPDATA'],  "Trail of Bits", "fuzzkit", "runs" )
@@ -119,10 +115,10 @@ class TestWizard(unittest.TestCase):
             for _ in [ 'Crashash', 'Exploitability', 'Ranks', 'Crash Reason' ]:
                 self.assertTrue(  _ in out )
 
-    def test_fuzzgoat(self):
-        cmd = r'echo 0 | python harness.py -e WIZARD -v -l  -t ./build/fuzzgoat/Debug/fuzzgoat.exe -a ./fuzzgoat/input-files/validObject'
-        out = runAndCaptureOutput(cmd)
-        self.assertRegex( out, r'0[)] ReadFile from.*validObject' )
+    # def test_fuzzgoat(self):
+    #     cmd = r'echo 0 | python harness.py -e WIZARD -v -l  -t ./build/fuzzgoat/Debug/fuzzgoat.exe -a ./fuzzgoat/input-files/validObject'
+    #     out = runAndCaptureOutput(cmd)
+    #     self.assertRegex( out, r'0[)] ReadFile from.*validObject' )
 
 
 def main():

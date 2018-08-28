@@ -28,7 +28,7 @@ VERSION=4
 
 PATH_KEYS = ['drrun_path', 'client_path', 'server_path', 'wizard_path', 'tracer_path', 'triager_path']
 ARGS_KEYS = ['drrun_args', 'client_args', 'server_args', 'target_args']
-INT_KEYS = ['runs', 'simultaneous', 'fuzz_timeout', 'tracer_timeout', 'seed', 'verbose']
+INT_KEYS = ['runs', 'simultaneous', 'fuzz_timeout', 'tracer_timeout', 'seed', 'verbose', 'function_number' ]
 FLAG_KEYS = ['debug', 'nopersist', 'continuous', 'exit_early', 'inline_stdout', 'preserve_runs']
 
 profile = 'DEFAULT'
@@ -49,8 +49,8 @@ for args in ARGS_KEYS:
 
 for num in INT_KEYS:
     CONFIG_SCHEMA[num] = {
-        'test': lambda x: type(x) is int and x >= 0,
-        'expected': 'nonnegative integer',
+        'test': lambda x: type(x) is int,
+        'expected': 'integer value',
         'required': False,
     }
 
@@ -98,6 +98,7 @@ if not os.path.exists(sl2_config_path):
         'target_args': '0 -f',
         'runs': 1,
         'simultaneous': 1,
+        'function_number': -1,
         'inline_stdout': False,
         'preserve_runs': False,
     }
@@ -168,6 +169,14 @@ parser.add_argument(
     type=int,
     help="Timeout (seconds) after which fuzzing runs should be killed. \
     By default, runs are not killed.")
+
+parser.add_argument(
+    '-fn', '--functionnumber',
+    action='store',
+    dest='function_number',
+    default=-1,
+    type=int,
+    help="Function call number to run")
 
 parser.add_argument(
     '-g', '--registry',
@@ -289,6 +298,7 @@ def create_new_profile(name, dynamorio_exe, build_dir, target_path, target_args)
         'target_args': target_args,
         'runs': 1,
         'simultaneous': 1,
+        'function_number': -1,
         'inline_stdout': False,
     }
 

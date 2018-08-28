@@ -60,29 +60,34 @@ def select_from_range(max_range, message):
         else:
             return index
 
-
+## Print and select findings, then write to disk
+# This will happen if there weren't any hookable functions in the target,
+# OR if the target's architecture isn't supported.
+# Either way there isn't much we can do, so exit.
 def select_and_dump_wizard_findings(wizard_findings, target_file):
-    # This will happen if there weren't any hookable functions in the target,
-    # OR if the target's architecture isn't supported.
-    # Either way there isn't much we can do, so exit.
+    cfg = harness.config.config
+
     if len(wizard_findings) == 0:
         print_l("[!] No wizard findings!")
         sys.exit()
 
-    """ Print and select findings, then write to disk """
-    print_l("Functions found:")
-    for i, finding in enumerate(wizard_findings):
-        if 'source' in finding:
-            print_l("{}) {func_name} from {source}:{start}-{end}".format(i, **finding))
-        else:
-            print_l("{}) {func_name}".format(i, **finding))
-        buffer = bytearray(finding['buffer'])
-        hexdump(buffer)
+    index = cfg['function_number']
+    if index>=0 and index<len(wizard_findings):
+        pass
+    else:
+        print_l("Functions found:")
+        for i, finding in enumerate(wizard_findings):
+            if 'source' in finding:
+                print_l("{}) {func_name} from {source}:{start}-{end}".format(i, **finding))
+            else:
+                print_l("{}) {func_name}".format(i, **finding))
+            buffer = bytearray(finding['buffer'])
+            hexdump(buffer)
 
-    # Let the user select a finding, add it to the config
-    index = select_from_range(len(wizard_findings), "Choose a function to fuzz> ")
+        # Let the user select a finding, add it to the config
+        index = select_from_range(len(wizard_findings), "Choose a function to fuzz> ")
+
     wizard_findings[index]['selected'] = True
-
     with open(target_file.replace("targets.msg", "all_targets.msg"), 'wb') as msg_file:
         msgpack.dump(wizard_findings, msg_file)
     with open(target_file, 'wb') as msg_file:
