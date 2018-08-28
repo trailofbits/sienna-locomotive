@@ -1,12 +1,16 @@
+##############################################################################################
+## @package utilz
+# General utilities and helper functions for the database
+
 import os
 import glob
 import re
 import harness.config
 
+## Converts the full path to an sl2 minidump to a runid
+# @param dmpPath minidump path
+# @return string runid
 def dumpPathToRunid( dmpPath ):
-    """
-    Converts the full path to an sl2 minidump to a runid
-    """
     runid = None
     m = re.match(r".*\\runs\\([a-fA-F0-9-]+)\\.*", dmpPath)
     if m:
@@ -14,11 +18,10 @@ def dumpPathToRunid( dmpPath ):
     return runid
 
 
-
+## Converts an sl2 runid into a minidump path
+# @param runid Runid for the crash
+# @return string path to minidump file
 def runidToDumpPath( runid ):
-    """
-    Converts an sl2 runid into a minidump path
-    """
     dumpPath = None
     cfg = harness.config
 

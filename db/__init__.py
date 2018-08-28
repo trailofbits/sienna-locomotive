@@ -1,4 +1,5 @@
 ############################################################################
+## @package db
 # Main interface for accessing the sl2 database
 
 from sqlalchemy import create_engine
@@ -10,16 +11,19 @@ import os
 import db.base
 
 
-
+## Gets sqlalchemy database session
+# Used to get a session for db stuff.  You can't reuse a session or db objects across
+# @return sqlalchemy database session
 def getSession():
-    """
-    Used to get a session for db stuff.  You can't reuse a session or db objects across
-    threads
-    """
     return Session()
 
 
-
+## Checks database and ABI version number
+# This will check the ABI version (config.VERSION) in python against
+# the version number if the database. If it's not in the database, we know
+# this is a clean run so we go ahead and store it.  If there is a version number
+# in the db, and it's less than the config.VERSION, we know there is mismatch with the
+# ABI version and will throw and error to protect the user
 def checkVersionNumber():
     versionNow = config.VERSION
     confVersion = db.Conf.factory('version')
@@ -41,11 +45,16 @@ Options include:
         raise( xception )
 
 
-
-
+## File path to db
 dbpath = '%s/%s' % ( config.sl2_dir, 'sl2.db' )
+
+## URL to db for sqlalchemy
 dburl = os.path.join( 'sqlite:///%s' % dbpath )
+
+## sqlalchemy database engine
 engine = create_engine(dburl, poolclass=NullPool )
+
+## Imports of the other classes
 from .conf import Conf
 from .tracer import Tracer
 from .checksec import Checksec
@@ -58,6 +67,6 @@ Session = sessionmaker(bind=engine)
 Session = scoped_session(Session)
 Session().commit()
 
-
+# Checks for version mismatch
 checkVersionNumber()
 

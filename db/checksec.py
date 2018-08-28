@@ -1,8 +1,10 @@
 ############################################################################
-# checkseck.py
+## @package checksec
 #
 # This is the python wrapper around winchecksec, a tool that's basically an
 # equivalent of checksec.sh
+#
+
 from sqlalchemy import *
 import os
 import harness.config
@@ -12,7 +14,7 @@ import json
 import db
 from db.base import Base
 
-
+## DB Wrapper for winchecksec
 class Checksec(Base):
 
     __tablename__ = "checksec"
@@ -24,7 +26,10 @@ class Checksec(Base):
     seh             = Column( String )
     path            = Column( String, primary_key=True )
 
+    ## Constructor for checksec object that takes json object from winchecksec
+    # @param json object from winchecksec
     def __init__(self, json):
+        # TODO: add other flags like ASLR
         self.dynamicBase     = json["dynamicBase"]
         self.forceIntegrity  = json["forceIntegrity"]
         self.isolation       = json["isolation"]
@@ -32,12 +37,13 @@ class Checksec(Base):
         self.seh             = json["seh"]
         self.path            = json["path"]
 
+    ## Factory for checksec from executable path
+    # Gets checksec information for dll or exe.
+    # If it already exists in the db, just return it
+    # @param path Path to DLL or EXE
+    # @return Checksec obj
     @staticmethod
     def byExecutable( path ):
-        """
-        Gets checksec information for dll or exe. If it already exists in the db, just
-        return the row
-        """
         cfg = harness.config
         session =  db.getSession()
 
@@ -56,7 +62,12 @@ class Checksec(Base):
         return ret
 
 
+    ## Creates short string description
+    # Returns a strings seperated by pipe symbols that
+    # succinctly describes the checksec state of the object
+    # @return string
     def shortString(self):
+        # TODO: implement other flags
         t = []
         if self.nx:
             t.append("NX")
