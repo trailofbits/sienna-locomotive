@@ -63,22 +63,32 @@ class StatsWidget(QtWidgets.QWidget):
     def update(self):
         session = db.getSession()
 
-        self.crashes = Crash.getAll()
+        self.crashes    = Crash.getAll()
         self.crashesCnt = len(self.crashes)
+        self.exploitabilityCnts = {
+            'High'      : 0,
+            'Medium'    : 0,
+            'Low'       : 0,
+            'Unknown'   : 0,
+            'None'      : 0
+        }
 
-        self.uniquesCnt = session.query(Crash).distinct(Crash.rank).group_by(Crash.rank).count()
-        self.dupesCount = self.crashesCnt - self.uniquesCnt
-        self.ranks = [ _.rank for _ in self.crashes ]
-        self.ranksMean      = statistics.mean(self.ranks)
-        self.ranksMedian    = statistics.median(self.ranks)
+        self.uniquesCnt     = 0
+        self.dupesCount     = 0
+        self.ranksMean      = 0
+        self.ranksMedian    = 0
 
-        self.exploitabilityCnts = {}
-
-        self.exploitabilityCnts['High'] = session.query(Crash).filter(Crash.rank==4).count()
-        self.exploitabilityCnts['Medium'] = session.query(Crash).filter(Crash.rank==3).count()
-        self.exploitabilityCnts['Low'] = session.query(Crash).filter(Crash.rank==2).count()
-        self.exploitabilityCnts['Unknown'] = session.query(Crash).filter(Crash.rank==1).count()
-        self.exploitabilityCnts['None'] = session.query(Crash).filter(Crash.rank==0).count()
+        if self.crashesCnt>0:
+            self.uniquesCnt = session.query(Crash).distinct(Crash.rank).group_by(Crash.rank).count()
+            self.dupesCount = self.crashesCnt - self.uniquesCnt
+            self.ranks = [ _.rank for _ in self.crashes ]
+            self.ranksMean      = statistics.mean(self.ranks)
+            self.ranksMedian    = statistics.median(self.ranks)
+            self.exploitabilityCnts['High']     = session.query(Crash).filter(Crash.rank==4).count()
+            self.exploitabilityCnts['Medium']   = session.query(Crash).filter(Crash.rank==3).count()
+            self.exploitabilityCnts['Low']      = session.query(Crash).filter(Crash.rank==2).count()
+            self.exploitabilityCnts['Unknown']  = session.query(Crash).filter(Crash.rank==1).count()
+            self.exploitabilityCnts['None']     = session.query(Crash).filter(Crash.rank==0).count()
 
         html = self.toHTML()
         self.web.setText(html)
