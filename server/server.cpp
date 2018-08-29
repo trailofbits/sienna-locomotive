@@ -637,7 +637,7 @@ static void handle_replay(HANDLE pipe)
     DWORD attrs = GetFileAttributes(target_file);
 
     if (attrs == INVALID_FILE_ATTRIBUTES || (attrs & FILE_ATTRIBUTE_DIRECTORY)) {
-        SL2_SERVER_LOG_FATAL("handle_replay: missing FKT or is a directory: %S", target_file);
+        SL2_SERVER_LOG_FATAL("missing FKT or is a directory: %S", target_file);
     }
 
     get_bytes_fkt(target_file, buf, size);
