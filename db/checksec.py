@@ -19,23 +19,37 @@ class Checksec(Base):
 
     __tablename__ = "checksec"
 
-    dynamicBase     = Column( String )
-    forceIntegrity  = Column( String )
-    isolation       = Column( String )
-    nx              = Column( String )
-    seh             = Column( String )
-    path            = Column( String, primary_key=True )
+    aslr               = Column( Boolean )
+    authenticode       = Column( Boolean )
+    cfg                = Column( Boolean )
+    dynamicBase        = Column( Boolean )
+    forceIntegrity     = Column( Boolean )
+    gs                 = Column( Boolean )
+    highEntropyVA      = Column( Boolean )
+    isolation          = Column( Boolean )
+    nx                 = Column( Boolean )
+    path               = Column( String, primary_key=True )
+    rfg                = Column( Boolean )
+    safeSEH            = Column( Boolean )
+    seh                = Column( Boolean )
 
     ## Constructor for checksec object that takes json object from winchecksec
     # @param json object from winchecksec
     def __init__(self, json):
-        # TODO: add other flags like ASLR
-        self.dynamicBase     = json["dynamicBase"]
-        self.forceIntegrity  = json["forceIntegrity"]
-        self.isolation       = json["isolation"]
-        self.nx              = json["nx"]
-        self.seh             = json["seh"]
-        self.path            = json["path"]
+        self.aslr               = json["aslr"]
+        self.authenticode       = json["authenticode"]
+        self.cfg                = json["cfg"]
+        self.dynamicBase        = json["dynamicBase"]
+        self.forceIntegrity     = json["forceIntegrity"]
+        self.gs                 = json["gs"]
+        self.highEntropyVA      = json["highEntropyVA"]
+        self.isolation          = json["isolation"]
+        self.nx                 = json["nx"]
+        self.path               = json["path"]
+        self.rfg                = json["rfg"]
+        self.safeSEH            = json["safeSEH"]
+        self.seh                = json["seh"]
+
 
     ## Factory for checksec from executable path
     # Gets checksec information for dll or exe.
@@ -69,16 +83,28 @@ class Checksec(Base):
     def shortString(self):
         # TODO: implement other flags
         t = []
-        if self.nx:
-            t.append("NX")
-        if self.seh:
-            t.append("SEH")
+        if self.aslr:
+            t.append("ASLR")
+        if self.authenticode:
+            t.append("Authenicode")
+        if self.cfg:
+            t.append("CFG")
         if self.dynamicBase:
             t.append("DynamicBase")
         if self.forceIntegrity:
             t.append("ForcedIntegrity")
+        if self.gs:
+            t.append("GS")
+        if self.highEntropyVA:
+            t.append("HighEntropyVA")
         if self.isolation:
             t.append("Isolation")
+        if self.nx:
+            t.append("NX")
+        if self.rfg:
+            t.append("RFG")
+        if self.seh:
+            t.append("SEH")
         return ' | '.join(t)
 
 
