@@ -1,16 +1,18 @@
-import sys
-import time
-from multiprocessing import cpu_count
-import os
-import json
-import db
+######################################################
+## @package gui
+# Code for the QT gui
 
 from PySide2 import QtWidgets
 from PySide2.QtCore import *
 from PySide2.QtGui import QFontDatabase, QMovie, QStandardItem, QBrush, QColor
 from PySide2.QtWidgets import *
-
+from multiprocessing import cpu_count
 from sqlalchemy import desc
+import db
+import json
+import os
+import sys
+import time
 
 from gui.checkbox_tree import (
     CheckboxTreeWidget,
@@ -33,6 +35,8 @@ from config_window import ConfigWindow
 import triage
 
 
+##
+# Main window for gui
 class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self):

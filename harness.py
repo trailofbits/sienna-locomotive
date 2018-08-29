@@ -1,4 +1,5 @@
 """
+@package harness
 Driver class for DynamoRIO client.
 Imports harness/config.py for argument and config file handling.
 Imports harness/state.py for managing the fuzzing lifecycle
