@@ -1,3 +1,6 @@
+#####################################################################################################
+## @package regress
+# Regression testing
 import unittest
 import test.support as support
 import sys
@@ -7,12 +10,14 @@ import glob
 import os
 import codecs
 
+
+## Set to true for stdout/stderr
 DEBUG=False
 
 TEST_APPLICATION='build/corpus/test_application/Debug/test_application.exe'
 TRIAGER=r'build\triage\Debug\triager.exe'
 
-
+## Wrapper for subprocess.run() which is 8bit clean
 def runAndCaptureOutput( cmd ):
 
     if type(cmd) == type([]):
@@ -29,10 +34,12 @@ def runAndCaptureOutput( cmd ):
         print( "\n<%s>" % out )
     return str(out)
 
+## Main class for testing
 class TestWizard(unittest.TestCase):
 
-    def test_0(self):
 
+    ## Basic test for wizard.dll
+    def test_0(self):
         cmd =  [ r'dynamorio\bin64\drrun.exe',
             r'-c',
             r'build/wizard/Debug/wizard.dll',
@@ -43,6 +50,7 @@ class TestWizard(unittest.TestCase):
         out = runAndCaptureOutput(cmd)
         self.assertTrue(  r'buffer":[65,65,65,65,65,65,65,65]'  in out )
 
+    ## Another wizard test with another usecase
     def test_2(self):
 
         cmd =  [ r'dynamorio\bin64\drrun.exe',
@@ -55,6 +63,8 @@ class TestWizard(unittest.TestCase):
         out = runAndCaptureOutput(cmd)
         self.assertTrue(  r'[60,104,116,109,108,62,10,32]' in out )
 
+
+    ## Checks wizard and registry functionalty
     def test_registry(self):
         cmd = r'python harness.py -fn 0 -r3 -l -v -e WIZARD -t '+ TEST_APPLICATION +' -a 4 -f'
         out = runAndCaptureOutput(cmd)
@@ -62,27 +72,26 @@ class TestWizard(unittest.TestCase):
         self.assertTrue( 'CRASH PTR' in out )
 
 
+    ## Makes sure we can capture stdout
     def test_captureStdout(self):
-
         targetString = 'XXXWWWXXX'
         # First version have -l, inlining stdout for us to capture.   String "XXXWWWXXX" should appear
         cmd = r'python harness.py -fn 0 -r3 -l -v -t '+ TEST_APPLICATION +' -a 9 -f'
         out = runAndCaptureOutput(cmd)
         self.assertTrue( targetString in out )
-
-
         # This version does not have have -l, so we aren't capturing stdout and String "XXXWWWXXX" should NOT appear
         cmd = r'python harness.py -fn 0 -r3 -v -t '+ TEST_APPLICATION +' -a 9 -f'
         out = runAndCaptureOutput(cmd)
         self.assertFalse( targetString in out )
 
+    ## Basic stages testing in harness
     def test_TheWiz(self):
         cmd = r'python harness.py -v -fn 0'
         out = runAndCaptureOutput(cmd)
         self.assertTrue( 'Process completed after' in out )
 
 
-
+    ## Test case #10, that an application actually crashes and that we catch the appropriate information
     def test_quickCrash(self):
         cmd =  r'python harness.py -fn 0 -c -x -l -v -t '+ TEST_APPLICATION +' -a 10 -f'
         out = runAndCaptureOutput(cmd)
@@ -101,6 +110,7 @@ class TestWizard(unittest.TestCase):
         #     self.assertTrue( "instructionPointer" in data )
 
 
+    ## Test the triaging is working with crashash, exploitability, etc...
     def test_triage(self):
         for _ in range(3):
             cmd =  r'python harness.py -fn 0 -c -x -l -v -t '+ TEST_APPLICATION +' -a 10 -f'
