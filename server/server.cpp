@@ -957,7 +957,7 @@ static void handle_register_pid(HANDLE pipe)
         NULL);
 
     if (file != INVALID_HANDLE_VALUE) {
-        if (!WriteFile(file, pid_s, wcsnlen_s(pid_s, sizeof(pid_s)) * sizeof(wchar_t), &txsize, NULL)) {
+        if (!WriteFile(file, pid_s, (DWORD) wcsnlen_s(pid_s, sizeof(pid_s)) * sizeof(wchar_t), &txsize, NULL)) {
             SL2_SERVER_LOG_ERROR("failed to write pid (pid=%lu, pids_file=%S)", pid, pids_file);
         }
 
