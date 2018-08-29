@@ -192,14 +192,11 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
 # @param cfg Configuration context dictionary
 # @param run_id Run ID (guid)
 def triagerRun( cfg, run_id ):
-    """
-    """
-
     ret = {}
     ret["run_id"] = run_id
     tracerOutput, _ = tracer_run(cfg, run_id)
     ret["tracerOutput"] = tracerOutput
-    crashInfo = db.Crash.factory( run_id )
+    crashInfo = db.Crash.factory( run_id, cfg['target_application_path'] )
     ret["crashInfo"] = crashInfo
 
     return ret

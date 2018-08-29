@@ -32,9 +32,22 @@ class TriageExport:
             'ranksString',
             'stackPointerString',
             'tag',
-            'formatted'
+            'formatted',
+            'targetPath',
+            'aslr',
+            'authenticode',
+            'cfg',
+            'dynamicBase',
+            'forceIntegrity',
+            'gs',
+            'highEntropyVA',
+            'isolation',
+            'nx',
+            'rfg',
+            'safeSEH',
+            'seh',
         ]
-        self.sqlExport = 'select %s from crash left join tracer on crash.runid = tracer.runid' % ",".join(self.cols)
+        self.sqlExport = 'select %s from crash left join tracer, checksec on crash.runid = tracer.runid and crash.targetPath = checksec.path' % ",".join(self.cols)
 
 
     ## Exports crash from run directories to appropriate directory structure.  Also generates

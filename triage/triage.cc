@@ -58,6 +58,7 @@ StatusCode Triage::preProcess() {
         return StatusCode::ERROR;
     }
 
+
     // Do some breakpad processing
     sc = proc_.Process( &dump_, &state_);
     if( PROCESS_OK!=sc ) {
@@ -188,7 +189,7 @@ const string Triage::crashash() const {
 ////////////////////////////////////////////////////////////////////////////
 // triageTag()
 //      A tag is basically a string that uniquely identifies the crash.  Its
-// includes exploitabilty, crash reason, and eventually a unique address
+// includes exploitability, crash reason, and eventually a unique address
 const string Triage::triageTag() const {
     fs::path  tPath;
     tPath.append( exploitability() );
@@ -238,7 +239,7 @@ const uint64_t Triage::instructionPointer() const {
 
 ////////////////////////////////////////////////////////////////////////////
 // exploitability()
-//      returns value from 0 to 4 for exploitabilty.  0 being None, 4 being
+//      returns value from 0 to 4 for exploitability.  0 being None, 4 being
 // High
 XploitabilityRank Triage::exploitabilityRank() const {
     XploitabilityRank rank = XploitabilityRank::XPLOITABILITY_NONE;
@@ -252,7 +253,7 @@ XploitabilityRank Triage::exploitabilityRank() const {
 
 ////////////////////////////////////////////////////////////////////////////
 // exploitability()
-//      String version of exploitabilty from None to High
+//      String version of exploitability from None to High
 const string Triage::exploitability() const {
     //return Xploitability::rankToString( exploitabilityRank() );
     XploitabilityRank rank = exploitabilityRank();

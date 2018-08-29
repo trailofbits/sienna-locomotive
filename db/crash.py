@@ -64,6 +64,8 @@ class Crash(Base):
     instructionPointerString    = Column( String(20) )
     ## Path to minidump for crash
     minidumpPath                = Column( String(270) )
+    ## Path to target (PUT)
+    targetPath                  = Column( String(270) )
     ## Integer version of exploitability (0-4, inclusive)
     rank                        = Column( Integer  )
     ## A colon separated list of each engines exploitability.  For example 1:2:2
@@ -82,7 +84,7 @@ class Crash(Base):
     ## Constructor for crash object
     # @param runid Run ID of crash
     # @param j json object version
-    def __init__(self, j, runid=None):
+    def __init__(self, j, runid=None, targetPath=None):
         try:
 
             self.runid                      = runid
@@ -100,6 +102,8 @@ class Crash(Base):
             self.instructionPointerString   = hex(j["instructionPointer"])
             ## Path to minidump for crash
             self.minidumpPath               = j["minidumpPath"]
+            ## Path to minidump for crash
+            self.targetPath                 = targetPath
             ## Integer version of exploitability (0-4, inclusive)
             self.rank                       = j["rank"]
             ## Stack pointer (rsp) at crash as hex string
@@ -161,7 +165,7 @@ class Crash(Base):
     # @param dmpPath string path to minidump file
     # @return Crash object
     @staticmethod
-    def factory( runid, dmpPath=None ):
+    def factory( runid, targetPath=None ):
         cfg = harness.config
         session = db.getSession()
         runid = str(runid)
@@ -169,14 +173,13 @@ class Crash(Base):
         if ret:
             return ret
 
-        if not dmpPath:
-            dmpPath = db.utilz.runidToDumpPath(runid)
+        dmpPath = db.utilz.runidToDumpPath(runid)
 
         if not dmpPath:
             print("Unable to find dumpfile for runid %s" % runid)
             return None
 
-        # Runs triager, which will give us exploitabilty info
+        # Runs triager, which will give us exploitability info
         # using 2 engines: Google's breakpad and an reimplementation of Microsofts
         # !exploitable
         cmd = [ cfg.config['triager_path'], dmpPath ]
@@ -191,7 +194,7 @@ class Crash(Base):
         if not j:
             return None
         try:
-            ret = Crash(j, runid)
+            ret = Crash(j, runid, targetPath)
         except x:
             print("Unable to process crash json")
             return None
