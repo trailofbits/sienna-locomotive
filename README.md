@@ -157,6 +157,15 @@ OK
 
 The triage system is a separate executable, `triager.exe` that is run by the harness.  It takes care of ranking exploitability, uniqueness, and binning of crashes.
 
+### Winchecksec
+
+
+### Statistics for different flags across EXEs on Windows 10
+
+| aslr | authenticode | cfg | dynamicBase | forceIntegrity | gs | highEntropyVA |  isolation |  nx |  rfg | safeSEH |  seh |
+| ---- | ------------ | --- | ----------- | -------------- | -- | ------------- | ---------- | --- | ---  | ------- | --- |
+| 79%	| 37% | 49%	| 79% | 3% | 65% | 43% | 100% | 79% | 6% | 25%| 91% |
+
 ### Exploitability
 
 The Exploitability ranking is a score for the potential ability to exploit a crash based on 3 engines.  The ranks, ranging from High (4) to None (0), in order of likelyhood are:
