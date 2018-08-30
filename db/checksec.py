@@ -64,15 +64,19 @@ class Checksec(Base):
         ret = session.query( Checksec ).filter( Checksec.path==path ).first()
         if ret:
             return ret
-
+        ret = None
         checker = cfg.config['checksec_path']
         cmd = [ checker, "-j", path ]
-        out = subprocess.check_output(cmd)
-        ret = json.loads(out)
-        ret = Checksec(ret)
 
-        session.add(ret)
-        session.commit()
+        try:
+            out = subprocess.check_output(cmd)
+            ret = json.loads(out)
+            ret = Checksec(ret)
+            session.add(ret)
+            session.commit()
+        except subprocess.CalledProcessError as x:
+            print("Exception", x)
+
         return ret
 
 
