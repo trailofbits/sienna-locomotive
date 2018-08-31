@@ -155,9 +155,11 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
                                 print_l("Killing child process:", pid)
                             try:
                                 os.kill(pid, signal.SIGTERM)
-                            except (PermissionError, OSError) as e:
-                                print_l("WARNING: Couldn't kill child process (maybe already dead?):", e)
+                            except PermissionError as e:
+                                print_l("WARNING: Couldn't kill child process (insufficient privilege?):", e)
                                 print_l("Try running the harness as an Administrator.")
+                            except OSError as e:
+                                print_l("WARNING: Couldn't kill child process (maybe already dead?):", e)
             except FileNotFoundError:
                 print_l("The PID file was missing so we couldn't kill the child process.")
                 print_l("Most likely this is due to a server crash.")
