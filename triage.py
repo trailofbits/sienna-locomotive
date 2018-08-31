@@ -89,7 +89,21 @@ class TriageExport:
         self.exportDir = path
         self.process()
 
-
+    @staticmethod
+    def checksecToExploitabilityRank(targetPath):
+        checksec = db.Checksec.byExecutable(targetPath)
+        if checksec==None:
+            return 0
+        attrmap = {
+            'aslr'              : 1,
+            'authenticode'      : 0,
+            'cfg'               : 1,
+            'dynamicBase'       : 1,  # maybe 0?
+            'forceIntegrity'    : 0,
+            'gs'                : 1,
+            'highEntropyVA'     : 0,
+            'nx'                : 1,
+        }
 if __name__ == '__main__':
 
     outdir = r"f:\2"

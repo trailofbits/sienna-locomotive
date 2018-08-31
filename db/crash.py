@@ -66,6 +66,14 @@ class Crash(Base):
     minidumpPath                = Column( String(270) )
     ## Path to target (PUT)
     targetPath                  = Column( String(270) )
+    ## RAX
+    rax                         = Column( String(20) )
+    ## RBX
+    rbx                         = Column( String(20) )
+    ## RCX
+    rcx                         = Column( String(20) )
+    ## RDX
+    rdx                         = Column( String(20) )
     ## Integer version of exploitability (0-4, inclusive)
     rank                        = Column( Integer  )
     ## A colon separated list of each engines exploitability.  For example 1:2:2
@@ -76,6 +84,8 @@ class Crash(Base):
     tag                         = Column( String(128) )
     ## Foreign key to tracer results
     tracer                      = relationship(  "Tracer", order_by=db.Tracer.runid, back_populates="crash", uselist=False)
+    ## Summary of triage information
+    triage                      = Column( String )
     ## Pickled object version of json object
     obj                         = Column( PickleType )
     ## Timestamp of the crash
@@ -114,6 +124,16 @@ class Crash(Base):
             self.ranks                      = self.obj["ranks"]
             ## A colon separated list of each engines exploitability.  For example 1:2:2
             self.ranksString                = self.ranksStringGenerate()
+            ## Summary of triage information
+            self.triage                     = j["triage"]
+            ## RAX
+            self.rax                        = hex(j['rax'])
+            ## RBX
+            self.rbx                        = hex(j['rbx'])
+            ## RCX
+            self.rcx                        = hex(j['rcx'])
+            ## RDX
+            self.rdx                        = hex(j['rdx'])
 
 
         except KeyError:

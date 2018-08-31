@@ -117,6 +117,7 @@ void Triage::processEngine(Xploitability& x) {
         cout << "Processing engine: " << x.name() << endl;
         const auto result   = x.process();
         results_.push_back( result );
+        cout << result << endl;
     } catch( string& x1 ) {
         cerr << x1 << endl;
     } catch( exception& x2 ) {
@@ -295,6 +296,7 @@ const string Triage::minidumpPath() const {
 // toJson()
 //      Converts a Triage object into a json object for persistence
 json Triage::toJson() const {
+    auto ctx = xploitabilityEngine_->getContext();
     return json{
         { "crashReason",        crashReason() },
         { "crashAddress",       crashAddress() },
@@ -306,7 +308,12 @@ json Triage::toJson() const {
         { "ranks",              ranks() },
         { "rank",               exploitabilityRank() },
         { "instructionPointer", instructionPointer() },
-        { "stackPointer",       stackPointer() }
+        { "stackPointer",       stackPointer() },
+        { "triage",             xploitabilityEngine_->str() },
+        { "rax",                ctx->rax },
+        { "rbx",                ctx->rbx },
+        { "rcx",                ctx->rcx },
+        { "rdx",                ctx->rdx },
     };
 }
 

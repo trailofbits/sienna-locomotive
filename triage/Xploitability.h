@@ -61,10 +61,11 @@ public:
 
     bool            isExceptionAddressInUser() const;
     bool            isExceptionAddressNearNull() const;
+    const MDRawContextAMD64*    getContext() const;
+    const string                name() const                { return name_; };
+    const uint64_t              instructionPointer() const  { return instructionPtr_; };
+    const uint64_t              stackPointer() const        { return stackPtr_; };
 
-    const string    name() const                { return name_; };
-    const uint64_t  instructionPointer() const  { return instructionPtr_; };
-    const uint64_t  stackPointer() const        { return stackPtr_; };
 
     friend ostream& operator<<( ostream& os,  Xploitability& result );
     string str( ) const;

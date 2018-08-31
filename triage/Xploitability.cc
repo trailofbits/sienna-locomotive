@@ -52,9 +52,14 @@ string Xploitability::str() const {
 
 static string polybase( uint64_t addr ) {
     ostringstream oss;
-    oss << "0x" << hex << addr;    
+    oss << "0x" << hex << addr;
     oss << " (" << dec << ")" << addr;
     return oss.str();
+}
+
+
+const MDRawContextAMD64* Xploitability::getContext() const {
+    return context_->GetContextAMD64();
 }
 
 ostream& operator<<( ostream& os, Xploitability& self ) {
@@ -62,7 +67,7 @@ ostream& operator<<( ostream& os, Xploitability& self ) {
     os << "ip           : " <<polybase( self.instructionPointer() ) << endl;
     os << "stackPtr     : " <<polybase( self.stackPointer() ) << endl;
     os << "rip          : " <<polybase( ctx->rip ) << endl;
-    os << "rsp          : " <<polybase( ctx->rsp ) << endl;    
+    os << "rsp          : " <<polybase( ctx->rsp ) << endl;
     os << "crash_address: " <<polybase( self.process_state_->crash_address() ) << endl;
     return os;
 }
@@ -70,60 +75,60 @@ ostream& operator<<( ostream& os, Xploitability& self ) {
 
 ////////////////////////////////////////////////////////////////////////////
 // Xploitability()
-//      Main container for things 
+//      Main container for things
 Xploitability::Xploitability( Minidump* dmp, ProcessState* state, const string moduleName )
         : Exploitability(dmp, state), name_(moduleName) {
 
-    
+
     MinidumpException* exception = dump_->GetException();
     if (!exception) {
         cout << " no exc rec" << endl;
         throw "No Exception record";
     }
 
-    
+
     rawException_ = exception->exception();
     if  (!rawException_) {
         throw "Can't get raw exception";
     }
-    
+
 
     context_ = exception->GetContext();
     if (!context_) {
         throw "Can't get context";
     }
-    
-    memoryList_ = dump_->GetMemoryList();    
-    if (!memoryList_) {        
+
+    memoryList_ = dump_->GetMemoryList();
+    if (!memoryList_) {
         memoryAvailable_ = false;
     }
 
     exceptionCode_ = rawException_->exception_record.exception_code;
 
-    
+
 
     if (!context_->GetInstructionPointer(&instructionPtr_)) {
         throw "can't get pc";
     }
-    
+
 
     // Getting the stack pointer.
     if (!context_->GetStackPointer(&stackPtr_)) {
         throw "Can't get stack pointer.";
     }
-    
+
 
     if(!memoryAvailable_)
         return;
 
-    
+
 
     size_t bufsz = 15;
     MinidumpMemoryRegion* instrRegion =
         memoryList_->GetMemoryRegionForAddress(instructionPtr_);
     if(!instrRegion)
         return;
-    
+
 
     const uint8_t *rawMem = instrRegion->GetMemory() + bufsz;
     if(!rawMem)
@@ -131,7 +136,7 @@ Xploitability::Xploitability( Minidump* dmp, ProcessState* state, const string m
     disassembler_ = make_unique<DisassemblerX86>(rawMem, bufsz,  instructionPtr_);
 
 
-    
+
 }
 
 
@@ -147,7 +152,7 @@ ExploitabilityRating Xploitability::CheckPlatformExploitability() {
 ////////////////////////////////////////////////////////////////////////////
 bool Xploitability::isExceptionAddressInUser() const {
     // Assuming 64bit
-    return process_state_->crash_address() <= 0x7fffffffffffffff;    
+    return process_state_->crash_address() <= 0x7fffffffffffffff;
 }
 
 ////////////////////////////////////////////////////////////////////////////
