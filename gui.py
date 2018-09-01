@@ -223,7 +223,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 ('RBX',             db.Crash.rbx,                       'rbx', {}),
                 ('RCX',             db.Crash.rcx,                       'rcx', {}),
                 ('RDX',             db.Crash.rdx,                       'rdx', {}),
-                ('Output',          db.Crash.output,                    'output', {}),
             ],
             orderBy=desc(db.Crash.timestamp) )
         self.crashesTable = QTableView()

@@ -204,6 +204,12 @@ class Crash(Base):
         # !exploitable
         cmd = [ cfg.config['triager_path'], dmpPath ]
         out = subprocess.check_output(cmd, shell=False)
+        # TODO: sorry didn't have time to clean this up before leave
+        dirname = os.path.dirname( dmpPath )
+        path = os.path.join(  dirname, "triage.txt" )
+        with open(path, "wb", newline=None) as f:
+            f.write(out)
+
         out = out.decode('utf8')
         j = None
         for line in out.splitlines():
@@ -220,13 +226,6 @@ class Crash(Base):
             print("Unable to process crash json")
             return None
 
-        # TODO: sorry didn't have time to clean this up before leave
-
-        dirname = os.path.dirname( dmpPath )
-        path = os.path.join(  dirname, "triage.txt" )
-        print("XXXXpath", path)
-        with open(path, "w") as f:
-            f.write(out)
 
         ret.mergeTracer()
         ret.reconstructor()
