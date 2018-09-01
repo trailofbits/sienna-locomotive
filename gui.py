@@ -219,11 +219,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 ('Crash Address',   db.Crash.crashAddressString,        'crashAddressString', {}),
                 ('RIP',             db.Crash.instructionPointerString,  'instructionPointerString', {}),
                 ('RSP',             db.Crash.stackPointerString,        'stackPointerString', {}),
+                ('RDI',             db.Crash.rdi,                       'rdi', {}),
+                ('RSI',             db.Crash.rsi,                       'rsi', {}),
+                ('RBP',             db.Crash.rdx,                       'rbp', {}),
                 ('RAX',             db.Crash.rax,                       'rax', {}),
                 ('RBX',             db.Crash.rbx,                       'rbx', {}),
                 ('RCX',             db.Crash.rcx,                       'rcx', {}),
                 ('RDX',             db.Crash.rdx,                       'rdx', {}),
-                ('RBP',             db.Crash.rdx,                       'rbp', {}),
             ],
             orderBy=desc(db.Crash.timestamp) )
         self.crashesTable = QTableView()
