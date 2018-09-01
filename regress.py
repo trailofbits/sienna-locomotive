@@ -12,7 +12,7 @@ import codecs
 
 
 ## Set to true for stdout/stderr
-DEBUG=True
+DEBUG=False
 
 TEST_APPLICATION='build/corpus/test_application/Debug/test_application.exe'
 TRIAGER=r'build\triage\Debug\triager.exe'
