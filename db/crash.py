@@ -85,7 +85,7 @@ class Crash(Base):
     ## Foreign key to tracer results
     tracer                      = relationship(  "Tracer", order_by=db.Tracer.runid, back_populates="crash", uselist=False)
     ## Summary of triage information
-    triage                      = Column( String )
+    output                      = Column( String )
     ## Pickled object version of json object
     obj                         = Column( PickleType )
     ## Timestamp of the crash
@@ -125,7 +125,7 @@ class Crash(Base):
             ## A colon separated list of each engines exploitability.  For example 1:2:2
             self.ranksString                = self.ranksStringGenerate()
             ## Summary of triage information
-            self.triage                     = j["triage"]
+            self.output                     = j["output"]
             ## RAX
             self.rax                        = hex(j['rax'])
             ## RBX
@@ -210,6 +210,7 @@ class Crash(Base):
             line = line.strip()
             if re.match( r"{.*}", line ):
                 j = json.loads(line)
+                j['output'] = out
 
         if not j:
             return None
@@ -218,6 +219,14 @@ class Crash(Base):
         except x:
             print("Unable to process crash json")
             return None
+
+        # TODO: sorry didn't have time to clean this up before leave
+
+        dirname = os.path.dirname( dmpPath )
+        path = os.path.join(  dirname, "triage.txt" )
+        print("XXXXpath", path)
+        with open(path, "w") as f:
+            f.write(out)
 
         ret.mergeTracer()
         ret.reconstructor()

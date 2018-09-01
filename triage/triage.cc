@@ -24,6 +24,9 @@
 #include "google_breakpad/processor/process_state.h"
 #include "google_breakpad/processor/call_stack.h"
 #include "google_breakpad/processor/stack_frame.h"
+#include "stackwalk_common.h"
+
+
 
 
 using namespace std;
@@ -88,6 +91,8 @@ StatusCode Triage::process() {
     cout << "Crashash: " << crashash() << endl;
 
 
+
+
     // There is a bug in Visual Studio that doesn't let you do this the sane way...
     vector< unique_ptr<Xploitability> > engine;
     engine.push_back( make_unique<XploitabilityBreakpad>( &dump_, &state_) );
@@ -102,6 +107,13 @@ StatusCode Triage::process() {
     // fs::path outminidumpPath(dirPath_.string());
     // outminidumpPath.append("triage.json");
     // persist(outminidumpPath.string());
+
+
+    PrintProcessState( state_, true, &resolver_);
+
+
+    const ProcessState& process_state = state_;
+    PrintProcessStateMachineReadable(process_state);
     cout << toJson() << endl;
 
     // It's all good.
