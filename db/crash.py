@@ -66,14 +66,6 @@ class Crash(Base):
     minidumpPath                = Column( String(270) )
     ## Path to target (PUT)
     targetPath                  = Column( String(270) )
-    ## RAX
-    rax                         = Column( String(20) )
-    ## RBX
-    rbx                         = Column( String(20) )
-    ## RCX
-    rcx                         = Column( String(20) )
-    ## RDX
-    rdx                         = Column( String(20) )
     ## Integer version of exploitability (0-4, inclusive)
     rank                        = Column( Integer  )
     ## A colon separated list of each engines exploitability.  For example 1:2:2
@@ -90,6 +82,38 @@ class Crash(Base):
     obj                         = Column( PickleType )
     ## Timestamp of the crash
     timestamp                   = Column( DateTime, default=func.now() )
+    ## register follow
+    cs                          = Column( String(20) )
+    dr0                         = Column( String(20) )
+    dr1                         = Column( String(20) )
+    dr2                         = Column( String(20) )
+    dr3                         = Column( String(20) )
+    dr6                         = Column( String(20) )
+    dr7                         = Column( String(20) )
+    ds                          = Column( String(20) )
+    eflags                      = Column( String(20) )
+    es                          = Column( String(20) )
+    fs                          = Column( String(20) )
+    gs                          = Column( String(20) )
+    mx_csr                      = Column( String(20) )
+    r10                         = Column( String(20) )
+    r11                         = Column( String(20) )
+    r12                         = Column( String(20) )
+    r13                         = Column( String(20) )
+    r14                         = Column( String(20) )
+    r15                         = Column( String(20) )
+    r8                          = Column( String(20) )
+    r9                          = Column( String(20) )
+    rax                         = Column( String(20) )
+    rbp                         = Column( String(20) )
+    rbx                         = Column( String(20) )
+    rcx                         = Column( String(20) )
+    rdi                         = Column( String(20) )
+    rdx                         = Column( String(20) )
+    rip                         = Column( String(20) )
+    rsi                         = Column( String(20) )
+    rsp                         = Column( String(20) )
+    ss                          = Column( String(20) )
 
     ## Constructor for crash object
     # @param runid Run ID of crash
@@ -126,15 +150,12 @@ class Crash(Base):
             self.ranksString                = self.ranksStringGenerate()
             ## Summary of triage information
             self.output                     = j["output"]
-            ## RAX
-            self.rax                        = hex(j['rax'])
-            ## RBX
-            self.rbx                        = hex(j['rbx'])
-            ## RCX
-            self.rcx                        = hex(j['rcx'])
-            ## RDX
-            self.rdx                        = hex(j['rdx'])
-
+            regs = ["cs",  "dr0",  "dr1",  "dr2",  "dr3",  "dr6",  "dr7",  "ds",  "eflags",  "es",
+                    "fs",  "gs",  "mx_csr",  "r10",  "r11",  "r12",  "r13",  "r14",  "r15",  "r8",
+                    "r9",  "rax",  "rbp",  "rbx",  "rcx",  "rdi",  "rdx",  "rip",  "rsi", "rsp",
+                    "ss" ]
+            for reg in regs:
+                setattr( self, reg, hex(j[reg]))
 
         except KeyError:
             raise "Was unable to parse crash json from triager"
