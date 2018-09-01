@@ -217,8 +217,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 ('Ranks',           db.Crash.ranksString,               'ranksString', {}),
                 ('Crashash',        db.Crash.crashash,                  'crashash', {}),
                 ('Crash Address',   db.Crash.crashAddressString,        'crashAddressString', {}),
-                ('IP',              db.Crash.instructionPointerString,  'instructionPointerString', {}),
-                ('Stack Pointer',   db.Crash.stackPointerString,        'stackPointerString', {}),
+                ('RIP',             db.Crash.instructionPointerString,  'instructionPointerString', {}),
+                ('RSP',             db.Crash.stackPointerString,        'stackPointerString', {}),
                 ('RAX',             db.Crash.rax,                       'rax', {}),
                 ('RBX',             db.Crash.rbx,                       'rbx', {}),
                 ('RCX',             db.Crash.rcx,                       'rcx', {}),
@@ -232,6 +232,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.crashesTable.horizontalHeader().setStretchLastSection(True)
         self.crashesTable.resizeColumnsToContents()
         self.crashesTable.show()
+        self.crashesTable.clicked.connect( self.crashClicked )
+
+
+        # Crash Browser, details about a crash
+        self.crashBrowser = QTextBrowser()
+        self.crashBrowser.setText("<NO CRASH SELECTED>")
+        self.crashBrowser.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+        self._layout.addWidget(self.crashBrowser)
 
 
         self.statsWidget = gui.stats.StatsWidget()
@@ -546,6 +554,16 @@ class MainWindow(QtWidgets.QMainWindow):
         triageExporter = triage.TriageExport(path)
         triageExporter.export()
         os.startfile(path)
+
+    ## Clicked on Crash
+    # When a cell is clicked in the crashes table, find the row
+    # and update the Crash browser to show triage.txt
+    def crashClicked( self, a):
+        row = a.row()
+        col = a.column()
+        data = a.data( Qt.UserRole )
+        crash = db.Crash.factory(data.runid)
+        self.crashBrowser.setText(crash.output)
 
 
 if __name__ == '__main__':

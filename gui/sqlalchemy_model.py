@@ -91,16 +91,18 @@ class SqlalchemyModel(QSqlTableModel):
     def data(self, index, role ):
         # If we return stuff on other roles we get weird
         # check boxes in the cells
-        if role!=Qt.DisplayRole:
-            return None
+        if role==Qt.DisplayRole:
+            row = self.rows[ index.row() ]
+            name = self.cols[ index.column() ][2]
 
+            ret = getattr(  row, name )
+            ret = str(ret)
+            return ret
+        ## This the custom role when a user clicks, return the entire row
+        if role==Qt.UserRole:
+            return self.rows[ index.row() ]
 
-        row = self.rows[ index.row() ]
-        name = self.cols[ index.column() ][2]
-
-        ret = getattr(  row, name )
-        ret = str(ret)
-        return ret
+        return  None
 
     ## Unimplemented but should be used to click on column header and sort
     def sort( self, col, order ):
