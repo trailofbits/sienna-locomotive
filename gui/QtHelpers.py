@@ -1,5 +1,6 @@
 from PySide2.QtCore import QObject, Signal
 
+
 class QIntVariable(QObject):
     valueChanged = Signal(int)
 
