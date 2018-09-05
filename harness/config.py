@@ -7,12 +7,11 @@
 # config file, use those instead.
 
 
-import os
-import sys
 import argparse
 import configparser
+import os
 import shlex
-
+import sys
 
 ## Schematizes the SL2 configuration.
 # Every configuration key has a 'test' function, an 'expected'
@@ -24,11 +23,11 @@ CONFIG_SCHEMA = {}
 
 # Increment this version number for any changes that might break backwards compatibilty.
 # This could be database schema changes, paths, file glob patterns, etc..
-VERSION=8
+VERSION = 8
 
 PATH_KEYS = ['drrun_path', 'client_path', 'server_path', 'wizard_path', 'tracer_path', 'triager_path']
 ARGS_KEYS = ['drrun_args', 'client_args', 'server_args', 'target_args']
-INT_KEYS = ['runs', 'simultaneous', 'fuzz_timeout', 'tracer_timeout', 'seed', 'verbose', 'function_number' ]
+INT_KEYS = ['runs', 'simultaneous', 'fuzz_timeout', 'tracer_timeout', 'seed', 'verbose', 'function_number']
 FLAG_KEYS = ['debug', 'nopersist', 'continuous', 'exit_early', 'inline_stdout', 'preserve_runs']
 
 profile = 'DEFAULT'
@@ -267,13 +266,14 @@ def set_profile(new_profile):
     global profile
     try:
         config = dict(_config[new_profile])
-    except Exception as e:
+    except:
         print("ERROR: No such profile:", new_profile)
         sys.exit()
 
     profile = new_profile
     update_config_from_args()
     validate_config()
+
 
 ## Creates a default profile configuration
 # @param name String name of configuration context
@@ -293,7 +293,7 @@ def create_new_profile(name, dynamorio_exe, build_dir, target_path, target_args)
         'wizard_path': os.path.join(build_dir, 'wizard\\Debug\\wizard.dll'),
         'tracer_path': os.path.join(build_dir, 'tracer_dynamorio\\Debug\\tracer.dll'),
         'triager_path': os.path.join(build_dir, 'triage\\Debug\\triager.exe'),
-        'checksec_path': os.path.join(build_dir, r'winchecksec\Debug\winchecksec.exe' ),
+        'checksec_path': os.path.join(build_dir, r'winchecksec\Debug\winchecksec.exe'),
         'target_application_path': target_path,
         'target_args': target_args,
         'runs': 1,
@@ -302,8 +302,9 @@ def create_new_profile(name, dynamorio_exe, build_dir, target_path, target_args)
         'inline_stdout': False,
     }
 
-    with open(sl2_config_path, 'w') as configfile:
-        _config.write(configfile)
+    with open(sl2_config_path, 'w') as config_file:
+        _config.write(config_file)
+
 
 ## Merges command line arguments into configuration
 def update_config_from_args():
@@ -351,6 +352,7 @@ def update_config_from_args():
             print("WARNING: Replacing UNC Path", config[key], "with", extension)
             config[key] = extension
 
+
 ## Sanity check for configuration
 def validate_config():
     """
@@ -374,4 +376,5 @@ set_profile(args.profile)
 
 if __name__ == '__main__':
     from pprint import pprint
+
     pprint(config)

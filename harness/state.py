@@ -2,16 +2,18 @@
 Helper functions for reading and writing files to manage the fuzzing lifecycle
 Imports harness/config.py for argument and config file handling.
 """
-import os
 import glob
-import re
 import json
-import msgpack
-import uuid
+import os
 import random
-from hashlib import sha1
+import re
+import uuid
 from csv import DictWriter
+from hashlib import sha1
 from typing import NamedTuple
+
+import msgpack
+
 import db
 from . import config
 
