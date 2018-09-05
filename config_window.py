@@ -1,8 +1,8 @@
+import os
 
-from PySide2.QtWidgets import QFileDialog, QStyle
 from PySide2 import QtWidgets
 from PySide2.QtCore import Qt, QSize
-import os
+from PySide2.QtWidgets import QFileDialog, QStyle
 
 from harness import config
 
@@ -71,7 +71,8 @@ class ConfigWindow(QtWidgets.QDialog):
         icon = self.style().standardIcon(QStyle.SP_MessageBoxWarning)
         self.bad_dr_path_warning = QtWidgets.QLabel()
         self.bad_dr_path_warning.setPixmap(icon.pixmap(32, 32))
-        self.bad_dr_path_warning.setToolTip("This path doesn't look quite right. It might be invalid, or drrun.exe may have been moved?")
+        self.bad_dr_path_warning.setToolTip(
+            "This path doesn't look quite right. It might be invalid, or drrun.exe may have been moved?")
         self.bad_dr_path_warning.hide()
 
         icon = self.style().standardIcon(QStyle.SP_MessageBoxCritical)
@@ -134,7 +135,8 @@ class ConfigWindow(QtWidgets.QDialog):
         if len(self.target_path.text()) == 0:
             QtWidgets.QMessageBox.critical(self, "Invalid Path", "Target application path cannot be empty")
             return
-        config.create_new_profile(name, os.path.normpath(self.drrun_path.text()), os.path.normpath(self.build_dir.text()),
+        config.create_new_profile(name, os.path.normpath(self.drrun_path.text()),
+                                  os.path.normpath(self.build_dir.text()),
                                   os.path.normpath(self.target_path.text()), self.target_args.text())
 
         self.profiles.clear()
@@ -183,7 +185,8 @@ class ConfigWindow(QtWidgets.QDialog):
                 missing.append(path)
         if len(missing) > 0:
             self.bad_build_dir_warning.show()
-            self.bad_build_dir_warning.setToolTip("This build root is missing some expected child paths: " + '\n'.join(missing))
+            self.bad_build_dir_warning.setToolTip(
+                "This build root is missing some expected child paths: " + '\n'.join(missing))
         else:
             self.bad_build_dir_warning.hide()
 

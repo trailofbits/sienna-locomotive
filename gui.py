@@ -2,18 +2,24 @@
 ## @package gui
 # Code for the QT gui
 
+import os
+import sys
+import time
+from functools import partial
+from multiprocessing import cpu_count
+
 from PySide2 import QtWidgets
 from PySide2.QtCore import *
 from PySide2.QtGui import QFontDatabase, QMovie, QStandardItem, QBrush, QColor
 from PySide2.QtWidgets import *
-from multiprocessing import cpu_count
 from sqlalchemy import desc
-import db
-import json
-import os
-import sys
-import time
 
+import db
+import gui.stats
+import triage
+from config_window import ConfigWindow
+from gui import sqlalchemy_model
+from gui.QtHelpers import QIntVariable, QFloatVariable, QTextAdapter
 from gui.checkbox_tree import (
     CheckboxTreeWidget,
     CheckboxTreeWidgetItem,
@@ -21,18 +27,9 @@ from gui.checkbox_tree import (
     CheckboxTreeSortFilterProxyModel,
     ComboboxTreeItemDelegate,
     mode_labels)
-from gui.QtHelpers import QIntVariable, QFloatVariable, QTextAdapter
-
 from harness import config
 from harness.state import get_target, export_crash_data_to_csv
 from harness.threads import WizardThread, FuzzerThread, ServerThread
-from functools import partial
-from gui import sqlalchemy_model
-
-import gui.stats
-
-from config_window import ConfigWindow
-import triage
 
 
 ##
@@ -48,7 +45,6 @@ class MainWindow(QtWidgets.QMainWindow):
         # Select config profile before starting
         self.cfg = ConfigWindow()
         self.cfg.exec()
-
 
         # Set up basic window
         self.setWindowTitle("Sienna Locomotive 2")
@@ -66,20 +62,18 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # CREATE WIDGETS #
 
-
         # Target info
         self.targetStatus = QtWidgets.QStatusBar()
 
         targetPath = config.config['target_application_path']
-        checksec = db.Checksec.byExecutable( targetPath )
-        targetString = "Target: {}\t Protections: {}".format( targetPath, checksec.shortString()  )
+        checksec = db.Checksec.byExecutable(targetPath)
+        targetString = "Target: {}\t Protections: {}".format(targetPath, checksec.shortString())
 
-        self.targetLabel =  QtWidgets.QLabel(targetString)
+        self.targetLabel = QtWidgets.QLabel(targetString)
         self.targetStatus.addWidget(self.targetLabel)
         self._layout.addWidget(self.targetStatus)
 
         # Create wizard button
-
 
         self.wizard_button = QtWidgets.QPushButton("Run Wizard")
         self._layout.addWidget(self.wizard_button)
@@ -160,7 +154,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Create spinbox for controlling simultaneous fuzzing instances
         self.thread_count = QtWidgets.QSpinBox()
         self.thread_count.setSuffix(" threads")
-        self.thread_count.setRange(1, 2*cpu_count())
+        self.thread_count.setRange(1, 2 * cpu_count())
         if 'simultaneous' in config.config:
             self.thread_count.setValue(config.config['simultaneous'])
 
@@ -177,7 +171,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.fuzz_controls_outer_layout = QtWidgets.QHBoxLayout()
         self.fuzz_controls_inner_left = QtWidgets.QVBoxLayout()
         self.fuzz_controls_inner_right = QtWidgets.QVBoxLayout()
-
 
         # Add widgets to left, right, and expanded layouts
         self.fuzz_controls_inner_left.addLayout(self.filter_layout)
@@ -196,7 +189,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.extension_layout.addWidget(QtWidgets.QLabel("Verbose:"), 1, 3, 1, 1, Qt.AlignRight)
         self.extension_layout.addWidget(self.verboseCheckBox, 1, 4, 1, 1, Qt.AlignLeft)
 
-
         self.fuzz_controls_inner_right.addWidget(self.expand_button)
 
         # Compose layouts
@@ -210,24 +202,24 @@ class MainWindow(QtWidgets.QMainWindow):
             session,
             db.Crash,
             [
-                ('Time',            db.Crash.timestamp,                 'timestamp', {}),
-                ('RunID',           db.Crash.runid,                     'runid', {} ),
-                ('Reason',          db.Crash.crashReason,               'crashReason', {}),
-                ('Exploitability',  db.Crash.exploitability,            'exploitability', {}),
-                ('Ranks',           db.Crash.ranksString,               'ranksString', {}),
-                ('Crashash',        db.Crash.crashash,                  'crashash', {}),
-                ('Crash Address',   db.Crash.crashAddressString,        'crashAddressString', {}),
-                ('RIP',             db.Crash.instructionPointerString,  'instructionPointerString', {}),
-                ('RSP',             db.Crash.stackPointerString,        'stackPointerString', {}),
-                ('RDI',             db.Crash.rdi,                       'rdi', {}),
-                ('RSI',             db.Crash.rsi,                       'rsi', {}),
-                ('RBP',             db.Crash.rdx,                       'rbp', {}),
-                ('RAX',             db.Crash.rax,                       'rax', {}),
-                ('RBX',             db.Crash.rbx,                       'rbx', {}),
-                ('RCX',             db.Crash.rcx,                       'rcx', {}),
-                ('RDX',             db.Crash.rdx,                       'rdx', {}),
+                ('Time', db.Crash.timestamp, 'timestamp', {}),
+                ('RunID', db.Crash.runid, 'runid', {}),
+                ('Reason', db.Crash.crashReason, 'crashReason', {}),
+                ('Exploitability', db.Crash.exploitability, 'exploitability', {}),
+                ('Ranks', db.Crash.ranksString, 'ranksString', {}),
+                ('Crashash', db.Crash.crashash, 'crashash', {}),
+                ('Crash Address', db.Crash.crashAddressString, 'crashAddressString', {}),
+                ('RIP', db.Crash.instructionPointerString, 'instructionPointerString', {}),
+                ('RSP', db.Crash.stackPointerString, 'stackPointerString', {}),
+                ('RDI', db.Crash.rdi, 'rdi', {}),
+                ('RSI', db.Crash.rsi, 'rsi', {}),
+                ('RBP', db.Crash.rdx, 'rbp', {}),
+                ('RAX', db.Crash.rax, 'rax', {}),
+                ('RBX', db.Crash.rbx, 'rbx', {}),
+                ('RCX', db.Crash.rcx, 'rcx', {}),
+                ('RDX', db.Crash.rdx, 'rdx', {}),
             ],
-            orderBy=desc(db.Crash.timestamp) )
+            orderBy=desc(db.Crash.timestamp))
         self.crashesTable = QTableView()
         self.crashesTable.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self.crashesTable.setModel(self.crashesModel)
@@ -235,8 +227,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.crashesTable.horizontalHeader().setStretchLastSection(True)
         self.crashesTable.resizeColumnsToContents()
         self.crashesTable.show()
-        self.crashesTable.clicked.connect( self.crashClicked )
-
+        self.crashesTable.clicked.connect(self.crashClicked)
 
         # Crash Browser, details about a crash
         self.crashBrowser = QTextBrowser()
@@ -244,11 +235,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.crashBrowser.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self._layout.addWidget(self.crashBrowser)
 
-
         self.statsWidget = gui.stats.StatsWidget()
         self._layout.addWidget(self.statsWidget)
-
-
 
         # Set up stop button (and hide it)
         self.stop_button = QtWidgets.QPushButton("Stop Fuzzing")
@@ -399,7 +387,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.crashes.append(crash)
         if not thread.should_fuzz:
             self.pause_all_threads()
-        #self.triage_output.append(str(crash))
+        # self.triage_output.append(str(crash))
         self.crashes.append(crash)
 
     def handle_server_crash(self):
@@ -421,9 +409,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.model.horizontalHeaderItem(0).setToolTip("The name of a fuzzable function")
         self.model.horizontalHeaderItem(1).setToolTip("The name of the file (if any) the function tried to read")
-        self.model.horizontalHeaderItem(2).setToolTip("The bytes in the file that the program tried to read (if available)")
+        self.model.horizontalHeaderItem(2).setToolTip(
+            "The bytes in the file that the program tried to read (if available)")
         self.model.horizontalHeaderItem(3).setToolTip("The order in which the wizard encountered this function")
-        self.model.horizontalHeaderItem(4).setToolTip("Which part of the program called this function. .exe modules are generally the most promising")
+        self.model.horizontalHeaderItem(4).setToolTip(
+            "Which part of the program called this function. .exe modules are generally the most promising")
         self.model.horizontalHeaderItem(5).setToolTip("How we re-identify whether we're calling this function again")
 
         for index, option in enumerate(self.target_data):
@@ -440,10 +430,11 @@ class MainWindow(QtWidgets.QMainWindow):
             add = []
             hx = []
             asc = []
-            for address in range(0, min(len(option["buffer"]), 16*5), 16):
+            for address in range(0, min(len(option["buffer"]), 16 * 5), 16):
                 add.append("0x%04X" % address)
                 hx.append(" ".join("{:02X}".format(c) for c in option["buffer"][address:address + 16]))
-                asc.append("".join((chr(c) if c in range(31, 127) else '.') for c in option["buffer"][address:address + 16]))
+                asc.append(
+                    "".join((chr(c) if c in range(31, 127) else '.') for c in option["buffer"][address:address + 16]))
             addr = QStandardItem('\n'.join(add))
             hexstr = QStandardItem('\n'.join(hx))
             asciistr = QStandardItem('\n'.join(asc))
@@ -454,7 +445,6 @@ class MainWindow(QtWidgets.QMainWindow):
             hexstr.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
             asciistr.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
             funcname_widget.appendRow([addr, hexstr, asciistr])
-
 
             idx_widget = QStandardItem(str(index))
             idx_widget.setEditable(False)
@@ -495,9 +485,9 @@ class MainWindow(QtWidgets.QMainWindow):
         """ Get the indices in the root model of all the visible items in the tree view """
         for row in range(self.module_proxy_model.rowCount()):
             yield self.func_proxy_model.mapToSource(
-                        self.file_proxy_model.mapToSource(
-                            self.module_proxy_model.mapToSource(
-                                self.module_proxy_model.index(row, 0))))
+                self.file_proxy_model.mapToSource(
+                    self.module_proxy_model.mapToSource(
+                        self.module_proxy_model.index(row, 0))))
 
     def check_all(self):
         """ Check all the visible boxes in the tree view """
@@ -550,9 +540,8 @@ class MainWindow(QtWidgets.QMainWindow):
         config.config['verbose'] = 2 if state else False
 
     def triageExportGui(self):
-
         path = QFileDialog.getExistingDirectory(dir=".")
-        if len(path)==0:
+        if len(path) == 0:
             return
         triageExporter = triage.TriageExport(path)
         triageExporter.export()
@@ -561,10 +550,9 @@ class MainWindow(QtWidgets.QMainWindow):
     ## Clicked on Crash
     # When a cell is clicked in the crashes table, find the row
     # and update the Crash browser to show triage.txt
-    def crashClicked( self, a):
-        row = a.row()
-        col = a.column()
-        data = a.data( Qt.UserRole )
+    def crashClicked(self, a):
+        # row, col = a.row(), a.column()
+        data = a.data(Qt.UserRole)
         crash = db.Crash.factory(data.runid)
         self.crashBrowser.setText(crash.output)
 

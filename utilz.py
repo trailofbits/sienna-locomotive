@@ -7,7 +7,5 @@ import re
 # @param s strings to sanitize
 # @return sanitized string
 def sanitizeString(s):
-    ret = s
-    ret = re.sub( r"[^a-zA-Z0-9\._]+", "_", ret )
-    ret = re.sub( r"_+", "_", ret )
-    return s
+    ret = re.sub(r"[^a-zA-Z0-9._]+", "_", s)
+    return re.sub(r"_+", "_", ret)
