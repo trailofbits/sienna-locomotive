@@ -6,10 +6,8 @@
 # info in the database
 
 from sqlalchemy import *
-from sqlalchemy import ForeignKey
 from sqlalchemy import orm
 from sqlalchemy.orm import relationship
-import glob
 import harness.config
 import json
 import os
@@ -46,74 +44,73 @@ import db
 #     'tag': 'None/EXCEPTION_BREAKPOINT/f96808cfc4798256'
 # </pre>
 class Crash(Base):
-
     __tablename__ = "crash"
 
-    id                          = Column( Integer, primary_key=True )
+    id = Column(Integer, primary_key=True)
     ## Runid for the crash
-    runid                       = Column( String(40)  )
+    runid = Column(String(40))
     ## Crash address as hex string
-    crashAddressString          = Column( String(20) )
+    crashAddressString = Column(String(20))
     ## Textual description of crash reason
-    crashReason                 = Column( String(270) )
+    crashReason = Column(String(270))
     ## Crashash (Crash Hash).  Identifier for binning related crashes
-    crashash                    = Column( String(64) )
+    crashash = Column(String(64))
     ## Text string description of Exploitability. Can be High, Medium, Low, Unknown, or None.
-    exploitability              = Column( String(32) )
+    exploitability = Column(String(32))
     ## Instruction Pointer (pc, eip, rep) as hex string
-    instructionPointerString    = Column( String(20) )
+    instructionPointerString = Column(String(20))
     ## Path to minidump for crash
-    minidumpPath                = Column( String(270) )
+    minidumpPath = Column(String(270))
     ## Path to target (PUT)
-    targetPath                  = Column( String(270) )
+    targetPath = Column(String(270))
     ## Integer version of exploitability (0-4, inclusive)
-    rank                        = Column( Integer  )
+    rank = Column(Integer)
     ## A colon separated list of each engines exploitability.  For example 1:2:2
-    ranksString                 = Column( String(8)  )
+    ranksString = Column(String(8))
     ## Stack pointer (rsp) at crash as hex string
-    stackPointerString          = Column( String(20) )
+    stackPointerString = Column(String(20))
     ## Tag or path used to succinctly describe crash bin
-    tag                         = Column( String(128) )
+    tag = Column(String(128))
     ## Foreign key to tracer results
-    tracer                      = relationship(  "Tracer", order_by=db.Tracer.runid, back_populates="crash", uselist=False)
+    tracer = relationship("Tracer", order_by=db.Tracer.runid, back_populates="crash", uselist=False)
     ## Summary of triage information
-    output                      = Column( String )
+    output = Column(String)
     ## Pickled object version of json object
-    obj                         = Column( PickleType )
+    obj = Column(PickleType)
     ## Timestamp of the crash
-    timestamp                   = Column( DateTime, default=func.now() )
+    timestamp = Column(DateTime, default=func.now())
     ## register follow
-    cs                          = Column( String(20) )
-    dr0                         = Column( String(20) )
-    dr1                         = Column( String(20) )
-    dr2                         = Column( String(20) )
-    dr3                         = Column( String(20) )
-    dr6                         = Column( String(20) )
-    dr7                         = Column( String(20) )
-    ds                          = Column( String(20) )
-    eflags                      = Column( String(20) )
-    es                          = Column( String(20) )
-    fs                          = Column( String(20) )
-    gs                          = Column( String(20) )
-    mx_csr                      = Column( String(20) )
-    r10                         = Column( String(20) )
-    r11                         = Column( String(20) )
-    r12                         = Column( String(20) )
-    r13                         = Column( String(20) )
-    r14                         = Column( String(20) )
-    r15                         = Column( String(20) )
-    r8                          = Column( String(20) )
-    r9                          = Column( String(20) )
-    rax                         = Column( String(20) )
-    rbp                         = Column( String(20) )
-    rbx                         = Column( String(20) )
-    rcx                         = Column( String(20) )
-    rdi                         = Column( String(20) )
-    rdx                         = Column( String(20) )
-    rip                         = Column( String(20) )
-    rsi                         = Column( String(20) )
-    rsp                         = Column( String(20) )
-    ss                          = Column( String(20) )
+    cs = Column(String(20))
+    dr0 = Column(String(20))
+    dr1 = Column(String(20))
+    dr2 = Column(String(20))
+    dr3 = Column(String(20))
+    dr6 = Column(String(20))
+    dr7 = Column(String(20))
+    ds = Column(String(20))
+    eflags = Column(String(20))
+    es = Column(String(20))
+    fs = Column(String(20))
+    gs = Column(String(20))
+    mx_csr = Column(String(20))
+    r10 = Column(String(20))
+    r11 = Column(String(20))
+    r12 = Column(String(20))
+    r13 = Column(String(20))
+    r14 = Column(String(20))
+    r15 = Column(String(20))
+    r8 = Column(String(20))
+    r9 = Column(String(20))
+    rax = Column(String(20))
+    rbp = Column(String(20))
+    rbx = Column(String(20))
+    rcx = Column(String(20))
+    rdi = Column(String(20))
+    rdx = Column(String(20))
+    rip = Column(String(20))
+    rsi = Column(String(20))
+    rsp = Column(String(20))
+    ss = Column(String(20))
 
     ## Constructor for crash object
     # @param runid Run ID of crash
@@ -121,57 +118,61 @@ class Crash(Base):
     def __init__(self, j, runid=None, targetPath=None):
         try:
 
-            self.runid                      = runid
+            self.runid = runid
             ## Json object
-            self.obj                        = j
+            self.obj = j
+
+            self.stackPointer = self.obj["stackPointer"]
+            self.crashAddress = self.obj["crashAddress"]
+            self.instructionPointer = self.obj["instructionPointer"]
+
             ## Crash address as hex string
-            self.crashAddressString         = hex(j["crashAddress"])
+            self.crashAddressString = hex(j["crashAddress"])
             ## Textual description of crash reason
-            self.crashReason                = j["crashReason"]
+            self.crashReason = j["crashReason"]
             ## Crashash (Crash Hash).  Identifier for binning related crashes
-            self.crashash                   = j["crashash"]
+            self.crashash = j["crashash"]
             ## Text string description of Exploitability. Can be High, Medium, Low, Unknown, or None.
-            self.exploitability             = j["exploitability"]
+            self.exploitability = j["exploitability"]
             ## Instruction Pointer (pc, eip, rep) as hex string
-            self.instructionPointerString   = hex(j["instructionPointer"])
+            self.instructionPointerString = hex(j["instructionPointer"])
             ## Path to minidump for crash
-            self.minidumpPath               = j["minidumpPath"]
+            self.minidumpPath = j["minidumpPath"]
             ## Path to minidump for crash
-            self.targetPath                 = targetPath
+            self.targetPath = targetPath
             ## Integer version of exploitability (0-4, inclusive)
-            self.rank                       = j["rank"]
+            self.rank = j["rank"]
             ## Stack pointer (rsp) at crash as hex string
-            self.stackPointerString         = hex(j["stackPointer"])
+            self.stackPointerString = hex(j["stackPointer"])
             ## Tag or path used to succinctly describe crash bin
-            self.tag                        = j["tag"]
+            self.tag = j["tag"]
             ## List of each engines exploitability.  For example [1,2,2]
-            self.ranks                      = self.obj["ranks"]
+            self.ranks = self.obj["ranks"]
             ## A colon separated list of each engines exploitability.  For example 1:2:2
-            self.ranksString                = self.ranksStringGenerate()
+            self.ranksString = self.ranksStringGenerate()
             ## Summary of triage information
-            self.output                     = j["output"]
-            regs = ["cs",  "dr0",  "dr1",  "dr2",  "dr3",  "dr6",  "dr7",  "ds",  "eflags",  "es",
-                    "fs",  "gs",  "mx_csr",  "r10",  "r11",  "r12",  "r13",  "r14",  "r15",  "r8",
-                    "r9",  "rax",  "rbp",  "rbx",  "rcx",  "rdi",  "rdx",  "rip",  "rsi", "rsp",
-                    "ss" ]
+            self.output = j["output"]
+            regs = ["cs", "dr0", "dr1", "dr2", "dr3", "dr6", "dr7", "ds", "eflags", "es",
+                    "fs", "gs", "mx_csr", "r10", "r11", "r12", "r13", "r14", "r15", "r8",
+                    "r9", "rax", "rbp", "rbx", "rcx", "rdi", "rdx", "rip", "rsi", "rsp",
+                    "ss"]
             for reg in regs:
-                setattr( self, reg, hex(j[reg]))
+                setattr(self, reg, hex(j[reg]))
 
         except KeyError:
-            raise "Was unable to parse crash json from triager"
-
+            raise Exception("Was unable to parse crash json from triager")
 
     ## Converts integer rank to exploitability string
     # @param rank integer rank
     # @return string
     @staticmethod
     def rankToExploitability(rank):
-        xploitabilities = [ 'None', 'Unknown', 'Low', 'Medium', 'High ']
+        xploitabilities = ['None', 'Unknown', 'Low', 'Medium', 'High ']
         return xploitabilities[rank]
 
     ## Merges results from tracer db row
     # See if there is a tracer result for this runid
-    def mergeTracer( self ):
+    def mergeTracer(self):
         tracer = db.Tracer.factory(self.runid)
         if not tracer:
             self.tracer = None
@@ -181,9 +182,9 @@ class Crash(Base):
     ## Reconstructs Crash object from database after it loads
     @orm.reconstructor
     def reconstructor(self):
-        self.stackPointer           = self.obj["stackPointer"]
-        self.crashAddress           = self.obj["crashAddress"]
-        self.instructionPointer     = self.obj["instructionPointer"]
+        self.stackPointer = self.obj["stackPointer"]
+        self.crashAddress = self.obj["crashAddress"]
+        self.instructionPointer = self.obj["instructionPointer"]
 
         if hasattr(self, 'ranks'):
             if self.tracer:
@@ -191,13 +192,13 @@ class Crash(Base):
 
             self.rank = max(self.ranks)
             self.exploitability = Crash.rankToExploitability(self.rank)
-            self.ranksString                = self.ranksStringGenerate()
+            self.ranksString = self.ranksStringGenerate()
 
     ## Returns all the crashes in the db as Crash objects
     @staticmethod
     def getAll():
         session = db.getSession()
-        return session.query( Crash ).all()
+        return session.query(Crash).all()
 
     ## Factory for crash object by runid
     # Factory for generating triage and exploitability information about a minidump. If
@@ -206,11 +207,11 @@ class Crash(Base):
     # @param dmpPath string path to minidump file
     # @return Crash object
     @staticmethod
-    def factory( runid, targetPath=None ):
+    def factory(runid, targetPath=None):
         cfg = harness.config
         session = db.getSession()
         runid = str(runid)
-        ret = session.query( Crash ).filter( Crash.runid==runid ).first()
+        ret = session.query(Crash).filter(Crash.runid == runid).first()
         if ret:
             return ret
 
@@ -223,11 +224,11 @@ class Crash(Base):
         # Runs triager, which will give us exploitability info
         # using 2 engines: Google's breakpad and an reimplementation of Microsofts
         # !exploitable
-        cmd = [ cfg.config['triager_path'], dmpPath ]
+        cmd = [cfg.config['triager_path'], dmpPath]
         out = subprocess.check_output(cmd, shell=False)
         # TODO: sorry didn't have time to clean this up before leave
-        dirname = os.path.dirname( dmpPath )
-        path = os.path.join(  dirname, "triage.txt" )
+        dirname = os.path.dirname(dmpPath)
+        path = os.path.join(dirname, "triage.txt")
         with open(path, "wb", newline=None) as f:
             f.write(out)
 
@@ -235,7 +236,7 @@ class Crash(Base):
         j = None
         for line in out.splitlines():
             line = line.strip()
-            if re.match( r"{.*}", line ):
+            if re.match(r"{.*}", line):
                 j = json.loads(line)
                 j['output'] = out
 
@@ -243,10 +244,9 @@ class Crash(Base):
             return None
         try:
             ret = Crash(j, runid, targetPath)
-        except x:
+        except:
             print("Unable to process crash json")
             return None
-
 
         ret.mergeTracer()
         ret.reconstructor()
@@ -256,7 +256,7 @@ class Crash(Base):
 
     ## Converts ranks list to colon seperated string
     def ranksStringGenerate(self):
-        tmp = [ str(_) for _ in self.ranks ]
+        tmp = [str(_) for _ in self.ranks]
         return ":".join(tmp)
 
     ## Returns string representation or summary of crash
@@ -272,5 +272,5 @@ class Crash(Base):
             self.instructionPointer,
             self.crashash,
             self.tag,
-            tracerInfo )
+            tracerInfo)
 #
