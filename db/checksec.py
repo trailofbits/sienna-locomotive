@@ -12,19 +12,7 @@ import json
 
 import db
 from db.base import Base
-from hashlib import sha256
-from functools import lru_cache
-
-@lru_cache()
-def hash_file(filename):
-    m = sha256()
-    with open(filename, 'rb') as f:
-        while True:
-            data = f.read(1024*512)
-            if not data:
-                break
-            m.update(data)
-    return m.hexdigest()
+from db.utilz import hash_file
 
 
 ## DB Wrapper for winchecksec

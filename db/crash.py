@@ -47,6 +47,7 @@ class Crash(Base):
     __tablename__ = "crash"
 
     id = Column(Integer, primary_key=True)
+    target_config = Column(String, ForeignKey("target_configs.target_slug"))
     ## Runid for the crash
     runid = Column(String(40))
     ## Crash address as hex string
@@ -138,7 +139,7 @@ class Crash(Base):
             self.instructionPointerString = hex(j["instructionPointer"])
             ## Path to minidump for crash
             self.minidumpPath = j["minidumpPath"]
-            ## Path to minidump for crash
+            ## Path to target binary
             self.targetPath = targetPath
             ## Integer version of exploitability (0-4, inclusive)
             self.rank = j["rank"]

@@ -5,6 +5,8 @@
 import os
 import glob
 import re
+from hashlib import sha256
+from functools import lru_cache
 import harness.config
 
 
@@ -31,3 +33,15 @@ def runidToDumpPath(runid):
         return dumpPath
 
     return dumpPath
+
+
+@lru_cache()
+def hash_file(filename):
+    m = sha256()
+    with open(filename, 'rb') as f:
+        while True:
+            data = f.read(1024*512)
+            if not data:
+                break
+            m.update(data)
+    return m.hexdigest()
