@@ -12,12 +12,26 @@ import json
 
 import db
 from db.base import Base
+from hashlib import sha256
+from functools import lru_cache
+
+@lru_cache()
+def hash_file(filename):
+    m = sha256()
+    with open(filename, 'rb') as f:
+        while True:
+            data = f.read(1024*512)
+            if not data:
+                break
+            m.update(data)
+    return m.hexdigest()
 
 
 ## DB Wrapper for winchecksec
 class Checksec(Base):
     __tablename__ = "checksec"
 
+    hash = Column(String(64), primary_key=True, unique=True)
     aslr = Column(Boolean)
     authenticode = Column(Boolean)
     cfg = Column(Boolean)
@@ -27,14 +41,15 @@ class Checksec(Base):
     highEntropyVA = Column(Boolean)
     isolation = Column(Boolean)
     nx = Column(Boolean)
-    path = Column(String, primary_key=True)
     rfg = Column(Boolean)
     safeSEH = Column(Boolean)
     seh = Column(Boolean)
+    path = Column(String)
 
     ## Constructor for checksec object that takes json object from winchecksec
     # @param json object from winchecksec
     def __init__(self, json_d):
+        self.hash = hash_file(json_d["path"])
         self.aslr = json_d["aslr"]
         self.authenticode = json_d["authenticode"]
         self.cfg = json_d["cfg"]
@@ -44,10 +59,10 @@ class Checksec(Base):
         self.highEntropyVA = json_d["highEntropyVA"]
         self.isolation = json_d["isolation"]
         self.nx = json_d["nx"]
-        self.path = json_d["path"]
         self.rfg = json_d["rfg"]
         self.safeSEH = json_d["safeSEH"]
         self.seh = json_d["seh"]
+        self.path = json_d["path"]
 
     ## Factory for checksec from executable path
     # Gets checksec information for dll or exe.
@@ -59,7 +74,7 @@ class Checksec(Base):
         cfg = harness.config
         session = db.getSession()
 
-        ret = session.query(Checksec).filter(Checksec.path == path).first()
+        ret = session.query(Checksec).filter(Checksec.hash == hash_file(path)).first()
         if ret:
             return ret
         ret = None
@@ -116,7 +131,7 @@ class Checksec(Base):
         if self.aslr:
             t.append("ASLR")
         if self.authenticode:
-            t.append("Authenicode")
+            t.append("Authenticode")
         if self.cfg:
             t.append("CFG")
         if self.dynamicBase:
@@ -138,11 +153,3 @@ class Checksec(Base):
         tags = ' | '.join(t)
 
         return "%3.0f%% (%s)" % (self.protectionPercent() * 100, tags)
-
-
-def main():
-    print("ok")
-
-
-if __name__ == '__main__':
-    main()

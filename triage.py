@@ -49,6 +49,7 @@ class TriageExport:
                      'safeSEH',
                      'seh',
                      ]
+        # TODO: Fix this to account for binary hashes
         self.sqlExport = 'select %s from crash left join tracer, checksec on crash.runid = tracer.runid and crash.targetPath = checksec.path' % ",".join(
             self.cols)
 
