@@ -22,7 +22,7 @@ class TargetConfig(Base):
 
     crashes = relationship("Crash", back_populates="target_config")
 
-    ## Constructor for checksec object that takes json object from winchecksec
+    ## Takes the slug referring to the target configuration (including arguments) and the path to the binary
     # @param slug
     # @param path
     def __init__(self, slug, path):
@@ -30,9 +30,7 @@ class TargetConfig(Base):
         self.hash = hash_file(path)
         self.path = path
 
-    ## Factory for checksec from executable path
-    # Gets checksec information for dll or exe.
-    # If it already exists in the db, just return it
+    ## Factory based on slug and path
     # @param slug
     # @param path Path to DLL or EXE
     # @return TargetConfig
