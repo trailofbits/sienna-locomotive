@@ -12,6 +12,7 @@ mode_labels = {1 << 0: "Nth Call",
                1 << 7: "Filename Comparison",
                1 << 8: "Nth Call @ Address"}
 
+
 # Inverse mapping so we can cheaply get bit flags out of text labels
 # mode_labels.update(dict(reversed(item) for item in mode_labels.items()))
 
@@ -68,7 +69,6 @@ class CheckboxTreeModel(QStandardItemModel):
 
 
 class CheckboxTreeWidget(QTreeView):
-
     itemCheckedStateChanged = Signal(CheckboxTreeWidgetItem, bool)
 
     def __init__(self, *args):

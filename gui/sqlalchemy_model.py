@@ -1,14 +1,14 @@
 ############################################################################
 ## @package sqlalchemy_model
 #
+from PySide2.QtCore import Qt
 from PySide2.QtSql import QSqlTableModel
-from PySide2.QtCore import  Qt
+
 
 ## Sqlalchemy to QT Table adapter
 # Acts as a model of a sqlalchemy object to a QSqlTableModel.  Allows for sorting,
 # column headers
 class SqlalchemyModel(QSqlTableModel):
-
 
     ## Constructor for the model
     # @param session sqlalchemy session object
@@ -34,29 +34,29 @@ class SqlalchemyModel(QSqlTableModel):
     # ],
     # orderBy=desc(db.Crash.timestamp) )
     # </pre>
-    def __init__(self, session, clazz, cols, orderBy, sort=(0,0) ):
+    def __init__(self, session, clazz, cols, orderBy, sort=(0, 0)):
         super().__init__()
 
-        self.session        = session
-        self.clazz          = clazz
-        self.cols           = cols
-        self.rows           = None
+        self.session = session
+        self.clazz = clazz
+        self.cols = cols
+        self.rows = None
         # sort is (column, order )
-        self.sort           = sort
-        self.orderBy        = orderBy
+        self.sort = sort
+        self.orderBy = orderBy
         self.update()
 
     ## QT TableModel method for returning horizontal and vertical headers
     # @param section Basically a 0-based column index
     # @param orientation Horizontal or vertical columns
     # @param role Use of the data, stick with the Qt.DisplayRole or else you'll get weird results
-    def headerData( self, section, orientation, role ):
+    def headerData(self, section, orientation, role):
         try:
             ret = self.cols[section][0]
         except:
             return None
 
-        if role!=Qt.DisplayRole or orientation!=Qt.Horizontal:
+        if role != Qt.DisplayRole or orientation != Qt.Horizontal:
             return None
 
         return ret
@@ -65,13 +65,12 @@ class SqlalchemyModel(QSqlTableModel):
     def flags(self, i):
         return Qt.ItemIsEnabled | Qt.ItemIsSelectable
 
-
     ## Updates table
     def update(self):
         self.layoutAboutToBeChanged.emit()
 
-        self.rows = self.session.query( self.clazz ).\
-            order_by(self.orderBy).\
+        self.rows = self.session.query(self.clazz). \
+            order_by(self.orderBy). \
             all()
         self.layoutChanged.emit()
 
@@ -88,27 +87,27 @@ class SqlalchemyModel(QSqlTableModel):
     ## Returns data for a cell
     # @param index indices for row and column
     # @param role Stick with the Qt.DisplayRole
-    def data(self, index, role ):
+    def data(self, index, role):
         # If we return stuff on other roles we get weird
         # check boxes in the cells
-        if role==Qt.DisplayRole:
-            row = self.rows[ index.row() ]
-            name = self.cols[ index.column() ][2]
+        if role == Qt.DisplayRole:
+            row = self.rows[index.row()]
+            name = self.cols[index.column()][2]
 
-            ret = getattr(  row, name )
+            ret = getattr(row, name)
             ret = str(ret)
             return ret
         ## This the custom role when a user clicks, return the entire row
-        if role==Qt.UserRole:
-            return self.rows[ index.row() ]
+        if role == Qt.UserRole:
+            return self.rows[index.row()]
 
-        return  None
+        return None
 
     ## Unimplemented but should be used to click on column header and sort
-    def sort( self, col, order ):
+    def sort(self, col, order):
         self.sort = (col, order)
         self.update()
 
     ## Unimplemented, we don't want to change results yet
-    def setData( self, index, value, role ):
+    def setData(self, index, value, role):
         pass

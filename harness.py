@@ -6,24 +6,17 @@ Imports harness/state.py for managing the fuzzing lifecycle
 Imports harness/instrument.py for running DynamoRIO instrumentation clients.
 """
 
-import os
-import concurrent.futures
-import msgpack
 import atexit
+import concurrent.futures
+import os
 import signal
-import winreg
 import sys
+import winreg
+
+import msgpack
 
 import harness.config
 import harness.statz
-
-from harness.state import (
-    get_target_dir,
-    get_all_targets,
-    get_runs,
-    stringify_program_array
-)
-
 from harness.instrument import (
     print_l,
     wizard_run,
@@ -32,6 +25,12 @@ from harness.instrument import (
     start_server,
     fuzz_and_triage,
     kill
+)
+from harness.state import (
+    get_target_dir,
+    get_all_targets,
+    get_runs,
+    stringify_program_array
 )
 
 
@@ -61,6 +60,7 @@ def select_from_range(max_range, message):
         else:
             return index
 
+
 ## Print and select findings, then write to disk
 # This will happen if there weren't any hookable functions in the target,
 # OR if the target's architecture isn't supported.
@@ -73,7 +73,7 @@ def select_and_dump_wizard_findings(wizard_findings, target_file):
         sys.exit()
 
     index = cfg['function_number']
-    if index>=0 and index<len(wizard_findings):
+    if index in range(0, len(wizard_findings)):
         pass
     else:
         print_l("Functions found:")
@@ -105,7 +105,7 @@ def hexdump(buffer, lines=4, line_len=16):
             break
         hexstr = " ".join("{:02X}".format(c) for c in buffer[address:address + line_len])
         asciistr = "".join((chr(c) if c in range(31, 127) else '.') for c in buffer[address:address + line_len])
-        print_l("%08X:  %s  | %s" % (address, hexstr + " "*(line_len*3 - len(hexstr)), asciistr))
+        print_l("%08X:  %s  | %s" % (address, hexstr + " " * (line_len * 3 - len(hexstr)), asciistr))
 
 
 def sanity_checks():
@@ -134,19 +134,22 @@ def sanity_checks():
 
     try:
         reg = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
-        key = winreg.OpenKey(reg, "SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting", 0, (winreg.KEY_WOW64_64KEY + winreg.KEY_READ))
+        key = winreg.OpenKey(reg, "SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting", 0,
+                             (winreg.KEY_WOW64_64KEY + winreg.KEY_READ))
         disabled = winreg.QueryValueEx(key, "Disabled")[0]
 
         if disabled != 1:
             print_l("[+] Fatal: Cowardly refusing to run with WER enabled.")
-            print_l("[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue.")
+            print_l(
+                "[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue.")
             sys.exit()
 
         winreg.CloseKey(key)
-    except OSError as e:
+    except OSError:
         # OSError here means that we *haven't* disabled WER, which is a problem.
         print_l("[+] Fatal: Cowardly refusing to run with WER enabled.")
-        print_l("[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue.")
+        print_l(
+            "[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue.")
         sys.exit()
         pass
     except Exception as e:

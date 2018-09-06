@@ -10,6 +10,15 @@ from harness import config
 import os
 import db.base
 
+## Imports of the other classes
+from .conf import Conf
+from .tracer import Tracer
+from .checksec import Checksec
+from .crash import Crash
+from .target_config import TargetConfig
+
+from . import utilz
+
 
 ## Gets sqlalchemy database session
 # Used to get a session for db stuff.  You can't reuse a session or db objects across
@@ -28,7 +37,7 @@ def checkVersionNumber():
     versionNow = config.VERSION
     confVersion = db.Conf.factory('version')
     if not confVersion:
-        db.Conf.factory( "version", versionNow )
+        db.Conf.factory("version", versionNow)
         return
 
     if confVersion.value < versionNow:
@@ -38,29 +47,21 @@ Options include:
   * Run  ./make reconfig
   * Remove the SL2 directory in %s
         """ % (confVersion.value, versionNow, config.sl2_dir)
-        print("!"*77)
+        print("!" * 77)
         print(msg)
-        print("!"*77)
+        print("!" * 77)
         xception = BaseException(msg)
-        raise( xception )
+        raise xception
 
 
 ## File path to db
-dbpath = '%s/%s' % ( config.sl2_dir, 'sl2.db' )
+dbpath = '%s/%s' % (config.sl2_dir, 'sl2.db')
 
 ## URL to db for sqlalchemy
-dburl = os.path.join( 'sqlite:///%s' % dbpath )
+dburl = os.path.join('sqlite:///%s' % dbpath)
 
 ## sqlalchemy database engine
-engine = create_engine(dburl, poolclass=NullPool )
-
-## Imports of the other classes
-from .conf import Conf
-from .tracer import Tracer
-from .checksec import Checksec
-from .crash import Crash
-
-from . import utilz
+engine = create_engine(dburl, poolclass=NullPool)
 
 db.base.Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
@@ -69,4 +70,3 @@ Session().commit()
 
 # Checks for version mismatch
 checkVersionNumber()
-

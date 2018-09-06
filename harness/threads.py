@@ -1,4 +1,5 @@
 from PySide2.QtCore import QThread, Signal, Qt
+
 from .instrument import wizard_run, fuzzer_run, start_server, triagerRun
 
 

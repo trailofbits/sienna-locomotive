@@ -5,6 +5,7 @@
 
 #include <string>
 #include <sstream>
+#include <memory>
 
 #include "google_breakpad/common/breakpad_types.h"
 #include "google_breakpad/processor/exploitability.h"

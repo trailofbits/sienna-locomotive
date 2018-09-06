@@ -6,50 +6,51 @@
 #
 
 from sqlalchemy import *
-import os
 import harness.config
 import subprocess
 import json
 
 import db
 from db.base import Base
+from db.utilz import hash_file
+
 
 ## DB Wrapper for winchecksec
 class Checksec(Base):
-
     __tablename__ = "checksec"
 
-    aslr               = Column( Boolean )
-    authenticode       = Column( Boolean )
-    cfg                = Column( Boolean )
-    dynamicBase        = Column( Boolean )
-    forceIntegrity     = Column( Boolean )
-    gs                 = Column( Boolean )
-    highEntropyVA      = Column( Boolean )
-    isolation          = Column( Boolean )
-    nx                 = Column( Boolean )
-    path               = Column( String, primary_key=True )
-    rfg                = Column( Boolean )
-    safeSEH            = Column( Boolean )
-    seh                = Column( Boolean )
+    hash = Column(String(64), primary_key=True, unique=True)
+    aslr = Column(Boolean)
+    authenticode = Column(Boolean)
+    cfg = Column(Boolean)
+    dynamicBase = Column(Boolean)
+    forceIntegrity = Column(Boolean)
+    gs = Column(Boolean)
+    highEntropyVA = Column(Boolean)
+    isolation = Column(Boolean)
+    nx = Column(Boolean)
+    rfg = Column(Boolean)
+    safeSEH = Column(Boolean)
+    seh = Column(Boolean)
+    path = Column(String)
 
     ## Constructor for checksec object that takes json object from winchecksec
     # @param json object from winchecksec
-    def __init__(self, json):
-        self.aslr               = json["aslr"]
-        self.authenticode       = json["authenticode"]
-        self.cfg                = json["cfg"]
-        self.dynamicBase        = json["dynamicBase"]
-        self.forceIntegrity     = json["forceIntegrity"]
-        self.gs                 = json["gs"]
-        self.highEntropyVA      = json["highEntropyVA"]
-        self.isolation          = json["isolation"]
-        self.nx                 = json["nx"]
-        self.path               = json["path"]
-        self.rfg                = json["rfg"]
-        self.safeSEH            = json["safeSEH"]
-        self.seh                = json["seh"]
-
+    def __init__(self, json_d):
+        self.hash = hash_file(json_d["path"])
+        self.aslr = json_d["aslr"]
+        self.authenticode = json_d["authenticode"]
+        self.cfg = json_d["cfg"]
+        self.dynamicBase = json_d["dynamicBase"]
+        self.forceIntegrity = json_d["forceIntegrity"]
+        self.gs = json_d["gs"]
+        self.highEntropyVA = json_d["highEntropyVA"]
+        self.isolation = json_d["isolation"]
+        self.nx = json_d["nx"]
+        self.rfg = json_d["rfg"]
+        self.safeSEH = json_d["safeSEH"]
+        self.seh = json_d["seh"]
+        self.path = json_d["path"]
 
     ## Factory for checksec from executable path
     # Gets checksec information for dll or exe.
@@ -57,16 +58,16 @@ class Checksec(Base):
     # @param path Path to DLL or EXE
     # @return Checksec obj
     @staticmethod
-    def byExecutable( path ):
+    def byExecutable(path):
         cfg = harness.config
-        session =  db.getSession()
+        session = db.getSession()
 
-        ret = session.query( Checksec ).filter( Checksec.path==path ).first()
+        ret = session.query(Checksec).filter(Checksec.hash == hash_file(path)).first()
         if ret:
             return ret
         ret = None
         checker = cfg.config['checksec_path']
-        cmd = [ checker, "-j", path ]
+        cmd = [checker, "-j", path]
 
         try:
             out = subprocess.check_output(cmd)
@@ -79,36 +80,34 @@ class Checksec(Base):
 
         return ret
 
-
     ## Returns value between 0 and 1 as a percentage of the rarity of protection flags.
     # If a binary has a flag that's rarely implemented (like RFG) it will more quickly increase this value
     def protectionPercent(self):
-        probabilities =  {
-            'aslr'              : 0.792031321971442,
-            'authenticode'      : 0.374942422846614,
-            'cfg'               : 0.492860432980193,
-            'dynamicBase'       : 0.796867802855827,
-            'forceIntegrity'    : 0.0322432058959005,
-            'gs'                : 0.652003684937817,
-            'highEntropyVA'     : 0.437586365730078,
-            'isolation'         : 1.0,
-            'nx'                : 0.795485951174574,
-            'rfg'               : 0.0631045601105481,
-            'safeSEH'           : 0.257254721326578,
-            'seh'               : 0.913403961308153
+        probabilities = {
+            'aslr': 0.792031321971442,
+            'authenticode': 0.374942422846614,
+            'cfg': 0.492860432980193,
+            'dynamicBase': 0.796867802855827,
+            'forceIntegrity': 0.0322432058959005,
+            'gs': 0.652003684937817,
+            'highEntropyVA': 0.437586365730078,
+            'isolation': 1.0,
+            'nx': 0.795485951174574,
+            'rfg': 0.0631045601105481,
+            'safeSEH': 0.257254721326578,
+            'seh': 0.913403961308153
         }
 
         probsMax = 0
         probsSum = 0
         for k, mean in probabilities.items():
             x = int(self.__getattribute__(k))
-            grab = 1-mean
-            if x==1:
+            grab = 1 - mean
+            if x == 1:
                 probsSum = probsSum + grab
             probsMax += grab
 
         return probsSum / probsMax
-
 
     ## Creates short string description
     # Returns a strings seperated by pipe symbols that
@@ -120,7 +119,7 @@ class Checksec(Base):
         if self.aslr:
             t.append("ASLR")
         if self.authenticode:
-            t.append("Authenicode")
+            t.append("Authenticode")
         if self.cfg:
             t.append("CFG")
         if self.dynamicBase:
@@ -141,12 +140,4 @@ class Checksec(Base):
             t.append("SEH")
         tags = ' | '.join(t)
 
-        return "%3.0f%% (%s)" % (self.protectionPercent()*100, tags)
-
-
-
-def main():
-    print("ok")
-
-if __name__ == '__main__':
-    main()
+        return "%3.0f%% (%s)" % (self.protectionPercent() * 100, tags)

@@ -5,22 +5,26 @@
 # Imports harness/enums.py for the targeting mode enum
 
 
-import subprocess
-import time
-import signal
-import threading
-import os
-import json
-import traceback
-import sys
-import shutil
-import msgpack
-import hashlib
 import array
+import hashlib
+import json
+import os
 import re
+import shutil
+import signal
+import subprocess
+import sys
+import threading
+import time
+import traceback
 from enum import IntEnum
 from typing import NamedTuple
 
+import msgpack
+
+import db
+from . import config
+from . import named_mutex
 from .state import (
     parse_tracer_output,
     generate_run_id,
@@ -29,11 +33,8 @@ from .state import (
     check_fuzz_line_for_crash,
     get_path_to_run_file,
     get_target_dir,
+    get_target_slug,
 )
-
-from . import config
-from . import named_mutex
-import db
 
 print_lock = threading.Lock()
 can_fuzz = True
@@ -187,21 +188,20 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
 
     return DRRun(popen_obj, invoke.seed, run_id)
 
+
 ## Executes a Triage run
 # Runs the sl2 triager on each of the minidumps generated
 # by a fuzzing run.  The information that gets returned
 # can't be used across threads so we end up fetching it from the db in the gui
 # @param cfg Configuration context dictionary
 # @param run_id Run ID (guid)
-def triagerRun( cfg, run_id ):
-    ret = {}
-    ret["run_id"] = run_id
+def triagerRun(cfg, run_id):
     tracerOutput, _ = tracer_run(cfg, run_id)
-    ret["tracerOutput"] = tracerOutput
-    crashInfo = db.Crash.factory( run_id, cfg['target_application_path'] )
-    ret["crashInfo"] = crashInfo
-
-    return ret
+    crashInfo = db.Crash.factory(run_id, get_target_slug(cfg), cfg['target_application_path'])
+    return {"run_id": run_id,
+            "tracerOutput": tracerOutput,
+            "crashInfo": crashInfo
+            }
 
 
 def wizard_run(config_dict):
@@ -354,8 +354,9 @@ def tracer_run(config_dict, run_id):
     write_output_files(run, run_id, 'triage')
 
     formatted, raw = parse_tracer_output(run_id)
-    db.Tracer.factory( run_id, formatted, raw )
+    db.Tracer.factory(run_id, formatted, raw)
     return formatted, raw
+
 
 ## Fuzzing run followed by triage
 # Runs the fuzzer (in a loop if continuous is true), then runs the triage

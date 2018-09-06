@@ -28,7 +28,7 @@ static uint32_t mutate_count;
 static std::set<reg_id_t, std::less<reg_id_t>, sl2_dr_allocator<reg_id_t>> tainted_regs;
 static std::set<app_pc, std::less<app_pc>, sl2_dr_allocator<app_pc>> tainted_mems;
 
-#define LAST_COUNT 5
+#define LAST_COUNT 5 // WARNING: If you change this, you need to update the database schema
 
 static int last_call_idx = 0;
 static int last_insn_idx = 0;
@@ -747,7 +747,9 @@ dump_regs(void *drcontext, app_pc exception_address) {
 
 /* Get crash info as JSON for dumping to stderr */
 std::string
-dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *excpt, std::string disassembly)
+dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *excpt, std::string disassembly,
+		  bool pc_tainted, bool stack_tainted, bool is_ret, bool is_indirect, bool is_direct, bool is_call,
+		  bool mem_write, bool mem_read, bool tainted_src, bool tainted_dst)
 {
     DWORD exception_code = excpt->record->ExceptionCode;
     app_pc exception_address = (app_pc)excpt->record->ExceptionAddress;
@@ -759,6 +761,16 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
     j["exception"] = exception_to_string(exception_code);
     j["location"] = (uint64) exception_address;
     j["instruction"] = disassembly;
+    j["pc_tainted"] = pc_tainted;
+	j["stack_tainted"] = stack_tainted;
+	j["is_ret"] = is_ret;
+	j["is_indirect"] = is_indirect;
+	j["is_direct"] = is_direct;
+	j["is_call"] = is_call;
+    j["mem_write"] = mem_write;
+	j["mem_read"] = mem_read;
+	j["tainted_src"] = tainted_src;
+	j["tainted_dst"] = tainted_dst;
 
     j["regs"] = json::array();
     reg_id_t regs[16] = {
@@ -836,10 +848,14 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
 
 /* Get Run ID and dump crash info into JSON file in the run folder. */
 static void
-dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t score, std::string disassembly)
+dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t score, std::string disassembly,
+		   bool pc_tainted, bool stack_tainted, bool is_ret, bool is_indirect, bool is_direct, bool is_call,
+		   bool mem_write, bool mem_read, bool tainted_src, bool tainted_dst)
 {
     sl2_crash_paths crash_paths = {0};
-    std::string crash_json = dump_json(drcontext, score, reason, excpt, disassembly);
+    std::string crash_json = dump_json(drcontext, score, reason, excpt, disassembly,
+    	  pc_tainted, stack_tainted, is_ret, is_indirect, is_direct, is_call,
+  		  mem_write, mem_read, tainted_src, tainted_dst);
 
     if (replay) {
         sl2_conn_request_crash_paths(&sl2_conn, dr_get_process_id(), &crash_paths);
@@ -932,7 +948,8 @@ on_exception(void *drcontext, dr_exception_t *excpt)
             reason = "oob execution";
             score = 50;
         }
-        dump_crash(drcontext, excpt, reason, score, disassembly);
+        dump_crash(drcontext, excpt, reason, score, disassembly, pc_tainted, stack_tainted, false, false, false, false,
+        		   false, false, false, false);
     }
 
     instr_t instr;
@@ -945,6 +962,18 @@ on_exception(void *drcontext, dr_exception_t *excpt)
 
     disassembly = buf;
 
+    // get crashing instruction
+    bool is_ret = instr_is_return(&instr);
+    bool is_direct = instr_is_ubr(&instr) || instr_is_cbr(&instr) || instr_is_call_direct(&instr);
+    bool is_indirect = instr_is_mbr(&instr);
+    bool is_call = instr_is_call(&instr); // this might be covered in other flags
+
+    bool mem_write = instr_writes_memory(&instr);
+    bool mem_read = instr_reads_memory(&instr);
+    bool tainted_src = false;
+    bool tainted_dst = false;
+
+
     // check exception code - illegal instructions are bad
     if (exception_code == EXCEPTION_ILLEGAL_INSTRUCTION) {
         if (pc_tainted) {
@@ -955,14 +984,16 @@ on_exception(void *drcontext, dr_exception_t *excpt)
             reason = "illegal instruction";
             score = 50;
         }
-        dump_crash(drcontext, excpt, reason, score, disassembly);
+        dump_crash(drcontext, excpt, reason, score, disassembly, pc_tainted, stack_tainted, false, false, false, false,
+                		   false, false, false, false);
     }
 
     // Divide by zero is probably not bad
     if (exception_code == EXCEPTION_INT_DIVIDE_BY_ZERO) {
         reason = "floating point exception";
         score = 0;
-        dump_crash(drcontext, excpt, reason, score, disassembly);
+        dump_crash(drcontext, excpt, reason, score, disassembly, pc_tainted, stack_tainted, is_ret, is_indirect, is_direct, is_call,
+        		   mem_write, mem_read, tainted_src, tainted_dst);
     }
 
     // Breakpoints - could indicate we're executing non-instructions?
@@ -970,14 +1001,9 @@ on_exception(void *drcontext, dr_exception_t *excpt)
     if (exception_code == EXCEPTION_BREAKPOINT) {
         reason = "breakpoint";
         score = 25;
-        dump_crash(drcontext, excpt, reason, score, disassembly);
+        dump_crash(drcontext, excpt, reason, score, disassembly, pc_tainted, stack_tainted, is_ret, is_indirect, is_direct, is_call,
+        		   mem_write, mem_read, tainted_src, tainted_dst);
     }
-
-    // get crashing instruction
-    bool is_ret = instr_is_return(&instr);
-    bool is_direct = instr_is_ubr(&instr) || instr_is_cbr(&instr) || instr_is_call_direct(&instr);
-    bool is_indirect = instr_is_mbr(&instr);
-    bool is_call = instr_is_call(&instr); // this might be covered in other flags
 
     // check branch
     if (is_direct || is_indirect || is_call) {
@@ -989,7 +1015,8 @@ on_exception(void *drcontext, dr_exception_t *excpt)
             reason = "branching";
             score = 25;
         }
-        dump_crash(drcontext, excpt, reason, score, disassembly);
+        dump_crash(drcontext, excpt, reason, score, disassembly, pc_tainted, stack_tainted, is_ret, is_indirect, is_direct, is_call,
+        		   mem_write, mem_read, tainted_src, tainted_dst);
     }
 
     // check ret
@@ -1003,13 +1030,9 @@ on_exception(void *drcontext, dr_exception_t *excpt)
             score = 75;
         }
 
-        dump_crash(drcontext, excpt, reason, score, disassembly);
+        dump_crash(drcontext, excpt, reason, score, disassembly, pc_tainted, stack_tainted, is_ret, is_indirect, is_direct, is_call,
+        		   mem_write, mem_read, tainted_src, tainted_dst);
     }
-
-    bool mem_write = instr_writes_memory(&instr);
-    bool mem_read = instr_reads_memory(&instr);
-    bool tainted_src = false;
-    bool tainted_dst = false;
 
     int src_count = instr_num_srcs(&instr);
     int dst_count = instr_num_dsts(&instr);
@@ -1039,7 +1062,8 @@ on_exception(void *drcontext, dr_exception_t *excpt)
             score = 50;
         }
 
-        dump_crash(drcontext, excpt, reason, score, disassembly);
+        dump_crash(drcontext, excpt, reason, score, disassembly, pc_tainted, stack_tainted, is_ret, is_indirect, is_direct, is_call,
+        		   mem_write, mem_read, tainted_src, tainted_dst);
     }
 
     // ditto, but for invalid reads
@@ -1054,10 +1078,12 @@ on_exception(void *drcontext, dr_exception_t *excpt)
             score = 25;
         }
 
-        dump_crash(drcontext, excpt, reason, score, disassembly);
+        dump_crash(drcontext, excpt, reason, score, disassembly, pc_tainted, stack_tainted, is_ret, is_indirect, is_direct, is_call,
+        		   mem_write, mem_read, tainted_src, tainted_dst);
     }
 
-    dump_crash(drcontext, excpt, reason, score, disassembly);
+    dump_crash(drcontext, excpt, reason, score, disassembly, pc_tainted, stack_tainted, is_ret, is_indirect, is_direct, is_call,
+    		   mem_write, mem_read, tainted_src, tainted_dst);
 
     return true;
 }
