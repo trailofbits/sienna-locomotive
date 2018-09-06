@@ -219,7 +219,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 ('RCX', db.Crash.rcx, 'rcx', {}),
                 ('RDX', db.Crash.rdx, 'rdx', {}),
             ],
-            orderBy=desc(db.Crash.timestamp))
+            orderBy=desc(db.Crash.timestamp),
+            filters={"target_config_slug": get_target_slug(config.config)})
         self.crashesTable = QTableView()
         self.crashesTable.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self.crashesTable.setModel(self.crashesModel)

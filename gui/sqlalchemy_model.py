@@ -12,7 +12,7 @@ class SqlalchemyModel(QSqlTableModel):
 
     ## Constructor for the model
     # @param session sqlalchemy session object
-    # @param clazz sqlalchemy Base class instance
+    # @param table_colmn sqlalchemy Base class instance
     # @param cols tuple of ( columnName, sqlObjectMember, stringColumnName, miscInfo )
     # @param orderBy sqlalchemy expression for sorting rows on query
     # @param sort UNIMPLEMENTED for clicking on table header, tuple in the form (columnNumber, order ), unimplemented
@@ -34,16 +34,17 @@ class SqlalchemyModel(QSqlTableModel):
     # ],
     # orderBy=desc(db.Crash.timestamp) )
     # </pre>
-    def __init__(self, session, clazz, cols, orderBy, sort=(0, 0)):
+    def __init__(self, session, table_colmn, cols, orderBy, filters={}, sort=(0, 0)):
         super().__init__()
 
         self.session = session
-        self.clazz = clazz
+        self.table_colmn = table_colmn
         self.cols = cols
         self.rows = None
         # sort is (column, order )
         self.sort = sort
         self.orderBy = orderBy
+        self.filters = filters
         self.update()
 
     ## QT TableModel method for returning horizontal and vertical headers
@@ -69,7 +70,8 @@ class SqlalchemyModel(QSqlTableModel):
     def update(self):
         self.layoutAboutToBeChanged.emit()
 
-        self.rows = self.session.query(self.clazz). \
+        self.rows = self.session.query(self.table_colmn). \
+            filter_by(**self.filters). \
             order_by(self.orderBy). \
             all()
         self.layoutChanged.emit()
