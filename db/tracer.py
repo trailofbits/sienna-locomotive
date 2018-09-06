@@ -69,7 +69,6 @@ class Tracer(Base):
     crashId = Column(Integer, ForeignKey('crash.id'))
     ## The exploitability rank based solely on tracer
     rank = Column(Integer)
-
     ## Constructor for a Tracer object
     # @param runid Run ID of tracer run
     # @param formatted String formatting results
