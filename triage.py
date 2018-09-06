@@ -7,12 +7,16 @@ import csv
 import os
 import shutil
 import sqlite3
+import re
 from shutil import ignore_patterns
 
 from PySide2.QtWidgets import QFileDialog
 
 import db
-import utilz
+
+def sanitizeString(s):
+    ret = re.sub(r"[^a-zA-Z0-9._]+", "_", s)
+    return re.sub(r"_+", "_", ret)
 
 
 ## Class for exporting triage results. Will iterate each crash from the db
@@ -71,9 +75,9 @@ class TriageExport:
         for crash in crashies:
             try:
                 dstdir = os.path.join(self.exportDir,
-                                      utilz.sanitizeString(crash.exploitability),
-                                      utilz.sanitizeString(crash.crashReason),
-                                      utilz.sanitizeString(crash.crashash),
+                                      sanitizeString(crash.exploitability),
+                                      sanitizeString(crash.crashReason),
+                                      sanitizeString(crash.crashash),
                                       crash.runid)
                 # os.makedirs( dstdir, exist_ok=True )
                 srcdir = os.path.dirname(crash.minidumpPath)
