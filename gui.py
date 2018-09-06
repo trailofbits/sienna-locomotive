@@ -28,7 +28,7 @@ from gui.checkbox_tree import (
     ComboboxTreeItemDelegate,
     mode_labels)
 from harness import config
-from harness.state import get_target, export_crash_data_to_csv
+from harness.state import get_target, export_crash_data_to_csv, get_target_slug
 from harness.threads import WizardThread, FuzzerThread, ServerThread
 
 
@@ -381,7 +381,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.crashesTable.resizeColumnsToContents()
         self.statsWidget.update()
         self.crash_counter.increment()
-        crash = db.Crash.factory(run_id)
+        crash = db.Crash.factory(run_id, get_target_slug(config.config))
         if not crash:
             return None
         self.crashes.append(crash)

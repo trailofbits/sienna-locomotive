@@ -47,7 +47,8 @@ class Crash(Base):
     __tablename__ = "crash"
 
     id = Column(Integer, primary_key=True)
-    target_config = Column(String, ForeignKey("target_configs.target_slug"))
+    target_config_slug = Column(String, ForeignKey("targets.target_slug"))
+    target_config = relationship("TargetConfig", back_populates="crashes")
     ## Runid for the crash
     runid = Column(String(40))
     ## Crash address as hex string
@@ -116,7 +117,7 @@ class Crash(Base):
     ## Constructor for crash object
     # @param runid Run ID of crash
     # @param j json object version
-    def __init__(self, j, runid=None, targetPath=None):
+    def __init__(self, j, slug, runid=None, targetPath=None):
         try:
 
             self.runid = runid
@@ -126,6 +127,8 @@ class Crash(Base):
             self.stackPointer = self.obj["stackPointer"]
             self.crashAddress = self.obj["crashAddress"]
             self.instructionPointer = self.obj["instructionPointer"]
+
+            self.target_config_slug = slug
 
             ## Crash address as hex string
             self.crashAddressString = hex(j["crashAddress"])
@@ -208,7 +211,7 @@ class Crash(Base):
     # @param dmpPath string path to minidump file
     # @return Crash object
     @staticmethod
-    def factory(runid, targetPath=None):
+    def factory(runid, slug=None, targetPath=None):
         cfg = harness.config
         session = db.getSession()
         runid = str(runid)
@@ -244,7 +247,7 @@ class Crash(Base):
         if not j:
             return None
         try:
-            ret = Crash(j, runid, targetPath)
+            ret = Crash(j, slug, runid, targetPath)
         except:
             print("Unable to process crash json")
             return None

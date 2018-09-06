@@ -110,17 +110,23 @@ def unstringify_program_array(stringified):
     return invoke[0], invoke[1:]
 
 
+def get_target_slug(_config):
+    # TODO(ww): Use os.path.basename for this?
+
+    exe_name = _config['target_application_path'].split('\\')[-1].strip('.exe').upper()
+    dir_hash = sha1(
+        "{} {}".format(_config['target_application_path'], _config['target_args']).encode('utf-8')
+    ).hexdigest()
+    return "{}_{}".format(exe_name, dir_hash)
+
+
 def get_target_dir(_config):
     """
     Gets (or creates) the path to a target directory for the current
     config file.
     """
-    # TODO(ww): Use os.path.basename for this?
-    exe_name = _config['target_application_path'].split('\\')[-1].strip('.exe').upper()
-    dir_hash = sha1(
-        "{} {}".format(_config['target_application_path'], _config['target_args']).encode('utf-8')
-    ).hexdigest()
-    dir_name = os.path.join(config.sl2_targets_dir, "{}_{}".format(exe_name, dir_hash))
+    slug = get_target_slug(_config)
+    dir_name = os.path.join(config.sl2_targets_dir, slug)
 
     if not os.path.isdir(dir_name):
         os.makedirs(dir_name)
@@ -131,6 +137,7 @@ def get_target_dir(_config):
             argfile.write(stringify_program_array(_config['target_application_path'], _config['target_args']))
 
     # Primes the db for checksec for this target if it doesn't already exist
+    db.TargetConfig.bySlug(slug, _config['target_application_path'])
     db.Checksec.byExecutable(_config['target_application_path'])
     return dir_name
 

@@ -33,6 +33,7 @@ from .state import (
     check_fuzz_line_for_crash,
     get_path_to_run_file,
     get_target_dir,
+    get_target_slug,
 )
 
 print_lock = threading.Lock()
@@ -196,7 +197,7 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
 # @param run_id Run ID (guid)
 def triagerRun(cfg, run_id):
     tracerOutput, _ = tracer_run(cfg, run_id)
-    crashInfo = db.Crash.factory(run_id, cfg['target_application_path'])
+    crashInfo = db.Crash.factory(run_id, get_target_slug(cfg), cfg['target_application_path'])
     return {"run_id": run_id,
             "tracerOutput": tracerOutput,
             "crashInfo": crashInfo
