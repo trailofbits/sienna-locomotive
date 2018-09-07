@@ -1034,7 +1034,20 @@ static void handle_coverage_info(HANDLE pipe)
         SL2_SERVER_LOG_FATAL("arena ID missing from strategy_map? (map size=%d)", strategy_map.size());
     }
 
-    // TODO(ww): Write the contents of it->second (strategy_state) to the pipe.
+    // First, write whether we're doing bucketing.
+    if (!WriteFile(pipe, &opts.bucketing, sizeof(opts.bucketing), &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("failed to write bucketing status");
+    }
+
+    // Then, write our current coverage score for the arena.
+    if (!WriteFile(pipe, &(it->second.score), sizeof(it->second.score), &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("failed to write coverage score");
+    }
+
+    // Then, write the number of tries remaining for the current strategy.
+    if (!WriteFile(pipe, &(it->second.tries_remaining), sizeof(it->second.tries_remaining), &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("failed to write number of tries remaining");
+    }
 
     rlock.unlock();
 }
