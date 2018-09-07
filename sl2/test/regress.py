@@ -63,7 +63,7 @@ class TestWizard(unittest.TestCase):
 
     ## Checks wizard and registry functionalty
     def test_registry(self):
-        cmd = r'python harness.py -fn 0 -r3 -l -v -e WIZARD -t ' + TEST_APPLICATION + ' -a 4 -f'
+        cmd = r'sl2-cli -fn 0 -r3 -l -v -e WIZARD -t ' + TEST_APPLICATION + ' -a 4 -f'
         out = runAndCaptureOutput(cmd)
         self.assertFalse('0) RegQueryValueEx' in out)
         self.assertTrue('CRASH PTR' in out)
@@ -72,23 +72,23 @@ class TestWizard(unittest.TestCase):
     def test_captureStdout(self):
         targetString = 'XXXWWWXXX'
         # First version have -l, inlining stdout for us to capture.   String "XXXWWWXXX" should appear
-        cmd = r'python harness.py -fn 0 -r3 -l -v -t ' + TEST_APPLICATION + ' -a 9 -f'
+        cmd = r'sl2-cli -fn 0 -r3 -l -v -t ' + TEST_APPLICATION + ' -a 9 -f'
         out = runAndCaptureOutput(cmd)
         self.assertTrue(targetString in out)
         # This version does not have have -l, so we aren't capturing stdout and String "XXXWWWXXX" should NOT appear
-        cmd = r'python harness.py -fn 0 -r3 -v -t ' + TEST_APPLICATION + ' -a 9 -f'
+        cmd = r'sl2-cli -fn 0 -r3 -v -t ' + TEST_APPLICATION + ' -a 9 -f'
         out = runAndCaptureOutput(cmd)
         self.assertFalse(targetString in out)
 
     ## Basic stages testing in harness
     def test_TheWiz(self):
-        cmd = r'python harness.py -v -fn 0'
+        cmd = r'sl2-cli -v -fn 0'
         out = runAndCaptureOutput(cmd)
         self.assertTrue('Process completed after' in out)
 
     ## Test case #10, that an application actually crashes and that we catch the appropriate information
     def test_quickCrash(self):
-        cmd = r'python harness.py -fn 0 -c -x -l -v -t ' + TEST_APPLICATION + ' -a 10 -f'
+        cmd = r'sl2-cli -fn 0 -c -x -l -v -t ' + TEST_APPLICATION + ' -a 10 -f'
         out = runAndCaptureOutput(cmd)
         self.assertTrue('Process completed after' in out)
         # self.assertRegex(  out, r'Triage .*: breakpoint .*caused EXCEPTION_BREAKPOINT'  )
@@ -107,7 +107,7 @@ class TestWizard(unittest.TestCase):
     ## Test the triaging is working with crashash, exploitability, etc...
     def test_triage(self):
         for _ in range(3):
-            cmd = r'python harness.py -fn 0 -c -x -l -v -t ' + TEST_APPLICATION + ' -a 10 -f'
+            cmd = r'sl2-cli -fn 0 -c -x -l -v -t ' + TEST_APPLICATION + ' -a 10 -f'
             out = runAndCaptureOutput(cmd)
 
         workingdir = os.path.join(os.environ['APPDATA'], "Trail of Bits", "fuzzkit", "runs")
@@ -120,7 +120,7 @@ class TestWizard(unittest.TestCase):
                 self.assertTrue(_ in out)
 
     # def test_fuzzgoat(self):
-    #     cmd = r'echo 0 | python harness.py -e WIZARD -v -l  -t ./build/fuzzgoat/Debug/fuzzgoat.exe -a ./fuzzgoat/input-files/validObject'
+    #     cmd = r'echo 0 | sl2-cli -e WIZARD -v -l  -t ./build/fuzzgoat/Debug/fuzzgoat.exe -a ./fuzzgoat/input-files/validObject'
     #     out = runAndCaptureOutput(cmd)
     #     self.assertRegex( out, r'0[)] ReadFile from.*validObject' )
 
