@@ -625,6 +625,9 @@ SL2Client::wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
     info->function = Function::MapViewOfFile;
     info->hFile = hFileMappingObject;
     info->lpBuffer = NULL;
+    // NOTE(ww): dwNumberOfBytesToMap=0 is a special case here, since 0 indicates that the
+    // entire file is being mapped into memory. What's the right way to get the size of the
+    // mapped file here?
     info->nNumberOfBytesToRead = dwNumberOfBytesToMap;
     info->position = NULL;
     info->retAddrOffset = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
@@ -632,6 +635,10 @@ SL2Client::wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
     fileArgHash fStruct = {0};
     fStruct.count = info->nNumberOfBytesToRead;
 
+    // NOTE(ww): This is probably wrong. We probably need to use GetMappedFileName,
+    // but that takes the address returned by MapViewOfFile and we don't have access to that yet.
+    // Maybe we should just hook CreateFileMapping/OpenFileMapping and associate the pathname
+    // used there with the handle we have access to here.
     GetFinalPathNameByHandle(info->hFile, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
 
     info->source = (wchar_t *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(fStruct.fileName));

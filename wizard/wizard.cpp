@@ -110,6 +110,12 @@ wrap_pre__read(void *wrapcxt, OUT void **user_data)
     client.wrap_pre__read(wrapcxt, user_data);
 }
 
+static void
+wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
+{
+    client.wrap_pre_MapViewOfFile(wrapcxt, user_data);
+}
+
 /* prints information about the function call to stderr so the harness can ingest it */
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data)
@@ -183,6 +189,71 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     dr_thread_free(drcontext, info, sizeof(client_read_info));
 }
 
+// NOTE(ww): MapViewOfFile can't use the Generic post-hook, since it
+// returns the address of the mapped region.
+static void
+wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
+{
+    void *drcontext;
+
+    if (!user_data) {
+        SL2_DR_DEBUG("Warning: user_data=NULL in wrap_post_MapViewOfFile!\n");
+        return;
+    }
+
+    if (!wrapcxt) {
+        SL2_DR_DEBUG("Warning: wrapcxt=NULL in wrap_post_MapViewOfFile! Using dr_get_current_drcontext.\n");
+        drcontext = dr_get_current_drcontext();
+    }
+    else {
+        drcontext = drwrap_get_drcontext(wrapcxt);
+    }
+
+    wstring_convert<std::codecvt_utf8<wchar_t>> utf8Converter;
+
+    client_read_info *info   = ((client_read_info *)user_data);
+    const char *func_name = function_to_string(info->function);
+
+    json j;
+    j["type"]               = "id";
+    j["callCount"]          = client.incrementCallCountForFunction(info->function);
+    j["retAddrCount"]       = client.incrementRetAddrCount(info->retAddrOffset);
+    j["retAddrOffset"]      = (uint64_t) info->retAddrOffset;
+    j["func_name"]          = func_name;
+
+
+
+    if(info->source != NULL) {
+        wstring wsource =  wstring(info->source);
+        j["source"]  = utf8Converter.to_bytes(wsource);
+
+        size_t end   = info->position + info->nNumberOfBytesToRead;
+        j["start"]   = info->position;
+        j["end"]     = end;
+    }
+
+    if (info->argHash != NULL) {
+        j["argHash"] = info->argHash;
+    }
+
+    char *lpBuffer = (char *) drwrap_get_retval(wrapcxt);
+    size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
+
+    vector<unsigned char> x(lpBuffer, lpBuffer + min(nNumberOfBytesToRead, 64));
+    j["buffer"] = x;
+
+    SL2_LOG_JSONL(j);
+
+    if (info->source) {
+        dr_thread_free(drcontext, info->source, MAX_PATH + 1);
+    }
+    if (info->argHash) {
+        dr_thread_free(drcontext, info->argHash, SL2_HASH_LEN + 1);
+    }
+
+    dr_thread_free(drcontext, info, sizeof(client_read_info));
+}
+
 /* Runs every time we load a new module. Wraps functions we can target. See fuzzer.cpp for a more-detailed version */
 static void
 on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
@@ -219,6 +290,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_PRE_HOOK1(toHookPre, fread_s);
     SL2_PRE_HOOK1(toHookPre, fread);
     SL2_PRE_HOOK1(toHookPre, _read);
+    SL2_PRE_HOOK1(toHookPre, MapViewOfFile);
 
     sl2_post_proto_map toHookPost;
     SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
@@ -235,6 +307,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_POST_HOOK2(toHookPost, fread_s, Generic);
     SL2_POST_HOOK2(toHookPost, fread, Generic);
     SL2_POST_HOOK2(toHookPost, _read, Generic);
+    SL2_POST_HOOK1(toHookPost, MapViewOfFile);
 
     sl2_pre_proto_map::iterator it;
     for (it = toHookPre.begin(); it != toHookPre.end(); it++) {
