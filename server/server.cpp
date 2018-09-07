@@ -1007,7 +1007,7 @@ static void handle_advise_mutation(HANDLE pipe)
     }
 }
 
-static void handle_arena_info(HANDLE pipe)
+static void handle_coverage_info(HANDLE pipe)
 {
     DWORD txsize;
     size_t size;
@@ -1118,8 +1118,8 @@ static DWORD WINAPI thread_handler(void *data)
             case EVT_ADVISE_MUTATION:
                 handle_advise_mutation(pipe);
                 break;
-            case EVT_ARENA_INFO:
-                handle_arena_info(pipe);
+            case EVT_COVERAGE_INFO:
+                handle_coverage_info(pipe);
                 break;
             case EVT_SESSION_TEARDOWN:
                 SL2_SERVER_LOG_INFO("ending a client's session with the server.");
