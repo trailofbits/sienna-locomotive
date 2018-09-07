@@ -1,4 +1,4 @@
-from distutils.core import setup
+from setuptools import setup
 
 setup(
     name='Sienna Locomotive 2',
@@ -17,6 +17,9 @@ setup(
         'console_scripts': [
             'sl2 = sl2.gui:main',
             'sl2-cli = sl2.harness:main'
+        ],
+        'gui_scripts': [
+            'sl2-noconsole = sl2.gui:main'
         ]
     }
 )

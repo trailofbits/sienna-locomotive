@@ -12,7 +12,7 @@ function Unzip
 
 
 Function InstallDependencies {
-    $deps = @("msgpack", "PySide2", "sqlalchemy")
+    $deps = @("setuptools", "msgpack", "PySide2", "sqlalchemy")
     foreach ( $dep in $deps ) {
         "Installing $dep"
         pip install "${dep}"
