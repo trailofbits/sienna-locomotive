@@ -23,6 +23,7 @@ sl2_funcmod SL2_FUNCMOD_TABLE[] = {
     {"fread_s", "UCRTBASED.DLL"},
     {"_read", "UCRTBASE.DLL"},
     {"_read", "UCRTBASED.DLL"},
+    {"MapViewOfFile", "KERNELBASE.DLL"},
 };
 
 SL2_EXPORT
@@ -604,6 +605,42 @@ SL2Client::wrap_pre__read(void *wrapcxt, OUT void **user_data)
     hash_args(info->argHash, &fStruct);
 }
 
+void
+SL2Client::wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
+{
+    SL2_DR_DEBUG("<in wrap_pre_MapViewOfFile>\n");
+
+    HANDLE hFileMappingObject = drwrap_get_arg(wrapcxt, 0);
+    #pragma warning(suppress: 4311 4302)
+    DWORD dwDesiredAccess = (DWORD) drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
+    DWORD dwFileOffsetHigh = (DWORD) drwrap_get_arg(wrapcxt, 2);
+    #pragma warning(suppress: 4311 4302)
+    DWORD dwFileOffsetLow = (DWORD) drwrap_get_arg(wrapcxt, 3);
+    size_t dwNumberOfBytesToMap = (size_t) drwrap_get_arg(wrapcxt, 4);
+
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
+
+    info->function = Function::MapViewOfFile;
+    info->hFile = hFileMappingObject;
+    info->lpBuffer = NULL;
+    info->nNumberOfBytesToRead = dwNumberOfBytesToMap;
+    info->position = NULL;
+    info->retAddrOffset = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+
+    fileArgHash fStruct = {0};
+    fStruct.count = info->nNumberOfBytesToRead;
+
+    GetFinalPathNameByHandle(info->hFile, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
+
+    info->source = (wchar_t *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(fStruct.fileName));
+    memcpy(info->source, fStruct.fileName, sizeof(fStruct.fileName));
+
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+    hash_args(info->argHash, &fStruct);
+}
+
 
 // TODO(ww): Document the fallback values here.
 SL2_EXPORT
@@ -648,6 +685,8 @@ const char *function_to_string(Function function)
             return "fread_s";
         case Function::_read:
             return "_read";
+        case Function::MapViewOfFile:
+            return "MapViewOfFile";
     }
 
     return "unknown";

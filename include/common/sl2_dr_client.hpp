@@ -85,6 +85,7 @@ enum class Function {
     fread,
     fread_s,
     _read,
+    MapViewOfFile,
 };
 
 // The set of supported function targeting techniques.
@@ -201,6 +202,7 @@ public:
     void        wrap_pre_fread(void *wrapcxt, OUT void **user_data);
     void        wrap_pre_fread_s(void *wrapcxt, OUT void **user_data);
     void        wrap_pre__read(void *wrapcxt, OUT void **user_data);
+    void        wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data);
     bool        loadJson(string json);
     uint64_t    incrementCallCountForFunction(Function function);
     uint64_t    incrementRetAddrCount(uint64_t retAddr);
