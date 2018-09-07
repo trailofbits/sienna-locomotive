@@ -238,31 +238,31 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
         interesting_call = false;
     }
 
-    char argHash[SL2_HASH_LEN + 1] = {0};
-
-    // NOTE(ww): If nNumberOfBytesToRead=0, then the entire file is being mapped.
-    // For the wizard's purposes (previewing the mapped buffer), just treat this
-    // as a 64 byte mapping.
-    if (!nNumberOfBytesToRead) {
-        nNumberOfBytesToRead = 64;
-    }
-
-    fStruct.readSize = 64;
-
-    j["source"]  = utf8Converter.to_bytes(wstring(fStruct.fileName));
-
-    size_t end   = info->position + info->nNumberOfBytesToRead;
-    j["start"]   = info->position;
-    j["end"]     = end;
-
-    hash_args(argHash, &fStruct);
-
-    j["argHash"] = argHash;
-
-    vector<unsigned char> x(map_base, map_base + min(nNumberOfBytesToRead, 64));
-    j["buffer"] = x;
-
     if (interesting_call) {
+        char argHash[SL2_HASH_LEN + 1] = {0};
+
+        // NOTE(ww): If nNumberOfBytesToRead=0, then the entire file is being mapped.
+        // For the wizard's purposes (previewing the mapped buffer), just treat this
+        // as a 64 byte mapping.
+        if (!nNumberOfBytesToRead) {
+            nNumberOfBytesToRead = 64;
+        }
+
+        fStruct.readSize = 64;
+
+        j["source"]  = utf8Converter.to_bytes(wstring(fStruct.fileName));
+
+        size_t end   = info->position + info->nNumberOfBytesToRead;
+        j["start"]   = info->position;
+        j["end"]     = end;
+
+        hash_args(argHash, &fStruct);
+
+        j["argHash"] = argHash;
+
+        vector<unsigned char> x(map_base, map_base + min(nNumberOfBytesToRead, 64));
+        j["buffer"] = x;
+
         SL2_LOG_JSONL(j);
     }
 
