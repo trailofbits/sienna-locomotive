@@ -8,15 +8,15 @@
 from sqlalchemy import *
 from sqlalchemy import orm
 from sqlalchemy.orm import relationship
-import harness.config
+from sl2.harness import config
 import json
 import os
 import re
 import subprocess
 from sqlalchemy.sql.expression import func
 
-from db.base import Base
-import db
+from .base import Base
+from sl2 import db
 
 
 ## Crash class
@@ -212,7 +212,7 @@ class Crash(Base):
     # @return Crash object
     @staticmethod
     def factory(runid, slug=None, targetPath=None):
-        cfg = harness.config
+        cfg = config
         session = db.getSession()
         runid = str(runid)
         ret = session.query(Crash).filter(Crash.runid == runid).first()
