@@ -15,11 +15,12 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'sl2 = sl2.gui:main',
-            'sl2-cli = sl2.harness:main'
+            'sl2 = sl2.gui.__main__:main',
+            'sl2-cli = sl2.harness.__main__:main',
+            'sl2-triage = sl2.triage.__main__:main'
         ],
         'gui_scripts': [
-            'sl2-noconsole = sl2.gui:main'
+            'sl2-noconsole = sl2.gui.__main__:main'
         ]
     }
 )

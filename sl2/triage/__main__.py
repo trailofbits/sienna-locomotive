@@ -115,10 +115,12 @@ class TriageExport:
         }
         return attrmap
 
-
-if __name__ == '__main__':
+def main():
     outdir = r"f:\2"
     print("outdir", outdir)
 
     pproc = TriageExport(outdir)
     pproc.export()
+
+if __name__ == '__main__':
+    main()

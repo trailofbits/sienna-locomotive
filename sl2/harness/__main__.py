@@ -156,7 +156,7 @@ def sanity_checks():
         print_l("[+] Unexpected exception during sanity checks:", e)
 
 
-def main():
+def _main():
     sanity_checks()
 
     config = harness.config.config
@@ -228,13 +228,15 @@ def main():
             # Wait for exit
             concurrent.futures.wait(fuzz_futures)
 
-
-if __name__ == '__main__':
+def main():
     signal.signal(signal.SIGINT, interrupted)
 
     try:
-        main()
+        _main()
     except KeyboardInterrupt:
         print_l("Waiting for worker threads to exit...")
         kill()
         raise
+
+if __name__ == '__main__':
+    main()
