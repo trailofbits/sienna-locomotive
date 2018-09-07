@@ -22,7 +22,7 @@ from typing import NamedTuple
 
 import msgpack
 
-import db
+from sl2 import db
 from . import config
 from . import named_mutex
 from .state import (

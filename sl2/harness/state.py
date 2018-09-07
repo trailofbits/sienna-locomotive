@@ -14,7 +14,7 @@ from typing import NamedTuple
 
 import msgpack
 
-import db
+from sl2 import db
 from . import config
 
 uuid_regex = re.compile("[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}")

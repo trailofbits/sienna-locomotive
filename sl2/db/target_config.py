@@ -7,9 +7,9 @@
 from sqlalchemy import *
 from sqlalchemy.orm import relationship
 
-import db
-from db.base import Base
-from db.utilz import hash_file
+from sl2 import db
+from .base import Base
+from .utilz import hash_file
 
 
 ## DB Wrapper for Target Config Files

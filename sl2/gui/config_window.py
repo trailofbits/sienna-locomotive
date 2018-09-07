@@ -4,7 +4,7 @@ from PySide2 import QtWidgets
 from PySide2.QtCore import Qt, QSize
 from PySide2.QtWidgets import QFileDialog, QStyle
 
-from harness import config
+from sl2.harness import config
 
 
 class ConfigWindow(QtWidgets.QDialog):

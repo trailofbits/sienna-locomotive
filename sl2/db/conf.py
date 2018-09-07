@@ -4,8 +4,8 @@
 
 from sqlalchemy import *
 
-from db.base import Base
-import db
+from .base import Base
+from sl2 import db
 
 
 ## Configuration key/value pairs

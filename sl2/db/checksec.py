@@ -6,13 +6,13 @@
 #
 
 from sqlalchemy import *
-import harness.config
+from sl2.harness import config
 import subprocess
 import json
 
-import db
-from db.base import Base
-from db.utilz import hash_file
+from sl2 import db
+from .base import Base
+from .utilz import hash_file
 
 
 ## DB Wrapper for winchecksec
@@ -59,7 +59,7 @@ class Checksec(Base):
     # @return Checksec obj
     @staticmethod
     def byExecutable(path):
-        cfg = harness.config
+        cfg = config
         session = db.getSession()
 
         ret = session.query(Checksec).filter(Checksec.hash == hash_file(path)).first()

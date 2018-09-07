@@ -7,7 +7,7 @@ import glob
 import re
 from hashlib import sha256
 from functools import lru_cache
-import harness.config
+from sl2.harness import config
 
 
 ## Converts the full path to an sl2 minidump to a runid
@@ -26,7 +26,7 @@ def dumpPathToRunid(dmpPath):
 # @return string path to minidump file
 def runidToDumpPath(runid):
     dumpPath = None
-    cfg = harness.config
+    cfg = config
 
     dumpsGlob = os.path.join(cfg.sl2_runs_dir, runid, 'initial.*.dmp')
     for dumpPath in glob.glob(dumpsGlob):

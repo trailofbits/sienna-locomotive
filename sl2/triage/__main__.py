@@ -12,7 +12,7 @@ from shutil import ignore_patterns
 
 from PySide2.QtWidgets import QFileDialog
 
-import db
+from sl2 import db
 
 ## strips out characters in a string that could be harmful for filenames or paths
 # @param s strings to sanitize

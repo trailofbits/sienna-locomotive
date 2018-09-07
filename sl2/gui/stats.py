@@ -4,8 +4,7 @@ import statistics
 
 from PySide2 import QtWidgets
 
-import db
-from db import Crash
+from sl2.db import Crash, getSession
 
 
 ## Widget for crash statistics
@@ -63,7 +62,7 @@ class StatsWidget(QtWidgets.QWidget):
 
     ## Requeries the database and updates the table
     def update(self):
-        session = db.getSession()
+        session = getSession()
 
         self.crashes = Crash.getAll()
         self.crashesCnt = len(self.crashes)

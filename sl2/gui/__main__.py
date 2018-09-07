@@ -14,22 +14,22 @@ from PySide2.QtGui import QFontDatabase, QMovie, QStandardItem, QBrush, QColor
 from PySide2.QtWidgets import *
 from sqlalchemy import desc
 
-import db
-import gui.stats
+from sl2 import db
+from . import stats
 import triage
-from config_window import ConfigWindow
-from gui import sqlalchemy_model
-from gui.QtHelpers import QIntVariable, QFloatVariable, QTextAdapter
-from gui.checkbox_tree import (
+from .config_window import ConfigWindow
+from . import sqlalchemy_model
+from .QtHelpers import QIntVariable, QFloatVariable, QTextAdapter
+from .checkbox_tree import (
     CheckboxTreeWidget,
     CheckboxTreeWidgetItem,
     CheckboxTreeModel,
     CheckboxTreeSortFilterProxyModel,
     ComboboxTreeItemDelegate,
     mode_labels)
-from harness import config
-from harness.state import get_target, export_crash_data_to_csv, get_target_slug
-from harness.threads import WizardThread, FuzzerThread, ServerThread
+from sl2.harness import config
+from sl2.harness.state import get_target, export_crash_data_to_csv, get_target_slug
+from sl2.harness.threads import WizardThread, FuzzerThread, ServerThread
 
 
 ##
@@ -236,7 +236,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.crashBrowser.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self._layout.addWidget(self.crashBrowser)
 
-        self.statsWidget = gui.stats.StatsWidget()
+        self.statsWidget = stats.StatsWidget()
         self._layout.addWidget(self.statsWidget)
 
         # Set up stop button (and hide it)

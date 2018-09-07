@@ -15,9 +15,8 @@ import winreg
 
 import msgpack
 
-import harness.config
-import harness.statz
-from harness.instrument import (
+from .config import config
+from .instrument import (
     print_l,
     wizard_run,
     fuzzer_run,
@@ -26,7 +25,7 @@ from harness.instrument import (
     fuzz_and_triage,
     kill
 )
-from harness.state import (
+from .state import (
     get_target_dir,
     get_all_targets,
     get_runs,
@@ -66,7 +65,7 @@ def select_from_range(max_range, message):
 # OR if the target's architecture isn't supported.
 # Either way there isn't much we can do, so exit.
 def select_and_dump_wizard_findings(wizard_findings, target_file):
-    cfg = harness.config.config
+    cfg = config
 
     if len(wizard_findings) == 0:
         print_l("[!] No wizard findings!")
@@ -159,7 +158,7 @@ def sanity_checks():
 def _main():
     sanity_checks()
 
-    config = harness.config.config
+    config = config
 
     start_server()
 

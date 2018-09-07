@@ -6,9 +6,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.pool import *
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import scoped_session
-from harness import config
+from sl2.harness import config
 import os
-import db.base
+from . import base
 
 ## Imports of the other classes
 from .conf import Conf
@@ -35,9 +35,9 @@ def getSession():
 # ABI version and will throw and error to protect the user
 def checkVersionNumber():
     versionNow = config.VERSION
-    confVersion = db.Conf.factory('version')
+    confVersion = Conf.factory('version')
     if not confVersion:
-        db.Conf.factory("version", versionNow)
+        Conf.factory("version", versionNow)
         return
 
     if confVersion.value < versionNow:
@@ -63,7 +63,7 @@ dburl = os.path.join('sqlite:///%s' % dbpath)
 ## sqlalchemy database engine
 engine = create_engine(dburl, poolclass=NullPool)
 
-db.base.Base.metadata.create_all(engine)
+base.Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 Session = scoped_session(Session)
 Session().commit()

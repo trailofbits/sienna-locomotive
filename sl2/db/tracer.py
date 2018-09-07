@@ -8,8 +8,8 @@ from sqlalchemy import *
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import relationship
 
-import db
-from db.base import Base
+from sl2 import db
+from .base import Base
 
 
 ## Represents a tracer run
