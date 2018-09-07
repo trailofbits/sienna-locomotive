@@ -258,6 +258,22 @@ static void server_cleanup()
     DeleteCriticalSection(&arena_lock);
 }
 
+// Called on session termination.
+static void destroy_pipe(HANDLE pipe)
+{
+    if (!FlushFileBuffers(pipe)) {
+        SL2_SERVER_LOG_ERROR("failed to flush pipe");
+    }
+
+    if (!DisconnectNamedPipe(pipe)) {
+        SL2_SERVER_LOG_ERROR("failed to disconnect pipe");
+    }
+
+    if (!CloseHandle(pipe)) {
+        SL2_SERVER_LOG_ERROR("failed to close pipe");
+    }
+}
+
 // Initialize the global variable (FUZZ_LOG) containing the path to the logging file.
 // NOTE(ww): We separate this from init_working_paths so that we can log any errors that
 // happen to occur in init_working_paths.
@@ -1050,21 +1066,6 @@ static void handle_coverage_info(HANDLE pipe)
     }
 
     rlock.unlock();
-}
-
-static void destroy_pipe(HANDLE pipe)
-{
-    if (!FlushFileBuffers(pipe)) {
-        SL2_SERVER_LOG_ERROR("failed to flush pipe");
-    }
-
-    if (!DisconnectNamedPipe(pipe)) {
-        SL2_SERVER_LOG_ERROR("failed to disconnect pipe");
-    }
-
-    if (!CloseHandle(pipe)) {
-        SL2_SERVER_LOG_ERROR("failed to close pipe");
-    }
 }
 
 /* Handles incoming connections from clients */
