@@ -196,6 +196,7 @@ static void
 wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 {
     void *drcontext;
+    bool interesting_call = true;
 
     if (!user_data) {
         SL2_DR_DEBUG("Warning: user_data=NULL in wrap_post_MapViewOfFile!\n");
@@ -230,9 +231,11 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     if (!GetMappedFileName(GetCurrentProcess(), map_base, fStruct.fileName, MAX_PATH)) {
         // NOTE(ww): This can happen when a memory-mapped object doesn't have a real file
         // backing it, e.g. when the mapping is of the page file or some other
-        // kernel-managed resource.
+        // kernel-managed resource. When that happens, we assume it's not something
+        // that the user wants to target.
         SL2_DR_DEBUG("GetMappedFileName failed (GLE=%d)\n", GetLastError());
-        SL2_DR_DEBUG("Maybe not an interesting MapViewOfFile call?\n");
+        SL2_DR_DEBUG("Assuming the call isn't interesting!\n");
+        interesting_call = false;
     }
 
     char argHash[SL2_HASH_LEN + 1] = {0};
@@ -259,7 +262,9 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     vector<unsigned char> x(map_base, map_base + min(nNumberOfBytesToRead, 64));
     j["buffer"] = x;
 
-    SL2_LOG_JSONL(j);
+    if (interesting_call) {
+        SL2_LOG_JSONL(j);
+    }
 
     dr_thread_free(drcontext, info, sizeof(client_read_info));
 }
