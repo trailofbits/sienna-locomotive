@@ -2,16 +2,17 @@
 #include <stddef.h> /* for offsetof */
 #include <map>
 #include <set>
-
-#include "common/sl2_dr_client.hpp"
-#include "common/sl2_dr_client_options.hpp"
-
 #include <iostream>
 #include <codecvt>
 #include <locale>
 
+#include "common/sl2_dr_client.hpp"
+#include "common/sl2_dr_client_options.hpp"
+
 #include "vendor/picosha2.h"
 using namespace std;
+
+#include <psapi.h>
 
 static SL2Client client;
 /* Run whenever a thread inits/exits */
@@ -209,10 +210,13 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
         drcontext = drwrap_get_drcontext(wrapcxt);
     }
 
-    wstring_convert<std::codecvt_utf8<wchar_t>> utf8Converter;
-
     client_read_info *info   = ((client_read_info *)user_data);
     const char *func_name = function_to_string(info->function);
+
+    char *map_base = (char *) drwrap_get_retval(wrapcxt);
+    size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
+
+    wstring_convert<std::codecvt_utf8<wchar_t>> utf8Converter;
 
     json j;
     j["type"]               = "id";
@@ -221,35 +225,41 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     j["retAddrOffset"]      = (uint64_t) info->retAddrOffset;
     j["func_name"]          = func_name;
 
+    fileArgHash fStruct = {0};
 
-
-    if(info->source != NULL) {
-        wstring wsource =  wstring(info->source);
-        j["source"]  = utf8Converter.to_bytes(wsource);
-
-        size_t end   = info->position + info->nNumberOfBytesToRead;
-        j["start"]   = info->position;
-        j["end"]     = end;
+    if (!GetMappedFileName(GetCurrentProcess(), map_base, fStruct.fileName, MAX_PATH)) {
+        // NOTE(ww): This can happen when a memory-mapped object doesn't have a real file
+        // backing it, e.g. when the mapping is of the page file or some other
+        // kernel-managed resource.
+        SL2_DR_DEBUG("GetMappedFileName failed (GLE=%d)\n", GetLastError());
+        SL2_DR_DEBUG("Maybe not an interesting MapViewOfFile call?\n");
     }
 
-    if (info->argHash != NULL) {
-        j["argHash"] = info->argHash;
+    char argHash[SL2_HASH_LEN + 1] = {0};
+
+    // NOTE(ww): If nNumberOfBytesToRead=0, then the entire file is being mapped.
+    // For the wizard's purposes (previewing the mapped buffer), just treat this
+    // as a 64 byte mapping.
+    if (!nNumberOfBytesToRead) {
+        nNumberOfBytesToRead = 64;
     }
 
-    char *lpBuffer = (char *) drwrap_get_retval(wrapcxt);
-    size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
+    fStruct.readSize = 64;
 
-    vector<unsigned char> x(lpBuffer, lpBuffer + min(nNumberOfBytesToRead, 64));
+    j["source"]  = utf8Converter.to_bytes(wstring(fStruct.fileName));
+
+    size_t end   = info->position + info->nNumberOfBytesToRead;
+    j["start"]   = info->position;
+    j["end"]     = end;
+
+    hash_args(argHash, &fStruct);
+
+    j["argHash"] = argHash;
+
+    vector<unsigned char> x(map_base, map_base + min(nNumberOfBytesToRead, 64));
     j["buffer"] = x;
 
     SL2_LOG_JSONL(j);
-
-    if (info->source) {
-        dr_thread_free(drcontext, info->source, MAX_PATH + 1);
-    }
-    if (info->argHash) {
-        dr_thread_free(drcontext, info->argHash, SL2_HASH_LEN + 1);
-    }
 
     dr_thread_free(drcontext, info, sizeof(client_read_info));
 }

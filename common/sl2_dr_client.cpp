@@ -632,20 +632,9 @@ SL2Client::wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
     info->position = NULL;
     info->retAddrOffset = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
-    fileArgHash fStruct = {0};
-    fStruct.count = info->nNumberOfBytesToRead;
-
-    // NOTE(ww): This is probably wrong. We probably need to use GetMappedFileName,
-    // but that takes the address returned by MapViewOfFile and we don't have access to that yet.
-    // Maybe we should just hook CreateFileMapping/OpenFileMapping and associate the pathname
-    // used there with the handle we have access to here.
-    GetFinalPathNameByHandle(info->hFile, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
-
-    info->source = (wchar_t *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(fStruct.fileName));
-    memcpy(info->source, fStruct.fileName, sizeof(fStruct.fileName));
-
-    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    hash_args(info->argHash, &fStruct);
+    // NOTE(ww): We populate these in the post-hook.
+    info->source = NULL;
+    info->argHash = NULL;
 }
 
 
