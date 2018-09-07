@@ -114,7 +114,6 @@ class Checksec(Base):
     # succinctly describes the checksec state of the object
     # @return string
     def shortString(self):
-        # TODO: implement other flags
         t = []
         if self.aslr:
             t.append("ASLR")
@@ -122,8 +121,6 @@ class Checksec(Base):
             t.append("Authenticode")
         if self.cfg:
             t.append("CFG")
-        if self.dynamicBase:
-            t.append("DynamicBase")
         if self.forceIntegrity:
             t.append("ForcedIntegrity")
         if self.gs:
@@ -138,6 +135,8 @@ class Checksec(Base):
             t.append("RFG")
         if self.seh:
             t.append("SEH")
+        if self.safeSEH:
+            t.append("SafeSEH")
         tags = ' | '.join(t)
 
         return "%3.0f%% (%s)" % (self.protectionPercent() * 100, tags)

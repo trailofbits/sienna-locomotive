@@ -258,6 +258,22 @@ static void server_cleanup()
     DeleteCriticalSection(&arena_lock);
 }
 
+// Called on session termination.
+static void destroy_pipe(HANDLE pipe)
+{
+    if (!FlushFileBuffers(pipe)) {
+        SL2_SERVER_LOG_ERROR("failed to flush pipe");
+    }
+
+    if (!DisconnectNamedPipe(pipe)) {
+        SL2_SERVER_LOG_ERROR("failed to disconnect pipe");
+    }
+
+    if (!CloseHandle(pipe)) {
+        SL2_SERVER_LOG_ERROR("failed to close pipe");
+    }
+}
+
 // Initialize the global variable (FUZZ_LOG) containing the path to the logging file.
 // NOTE(ww): We separate this from init_working_paths so that we can log any errors that
 // happen to occur in init_working_paths.
@@ -1007,19 +1023,49 @@ static void handle_advise_mutation(HANDLE pipe)
     }
 }
 
-static void destroy_pipe(HANDLE pipe)
+static void handle_coverage_info(HANDLE pipe)
 {
-    if (!FlushFileBuffers(pipe)) {
-        SL2_SERVER_LOG_ERROR("failed to flush pipe");
+    DWORD txsize;
+    size_t size;
+    wchar_t arena_id[SL2_HASH_LEN + 1] = {0};
+
+    if (!ReadFile(pipe, &size, sizeof(size), &txsize, NULL))  {
+        SL2_SERVER_LOG_FATAL("failed to read arena ID size");
     }
 
-    if (!DisconnectNamedPipe(pipe)) {
-        SL2_SERVER_LOG_ERROR("failed to disconnect pipe");
+    if (size != SL2_HASH_LEN * sizeof(wchar_t)) {
+        SL2_SERVER_LOG_FATAL("wrong arena ID size %lu != %lu", size, SL2_HASH_LEN * sizeof(wchar_t));
     }
 
-    if (!CloseHandle(pipe)) {
-        SL2_SERVER_LOG_ERROR("failed to close pipe");
+    if (!ReadFile(pipe, &arena_id, (DWORD) size, &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("failed to read arena ID");
     }
+
+    SL2_SERVER_LOG_INFO("got arena ID: %S", arena_id);
+
+    rlock.lock();
+    sl2_strategy_map_t::iterator it = strategy_map.find(arena_id);
+
+    if (it == strategy_map.end()) {
+        SL2_SERVER_LOG_FATAL("arena ID missing from strategy_map? (map size=%d)", strategy_map.size());
+    }
+
+    // First, write whether we're doing bucketing.
+    if (!WriteFile(pipe, &opts.bucketing, sizeof(opts.bucketing), &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("failed to write bucketing status");
+    }
+
+    // Then, write our current coverage score for the arena.
+    if (!WriteFile(pipe, &(it->second.score), sizeof(it->second.score), &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("failed to write coverage score");
+    }
+
+    // Then, write the number of tries remaining for the current strategy.
+    if (!WriteFile(pipe, &(it->second.tries_remaining), sizeof(it->second.tries_remaining), &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("failed to write number of tries remaining");
+    }
+
+    rlock.unlock();
 }
 
 /* Handles incoming connections from clients */
@@ -1085,6 +1131,9 @@ static DWORD WINAPI thread_handler(void *data)
                 break;
             case EVT_ADVISE_MUTATION:
                 handle_advise_mutation(pipe);
+                break;
+            case EVT_COVERAGE_INFO:
+                handle_coverage_info(pipe);
                 break;
             case EVT_SESSION_TEARDOWN:
                 SL2_SERVER_LOG_INFO("ending a client's session with the server.");
