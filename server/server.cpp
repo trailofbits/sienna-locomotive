@@ -1007,6 +1007,38 @@ static void handle_advise_mutation(HANDLE pipe)
     }
 }
 
+static void handle_arena_info(HANDLE pipe)
+{
+    DWORD txsize;
+    size_t size;
+    wchar_t arena_id[SL2_HASH_LEN + 1] = {0};
+
+    if (!ReadFile(pipe, &size, sizeof(size), &txsize, NULL))  {
+        SL2_SERVER_LOG_FATAL("failed to read arena ID size");
+    }
+
+    if (size != SL2_HASH_LEN * sizeof(wchar_t)) {
+        SL2_SERVER_LOG_FATAL("wrong arena ID size %lu != %lu", size, SL2_HASH_LEN * sizeof(wchar_t));
+    }
+
+    if (!ReadFile(pipe, &arena_id, (DWORD) size, &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("failed to read arena ID");
+    }
+
+    SL2_SERVER_LOG_INFO("got arena ID: %S", arena_id);
+
+    rlock.lock();
+    sl2_strategy_map_t::iterator it = strategy_map.find(arena_id);
+
+    if (it == strategy_map.end()) {
+        SL2_SERVER_LOG_FATAL("arena ID missing from strategy_map? (map size=%d)", strategy_map.size());
+    }
+
+    // TODO(ww): Write the contents of it->second (strategy_state) to the pipe.
+
+    rlock.unlock();
+}
+
 static void destroy_pipe(HANDLE pipe)
 {
     if (!FlushFileBuffers(pipe)) {
@@ -1085,6 +1117,9 @@ static DWORD WINAPI thread_handler(void *data)
                 break;
             case EVT_ADVISE_MUTATION:
                 handle_advise_mutation(pipe);
+                break;
+            case EVT_ARENA_INFO:
+                handle_arena_info(pipe);
                 break;
             case EVT_SESSION_TEARDOWN:
                 SL2_SERVER_LOG_INFO("ending a client's session with the server.");

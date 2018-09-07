@@ -76,6 +76,8 @@ enum Event {
     EVT_REGISTER_PID,       // 13
     // Request mutation strategy advice from the server.
     EVT_ADVISE_MUTATION,    // 14
+    // Request information about an arena from the server.
+    EVT_ARENA_INFO,         // 15
     // Use this as a default value when handling multiple events.
     // NOTE(ww): The server will complain and may die if you send this.
     EVT_INVALID = 255,
