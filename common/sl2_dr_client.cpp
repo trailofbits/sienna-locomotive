@@ -635,6 +635,14 @@ SL2Client::wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
     // NOTE(ww): We populate these in the post-hook.
     info->source = NULL;
     info->argHash = NULL;
+
+    // Change write-access requests to copy-on-write requests, since we don't want to clobber
+    // our original input file with mutated data.
+    if (dwDesiredAccess == FILE_MAP_ALL_ACCESS || dwDesiredAccess == FILE_MAP_WRITE) {
+        SL2_DR_DEBUG("MapViewOfFile requested write access, changing to CoW!\n");
+        uint64_t fixed_access = FILE_MAP_COPY;
+        drwrap_set_arg(wrapcxt, 1, (void *) fixed_access);
+    }
 }
 
 
