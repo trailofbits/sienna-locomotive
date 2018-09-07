@@ -1,12 +1,12 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
-    name='Sienna Locomotive 2',
-    version='0.1dev',
+    name='sienna-locomotive',
+    version='0.2dev',
     description='A User-Friendly Fuzzing Tool',
     url='https://github.com/trailofbits/sienna-locomotive',
     author='Trail of Bits',
-    packages=['db', 'gui', 'harness'],
+    packages=find_packages(),
     long_description=open('README.md').read(),
     install_requires=[
         'msgpack',
