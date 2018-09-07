@@ -122,8 +122,6 @@ class Checksec(Base):
             t.append("Authenticode")
         if self.cfg:
             t.append("CFG")
-        if self.dynamicBase:
-            t.append("DynamicBase")
         if self.forceIntegrity:
             t.append("ForcedIntegrity")
         if self.gs:
