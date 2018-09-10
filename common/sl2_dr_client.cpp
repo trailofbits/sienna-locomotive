@@ -638,9 +638,14 @@ SL2Client::wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
 
     // Change write-access requests to copy-on-write requests, since we don't want to clobber
     // our original input file with mutated data.
-    if (dwDesiredAccess == FILE_MAP_ALL_ACCESS || dwDesiredAccess == FILE_MAP_WRITE) {
-        SL2_DR_DEBUG("MapViewOfFile requested write access, changing to CoW!\n");
+    // TODO(ww): Is this going to cause problems for programs that attept to create multiple
+    // different memory maps of the same on-disk file?
+    if (dwDesiredAccess & FILE_MAP_ALL_ACCESS || dwDesiredAccess & FILE_MAP_WRITE) {
+        SL2_DR_DEBUG("user requested write access from MapViewOfFile, changing to CoW!\n");
         uint64_t fixed_access = FILE_MAP_COPY;
+
+        fixed_access |= (dwDesiredAccess & FILE_MAP_EXECUTE);
+
         drwrap_set_arg(wrapcxt, 1, (void *) fixed_access);
     }
 }
