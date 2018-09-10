@@ -212,7 +212,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     client_read_info *info   = ((client_read_info *)user_data);
     const char *func_name = function_to_string(info->function);
 
-    char *map_base = (char *) drwrap_get_retval(wrapcxt);
+    info->lpBuffer = drwrap_get_retval(wrapcxt);
 
     wstring_convert<std::codecvt_utf8<wchar_t>> utf8Converter;
 
@@ -225,7 +225,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 
     fileArgHash fStruct = {0};
 
-    if (!GetMappedFileName(GetCurrentProcess(), map_base, fStruct.fileName, MAX_PATH)) {
+    if (!GetMappedFileName(GetCurrentProcess(), info->lpBuffer, fStruct.fileName, MAX_PATH)) {
         // NOTE(ww): This can happen when a memory-mapped object doesn't have a real file
         // backing it, e.g. when the mapping is of the page file or some other
         // kernel-managed resource. When that happens, we assume it's not something
@@ -241,7 +241,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
         // NOTE(ww): If nNumberOfBytesToRead=0, then the entire file is being mapped.
         // Get the real size by querying the base address with VirtualQuery.
         if (!info->nNumberOfBytesToRead) {
-            dr_virtual_query((byte *) map_base, &memory_info, sizeof(memory_info));
+            dr_virtual_query((byte *) info->lpBuffer, &memory_info, sizeof(memory_info));
 
             info->nNumberOfBytesToRead = memory_info.RegionSize;
         }
@@ -258,7 +258,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 
         j["argHash"] = info->argHash;
 
-        vector<unsigned char> x(map_base, map_base + min(info->nNumberOfBytesToRead, 64));
+        vector<unsigned char> x((char *) info->lpBuffer, ((char *) info->lpBuffer) + min(info->nNumberOfBytesToRead, 64));
         j["buffer"] = x;
 
         SL2_LOG_JSONL(j);

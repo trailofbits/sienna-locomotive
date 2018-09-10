@@ -8,22 +8,6 @@
 #include "common/mutation.hpp"
 #include "common/sl2_server_api.hpp"
 
-
-// Metadata object for a target function call
-struct fuzzer_read_info {
-    Function function;
-    HANDLE hFile;
-    void *lpBuffer;
-    size_t nNumberOfBytesToRead;
-    DWORD *lpNumberOfBytesRead;
-    uint64_t position;
-    uint64_t retAddrOffset;
-    // TODO(ww): Make this a wchar_t * for consistency.
-    char *argHash;
-};
-
-static bool mutate(HANDLE hFile, size_t position, void *buf, size_t size);
-
 static droption_t<bool> op_no_coverage(
     DROPTION_SCOPE_CLIENT,
     "n",
@@ -224,7 +208,7 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
         do_mutation(&mutation);
     }
 
-//    SL2_DR_DEBUG("mutate: %.*s\n", mutation.bufsize, mutation.buffer);
+    // SL2_DR_DEBUG("mutate: %.*s\n", mutation.bufsize, mutation.buffer);
 
     // Tell the server about our mutation.
     if (sl2_conn_register_mutation(&sl2_conn, &mutation) != SL2Response::OK) {
@@ -439,11 +423,11 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     SL2_DR_DEBUG("<in wrap_post_MapViewOfFile>\n");
 
     client_read_info *info = (client_read_info *) user_data;
-    char *map_base = (char *) drwrap_get_retval(wrapcxt);
+    info->lpBuffer = drwrap_get_retval(wrapcxt);
     MEMORY_BASIC_INFORMATION memory_info = {0};
 
     if (!info->nNumberOfBytesToRead) {
-        dr_virtual_query((byte *) map_base, &memory_info, sizeof(memory_info));
+        dr_virtual_query((byte *) info->lpBuffer, &memory_info, sizeof(memory_info));
 
         info->nNumberOfBytesToRead = memory_info.RegionSize;
     }
@@ -453,7 +437,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 
     // NOTE(ww): The wizard should weed these failures out for us; if it happens
     // here, there's not much we can do.
-    if (!GetMappedFileName(GetCurrentProcess(), map_base, fStruct.fileName, MAX_PATH)) {
+    if (!GetMappedFileName(GetCurrentProcess(), info->lpBuffer, fStruct.fileName, MAX_PATH)) {
         SL2_DR_DEBUG("Fatal: Couldn't get filename for memory map! Aborting.\n");
         crashed = false;
         dr_exit_process(1);

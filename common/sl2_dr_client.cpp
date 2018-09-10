@@ -624,7 +624,6 @@ SL2Client::wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
 
     info->function = Function::MapViewOfFile;
     info->hFile = hFileMappingObject;
-    info->lpBuffer = NULL;
     // NOTE(ww): dwNumberOfBytesToMap=0 is a special case here, since 0 indicates that the
     // entire file is being mapped into memory. We handle this case in the post-hook
     // with a VirtualQuery call.
@@ -632,8 +631,10 @@ SL2Client::wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
     info->position = 0;
     info->retAddrOffset = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
-    // NOTE(ww): We populate these in the post-hook, when necessary.
     info->source = NULL;
+
+    // NOTE(ww): We populate these in the post-hook, when necessary.
+    info->lpBuffer = NULL;
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
 
     // Change write-access requests to copy-on-write requests, since we don't want to clobber
