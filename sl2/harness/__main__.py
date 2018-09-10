@@ -158,8 +158,6 @@ def sanity_checks():
 def _main():
     sanity_checks()
 
-    config = config
-
     start_server()
 
     target_file = os.path.join(get_target_dir(config), 'targets.msg')
