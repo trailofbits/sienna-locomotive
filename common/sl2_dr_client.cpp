@@ -656,7 +656,7 @@ bool
 SL2Client::is_sane_post_hook(void *wrapcxt, void *user_data, void **drcontext)
 {
     if (!user_data) {
-        SL2_DR_DEBUG("Warning: user_data=NULL in post-hook!\n");
+        SL2_DR_DEBUG("Fatal: user_data=NULL in post-hook!\n");
         return false;
     }
 
