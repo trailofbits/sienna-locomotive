@@ -1,10 +1,6 @@
-#include <stdio.h>
-#include <stddef.h> /* for offsetof */
 #include <map>
-#include <set>
 #include <iostream>
 #include <codecvt>
-#include <locale>
 
 #include "common/sl2_dr_client.hpp"
 #include "common/sl2_dr_client_options.hpp"
@@ -13,6 +9,7 @@
 using namespace std;
 
 static SL2Client client;
+
 /* Run whenever a thread inits/exits */
 static void
 on_thread_init(void *drcontext)

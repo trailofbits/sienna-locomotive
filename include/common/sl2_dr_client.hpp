@@ -10,7 +10,6 @@
 #include <Dbghelp.h>
 #include <psapi.h>
 
-
 #include "vendor/json.hpp"
 #include "dr_api.h"
 #include "drmgr.h"
@@ -19,7 +18,6 @@
 #include "drreg.h"
 
 #include <string>
-#include <fstream>
 
 using namespace std;
 

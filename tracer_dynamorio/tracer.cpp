@@ -1,7 +1,5 @@
-#include <stdio.h>
 #include <map>
 #include <set>
-#include <fstream>
 
 #include "vendor/picosha2.h"
 

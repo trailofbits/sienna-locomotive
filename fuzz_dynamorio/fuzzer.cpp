@@ -1,6 +1,4 @@
 #include <map>
-#include <stdio.h>
-#include <fstream>
 
 #include "common/sl2_dr_client.hpp"
 #include "common/sl2_dr_client_options.hpp"
