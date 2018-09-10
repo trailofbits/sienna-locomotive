@@ -1,19 +1,15 @@
-#include <stdio.h>
-#include <stddef.h> /* for offsetof */
 #include <map>
-#include <set>
+#include <iostream>
+#include <codecvt>
 
 #include "common/sl2_dr_client.hpp"
 #include "common/sl2_dr_client_options.hpp"
-
-#include <iostream>
-#include <codecvt>
-#include <locale>
 
 #include "vendor/picosha2.h"
 using namespace std;
 
 static SL2Client client;
+
 /* Run whenever a thread inits/exits */
 static void
 on_thread_init(void *drcontext)
@@ -110,29 +106,26 @@ wrap_pre__read(void *wrapcxt, OUT void **user_data)
     client.wrap_pre__read(wrapcxt, user_data);
 }
 
+static void
+wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
+{
+    client.wrap_pre_MapViewOfFile(wrapcxt, user_data);
+}
+
 /* prints information about the function call to stderr so the harness can ingest it */
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data)
 {
-    void *drcontext;
+    void *drcontext = NULL;
 
-    if (!user_data) {
-        SL2_DR_DEBUG("Warning: user_data=NULL in wrap_post_Generic!\n");
+    if (!client.is_sane_post_hook(wrapcxt, user_data, &drcontext)) {
         return;
-    }
-
-    if (!wrapcxt) {
-        SL2_DR_DEBUG("Warning: wrapcxt=NULL in wrap_post_Generic! Using dr_get_current_drcontext.\n");
-        drcontext = dr_get_current_drcontext();
-    }
-    else {
-        drcontext = drwrap_get_drcontext(wrapcxt);
     }
 
     wstring_convert<std::codecvt_utf8<wchar_t>> utf8Converter;
 
-    client_read_info *info   = ((client_read_info *)user_data);
-    const char *func_name = function_to_string(info->function);
+    client_read_info *info = (client_read_info *) user_data;
+    const char *func_name  = function_to_string(info->function);
 
     json j;
     j["type"]               = "id";
@@ -140,7 +133,6 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     j["retAddrCount"]       = client.incrementRetAddrCount(info->retAddrOffset);
     j["retAddrOffset"]      = (uint64_t) info->retAddrOffset;
     j["func_name"]          = func_name;
-
 
 
     if(info->source != NULL) {
@@ -156,19 +148,16 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
         j["argHash"] = info->argHash;
     }
 
-    char *lpBuffer = (char *) info->lpBuffer;
-    size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
-
     if (info->function == Function::_read){
         #pragma warning(suppress: 4311 4302)
-        nNumberOfBytesToRead = min(nNumberOfBytesToRead, (int) drwrap_get_retval(wrapcxt));
+        info->nNumberOfBytesToRead = min(info->nNumberOfBytesToRead, (int) drwrap_get_retval(wrapcxt));
     }
 
     if ((long long) info->lpNumberOfBytesRead & 0xffffffff){
-        nNumberOfBytesToRead = min(nNumberOfBytesToRead, (int) *(info->lpNumberOfBytesRead));
+        info->nNumberOfBytesToRead = min(info->nNumberOfBytesToRead, (int) *(info->lpNumberOfBytesRead));
     }
 
-    vector<unsigned char> x(lpBuffer, lpBuffer + min(nNumberOfBytesToRead, 64));
+    vector<unsigned char> x((char *) info->lpBuffer, ((char *) info->lpBuffer) + min(info->nNumberOfBytesToRead, 64));
     j["buffer"] = x;
 
     SL2_LOG_JSONL(j);
@@ -180,6 +169,77 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
         dr_thread_free(drcontext, info->argHash, SL2_HASH_LEN + 1);
     }
 
+    dr_thread_free(drcontext, info, sizeof(client_read_info));
+}
+
+// NOTE(ww): MapViewOfFile can't use the Generic post-hook, as
+// we need the address of the mapped view that it returns.
+static void
+wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
+{
+    void *drcontext = NULL;
+    bool interesting_call = true;
+
+    if (!client.is_sane_post_hook(wrapcxt, user_data, &drcontext)) {
+        return;
+    }
+
+    client_read_info *info   = ((client_read_info *)user_data);
+    const char *func_name = function_to_string(info->function);
+
+    info->lpBuffer = drwrap_get_retval(wrapcxt);
+
+    wstring_convert<std::codecvt_utf8<wchar_t>> utf8Converter;
+
+    json j;
+    j["type"]               = "id";
+    j["callCount"]          = client.incrementCallCountForFunction(info->function);
+    j["retAddrCount"]       = client.incrementRetAddrCount(info->retAddrOffset);
+    j["retAddrOffset"]      = (uint64_t) info->retAddrOffset;
+    j["func_name"]          = func_name;
+
+    fileArgHash fStruct = {0};
+
+    if (!GetMappedFileName(GetCurrentProcess(), info->lpBuffer, fStruct.fileName, MAX_PATH)) {
+        // NOTE(ww): This can happen when a memory-mapped object doesn't have a real file
+        // backing it, e.g. when the mapping is of the page file or some other
+        // kernel-managed resource. When that happens, we assume it's not something
+        // that the user wants to target.
+        SL2_DR_DEBUG("GetMappedFileName failed (GLE=%d)\n", GetLastError());
+        SL2_DR_DEBUG("Assuming the call isn't interesting!\n");
+        interesting_call = false;
+    }
+
+    if (interesting_call) {
+        MEMORY_BASIC_INFORMATION memory_info = {0};
+
+        // NOTE(ww): If nNumberOfBytesToRead=0, then the entire file is being mapped.
+        // Get the real size by querying the base address with VirtualQuery.
+        if (!info->nNumberOfBytesToRead) {
+            dr_virtual_query((byte *) info->lpBuffer, &memory_info, sizeof(memory_info));
+
+            info->nNumberOfBytesToRead = memory_info.RegionSize;
+        }
+
+        fStruct.readSize = info->nNumberOfBytesToRead;
+
+        j["source"]  = utf8Converter.to_bytes(wstring(fStruct.fileName));
+
+        size_t end   = info->position + info->nNumberOfBytesToRead;
+        j["start"]   = info->position;
+        j["end"]     = end;
+
+        hash_args(info->argHash, &fStruct);
+
+        j["argHash"] = info->argHash;
+
+        vector<unsigned char> x((char *) info->lpBuffer, ((char *) info->lpBuffer) + min(info->nNumberOfBytesToRead, 64));
+        j["buffer"] = x;
+
+        SL2_LOG_JSONL(j);
+    }
+
+    dr_thread_free(drcontext, info->argHash, SL2_HASH_LEN + 1);
     dr_thread_free(drcontext, info, sizeof(client_read_info));
 }
 
@@ -204,68 +264,70 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     j["mod_name"]           = dr_module_preferred_name(mod);
     SL2_LOG_JSONL(j);
 
-    sl2_pre_proto_map toHookPre;
-    SL2_PRE_HOOK1(toHookPre, ReadFile);
-    SL2_PRE_HOOK1(toHookPre, InternetReadFile);
-    SL2_PRE_HOOK2(toHookPre, ReadEventLogA, ReadEventLog);
-    SL2_PRE_HOOK2(toHookPre, ReadEventLogW, ReadEventLog);
-    if( op_registry.get_value() ) {
-        SL2_PRE_HOOK2(toHookPre, RegQueryValueExW, RegQueryValueEx);
-        SL2_PRE_HOOK2(toHookPre, RegQueryValueExA, RegQueryValueEx);
-    }
-    SL2_PRE_HOOK1(toHookPre, WinHttpWebSocketReceive);
-    SL2_PRE_HOOK1(toHookPre, WinHttpReadData);
-    SL2_PRE_HOOK1(toHookPre, recv);
-    SL2_PRE_HOOK1(toHookPre, fread_s);
-    SL2_PRE_HOOK1(toHookPre, fread);
-    SL2_PRE_HOOK1(toHookPre, _read);
+    sl2_pre_proto_map pre_hooks;
+    SL2_PRE_HOOK1(pre_hooks, ReadFile);
+    SL2_PRE_HOOK1(pre_hooks, InternetReadFile);
+    SL2_PRE_HOOK2(pre_hooks, ReadEventLogA, ReadEventLog);
+    SL2_PRE_HOOK2(pre_hooks, ReadEventLogW, ReadEventLog);
 
-    sl2_post_proto_map toHookPost;
-    SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
-    SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
-    SL2_POST_HOOK2(toHookPost, ReadEventLogA, Generic);
-    SL2_POST_HOOK2(toHookPost, ReadEventLogW, Generic);
-    if( op_registry.get_value() ) {
-        SL2_POST_HOOK2(toHookPost, RegQueryValueExW, Generic);
-        SL2_POST_HOOK2(toHookPost, RegQueryValueExA, Generic);
+    if (op_registry.get_value()) {
+        SL2_PRE_HOOK2(pre_hooks, RegQueryValueExW, RegQueryValueEx);
+        SL2_PRE_HOOK2(pre_hooks, RegQueryValueExA, RegQueryValueEx);
     }
-    SL2_POST_HOOK2(toHookPost, WinHttpWebSocketReceive, Generic);
-    SL2_POST_HOOK2(toHookPost, WinHttpReadData, Generic);
-    SL2_POST_HOOK2(toHookPost, recv, Generic);
-    SL2_POST_HOOK2(toHookPost, fread_s, Generic);
-    SL2_POST_HOOK2(toHookPost, fread, Generic);
-    SL2_POST_HOOK2(toHookPost, _read, Generic);
+
+    SL2_PRE_HOOK1(pre_hooks, WinHttpWebSocketReceive);
+    SL2_PRE_HOOK1(pre_hooks, WinHttpReadData);
+    SL2_PRE_HOOK1(pre_hooks, recv);
+    SL2_PRE_HOOK1(pre_hooks, fread_s);
+    SL2_PRE_HOOK1(pre_hooks, fread);
+    SL2_PRE_HOOK1(pre_hooks, _read);
+    SL2_PRE_HOOK1(pre_hooks, MapViewOfFile);
+
+    sl2_post_proto_map post_hooks;
+    SL2_POST_HOOK2(post_hooks, ReadFile, Generic);
+    SL2_POST_HOOK2(post_hooks, InternetReadFile, Generic);
+    SL2_POST_HOOK2(post_hooks, ReadEventLogA, Generic);
+    SL2_POST_HOOK2(post_hooks, ReadEventLogW, Generic);
+
+    if (op_registry.get_value()) {
+        SL2_POST_HOOK2(post_hooks, RegQueryValueExW, Generic);
+        SL2_POST_HOOK2(post_hooks, RegQueryValueExA, Generic);
+    }
+
+    SL2_POST_HOOK2(post_hooks, WinHttpWebSocketReceive, Generic);
+    SL2_POST_HOOK2(post_hooks, WinHttpReadData, Generic);
+    SL2_POST_HOOK2(post_hooks, recv, Generic);
+    SL2_POST_HOOK2(post_hooks, fread_s, Generic);
+    SL2_POST_HOOK2(post_hooks, fread, Generic);
+    SL2_POST_HOOK2(post_hooks, _read, Generic);
+    SL2_POST_HOOK1(post_hooks, MapViewOfFile);
+
+    void(__cdecl *pre_hook)(void *, void **);
+    void(__cdecl *post_hook)(void *, void *);
 
     sl2_pre_proto_map::iterator it;
-    for (it = toHookPre.begin(); it != toHookPre.end(); it++) {
-        char *functionName = it->first;
+    for (it = pre_hooks.begin(); it != pre_hooks.end(); it++) {
+        char *function_name = it->first;
 
-        void(__cdecl *hookFunctionPre)(void *, void **);
-        hookFunctionPre = it->second;
-        void(__cdecl *hookFunctionPost)(void *, void *);
-        hookFunctionPost = NULL;
+        pre_hook = it->second;
+        post_hook = post_hooks[function_name];
 
-        // TODO(ww): Why do we do this, instead of just assigning above?
-        if (toHookPost.find(functionName) != toHookPost.end()) {
-            hookFunctionPost = toHookPost[functionName];
-        }
-
-        app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
+        app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, function_name);
         const char *mod_name = dr_module_preferred_name(mod);
 
-        if (!function_is_in_expected_module(functionName, mod_name)) {
+        if (!function_is_in_expected_module(function_name, mod_name)) {
             continue;
         }
 
         if (towrap != NULL) {
             dr_flush_region(towrap, 0x1000);
-            bool ok = drwrap_wrap(towrap, hookFunctionPre, hookFunctionPost);
+            bool ok = drwrap_wrap(towrap, pre_hook, post_hook);
             json j;
 
             if (!ok) {
                 j["type"] = "error";
                 std::basic_ostringstream<char, std::char_traits<char>, sl2_dr_allocator<char>> s;
-                s << "FAILED to wrap " << functionName <<  " @ " << towrap << " already wrapped?";
+                s << "FAILED to wrap " << function_name <<  " @ " << towrap << " already wrapped?";
                 j["msg"] = s.str();
                 SL2_LOG_JSONL(j);
             }

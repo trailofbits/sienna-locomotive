@@ -1,28 +1,10 @@
 #include <map>
-#include <stdio.h>
-#include <fstream>
 
 #include "common/sl2_dr_client.hpp"
 #include "common/sl2_dr_client_options.hpp"
 #include "vendor/picosha2.h"
 #include "common/mutation.hpp"
 #include "common/sl2_server_api.hpp"
-
-
-// Metadata object for a target function call
-struct fuzzer_read_info {
-    Function function;
-    HANDLE hFile;
-    void *lpBuffer;
-    size_t nNumberOfBytesToRead;
-    DWORD *lpNumberOfBytesRead;
-    uint64_t position;
-    uint64_t retAddrOffset;
-    // TODO(ww): Make this a wchar_t * for consistency.
-    char *argHash;
-};
-
-static bool mutate(HANDLE hFile, size_t position, void *buf, size_t size);
 
 static droption_t<bool> op_no_coverage(
     DROPTION_SCOPE_CLIENT,
@@ -169,6 +151,7 @@ on_dr_exit(void)
         CloseHandle(dump_file);
     }
 
+
     if (coverage_guided) {
         sl2_conn_register_arena(&sl2_conn, &arena);
     }
@@ -224,7 +207,7 @@ mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bu
         do_mutation(&mutation);
     }
 
-//    SL2_DR_DEBUG("mutate: %.*s\n", mutation.bufsize, mutation.buffer);
+    // SL2_DR_DEBUG("mutate: %.*s\n", mutation.bufsize, mutation.buffer);
 
     // Tell the server about our mutation.
     if (sl2_conn_register_mutation(&sl2_conn, &mutation) != SL2Response::OK) {
@@ -362,46 +345,39 @@ wrap_pre__read(void *wrapcxt, OUT void **user_data)
     client.wrap_pre__read(wrapcxt, user_data);
 }
 
+static void
+wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
+{
+    client.wrap_pre_MapViewOfFile(wrapcxt, user_data);
+}
+
 /* Mutates whatever data the hooked function wrote */
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data)
 {
-    void *drcontext;
+    void *drcontext = NULL;
 
-    if (!user_data) {
-        SL2_DR_DEBUG("Warning: user_data=NULL in wrap_post_Generic!\n");
+    if (!client.is_sane_post_hook(wrapcxt, user_data, &drcontext)) {
         return;
-    }
-
-    if (!wrapcxt) {
-        SL2_DR_DEBUG("Warning: wrapcxt=NULL in wrap_post_Generic! Using dr_get_current_drcontext.\n");
-        drcontext = dr_get_current_drcontext();
-    }
-    else {
-        drcontext = drwrap_get_drcontext(wrapcxt);
     }
 
     SL2_DR_DEBUG("<in wrap_post_Generic>\n");
 
     client_read_info *info = (client_read_info *) user_data;
 
-    // Grab stored metadata
-    size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
-    Function function           = info->function;
-
     // Identify whether this is the function we want to target
-    bool targeted = client.isFunctionTargeted(function, info);
-    client.incrementCallCountForFunction(function);
+    bool targeted = client.is_function_targeted(info);
+    client.incrementCallCountForFunction(info->function);
 
     // NOTE(ww): We should never read more bytes than we request, so this is more
     // of a sanity check than anything else.
-    if (info->lpNumberOfBytesRead && *(info->lpNumberOfBytesRead) < nNumberOfBytesToRead) {
-        nNumberOfBytesToRead = *(info->lpNumberOfBytesRead);
+    if (info->lpNumberOfBytesRead && *(info->lpNumberOfBytesRead) < info->nNumberOfBytesToRead) {
+        info->nNumberOfBytesToRead = *(info->lpNumberOfBytesRead);
     }
 
     if (targeted) {
         // If the mutation process fails in any way, consider this fuzzing run a loss.
-        if (!mutate(function, info->hFile, info->position, info->lpBuffer, nNumberOfBytesToRead)) {
+        if (!mutate(info->function, info->hFile, info->position, info->lpBuffer, info->nNumberOfBytesToRead)) {
             crashed = false;
             dr_exit_process(1);
         }
@@ -411,6 +387,58 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
         dr_thread_free(drcontext, info->argHash, SL2_HASH_LEN + 1);
     }
 
+    dr_thread_free(drcontext, info, sizeof(client_read_info));
+}
+
+// NOTE(ww): MapViewOfFile can't use the Generic post-hook, as
+// we need the address of the mapped view that it returns.
+static void
+wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
+{
+    void *drcontext = NULL;
+
+    if (!client.is_sane_post_hook(wrapcxt, user_data, &drcontext)) {
+        return;
+    }
+
+    SL2_DR_DEBUG("<in wrap_post_MapViewOfFile>\n");
+
+    client_read_info *info = (client_read_info *) user_data;
+    info->lpBuffer = drwrap_get_retval(wrapcxt);
+    MEMORY_BASIC_INFORMATION memory_info = {0};
+
+    if (!info->nNumberOfBytesToRead) {
+        dr_virtual_query((byte *) info->lpBuffer, &memory_info, sizeof(memory_info));
+
+        info->nNumberOfBytesToRead = memory_info.RegionSize;
+    }
+
+    fileArgHash fStruct = {0};
+    fStruct.readSize = info->nNumberOfBytesToRead;
+
+    // NOTE(ww): The wizard should weed these failures out for us; if it happens
+    // here, there's not much we can do.
+    if (!GetMappedFileName(GetCurrentProcess(), info->lpBuffer, fStruct.fileName, MAX_PATH)) {
+        SL2_DR_DEBUG("Fatal: Couldn't get filename for memory map! Aborting.\n");
+        crashed = false;
+        dr_exit_process(1);
+    }
+
+    // Create the argHash, now that we have the correct source and nNumberOfBytesToRead.
+    hash_args(info->argHash, &fStruct);
+
+    bool targeted = client.is_function_targeted(info);
+    client.incrementCallCountForFunction(info->function);
+
+    if (targeted) {
+        // If the mutation process fails in any way, consider this fuzzing run a loss.
+        if (!mutate(info->function, info->hFile, info->position, info->lpBuffer, info->nNumberOfBytesToRead)) {
+            crashed = false;
+            dr_exit_process(1);
+        }
+    }
+
+    dr_thread_free(drcontext, info->argHash, SL2_HASH_LEN + 1);
     dr_thread_free(drcontext, info, sizeof(client_read_info));
 }
 
@@ -426,37 +454,43 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     const char *mod_name = dr_module_preferred_name(mod);
     app_pc towrap;
 
-    sl2_pre_proto_map toHookPre;
-    SL2_PRE_HOOK1(toHookPre, ReadFile);
-    SL2_PRE_HOOK1(toHookPre, InternetReadFile);
-    SL2_PRE_HOOK2(toHookPre, ReadEventLogA, ReadEventLog);
-    SL2_PRE_HOOK2(toHookPre, ReadEventLogW, ReadEventLog);
-    if( op_registry.get_value() ) {
-        SL2_PRE_HOOK2(toHookPre, RegQueryValueExW, RegQueryValueEx);
-        SL2_PRE_HOOK2(toHookPre, RegQueryValueExA, RegQueryValueEx);
-    }
-    SL2_PRE_HOOK1(toHookPre, WinHttpWebSocketReceive);
-    SL2_PRE_HOOK1(toHookPre, WinHttpReadData);
-    SL2_PRE_HOOK1(toHookPre, recv);
-    SL2_PRE_HOOK1(toHookPre, fread_s);
-    SL2_PRE_HOOK1(toHookPre, fread);
-    SL2_PRE_HOOK1(toHookPre, _read);
+    sl2_pre_proto_map pre_hooks;
+    SL2_PRE_HOOK1(pre_hooks, ReadFile);
+    SL2_PRE_HOOK1(pre_hooks, InternetReadFile);
+    SL2_PRE_HOOK2(pre_hooks, ReadEventLogA, ReadEventLog);
+    SL2_PRE_HOOK2(pre_hooks, ReadEventLogW, ReadEventLog);
 
-    sl2_post_proto_map toHookPost;
-    SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
-    SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
-    SL2_POST_HOOK2(toHookPost, ReadEventLogA, Generic);
-    SL2_POST_HOOK2(toHookPost, ReadEventLogW, Generic);
-    if( op_registry.get_value() ) {
-        SL2_POST_HOOK2(toHookPost, RegQueryValueExW, Generic);
-        SL2_POST_HOOK2(toHookPost, RegQueryValueExA, Generic);
+    if (op_registry.get_value()) {
+        SL2_PRE_HOOK2(pre_hooks, RegQueryValueExW, RegQueryValueEx);
+        SL2_PRE_HOOK2(pre_hooks, RegQueryValueExA, RegQueryValueEx);
     }
-    SL2_POST_HOOK2(toHookPost, WinHttpWebSocketReceive, Generic);
-    SL2_POST_HOOK2(toHookPost, WinHttpReadData, Generic);
-    SL2_POST_HOOK2(toHookPost, recv, Generic);
-    SL2_POST_HOOK2(toHookPost, fread_s, Generic);
-    SL2_POST_HOOK2(toHookPost, fread, Generic);
-    SL2_POST_HOOK2(toHookPost, _read, Generic);
+
+    SL2_PRE_HOOK1(pre_hooks, WinHttpWebSocketReceive);
+    SL2_PRE_HOOK1(pre_hooks, WinHttpReadData);
+    SL2_PRE_HOOK1(pre_hooks, recv);
+    SL2_PRE_HOOK1(pre_hooks, fread_s);
+    SL2_PRE_HOOK1(pre_hooks, fread);
+    SL2_PRE_HOOK1(pre_hooks, _read);
+    SL2_PRE_HOOK1(pre_hooks, MapViewOfFile);
+
+    sl2_post_proto_map post_hooks;
+    SL2_POST_HOOK2(post_hooks, ReadFile, Generic);
+    SL2_POST_HOOK2(post_hooks, InternetReadFile, Generic);
+    SL2_POST_HOOK2(post_hooks, ReadEventLogA, Generic);
+    SL2_POST_HOOK2(post_hooks, ReadEventLogW, Generic);
+
+    if (op_registry.get_value()) {
+        SL2_POST_HOOK2(post_hooks, RegQueryValueExW, Generic);
+        SL2_POST_HOOK2(post_hooks, RegQueryValueExA, Generic);
+    }
+
+    SL2_POST_HOOK2(post_hooks, WinHttpWebSocketReceive, Generic);
+    SL2_POST_HOOK2(post_hooks, WinHttpReadData, Generic);
+    SL2_POST_HOOK2(post_hooks, recv, Generic);
+    SL2_POST_HOOK2(post_hooks, fread_s, Generic);
+    SL2_POST_HOOK2(post_hooks, fread, Generic);
+    SL2_POST_HOOK2(post_hooks, _read, Generic);
+    SL2_POST_HOOK1(post_hooks, MapViewOfFile);
 
     // Wrap IsProcessorFeaturePresent and UnhandledExceptionFilter to prevent
     // __fastfail from circumventing our exception tracking. See the comment
@@ -492,23 +526,23 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
         SL2_DR_DEBUG("OLE32.DLL loaded, but we don't have an DllDebugObjectRpcHook mitigation yet!\n");
     }
 
-    // TODO(ww): Wrap and mitigate whatever functions WER uses.
+    void(__cdecl *pre_hook)(void *, void **);
+    void(__cdecl *post_hook)(void *, void *);
 
-    // Iterate over list of hooks and register them with DynamoRIO
     sl2_pre_proto_map::iterator it;
-    for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
-        char *functionName = it->first;
+    for(it = pre_hooks.begin(); it != pre_hooks.end(); it++) {
+        char *function_name = it->first;
         bool hook = false;
 
-        if (!function_is_in_expected_module(functionName, mod_name)) {
+        if (!function_is_in_expected_module(function_name, mod_name)) {
             continue;
         }
 
         for (targetFunction t : client.parsedJson) {
-            if (t.selected && STREQ(t.functionName.c_str(), functionName)){
+            if (t.selected && STREQ(t.functionName.c_str(), function_name)){
                 hook = true;
             }
-            else if (t.selected && (STREQ(functionName, "RegQueryValueExW") || STREQ(functionName, "RegQueryValueExA"))) {
+            else if (t.selected && (STREQ(function_name, "RegQueryValueExW") || STREQ(function_name, "RegQueryValueExA"))) {
                 if (!STREQ(t.functionName.c_str(), "RegQueryValueEx")) {
                     hook = false;
                 }
@@ -519,27 +553,20 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
             continue;
         }
 
-        void(__cdecl *hookFunctionPre)(void *, void **);
-        hookFunctionPre = it->second;
-        void(__cdecl *hookFunctionPost)(void *, void *);
-        hookFunctionPost = NULL;
-
-        // TODO(ww): Why do we do this, instead of just assigning above?
-        if (toHookPost.find(functionName) != toHookPost.end()) {
-            hookFunctionPost = toHookPost[functionName];
-        }
+        pre_hook = it->second;
+        post_hook = post_hooks[function_name];
 
         // Only hook ReadFile calls from the kernel (TODO - investigate fuzzgoat results)
-        towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
+        towrap = (app_pc) dr_get_proc_address(mod->handle, function_name);
 
         // If everything looks good and we've made it this far, wrap the function
         if (towrap != NULL) {
             dr_flush_region(towrap, 0x1000);
-            bool ok = drwrap_wrap(towrap, hookFunctionPre, hookFunctionPost);
+            bool ok = drwrap_wrap(towrap, pre_hook, post_hook);
             if (ok) {
-                SL2_DR_DEBUG("<wrapped %s @ 0x%p in %s\n", functionName, towrap, mod_name);
+                SL2_DR_DEBUG("<wrapped %s @ 0x%p in %s\n", function_name, towrap, mod_name);
             } else {
-                SL2_DR_DEBUG("<FAILED to wrap %s @ 0x%p: already wrapped?\n", functionName, towrap);
+                SL2_DR_DEBUG("<FAILED to wrap %s @ 0x%p: already wrapped?\n", function_name, towrap);
             }
         }
     }

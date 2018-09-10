@@ -1,4 +1,4 @@
-#include <stdint.h>
+#include <cstdint>
 #include <random>
 
 #include "common/sl2_dr_client.hpp"
