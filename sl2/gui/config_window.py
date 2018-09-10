@@ -59,7 +59,7 @@ class ConfigWindow(QtWidgets.QDialog):
         self.drrun_path.setText(config._config['DEFAULT']['drrun_path'])
 
         # self.build_dir.setPlaceholderText("Path to SL2 build directory")
-        self.build_dir.setText(os.path.join(os.path.dirname(os.path.realpath(__file__)), "build"))
+        self.build_dir.setText(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))), "build"))
 
         self.target_path.setPlaceholderText("Path to target application")
         self.target_args.setPlaceholderText("Target arguments")
