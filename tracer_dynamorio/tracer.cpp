@@ -1245,7 +1245,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     client_read_info *info = (client_read_info *) user_data;
 
     // Identify whether this is the function we want to target
-    bool targeted = client.isFunctionTargeted(info->function, info);
+    bool targeted = client.is_function_targeted(info);
     client.incrementCallCountForFunction(info->function);
 
     // Mark the targeted memory as tainted
@@ -1310,7 +1310,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     // Create the argHash, now that we have the correct source and nNumberOfBytesToRead.
     hash_args(info->argHash, &fStruct);
 
-    bool targeted = client.isFunctionTargeted(info->function, info);
+    bool targeted = client.is_function_targeted(info);
     client.incrementCallCountForFunction(info->function);
 
     if (targeted) {

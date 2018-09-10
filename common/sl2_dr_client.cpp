@@ -48,12 +48,13 @@ SL2Client::SL2Client() {
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-// isFunctionTargeted()
+// is_function_targeted()
 //
 // Returns true if the current function should be targeted.
 bool SL2Client::
-isFunctionTargeted(Function function, client_read_info* info)
+is_function_targeted(client_read_info* info)
 {
+    Function function = info->function;
     const char *func_name = function_to_string(function);
 
     for (targetFunction t : parsedJson){

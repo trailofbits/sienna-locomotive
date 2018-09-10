@@ -186,8 +186,7 @@ public:
 
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Methods
-    // TODO(ww): isFunctionTargeted should just take client_read_info.
-    bool        isFunctionTargeted(Function function,  client_read_info* info);
+    bool        is_function_targeted(client_read_info *info);
     bool        compare_filenames(targetFunction &t, client_read_info* info);
     bool        compare_indices(targetFunction &t, Function &function);
     bool        compare_index_at_retaddr(targetFunction &t, client_read_info* info);
