@@ -1,6 +1,7 @@
 from PySide2.QtCore import QThread, Signal, Qt
 
 from .instrument import wizard_run, fuzzer_run, start_server, triagerRun
+from sl2.db.run_block import SessionManager
 
 
 class WizardThread(QThread):
@@ -45,23 +46,25 @@ class FuzzerThread(QThread):
     def run(self):
         self.should_fuzz = True
 
-        while self.should_fuzz:
-            crashed, run_id = fuzzer_run(self.config_dict, self.target_file)
+        with SessionManager() as manager:
+            while self.should_fuzz:
+                    crashed, run_id = fuzzer_run(self.config_dict, self.target_file)
+                    manager.run_complete(found_crash=crashed)
 
-            if crashed:
-                if self.config_dict['exit_early']:
-                    self.pause()
-                # We can't pass this object to another thread since it's database, so just returning the runid
-                triagerInfo = triagerRun(self.config_dict, run_id)
-                self.foundCrash.emit(self, str(run_id))
+                    if crashed:
+                        if self.config_dict['exit_early']:
+                            self.pause()
+                        # We can't pass this object to another thread since it's database, so just returning the runid
+                        triagerInfo = triagerRun(self.config_dict, run_id)
+                        self.foundCrash.emit(self, str(run_id))
 
-            if not self.config_dict['continuous']:
-                self.pause()
+                    if not self.config_dict['continuous']:
+                        self.pause()
 
-            if run_id == -1:
-                self.server_crashed.emit()
-                self.pause()
-            self.runComplete.emit()
+                    if run_id == -1:
+                        self.server_crashed.emit()
+                        self.pause()
+                    self.runComplete.emit()
 
     def continuous_state_changed(self, new_state):
         self.config_dict['continuous'] = (new_state == Qt.Checked)
