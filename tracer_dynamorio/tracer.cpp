@@ -757,7 +757,7 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
     j["score"] = score;
     j["reason"] = reason;
     j["exception"] = exception_to_string(exception_code);
-    j["location"] = (uint64) exception_address;
+    j["location"] = (uint64_t) exception_address;
     j["instruction"] = disassembly;
     j["pc_tainted"] = pc_tainted;
 	j["stack_tainted"] = stack_tainted;
@@ -800,7 +800,7 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
 
     bool tainted = tainted_regs.find(DR_REG_NULL) != tainted_regs.end();
     json rip = {{"reg", "rip"},
-                {"value", (uint64) exception_address},
+                {"value", (uint64_t) exception_address},
                 {"tainted", tainted}};
     j["regs"].push_back(rip);
 
@@ -808,14 +808,14 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
     for (int i = 0; i < LAST_COUNT; i++) {
         int idx = last_call_idx + i;
         idx %= LAST_COUNT;
-        j["last_calls"].push_back((uint64)last_calls[idx]);
+        j["last_calls"].push_back((uint64_t) last_calls[idx]);
     }
 
     j["last_insns"] = json::array();
     for (int i = 0; i < LAST_COUNT; i++) {
         int idx = last_insn_idx + i;
         idx %= LAST_COUNT;
-        j["last_insns"].push_back((uint64)last_insns[idx]);
+        j["last_insns"].push_back((uint64_t) last_insns[idx]);
     }
 
     j["tainted_addrs"] = json::array();
