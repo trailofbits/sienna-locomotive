@@ -456,39 +456,39 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     const char *mod_name = dr_module_preferred_name(mod);
     app_pc towrap;
 
-    sl2_pre_proto_map toHookPre;
-    SL2_PRE_HOOK1(toHookPre, ReadFile);
-    SL2_PRE_HOOK1(toHookPre, InternetReadFile);
-    SL2_PRE_HOOK2(toHookPre, ReadEventLogA, ReadEventLog);
-    SL2_PRE_HOOK2(toHookPre, ReadEventLogW, ReadEventLog);
+    sl2_pre_proto_map pre_hooks;
+    SL2_PRE_HOOK1(pre_hooks, ReadFile);
+    SL2_PRE_HOOK1(pre_hooks, InternetReadFile);
+    SL2_PRE_HOOK2(pre_hooks, ReadEventLogA, ReadEventLog);
+    SL2_PRE_HOOK2(pre_hooks, ReadEventLogW, ReadEventLog);
     if( op_registry.get_value() ) {
-        SL2_PRE_HOOK2(toHookPre, RegQueryValueExW, RegQueryValueEx);
-        SL2_PRE_HOOK2(toHookPre, RegQueryValueExA, RegQueryValueEx);
+        SL2_PRE_HOOK2(pre_hooks, RegQueryValueExW, RegQueryValueEx);
+        SL2_PRE_HOOK2(pre_hooks, RegQueryValueExA, RegQueryValueEx);
     }
-    SL2_PRE_HOOK1(toHookPre, WinHttpWebSocketReceive);
-    SL2_PRE_HOOK1(toHookPre, WinHttpReadData);
-    SL2_PRE_HOOK1(toHookPre, recv);
-    SL2_PRE_HOOK1(toHookPre, fread_s);
-    SL2_PRE_HOOK1(toHookPre, fread);
-    SL2_PRE_HOOK1(toHookPre, _read);
-    SL2_PRE_HOOK1(toHookPre, MapViewOfFile);
+    SL2_PRE_HOOK1(pre_hooks, WinHttpWebSocketReceive);
+    SL2_PRE_HOOK1(pre_hooks, WinHttpReadData);
+    SL2_PRE_HOOK1(pre_hooks, recv);
+    SL2_PRE_HOOK1(pre_hooks, fread_s);
+    SL2_PRE_HOOK1(pre_hooks, fread);
+    SL2_PRE_HOOK1(pre_hooks, _read);
+    SL2_PRE_HOOK1(pre_hooks, MapViewOfFile);
 
-    sl2_post_proto_map toHookPost;
-    SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
-    SL2_POST_HOOK2(toHookPost, InternetReadFile, Generic);
-    SL2_POST_HOOK2(toHookPost, ReadEventLogA, Generic);
-    SL2_POST_HOOK2(toHookPost, ReadEventLogW, Generic);
+    sl2_post_proto_map post_hooks;
+    SL2_POST_HOOK2(post_hooks, ReadFile, Generic);
+    SL2_POST_HOOK2(post_hooks, InternetReadFile, Generic);
+    SL2_POST_HOOK2(post_hooks, ReadEventLogA, Generic);
+    SL2_POST_HOOK2(post_hooks, ReadEventLogW, Generic);
     if( op_registry.get_value() ) {
-        SL2_POST_HOOK2(toHookPost, RegQueryValueExW, Generic);
-        SL2_POST_HOOK2(toHookPost, RegQueryValueExA, Generic);
+        SL2_POST_HOOK2(post_hooks, RegQueryValueExW, Generic);
+        SL2_POST_HOOK2(post_hooks, RegQueryValueExA, Generic);
     }
-    SL2_POST_HOOK2(toHookPost, WinHttpWebSocketReceive, Generic);
-    SL2_POST_HOOK2(toHookPost, WinHttpReadData, Generic);
-    SL2_POST_HOOK2(toHookPost, recv, Generic);
-    SL2_POST_HOOK2(toHookPost, fread_s, Generic);
-    SL2_POST_HOOK2(toHookPost, fread, Generic);
-    SL2_POST_HOOK2(toHookPost, _read, Generic);
-    SL2_POST_HOOK1(toHookPost, MapViewOfFile);
+    SL2_POST_HOOK2(post_hooks, WinHttpWebSocketReceive, Generic);
+    SL2_POST_HOOK2(post_hooks, WinHttpReadData, Generic);
+    SL2_POST_HOOK2(post_hooks, recv, Generic);
+    SL2_POST_HOOK2(post_hooks, fread_s, Generic);
+    SL2_POST_HOOK2(post_hooks, fread, Generic);
+    SL2_POST_HOOK2(post_hooks, _read, Generic);
+    SL2_POST_HOOK1(post_hooks, MapViewOfFile);
 
     // Wrap IsProcessorFeaturePresent and UnhandledExceptionFilter to prevent
     // __fastfail from circumventing our exception tracking. See the comment
@@ -528,7 +528,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 
     // Iterate over list of hooks and register them with DynamoRIO
     sl2_pre_proto_map::iterator it;
-    for(it = toHookPre.begin(); it != toHookPre.end(); it++) {
+    for(it = pre_hooks.begin(); it != pre_hooks.end(); it++) {
         char *functionName = it->first;
         bool hook = false;
 
@@ -557,8 +557,8 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
         hookFunctionPost = NULL;
 
         // TODO(ww): Why do we do this, instead of just assigning above?
-        if (toHookPost.find(functionName) != toHookPost.end()) {
-            hookFunctionPost = toHookPost[functionName];
+        if (post_hooks.find(functionName) != post_hooks.end()) {
+            hookFunctionPost = post_hooks[functionName];
         }
 
         // Only hook ReadFile calls from the kernel (TODO - investigate fuzzgoat results)
