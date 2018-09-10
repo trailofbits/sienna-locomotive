@@ -1416,30 +1416,30 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
         SL2_DR_DEBUG("OLE32.DLL loaded, but we don't have an DllDebugObjectRpcHook mitigation yet!\n");
     }
 
-    // TODO(ww): Wrap and mitigate whatever functions WER uses.
-
     /* assume our target executable is an exe */
     if (strstr(mod_name, ".exe") != NULL) {
         module_start = mod->start; // TODO evaluate us of dr_get_application_name above
         module_end = module_start + mod->module_internal_size;
     }
 
-    // when a module is loaded, iterate its functions looking for matches in pre_hooks
+    void(__cdecl *pre_hook)(void *, void **);
+    void(__cdecl *post_hook)(void *, void *);
+
     sl2_pre_proto_map::iterator it;
     for (it = pre_hooks.begin(); it != pre_hooks.end(); it++) {
-        char *functionName = it->first;
+        char *function_name = it->first;
         bool hook = false;
 
-        if (!function_is_in_expected_module(functionName, mod_name)) {
+        if (!function_is_in_expected_module(function_name, mod_name)) {
             continue;
         }
 
         // Look for function matching the target specified on the command line
         for (targetFunction t : client.parsedJson) {
-            if (t.selected && STREQ(t.functionName.c_str(), functionName)){
+            if (t.selected && STREQ(t.functionName.c_str(), function_name)){
                 hook = true;
             }
-            else if (t.selected && (STREQ(functionName, "RegQueryValueExW") || STREQ(functionName, "RegQueryValueExA"))) {
+            else if (t.selected && (STREQ(function_name, "RegQueryValueExW") || STREQ(function_name, "RegQueryValueExA"))) {
                 if (!STREQ(t.functionName.c_str(), "RegQueryValueEx")) {
                     hook = false;
                 }
@@ -1450,30 +1450,22 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
             continue;
         }
 
-        void(__cdecl *hookFunctionPre)(void *, void **);
-        hookFunctionPre = it->second;
-        void(__cdecl *hookFunctionPost)(void *, void *);
-        hookFunctionPost = NULL;
-
-        // if we have a post hook function, use it
-        // TODO(ww): Why do we do this, instead of just assigning above?
-        if (post_hooks.find(functionName) != post_hooks.end()) {
-            hookFunctionPost = post_hooks[functionName];
-        }
+        pre_hook = it->second;
+        post_hook = post_hooks[function_name];
 
         // find target function in module
-        towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
+        towrap = (app_pc) dr_get_proc_address(mod->handle, function_name);
 
         // if the function was found, wrap it
         if (towrap != NULL) {
             dr_flush_region(towrap, 0x1000);
-            bool ok = drwrap_wrap(towrap, hookFunctionPre, hookFunctionPost);
+            bool ok = drwrap_wrap(towrap, pre_hook, post_hook);
             // bool ok = false;
             if (ok) {
-                SL2_DR_DEBUG("<wrapped %s @ 0x%p>\n", functionName, towrap);
+                SL2_DR_DEBUG("<wrapped %s @ 0x%p>\n", function_name, towrap);
             }
             else {
-                SL2_DR_DEBUG("<FAILED to wrap %s @ 0x%p: already wrapped?>\n", functionName, towrap);
+                SL2_DR_DEBUG("<FAILED to wrap %s @ 0x%p: already wrapped?>\n", function_name, towrap);
             }
         }
     }

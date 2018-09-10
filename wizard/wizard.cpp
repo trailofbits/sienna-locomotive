@@ -301,36 +301,32 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_POST_HOOK2(post_hooks, _read, Generic);
     SL2_POST_HOOK1(post_hooks, MapViewOfFile);
 
+    void(__cdecl *pre_hook)(void *, void **);
+    void(__cdecl *post_hook)(void *, void *);
+
     sl2_pre_proto_map::iterator it;
     for (it = pre_hooks.begin(); it != pre_hooks.end(); it++) {
-        char *functionName = it->first;
+        char *function_name = it->first;
 
-        void(__cdecl *hookFunctionPre)(void *, void **);
-        hookFunctionPre = it->second;
-        void(__cdecl *hookFunctionPost)(void *, void *);
-        hookFunctionPost = NULL;
+        pre_hook = it->second;
+        post_hook = post_hooks[function_name];
 
-        // TODO(ww): Why do we do this, instead of just assigning above?
-        if (post_hooks.find(functionName) != post_hooks.end()) {
-            hookFunctionPost = post_hooks[functionName];
-        }
-
-        app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, functionName);
+        app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, function_name);
         const char *mod_name = dr_module_preferred_name(mod);
 
-        if (!function_is_in_expected_module(functionName, mod_name)) {
+        if (!function_is_in_expected_module(function_name, mod_name)) {
             continue;
         }
 
         if (towrap != NULL) {
             dr_flush_region(towrap, 0x1000);
-            bool ok = drwrap_wrap(towrap, hookFunctionPre, hookFunctionPost);
+            bool ok = drwrap_wrap(towrap, pre_hook, post_hook);
             json j;
 
             if (!ok) {
                 j["type"] = "error";
                 std::basic_ostringstream<char, std::char_traits<char>, sl2_dr_allocator<char>> s;
-                s << "FAILED to wrap " << functionName <<  " @ " << towrap << " already wrapped?";
+                s << "FAILED to wrap " << function_name <<  " @ " << towrap << " already wrapped?";
                 j["msg"] = s.str();
                 SL2_LOG_JSONL(j);
             }
