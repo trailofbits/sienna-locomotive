@@ -1224,6 +1224,12 @@ wrap_pre__read(void *wrapcxt, OUT void **user_data)
     client.wrap_pre__read(wrapcxt, user_data);
 }
 
+static void
+wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
+{
+    client.wrap_pre_MapViewOfFile(wrapcxt, user_data);
+}
+
 /* Called after each targeted function to replay mutation and mark bytes as tainted */
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data)
@@ -1247,18 +1253,13 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 
     client_read_info *info = (client_read_info *) user_data;
 
-    // Grab stored metadata
-    void *lpBuffer              = info->lpBuffer;
-    size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
-    Function function           = info->function;
-
     // Identify whether this is the function we want to target
-    bool targeted = client.isFunctionTargeted( function, info );
-    client.incrementCallCountForFunction(function);
+    bool targeted = client.isFunctionTargeted(info->function, info);
+    client.incrementCallCountForFunction(info->function);
 
     // Mark the targeted memory as tainted
     if (targeted) {
-        taint_mem((app_pc)lpBuffer, nNumberOfBytesToRead);
+        taint_mem((app_pc) info->lpBuffer, info->nNumberOfBytesToRead);
     }
 
     // Talk to the server, get the stored mutation from the fuzzing run, and write it into memory.
@@ -1269,7 +1270,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
             SL2_DR_DEBUG("user requested replay WITHOUT mutation!\n");
         }
         else {
-            sl2_conn_request_replay(&sl2_conn, mutate_count, nNumberOfBytesToRead, lpBuffer);
+            sl2_conn_request_replay(&sl2_conn, mutate_count, info->nNumberOfBytesToRead, info->lpBuffer);
         }
 
         mutate_count++;
@@ -1281,6 +1282,76 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
         dr_thread_free(drcontext, info->argHash, SL2_HASH_LEN + 1);
     }
 
+    dr_thread_free(drcontext, info, sizeof(client_read_info));
+}
+
+static void
+wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
+{
+    void *drcontext;
+
+    if (!user_data) {
+        SL2_DR_DEBUG("Warning: user_data=NULL in wrap_post_MapViewOfFile!\n");
+        return;
+    }
+
+    if (!wrapcxt) {
+        SL2_DR_DEBUG("Warning: wrapcxt=NULL in wrap_post_MapViewOfFile! Using dr_get_current_drcontext.\n");
+        drcontext = dr_get_current_drcontext();
+    }
+    else {
+        drcontext = drwrap_get_drcontext(wrapcxt);
+    }
+
+    SL2_DR_DEBUG("<in wrap_post_MapViewOfFile>\n");
+
+    client_read_info *info = (client_read_info *) user_data;
+    char *map_base = (char *) drwrap_get_retval(wrapcxt);
+    MEMORY_BASIC_INFORMATION memory_info = {0};
+
+    if (!info->nNumberOfBytesToRead) {
+        dr_virtual_query((byte *) map_base, &memory_info, sizeof(memory_info));
+
+        info->nNumberOfBytesToRead = memory_info.RegionSize;
+    }
+
+    fileArgHash fStruct = {0};
+    fStruct.readSize = info->nNumberOfBytesToRead;
+
+    // NOTE(ww): The wizard should weed these failures out for us; if it happens
+    // here, there's not much we can do.
+    if (!GetMappedFileName(GetCurrentProcess, map_base, fStruct.fileName, MAX_PATH)) {
+        SL2_DR_DEBUG("Fatal: Couldn't get filename for memory map! Aborting.\n");
+        dr_exit_process(1);
+    }
+
+    // Create the argHash, now that we have the correct source and nNumberOfBytesToRead.
+    hash_args(info->argHash, &fStruct);
+
+    bool targeted = client.isFunctionTargeted(info->function, info);
+    client.incrementCallCountForFunction(info->function);
+
+    if (targeted) {
+        taint_mem((app_pc) info->lpBuffer, info->nNumberOfBytesToRead);
+    }
+
+    // Talk to the server, get the stored mutation from the fuzzing run, and write it into memory.
+    if (replay && targeted) {
+        dr_mutex_lock(mutatex);
+
+        if (no_mutate) {
+            SL2_DR_DEBUG("user requested replay WITHOUT mutation!\n");
+        }
+        else {
+            sl2_conn_request_replay(&sl2_conn, mutate_count, info->nNumberOfBytesToRead, info->lpBuffer);
+        }
+
+        mutate_count++;
+
+        dr_mutex_unlock(mutatex);
+    }
+
+    dr_thread_free(drcontext, info->argHash, SL2_HASH_LEN + 1);
     dr_thread_free(drcontext, info, sizeof(client_read_info));
 }
 
@@ -1310,6 +1381,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_PRE_HOOK1(toHookPre, fread_s);
     SL2_PRE_HOOK1(toHookPre, fread);
     SL2_PRE_HOOK1(toHookPre, _read);
+    SL2_PRE_HOOK1(toHookPre, MapViewOfFile);
 
     sl2_post_proto_map toHookPost;
     SL2_POST_HOOK2(toHookPost, ReadFile, Generic);
@@ -1326,6 +1398,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     SL2_POST_HOOK2(toHookPost, fread_s, Generic);
     SL2_POST_HOOK2(toHookPost, fread, Generic);
     SL2_POST_HOOK2(toHookPost, _read, Generic);
+    SL2_POST_HOOK1(toHookPost, MapViewOfFile);
 
     // Wrap IsProcessorFeaturePresent and UnhandledExceptionFilter to prevent
     // __fastfail from circumventing our exception tracking. See the comment

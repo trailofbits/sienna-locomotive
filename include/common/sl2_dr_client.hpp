@@ -8,6 +8,7 @@
 #include <Rpc.h>
 #include <io.h>
 #include <Dbghelp.h>
+#include <psapi.h>
 
 
 #include "vendor/json.hpp"
@@ -185,6 +186,7 @@ public:
 
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Methods
+    // TODO(ww): isFunctionTargeted should just take client_read_info.
     bool        isFunctionTargeted(Function function,  client_read_info* info);
     bool        compare_filenames(targetFunction &t, client_read_info* info);
     bool        compare_indices(targetFunction &t, Function &function);

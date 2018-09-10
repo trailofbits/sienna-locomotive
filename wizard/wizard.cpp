@@ -12,8 +12,6 @@
 #include "vendor/picosha2.h"
 using namespace std;
 
-#include <psapi.h>
-
 static SL2Client client;
 /* Run whenever a thread inits/exits */
 static void
@@ -238,7 +236,6 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     }
 
     if (interesting_call) {
-        char argHash[SL2_HASH_LEN + 1] = {0};
         MEMORY_BASIC_INFORMATION memory_info = {0};
 
         // NOTE(ww): If nNumberOfBytesToRead=0, then the entire file is being mapped.
@@ -249,7 +246,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
             info->nNumberOfBytesToRead = memory_info.RegionSize;
         }
 
-        fStruct.readSize = 64;
+        fStruct.readSize = info->nNumberOfBytesToRead;
 
         j["source"]  = utf8Converter.to_bytes(wstring(fStruct.fileName));
 
@@ -257,9 +254,9 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
         j["start"]   = info->position;
         j["end"]     = end;
 
-        hash_args(argHash, &fStruct);
+        hash_args(info->argHash, &fStruct);
 
-        j["argHash"] = argHash;
+        j["argHash"] = info->argHash;
 
         vector<unsigned char> x(map_base, map_base + min(info->nNumberOfBytesToRead, 64));
         j["buffer"] = x;
@@ -267,6 +264,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
         SL2_LOG_JSONL(j);
     }
 
+    dr_thread_free(drcontext, info->argHash, SL2_HASH_LEN + 1);
     dr_thread_free(drcontext, info, sizeof(client_read_info));
 }
 

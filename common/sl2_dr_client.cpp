@@ -520,7 +520,7 @@ SL2Client::wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
     info->lpBuffer             = buffer;
     info->nNumberOfBytesToRead = size * count;
     info->lpNumberOfBytesRead  = NULL;
-    info->position             = NULL;
+    info->position             = 0;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
     fileArgHash fStruct = {0};
@@ -557,7 +557,7 @@ SL2Client::wrap_pre_fread(void *wrapcxt, OUT void **user_data)
     info->lpBuffer             = buffer;
     info->nNumberOfBytesToRead = size * count;
     info->lpNumberOfBytesRead  = NULL;
-    info->position             = NULL;
+    info->position             = 0;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
     fileArgHash fStruct = {0};
@@ -593,7 +593,7 @@ SL2Client::wrap_pre__read(void *wrapcxt, OUT void **user_data)
     info->lpBuffer             = buffer;
     info->nNumberOfBytesToRead = count;
     info->lpNumberOfBytesRead  = NULL;
-    info->position             = NULL;
+    info->position             = 0;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
     fileArgHash fStruct = {0};
@@ -626,15 +626,15 @@ SL2Client::wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
     info->hFile = hFileMappingObject;
     info->lpBuffer = NULL;
     // NOTE(ww): dwNumberOfBytesToMap=0 is a special case here, since 0 indicates that the
-    // entire file is being mapped into memory. What's the right way to get the size of the
-    // mapped file here?
+    // entire file is being mapped into memory. We handle this case in the post-hook
+    // with a VirtualQuery call.
     info->nNumberOfBytesToRead = dwNumberOfBytesToMap;
-    info->position = NULL;
+    info->position = 0;
     info->retAddrOffset = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
-    // NOTE(ww): We populate these in the post-hook.
+    // NOTE(ww): We populate these in the post-hook, when necessary.
     info->source = NULL;
-    info->argHash = NULL;
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
 
     // Change write-access requests to copy-on-write requests, since we don't want to clobber
     // our original input file with mutated data.
