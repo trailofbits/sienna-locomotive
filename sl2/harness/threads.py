@@ -1,5 +1,6 @@
 from PySide2.QtCore import QThread, Signal, Qt
 
+from .state import get_target_slug
 from .instrument import wizard_run, fuzzer_run, start_server, triagerRun
 from sl2.db.run_block import SessionManager
 
@@ -46,7 +47,7 @@ class FuzzerThread(QThread):
     def run(self):
         self.should_fuzz = True
 
-        with SessionManager() as manager:
+        with SessionManager(get_target_slug(self.config_dict)) as manager:
             while self.should_fuzz:
                     crashed, run_id = fuzzer_run(self.config_dict, self.target_file)
                     manager.run_complete(found_crash=crashed)

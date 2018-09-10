@@ -17,6 +17,7 @@ import sys
 import threading
 import time
 import traceback
+import struct
 from enum import IntEnum
 from typing import NamedTuple
 
@@ -386,6 +387,29 @@ def fuzz_and_triage(config_dict):
 
     except Exception:
         traceback.print_exc()
+
+
+def read_coverage_information():
+    # with open(config.sl2_server_pipe_path, 'r+b', 0) as pipe:
+    #     pipe.write(struct.pack('B', 15))
+    #     pipe.seek(0)
+    #
+    #     n = struct.unpack('I', pipe.read(4))[0]
+    #     bucketing = pipe.read(n)
+    #     pipe.seek(0)
+    #     n = struct.unpack('I', pipe.read(4))[0]
+    #     score = pipe.read(n)
+    #     pipe.seek(0)
+    #     n = struct.unpack('I', pipe.read(4))[0]
+    #     num_remaining = pipe.read(n)
+    #     pipe.seek(0)
+    #
+    #     print("Bucketing:", bucketing)
+    #     print("Score:", score)
+    #     print("Num Remaining:", num_remaining)
+    #
+    #     return bucketing, score, num_remaining
+    return False, 0, 0
 
 
 def kill():
