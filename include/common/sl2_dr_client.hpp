@@ -205,6 +205,7 @@ public:
     void        wrap_pre_fread_s(void *wrapcxt, OUT void **user_data);
     void        wrap_pre__read(void *wrapcxt, OUT void **user_data);
     void        wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data);
+    bool        is_sane_post_hook(void *wrapcxt, void *user_data, void **drcontext);
     bool        loadJson(string json);
     uint64_t    incrementCallCountForFunction(Function function);
     uint64_t    incrementRetAddrCount(uint64_t retAddr);

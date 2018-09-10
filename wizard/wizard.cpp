@@ -119,25 +119,16 @@ wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data)
 {
-    void *drcontext;
+    void *drcontext = NULL;
 
-    if (!user_data) {
-        SL2_DR_DEBUG("Warning: user_data=NULL in wrap_post_Generic!\n");
+    if (!client.is_sane_post_hook(wrapcxt, user_data, &drcontext)) {
         return;
-    }
-
-    if (!wrapcxt) {
-        SL2_DR_DEBUG("Warning: wrapcxt=NULL in wrap_post_Generic! Using dr_get_current_drcontext.\n");
-        drcontext = dr_get_current_drcontext();
-    }
-    else {
-        drcontext = drwrap_get_drcontext(wrapcxt);
     }
 
     wstring_convert<std::codecvt_utf8<wchar_t>> utf8Converter;
 
-    client_read_info *info   = ((client_read_info *)user_data);
-    const char *func_name = function_to_string(info->function);
+    client_read_info *info = (client_read_info *) user_data;
+    const char *func_name  = function_to_string(info->function);
 
     json j;
     j["type"]               = "id";
@@ -145,7 +136,6 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     j["retAddrCount"]       = client.incrementRetAddrCount(info->retAddrOffset);
     j["retAddrOffset"]      = (uint64_t) info->retAddrOffset;
     j["func_name"]          = func_name;
-
 
 
     if(info->source != NULL) {
@@ -161,19 +151,16 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
         j["argHash"] = info->argHash;
     }
 
-    char *lpBuffer = (char *) info->lpBuffer;
-    size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
-
     if (info->function == Function::_read){
         #pragma warning(suppress: 4311 4302)
-        nNumberOfBytesToRead = min(nNumberOfBytesToRead, (int) drwrap_get_retval(wrapcxt));
+        info->nNumberOfBytesToRead = min(info->nNumberOfBytesToRead, (int) drwrap_get_retval(wrapcxt));
     }
 
     if ((long long) info->lpNumberOfBytesRead & 0xffffffff){
-        nNumberOfBytesToRead = min(nNumberOfBytesToRead, (int) *(info->lpNumberOfBytesRead));
+        info->nNumberOfBytesToRead = min(info->nNumberOfBytesToRead, (int) *(info->lpNumberOfBytesRead));
     }
 
-    vector<unsigned char> x(lpBuffer, lpBuffer + min(nNumberOfBytesToRead, 64));
+    vector<unsigned char> x((char *) info->lpBuffer, ((char *) info->lpBuffer) + min(info->nNumberOfBytesToRead, 64));
     j["buffer"] = x;
 
     SL2_LOG_JSONL(j);
@@ -193,20 +180,11 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 static void
 wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 {
-    void *drcontext;
+    void *drcontext = NULL;
     bool interesting_call = true;
 
-    if (!user_data) {
-        SL2_DR_DEBUG("Warning: user_data=NULL in wrap_post_MapViewOfFile!\n");
+    if (!client.is_sane_post_hook(wrapcxt, user_data, &drcontext)) {
         return;
-    }
-
-    if (!wrapcxt) {
-        SL2_DR_DEBUG("Warning: wrapcxt=NULL in wrap_post_MapViewOfFile! Using dr_get_current_drcontext.\n");
-        drcontext = dr_get_current_drcontext();
-    }
-    else {
-        drcontext = drwrap_get_drcontext(wrapcxt);
     }
 
     client_read_info *info   = ((client_read_info *)user_data);

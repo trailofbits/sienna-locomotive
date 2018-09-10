@@ -1234,19 +1234,10 @@ wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data)
 {
-    void *drcontext;
+    void *drcontext = NULL;
 
-    if (!user_data) {
-        SL2_DR_DEBUG("Warning: user_data=NULL in wrap_post_Generic!\n");
+    if (!client.is_sane_post_hook(wrapcxt, user_data, &drcontext)) {
         return;
-    }
-
-    if (!wrapcxt) {
-        SL2_DR_DEBUG("Warning: wrapcxt=NULL in wrap_post_Generic! Using dr_get_current_drcontext.\n");
-        drcontext = dr_get_current_drcontext();
-    }
-    else {
-        drcontext = drwrap_get_drcontext(wrapcxt);
     }
 
     SL2_DR_DEBUG("<in wrap_post_Generic>\n");
@@ -1288,19 +1279,10 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 static void
 wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 {
-    void *drcontext;
+    void *drcontext = NULL;
 
-    if (!user_data) {
-        SL2_DR_DEBUG("Warning: user_data=NULL in wrap_post_MapViewOfFile!\n");
+    if (!client.is_sane_post_hook(wrapcxt, user_data, &drcontext)) {
         return;
-    }
-
-    if (!wrapcxt) {
-        SL2_DR_DEBUG("Warning: wrapcxt=NULL in wrap_post_MapViewOfFile! Using dr_get_current_drcontext.\n");
-        drcontext = dr_get_current_drcontext();
-    }
-    else {
-        drcontext = drwrap_get_drcontext(wrapcxt);
     }
 
     SL2_DR_DEBUG("<in wrap_post_MapViewOfFile>\n");

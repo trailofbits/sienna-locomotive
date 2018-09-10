@@ -651,6 +651,25 @@ SL2Client::wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
     }
 }
 
+bool
+SL2Client::is_sane_post_hook(void *wrapcxt, void *user_data, void **drcontext)
+{
+    if (!user_data) {
+        SL2_DR_DEBUG("Warning: user_data=NULL in post-hook!\n");
+        return false;
+    }
+
+    if (!wrapcxt) {
+        SL2_DR_DEBUG("Warning: wrapcxt=NULL in post-hook, using dr_get_current_drcontext!\n");
+        *drcontext = dr_get_current_drcontext();
+    }
+    else {
+        *drcontext = drwrap_get_drcontext(wrapcxt);
+    }
+
+    return true;
+}
+
 
 // TODO(ww): Document the fallback values here.
 SL2_EXPORT
