@@ -190,8 +190,8 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     dr_thread_free(drcontext, info, sizeof(client_read_info));
 }
 
-// NOTE(ww): MapViewOfFile can't use the Generic post-hook, since it
-// returns the address of the mapped region.
+// NOTE(ww): MapViewOfFile can't use the Generic post-hook, as
+// we need the address of the mapped view that it returns.
 static void
 wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 {
@@ -215,7 +215,6 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     const char *func_name = function_to_string(info->function);
 
     char *map_base = (char *) drwrap_get_retval(wrapcxt);
-    size_t nNumberOfBytesToRead = info->nNumberOfBytesToRead;
 
     wstring_convert<std::codecvt_utf8<wchar_t>> utf8Converter;
 
@@ -240,12 +239,14 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 
     if (interesting_call) {
         char argHash[SL2_HASH_LEN + 1] = {0};
+        MEMORY_BASIC_INFORMATION memory_info = {0};
 
         // NOTE(ww): If nNumberOfBytesToRead=0, then the entire file is being mapped.
-        // For the wizard's purposes (previewing the mapped buffer), just treat this
-        // as a 64 byte mapping.
-        if (!nNumberOfBytesToRead) {
-            nNumberOfBytesToRead = 64;
+        // Get the real size by querying the base address with VirtualQuery.
+        if (!info->nNumberOfBytesToRead) {
+            dr_virtual_query((byte *) map_base, &memory_info, sizeof(memory_info));
+
+            info->nNumberOfBytesToRead = memory_info.RegionSize;
         }
 
         fStruct.readSize = 64;
@@ -260,7 +261,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 
         j["argHash"] = argHash;
 
-        vector<unsigned char> x(map_base, map_base + min(nNumberOfBytesToRead, 64));
+        vector<unsigned char> x(map_base, map_base + min(info->nNumberOfBytesToRead, 64));
         j["buffer"] = x;
 
         SL2_LOG_JSONL(j);
