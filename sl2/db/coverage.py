@@ -16,8 +16,8 @@ class CoverageRecord(Base):
     score = Column(Integer)
     num_tries_remaining = Column(Integer)
 
-    def __init__(self, run_block_id, bucketing, score, num_tries_remaining):
-        self.run_block_id = run_block_id
+    def __init__(self, run_block, bucketing, score, num_tries_remaining):
+        self.run_block = run_block
         self.bucketing = bucketing
         self.score = score
         self.num_tries_remaining = num_tries_remaining

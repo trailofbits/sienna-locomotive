@@ -53,7 +53,7 @@ class SessionManager(object):
         session = db.getSession()
 
         record = RunBlock(self.target_slug, self.started, self.runs_counted, self.crash_counter)
-        cov = CoverageRecord(record.id, bucketing, score, remaining)  # TODO Get coverage
+        cov = CoverageRecord(record, bucketing, score, remaining)  # TODO Get coverage
 
         session.add(record)
         session.add(cov)
