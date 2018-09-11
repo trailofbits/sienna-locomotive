@@ -184,6 +184,7 @@ public:
 
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Methods
+    // Method targeting methods.
     bool        is_function_targeted(client_read_info *info);
     bool        compare_filenames(targetFunction &t, client_read_info* info);
     bool        compare_indices(targetFunction &t, Function &function);
@@ -191,6 +192,14 @@ public:
     bool        compare_return_addresses(targetFunction &t, client_read_info* info);
     bool        compare_arg_hashes(targetFunction &t, client_read_info* info);
     bool        compare_arg_buffers(targetFunction &t, client_read_info* info);
+
+    // Crash-diversion mitigation methods.
+    void        wrap_pre_IsProcessorFeaturePresent(void *wrapcxt, OUT void **user_data);
+    void        wrap_post_IsProcessorFeaturePresent(void *wrapcxt, OUT void *user_data);
+    void        wrap_pre_UnhandledExceptionFilter(void *wrapcxt, OUT void **user_data, bool (*on_exception)(void *, dr_exception_t *));
+    void        wrap_pre_VerifierStopMessage(void *wrapcxt, OUT void **user_data, bool (*on_exception)(void *, dr_exception_t *));
+
+    // Pre- and post-hook related methods.
     void        wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data);
     void        wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data);
     void        wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data);
