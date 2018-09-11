@@ -78,35 +78,35 @@ class Tracer(Base):
     instruction = Column(String)
     reason = Column(String)
 
-    call0 = Column(Integer)
-    call1 = Column(Integer)
-    call2 = Column(Integer)
-    call3 = Column(Integer)
-    call4 = Column(Integer)
+    call0 = Column(String(20))
+    call1 = Column(String(20))
+    call2 = Column(String(20))
+    call3 = Column(String(20))
+    call4 = Column(String(20))
 
-    insn0 = Column(Integer)
-    insn1 = Column(Integer)
-    insn2 = Column(Integer)
-    insn3 = Column(Integer)
-    insn4 = Column(Integer)
+    insn0 = Column(String(20))
+    insn1 = Column(String(20))
+    insn2 = Column(String(20))
+    insn3 = Column(String(20))
+    insn4 = Column(String(20))
 
-    rax = Column(Integer)
-    rbx = Column(Integer)
-    rcx = Column(Integer)
-    rdx = Column(Integer)
-    rsp = Column(Integer)
-    rbp = Column(Integer)
-    rsi = Column(Integer)
-    rdi = Column(Integer)
-    r8 = Column(Integer)
-    r9 = Column(Integer)
-    r10 = Column(Integer)
-    r11 = Column(Integer)
-    r12 = Column(Integer)
-    r13 = Column(Integer)
-    r14 = Column(Integer)
-    r15 = Column(Integer)
-    rip = Column(Integer)
+    rax = Column(String(20))
+    rbx = Column(String(20))
+    rcx = Column(String(20))
+    rdx = Column(String(20))
+    rsp = Column(String(20))
+    rbp = Column(String(20))
+    rsi = Column(String(20))
+    rdi = Column(String(20))
+    r8 = Column(String(20))
+    r9 = Column(String(20))
+    r10 = Column(String(20))
+    r11 = Column(String(20))
+    r12 = Column(String(20))
+    r13 = Column(String(20))
+    r14 = Column(String(20))
+    r15 = Column(String(20))
+    rip = Column(String(20))
 
     regTaint = Column(Integer)
 
@@ -136,8 +136,8 @@ class Tracer(Base):
         self.reason = rawJson["reason"]
 
         for i in range(5):
-            setattr(self, "call{}".format(i), rawJson["last_calls"][i])
-            setattr(self, "insn{}".format(i), rawJson["last_insns"][i])
+            setattr(self, "call{}".format(i), hex(rawJson["last_calls"][i]))
+            setattr(self, "insn{}".format(i), hex(rawJson["last_insns"][i]))
 
         flattened_regs = {}
         for reg in rawJson["regs"]:
@@ -146,7 +146,7 @@ class Tracer(Base):
         reg_taint = 0
         for index, reg in enumerate(regs):
             if reg in flattened_regs:
-                setattr(self, reg, flattened_regs[reg][0])
+                setattr(self, reg, hex(flattened_regs[reg][0]))
             else:
                 print("[!] The tracer didn't return a value for {}".format(reg))
             if flattened_regs[reg][1]:

@@ -16,6 +16,7 @@ from .tracer import Tracer
 from .checksec import Checksec
 from .crash import Crash
 from .target_config import TargetConfig
+from .run_block import RunBlock
 
 from . import utilz
 

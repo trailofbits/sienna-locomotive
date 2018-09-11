@@ -43,7 +43,8 @@ class TestWizard(unittest.TestCase):
                r'build/wizard/Debug/wizard.dll',
                r'--',
                TEST_APPLICATION,
-               r'0']
+               r'0',
+               r'-f']
 
         out = runAndCaptureOutput(cmd)
         self.assertTrue(r'buffer":[65,65,65,65,65,65,65,65]' in out)
@@ -56,7 +57,8 @@ class TestWizard(unittest.TestCase):
                r'build/wizard/Debug/wizard.dll',
                r'--',
                TEST_APPLICATION,
-               r'2']
+               r'2',
+               r'-f']
 
         out = runAndCaptureOutput(cmd)
         self.assertTrue(r'[60,104,116,109,108,62,10,32]' in out)

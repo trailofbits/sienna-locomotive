@@ -122,6 +122,8 @@ class Crash(Base):
 
             self.runid = runid
             ## Json object
+            self.output = j["output"]
+            del(j["output"])
             self.obj = j
 
             self.stackPointer = self.obj["stackPointer"]
@@ -151,11 +153,10 @@ class Crash(Base):
             ## Tag or path used to succinctly describe crash bin
             self.tag = j["tag"]
             ## List of each engines exploitability.  For example [1,2,2]
-            self.ranks = self.obj["ranks"]
+            self.ranks = j["ranks"]
             ## A colon separated list of each engines exploitability.  For example 1:2:2
             self.ranksString = self.ranksStringGenerate()
             ## Summary of triage information
-            self.output = j["output"]
             regs = ["cs", "dr0", "dr1", "dr2", "dr3", "dr6", "dr7", "ds", "eflags", "es",
                     "fs", "gs", "mx_csr", "r10", "r11", "r12", "r13", "r14", "r15", "r8",
                     "r9", "rax", "rbp", "rbx", "rcx", "rdi", "rdx", "rip", "rsi", "rsp",

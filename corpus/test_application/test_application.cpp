@@ -208,11 +208,11 @@ int test_fread(bool fuzzing) {
 
 int test_argCompare(bool fuzzing) {
 
-    readfile(L"test_argCompare_fail.txt");
-    readfile(L"test_argCompare_fail.txt");
-    readfile(L"test_argCompare_fail.txt");
-    readfile(L"test_argCompare_win.txt");
-    readfile(L"test_argCompare_fail.txt");
+    readfile(L"sl2\\test\\test_argCompare_fail.txt");
+    readfile(L"sl2\\test\\test_argCompare_fail.txt");
+    readfile(L"sl2\\test\\test_argCompare_fail.txt");
+    readfile(L"sl2\\test\\test_argCompare_win.txt");
+    readfile(L"sl2\\test\\test_argCompare_fail.txt");
 
     return 0;
 }
@@ -229,7 +229,7 @@ int test_quickCrash(bool fuzzing) {
     printf("Starting quickCrash()...\n");
     char buf[1024];
     memset(buf, 0, sizeof(buf) );
-    readfile(L"test_argCompare_win.txt", (uint8_t*)buf);
+    readfile(L"sl2\\test\\test_argCompare_win.txt", (uint8_t*)buf);
     printf("(%s)\n", buf);
     if( strstr( buf, "WIN!!!" ) != NULL ) {
         crash();

@@ -17,12 +17,13 @@ import sys
 import threading
 import time
 import traceback
+import struct
 from enum import IntEnum
 from typing import NamedTuple
 
 import msgpack
 
-from sl2 import db
+from sl2.db import Crash, Tracer
 from . import config
 from . import named_mutex
 from .state import (
@@ -63,6 +64,7 @@ class DRRun(NamedTuple):
     process: subprocess.Popen
     seed: str
     run_id: str
+    last_arena: str
 
 
 def print_l(*args):
@@ -135,7 +137,10 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
             print_l("Lost connection to server! Restarting...")
             run_id = -1
 
-        return DRRun(popen_obj, invoke.seed, run_id)
+        arena_id = None
+        if '-a' in config_dict["client_args"]:
+            arena_id = config_dict["client_args"][config_dict["client_args"].index('-a') + 1]
+        return DRRun(popen_obj, invoke.seed, run_id, arena_id)
 
     # Handle cases where the program didn't exit in time
     except subprocess.TimeoutExpired:
@@ -197,7 +202,7 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
 # @param run_id Run ID (guid)
 def triagerRun(cfg, run_id):
     tracerOutput, _ = tracer_run(cfg, run_id)
-    crashInfo = db.Crash.factory(run_id, get_target_slug(cfg), cfg['target_application_path'])
+    crashInfo = Crash.factory(run_id, get_target_slug(cfg), cfg['target_application_path'])
     return {"run_id": run_id,
             "tracerOutput": tracerOutput,
             "crashInfo": crashInfo
@@ -230,7 +235,7 @@ def wizard_run(config_dict):
             line = line.decode('utf-8')
 
             if re.match(r'ERROR: Target process .* is for the wrong architecture', line):
-                print_l("[!] Bad architecute for target application:", config_dict['target_application_path'])
+                print_l("[!] Bad architecture for target application:", config_dict['target_application_path'])
                 return []
 
             obj = json.loads(line)
@@ -327,7 +332,7 @@ def fuzzer_run(config_dict, targets_file):
             print_l("Run %s did not find a crash" % run_id)
         shutil.rmtree(os.path.join(config.sl2_runs_dir, str(run_id)), ignore_errors=True)
 
-    return crashed, run.run_id
+    return crashed, run
 
 
 ## Runs the triaging tool
@@ -354,7 +359,7 @@ def tracer_run(config_dict, run_id):
     write_output_files(run, run_id, 'triage')
 
     formatted, raw = parse_tracer_output(run_id)
-    db.Tracer.factory(run_id, formatted, raw)
+    Tracer.factory(run_id, formatted, raw)
     return formatted, raw
 
 
@@ -371,10 +376,10 @@ def fuzz_and_triage(config_dict):
     # TODO: Move try/except so we can start new runs after an exception
     try:
         while can_fuzz:
-            crashed, run_id = fuzzer_run(config_dict, targets_file)
+            crashed, run = fuzzer_run(config_dict, targets_file)
             if crashed:
 
-                triagerInfo = triagerRun(config_dict, run_id)
+                triagerInfo = triagerRun(config_dict, run.run_id)
                 print_l(triagerInfo)
 
                 if config_dict['exit_early']:
