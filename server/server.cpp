@@ -836,16 +836,20 @@ static void handle_set_arena(HANDLE pipe)
                 strategy = (prior.strategy + 1) % SL2_NUM_STRATEGIES;
             }
             else {
+                bool found_success = false;
                 strategy = 0;
 
-                for (int i = 1; i < SL2_NUM_STRATEGIES - 1; ++i) {
-                    if (prior.success_map[i] > prior.success_map[i + 1]) {
+                for (int i = 1; i < SL2_NUM_STRATEGIES; ++i) {
+                    if (prior.success_map[strategy] < prior.success_map[i]
+                        && prior.strategy != i) {
                         strategy = i;
+                        found_success = true;
                     }
                 }
 
-                // Fallback: We've seen no successful strategies, so just move on.
-                if (!strategy) {
+                // Fallback: We've seen no successful strategies (other than the current one),
+                // so just move on.
+                if (!found_success) {
                     strategy = (prior.strategy + 1) % SL2_NUM_STRATEGIES;
                 }
             }
