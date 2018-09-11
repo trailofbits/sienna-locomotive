@@ -23,6 +23,22 @@ on_thread_exit(void *drcontext)
     SL2_DR_DEBUG("wizard#on_thread_exit\n");
 }
 
+static bool
+on_exception(void *drcontext, dr_exception_t *excpt)
+{
+    SL2_DR_DEBUG("The target application crashed under the wizard!\n");
+
+    json j;
+
+    j["type"] = "error";
+    j["exception"] = exception_to_string(excpt->record->ExceptionCode);
+
+    SL2_LOG_JSONL(j);
+
+    dr_exit_process(1);
+    return true;
+}
+
 /* Clean up after the target binary exits */
 static void
 on_dr_exit(void)
@@ -221,6 +237,8 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
             info->nNumberOfBytesToRead = memory_info.RegionSize;
         }
 
+        SL2_DR_DEBUG("nNumberOfBytesToRead=%lu", info->nNumberOfBytesToRead);
+
         fStruct.readSize = info->nNumberOfBytesToRead;
 
         j["source"]  = utf8Converter.to_bytes(wstring(fStruct.fileName));
@@ -349,7 +367,8 @@ void wizard(client_id_t id, int argc, const char *argv[])
 
     if (!drmgr_register_module_load_event(on_module_load) ||
         !drmgr_register_thread_init_event(on_thread_init) ||
-        !drmgr_register_thread_exit_event(on_thread_exit))
+        !drmgr_register_thread_exit_event(on_thread_exit) ||
+        !drmgr_register_exception_event(on_exception))
     {
         DR_ASSERT(false);
     }
