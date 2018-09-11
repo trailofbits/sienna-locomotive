@@ -23,6 +23,7 @@ sl2_funcmod SL2_FUNCMOD_TABLE[] = {
     {"fread_s", "UCRTBASED.DLL"},
     {"_read", "UCRTBASE.DLL"},
     {"_read", "UCRTBASED.DLL"},
+    {"MapViewOfFile", "KERNELBASE.DLL"},
 };
 
 SL2_EXPORT
@@ -47,12 +48,13 @@ SL2Client::SL2Client() {
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-// isFunctionTargeted()
+// is_function_targeted()
 //
 // Returns true if the current function should be targeted.
 bool SL2Client::
-isFunctionTargeted(Function function, client_read_info* info)
+is_function_targeted(client_read_info* info)
 {
+    Function function = info->function;
     const char *func_name = function_to_string(function);
 
     for (targetFunction t : parsedJson){
@@ -519,7 +521,7 @@ SL2Client::wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
     info->lpBuffer             = buffer;
     info->nNumberOfBytesToRead = size * count;
     info->lpNumberOfBytesRead  = NULL;
-    info->position             = NULL;
+    info->position             = 0;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
     fileArgHash fStruct = {0};
@@ -556,7 +558,7 @@ SL2Client::wrap_pre_fread(void *wrapcxt, OUT void **user_data)
     info->lpBuffer             = buffer;
     info->nNumberOfBytesToRead = size * count;
     info->lpNumberOfBytesRead  = NULL;
-    info->position             = NULL;
+    info->position             = 0;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
     fileArgHash fStruct = {0};
@@ -592,7 +594,7 @@ SL2Client::wrap_pre__read(void *wrapcxt, OUT void **user_data)
     info->lpBuffer             = buffer;
     info->nNumberOfBytesToRead = count;
     info->lpNumberOfBytesRead  = NULL;
-    info->position             = NULL;
+    info->position             = 0;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
     fileArgHash fStruct = {0};
@@ -602,6 +604,71 @@ SL2Client::wrap_pre__read(void *wrapcxt, OUT void **user_data)
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
     hash_args(info->argHash, &fStruct);
+}
+
+void
+SL2Client::wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
+{
+    SL2_DR_DEBUG("<in wrap_pre_MapViewOfFile>\n");
+
+    HANDLE hFileMappingObject = drwrap_get_arg(wrapcxt, 0);
+    #pragma warning(suppress: 4311 4302)
+    DWORD dwDesiredAccess = (DWORD) drwrap_get_arg(wrapcxt, 1);
+    #pragma warning(suppress: 4311 4302)
+    DWORD dwFileOffsetHigh = (DWORD) drwrap_get_arg(wrapcxt, 2);
+    #pragma warning(suppress: 4311 4302)
+    DWORD dwFileOffsetLow = (DWORD) drwrap_get_arg(wrapcxt, 3);
+    size_t dwNumberOfBytesToMap = (size_t) drwrap_get_arg(wrapcxt, 4);
+
+    *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
+    client_read_info *info = (client_read_info *) *user_data;
+
+    info->function = Function::MapViewOfFile;
+    info->hFile = hFileMappingObject;
+    // NOTE(ww): dwNumberOfBytesToMap=0 is a special case here, since 0 indicates that the
+    // entire file is being mapped into memory. We handle this case in the post-hook
+    // with a VirtualQuery call.
+    info->nNumberOfBytesToRead = dwNumberOfBytesToMap;
+    info->position = 0;
+    info->retAddrOffset = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+
+    info->source = NULL;
+
+    // NOTE(ww): We populate these in the post-hook, when necessary.
+    info->lpBuffer = NULL;
+    info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
+
+    // Change write-access requests to copy-on-write requests, since we don't want to clobber
+    // our original input file with mutated data.
+    // TODO(ww): Is this going to cause problems for programs that attept to create multiple
+    // different memory maps of the same on-disk file?
+    if (dwDesiredAccess & FILE_MAP_ALL_ACCESS || dwDesiredAccess & FILE_MAP_WRITE) {
+        SL2_DR_DEBUG("user requested write access from MapViewOfFile, changing to CoW!\n");
+        uint64_t fixed_access = FILE_MAP_COPY;
+
+        fixed_access |= (dwDesiredAccess & FILE_MAP_EXECUTE);
+
+        drwrap_set_arg(wrapcxt, 1, (void *) fixed_access);
+    }
+}
+
+bool
+SL2Client::is_sane_post_hook(void *wrapcxt, void *user_data, void **drcontext)
+{
+    if (!user_data) {
+        SL2_DR_DEBUG("Fatal: user_data=NULL in post-hook!\n");
+        return false;
+    }
+
+    if (!wrapcxt) {
+        SL2_DR_DEBUG("Warning: wrapcxt=NULL in post-hook, using dr_get_current_drcontext!\n");
+        *drcontext = dr_get_current_drcontext();
+    }
+    else {
+        *drcontext = drwrap_get_drcontext(wrapcxt);
+    }
+
+    return true;
 }
 
 
@@ -648,6 +715,8 @@ const char *function_to_string(Function function)
             return "fread_s";
         case Function::_read:
             return "_read";
+        case Function::MapViewOfFile:
+            return "MapViewOfFile";
     }
 
     return "unknown";

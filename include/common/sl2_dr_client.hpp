@@ -8,7 +8,7 @@
 #include <Rpc.h>
 #include <io.h>
 #include <Dbghelp.h>
-
+#include <psapi.h>
 
 #include "vendor/json.hpp"
 #include "dr_api.h"
@@ -18,7 +18,6 @@
 #include "drreg.h"
 
 #include <string>
-#include <fstream>
 
 using namespace std;
 
@@ -85,6 +84,7 @@ enum class Function {
     fread,
     fread_s,
     _read,
+    MapViewOfFile,
 };
 
 // The set of supported function targeting techniques.
@@ -184,7 +184,7 @@ public:
 
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Methods
-    bool        isFunctionTargeted(Function function,  client_read_info* info);
+    bool        is_function_targeted(client_read_info *info);
     bool        compare_filenames(targetFunction &t, client_read_info* info);
     bool        compare_indices(targetFunction &t, Function &function);
     bool        compare_index_at_retaddr(targetFunction &t, client_read_info* info);
@@ -201,6 +201,8 @@ public:
     void        wrap_pre_fread(void *wrapcxt, OUT void **user_data);
     void        wrap_pre_fread_s(void *wrapcxt, OUT void **user_data);
     void        wrap_pre__read(void *wrapcxt, OUT void **user_data);
+    void        wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data);
+    bool        is_sane_post_hook(void *wrapcxt, void *user_data, void **drcontext);
     bool        loadJson(string json);
     uint64_t    incrementCallCountForFunction(Function function);
     uint64_t    incrementRetAddrCount(uint64_t retAddr);
