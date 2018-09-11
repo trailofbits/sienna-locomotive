@@ -49,20 +49,20 @@ class FuzzerThread(QThread):
 
         with SessionManager(get_target_slug(self.config_dict)) as manager:
             while self.should_fuzz:
-                    crashed, run_id = fuzzer_run(self.config_dict, self.target_file)
-                    manager.run_complete(found_crash=crashed)
+                    crashed, run = fuzzer_run(self.config_dict, self.target_file)
+                    manager.run_complete(run, found_crash=crashed)
 
                     if crashed:
                         if self.config_dict['exit_early']:
                             self.pause()
                         # We can't pass this object to another thread since it's database, so just returning the runid
-                        triagerInfo = triagerRun(self.config_dict, run_id)
-                        self.foundCrash.emit(self, str(run_id))
+                        triagerInfo = triagerRun(self.config_dict, run.run_id)
+                        self.foundCrash.emit(self, str(run.run_id))
 
                     if not self.config_dict['continuous']:
                         self.pause()
 
-                    if run_id == -1:
+                    if run.run_id == -1:
                         self.server_crashed.emit()
                         self.pause()
                     self.runComplete.emit()
