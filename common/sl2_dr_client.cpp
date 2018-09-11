@@ -208,7 +208,7 @@ SL2Client::wrap_post_IsProcessorFeaturePresent(void *wrapcxt, void *user_data)
 }
 
 void
-SL2Client::wrap_pre_UnhandledExceptionFilter(void *wrapcxt, OUT void **user_data)
+SL2Client::wrap_pre_UnhandledExceptionFilter(void *wrapcxt, OUT void **user_data, bool (*on_exception)(void *, dr_exception_t *))
 {
     SL2_DR_DEBUG("wrap_pre_UnhandledExceptionFilter: stealing unhandled exception\n");
 
@@ -226,7 +226,7 @@ SL2Client::wrap_pre_UnhandledExceptionFilter(void *wrapcxt, OUT void **user_data
 */
 
 void
-SL2Client::wrap_pre_VerifierStopMessage(void *wrapcxt, OUT void **user_data)
+SL2Client::wrap_pre_VerifierStopMessage(void *wrapcxt, OUT void **user_data, bool (*on_exception)(void *, dr_exception_t *))
 {
     SL2_DR_DEBUG("wrap_pre_VerifierStopMessage: stealing unhandled exception\n");
 

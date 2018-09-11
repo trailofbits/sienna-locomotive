@@ -230,12 +230,12 @@ static void wrap_post_IsProcessorFeaturePresent(void *wrapcxt, void *user_data)
 
 static void wrap_pre_UnhandledExceptionFilter(void *wrapcxt, OUT void **user_data)
 {
-    client.wrap_pre_UnhandledExceptionFilter(wrapcxt, user_data);
+    client.wrap_pre_UnhandledExceptionFilter(wrapcxt, user_data, on_exception);
 }
 
 static void wrap_pre_VerifierStopMessage(void *wrapcxt, OUT void **user_data)
 {
-    client.wrap_pre_VerifierStopMessage(wrapcxt, user_data);
+    client.wrap_pre_VerifierStopMessage(wrapcxt, user_data, on_exception);
 }
 
 static void

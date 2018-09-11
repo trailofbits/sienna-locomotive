@@ -195,9 +195,9 @@ public:
 
     // Crash-diversion mitigation methods.
     void        wrap_pre_IsProcessorFeaturePresent(void *wrapcxt, OUT void **user_data);
-    void        wrap_post_IsProcessorFeaturePresent(void *wrapcxt, OUT void **user_data);
-    void        wrap_pre_UnhandledExceptionFilter(void *wrapcxt, OUT void **user_data);
-    void        wrap_pre_VerifierStopMessage(void *wrapcxt, OUT void **user_data);
+    void        wrap_post_IsProcessorFeaturePresent(void *wrapcxt, OUT void *user_data);
+    void        wrap_pre_UnhandledExceptionFilter(void *wrapcxt, OUT void **user_data, bool (*on_exception)(void *, dr_exception_t *));
+    void        wrap_pre_VerifierStopMessage(void *wrapcxt, OUT void **user_data, bool (*on_exception)(void *, dr_exception_t *));
 
     // Pre- and post-hook related methods.
     void        wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data);
