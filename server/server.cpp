@@ -577,11 +577,16 @@ static void handle_register_mutation(HANDLE pipe)
         uint8_t *buf = (uint8_t *) malloc(size);
 
         if (buf == NULL) {
-            SL2_SERVER_LOG_FATAL("failed to allocate mutation buffer (size=%lu)", size);
+            SL2_SERVER_LOG_ERROR("failed to allocate mutation buffer (size=%lu)", size);
+            status = 1;
+            goto cleanup;
         }
 
         if (!ReadFile(pipe, buf, (DWORD)size, &txsize, NULL)) {
-            SL2_SERVER_LOG_FATAL("failed to read mutation buffer from pipe (size=%lu)", size);
+            SL2_SERVER_LOG_ERROR("failed to read mutation buffer from pipe (size=%lu)", size);
+            free(buf);
+            status = 1;
+            goto cleanup;
         }
 
         if (txsize < size) {
@@ -596,10 +601,14 @@ static void handle_register_mutation(HANDLE pipe)
         PathCchCombine(target_file, MAX_PATH, run_dir, mutate_fname);
 
         status = write_fkt(target_file, type, mutation_type, resource_size, resource_path, position, size, buf);
+
+        free(buf);
     }
     else {
         SL2_SERVER_LOG_WARN("got size=%lu, skipping registration", size);
     }
+
+    cleanup:
 
     if (!WriteFile(pipe, &status, sizeof(status), &txsize, NULL)) {
         SL2_SERVER_LOG_FATAL("failed to write server status");
