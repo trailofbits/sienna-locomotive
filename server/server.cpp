@@ -43,6 +43,7 @@ struct strategy_state {
 };
 
 struct server_opts {
+    bool dump_mut_buffer;
     bool pinned;
     bool bucketing;
     uint32_t stickiness;
@@ -601,6 +602,28 @@ static void handle_register_mutation(HANDLE pipe)
         PathCchCombine(target_file, MAX_PATH, run_dir, mutate_fname);
 
         status = write_fkt(target_file, type, mutation_type, resource_size, resource_path, position, size, buf);
+
+        if (opts.dump_mut_buffer) {
+            SL2_SERVER_LOG_INFO("mutation buffer dump requested");
+
+            memset(target_file, 0, (MAX_PATH + 1) * sizeof(wchar_t));
+            PathCchCombine(target_file, MAX_PATH, run_dir, L"buffer.bin");
+
+            HANDLE file = CreateFile(target_file,
+                GENERIC_WRITE,
+                0, NULL,
+                CREATE_ALWAYS,
+                FILE_ATTRIBUTE_NORMAL,
+                NULL);
+
+            if (file != INVALID_HANDLE_VALUE) {
+                WriteFile(file, buf, size, &txsize, NULL);
+                CloseHandle(file);
+            }
+            else {
+                SL2_SERVER_LOG_ERROR("couldn't create buffer dump file?");
+            }
+        }
 
         free(buf);
     }
@@ -1201,6 +1224,9 @@ int main(int argc, char **argv)
         else if (STREQ(argv[i], "-p")) {
             opts.pinned = true;
         }
+        else if (STREQ(argv[i], "-d")) {
+            opts.dump_mut_buffer = true;
+        }
     }
 
     if (opts.pinned && !pin_to_free_processor()) {
@@ -1209,7 +1235,8 @@ int main(int argc, char **argv)
 
     init_working_paths();
 
-    SL2_SERVER_LOG_INFO("pinned=%d, bucketing=%d, stickiness=%d", opts.pinned, opts.bucketing, opts.stickiness);
+    SL2_SERVER_LOG_INFO("dump_mut_buffer=%d, pinned=%d, bucketing=%d, stickiness=%d",
+        opts.dump_mut_buffer, opts.pinned, opts.bucketing, opts.stickiness);
 
     InitializeCriticalSection(&pid_lock);
     InitializeCriticalSection(&fkt_lock);
