@@ -237,8 +237,6 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
             info->nNumberOfBytesToRead = memory_info.RegionSize;
         }
 
-        SL2_DR_DEBUG("nNumberOfBytesToRead=%lu", info->nNumberOfBytesToRead);
-
         fStruct.readSize = info->nNumberOfBytesToRead;
 
         j["source"]  = utf8Converter.to_bytes(wstring(fStruct.fileName));
