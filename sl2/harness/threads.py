@@ -2,7 +2,20 @@ from PySide2.QtCore import QThread, Signal, Qt
 
 from .state import get_target_slug
 from .instrument import wizard_run, fuzzer_run, start_server, triagerRun
+from sl2 import db
 from sl2.db.run_block import SessionManager
+
+
+class ChecksecThread(QThread):
+    resultReady = Signal(str)
+
+    def __init__(self, target_path):
+        QThread.__init__(self)
+        self.target_path = target_path
+
+    def run(self):
+        checksec_output = db.Checksec.byExecutable(self.target_path).shortString()
+        self.resultReady.emit(checksec_output)
 
 
 class WizardThread(QThread):
