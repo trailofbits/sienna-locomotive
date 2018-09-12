@@ -200,7 +200,7 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
 # can't be used across threads so we end up fetching it from the db in the gui
 # @param cfg Configuration context dictionary
 # @param run_id Run ID (guid)
-def triagerRun(cfg, run_id):
+def triager_run(cfg, run_id):
     tracerOutput, _ = tracer_run(cfg, run_id)
     crashInfo = Crash.factory(run_id, get_target_slug(cfg), cfg['target_application_path'])
     return {"run_id": run_id,
@@ -379,7 +379,7 @@ def fuzz_and_triage(config_dict):
             crashed, run = fuzzer_run(config_dict, targets_file)
             if crashed:
 
-                triagerInfo = triagerRun(config_dict, run.run_id)
+                triagerInfo = triager_run(config_dict, run.run_id)
                 print_l(triagerInfo)
 
                 if config_dict['exit_early']:

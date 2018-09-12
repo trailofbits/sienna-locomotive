@@ -1,7 +1,7 @@
 from PySide2.QtCore import QThread, Signal, Qt
 
 from .state import get_target_slug
-from .instrument import wizard_run, fuzzer_run, start_server, triagerRun
+from .instrument import wizard_run, fuzzer_run, start_server, triager_run
 from sl2 import db
 from sl2.db.run_block import SessionManager
 
@@ -69,7 +69,7 @@ class FuzzerThread(QThread):
                         if self.config_dict['exit_early']:
                             self.pause()
                         # We can't pass this object to another thread since it's database, so just returning the runid
-                        triagerInfo = triagerRun(self.config_dict, run.run_id)
+                        triagerInfo = triager_run(self.config_dict, run.run_id)
                         self.foundCrash.emit(self, str(run.run_id))
 
                     if not self.config_dict['continuous']:
