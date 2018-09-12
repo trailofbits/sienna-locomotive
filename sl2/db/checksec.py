@@ -64,8 +64,8 @@ class Checksec(Base):
 
         ret = session.query(Checksec).filter(Checksec.hash == hash_file(path)).first()
         if ret:
+            session.close()
             return ret
-        ret = None
         checker = cfg.config['checksec_path']
         cmd = [checker, "-j", path]
 
@@ -75,6 +75,7 @@ class Checksec(Base):
             ret = Checksec(ret)
             session.add(ret)
             session.commit()
+            session.close()
         except subprocess.CalledProcessError as x:
             print("Exception", x)
 
