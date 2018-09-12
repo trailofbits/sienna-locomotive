@@ -105,12 +105,11 @@ Function Deploy{
     $ErrorActionPreference = "Stop"
 
     "Rebuilding Code Files"
-    #Build
+    Build
 
     "Creating Deploy Directory"
     Remove-Item sl2-deploy -Recurse -ErrorAction Ignore
     mkdir sl2-deploy
-    #Copy-Item -Recurse dynamorio sl2-deploy
 
     "Creating Binary Directories"
     New-Item sl2-deploy\build\common -Type Directory
@@ -134,37 +133,19 @@ Function Deploy{
     Copy-Item build\winchecksec\Debug sl2-deploy\build\winchecksec -Recurse -Force
     Copy-Item build\wizard\Debug sl2-deploy\build\wizard -Recurse -Force
 
-    "Downloading Python"
-    $url="https://www.python.org/ftp/python/3.7.0/python-3.7.0-embed-amd64.zip"
+    "Copying DynamoRIO"
+    Copy-Item -Recurse dynamorio sl2-deploy
 
-    [Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
-    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]'Tls,Tls11,Tls12'
-    $client = New-Object System.Net.WebClient
+    "Copying Python Files"
+    Copy-Item sl2 sl2-deploy -Recurse -Force
 
-    "Downloading from " + $url
-    $zip = "$cwd\python.zip"
-    $client.DownloadFile($url, $zip)
-    Unzip $zip "$cwd\sl2-deploy\python37"
-    SafeDelete("python.zip")
-
-    "Installing Setuptools"
-    pip install setuptools -t sl2-deploy\python37
-
-    "Installing Wheel"
-    pip install wheel -t sl2-deploy\python37
-
-    "Installing Python Package"
-    sl2-deploy\python37\python.exe setup.py sdist -d sl2-deploy bdist_wheel -d sl2-deploy\python37\
-    sl2-deploy\python37\python.exe setup.py install --install-lib sl2-deploy\python37
-
-    "Running Tests"
-    cd sl2-deploy
-    .\python37\Scripts\sl2-test.exe
-    cd ..
+    "Copying Helper Files"
+    Copy-Item deploy\* sl2-deploy
+    Copy-Item setup.py sl2-deploy
+    Copy-Item README.md sl2-deploy
 
     "Compressing Deployment Archive"
-    #Compress-Archive -force sl2-deploy sl2-deploy.zip
-
+    Compress-Archive -force sl2-deploy sl2-deploy.zip
 }
 
 Function Help {

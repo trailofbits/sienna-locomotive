@@ -42,6 +42,14 @@ catch {
 }
 
 
+"Checking to see if WER is disabled"
+try { Get-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\Windows Error Reporting" -Name "Disabled" }
+catch {
+    "You have not disabled Windows Error Reporting! This may interfere with the SL2 Unit Tests. Please follow the instructions in the README to disable it and run install.ps1 again."
+    & cmd /c pause
+    exit
+}
+
 "Installing Dependencies and creating scripts"
 python setup.py install --install-scripts "$cwd\Scripts"
 
@@ -59,7 +67,6 @@ $Shortcut.Description = "Sienna Locomotive 2 Graphical Fuzzing Interface"
 
 $Shortcut.Save()
 
-
 $TargetFile = "`"$env:APPDATA\Trail of Bits\fuzzkit\`""
 $ShortcutFile = "$env:USERPROFILE\Desktop\SL2 Working Files.lnk"
 $WScriptShell = New-Object -ComObject WScript.Shell
@@ -70,6 +77,9 @@ $Shortcut.Arguments = $TargetFile
 $Shortcut.Description = "SL2 Run Files"
 
 $Shortcut.Save()
+
+"Running Tests"
+.\Scripts\sl2-test.exe
 
 "Sienna Locomotive 2 has been succesfully installed. You can now run the GUI via the shortcut on the desktop, or by typing `sl2` into Powershell."
 
