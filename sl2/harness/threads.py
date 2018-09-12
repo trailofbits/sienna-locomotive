@@ -14,7 +14,7 @@ class ChecksecThread(QThread):
         self.target_path = target_path
 
     def run(self):
-        checksec_output = db.Checksec.byExecutable(self.target_path).shortString()
+        checksec_output = db.Checksec.byExecutable(self.target_path).short_description()
         self.resultReady.emit(checksec_output)
 
 

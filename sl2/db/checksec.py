@@ -99,7 +99,7 @@ class Checksec(Base):
 
     ## Returns value between 0 and 1 as a percentage of the rarity of protection flags.
     # If a binary has a flag that's rarely implemented (like RFG) it will more quickly increase this value
-    def protectionPercent(self):
+    def _protection_percent(self):
         probsMax = 0
         probsSum = 0
 
@@ -116,7 +116,7 @@ class Checksec(Base):
     # Returns a strings seperated by pipe symbols that
     # succinctly describes the checksec state of the object
     # @return string
-    def shortString(self):
+    def short_description(self):
         t = []
         if self.aslr:
             t.append("ASLR")
@@ -142,4 +142,4 @@ class Checksec(Base):
             t.append("SafeSEH")
         tags = ' | '.join(t)
 
-        return "%3.0f%% (%s)" % (self.protectionPercent() * 100, tags)
+        return "%3.0f%% (%s)" % (self._protection_percent() * 100, tags)
