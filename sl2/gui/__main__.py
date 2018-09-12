@@ -14,9 +14,12 @@ from PySide2.QtGui import QFontDatabase, QMovie, QStandardItem, QBrush, QColor
 from PySide2.QtWidgets import *
 from sqlalchemy import desc
 
-from sl2 import db
+from sl2 import db, triage
+from sl2.harness import config
+from sl2.harness.state import get_target, export_crash_data_to_csv, get_target_slug
+from sl2.harness.threads import ChecksecThread, WizardThread, FuzzerThread, ServerThread
+
 from . import stats
-import triage
 from .config_window import ConfigWindow
 from . import sqlalchemy_model
 from .QtHelpers import QIntVariable, QFloatVariable, QTextAdapter
@@ -27,10 +30,6 @@ from .checkbox_tree import (
     CheckboxTreeSortFilterProxyModel,
     ComboboxTreeItemDelegate,
     mode_labels)
-from sl2.harness import config
-from sl2.harness.state import get_target, export_crash_data_to_csv, get_target_slug
-from sl2.harness.threads import ChecksecThread, WizardThread, FuzzerThread, ServerThread
-
 
 ##
 # Main window for gui
