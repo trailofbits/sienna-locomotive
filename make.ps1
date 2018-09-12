@@ -101,6 +101,72 @@ Function Dep {
     SafeDelete "dynamorio"
 }
 
+Function Deploy{
+    $ErrorActionPreference = "Stop"
+
+    "Rebuilding Code Files"
+    #Build
+
+    "Creating Deploy Directory"
+    Remove-Item sl2-deploy -Recurse -ErrorAction Ignore
+    mkdir sl2-deploy
+    #Copy-Item -Recurse dynamorio sl2-deploy
+
+    "Creating Binary Directories"
+    New-Item sl2-deploy\build\common -Type Directory
+    New-Item sl2-deploy\build\corpus\test_application -Type Directory
+    New-Item sl2-deploy\build\fuzz_dynamorio -Type Directory
+    New-Item sl2-deploy\build\fuzzgoat -Type Directory
+    New-Item sl2-deploy\build\server -Type Directory
+    New-Item sl2-deploy\build\tracer_dynamorio -Type Directory
+    New-Item sl2-deploy\build\triage -Type Directory
+    New-Item sl2-deploy\build\winchecksec -Type Directory
+    New-Item sl2-deploy\build\wizard -Type Directory
+
+    "Copying Compiled Binaries"
+    Copy-Item build\common\Debug sl2-deploy\build\common -Recurse -Force
+    Copy-Item build\corpus\test_application\Debug sl2-deploy\build\corpus\test_application -Recurse -Force
+    Copy-Item build\fuzz_dynamorio\Debug sl2-deploy\build\fuzz_dynamorio -Recurse -Force
+    Copy-Item build\fuzzgoat\Debug sl2-deploy\build\fuzzgoat -Recurse -Force
+    Copy-Item build\server\Debug sl2-deploy\build\server -Recurse -Force
+    Copy-Item build\tracer_dynamorio\Debug sl2-deploy\build\tracer_dynamorio -Recurse -Force
+    Copy-Item build\triage\Debug sl2-deploy\build\triage -Recurse -Force
+    Copy-Item build\winchecksec\Debug sl2-deploy\build\winchecksec -Recurse -Force
+    Copy-Item build\wizard\Debug sl2-deploy\build\wizard -Recurse -Force
+
+    "Downloading Python"
+    $url="https://www.python.org/ftp/python/3.7.0/python-3.7.0-embed-amd64.zip"
+
+    [Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]'Tls,Tls11,Tls12'
+    $client = New-Object System.Net.WebClient
+
+    "Downloading from " + $url
+    $zip = "$cwd\python.zip"
+    $client.DownloadFile($url, $zip)
+    Unzip $zip "$cwd\sl2-deploy\python37"
+    SafeDelete("python.zip")
+
+    "Installing Setuptools"
+    pip install setuptools -t sl2-deploy\python37
+
+    "Installing Wheel"
+    pip install wheel -t sl2-deploy\python37
+
+    "Installing Python Package"
+    sl2-deploy\python37\python.exe setup.py sdist -d sl2-deploy bdist_wheel -d sl2-deploy\python37\
+    sl2-deploy\python37\python.exe setup.py install --install-lib sl2-deploy\python37
+
+    "Running Tests"
+    cd sl2-deploy
+    .\python37\Scripts\sl2-test.exe
+    cd ..
+
+    "Compressing Deployment Archive"
+    #Compress-Archive -force sl2-deploy sl2-deploy.zip
+
+}
+
 Function Help {
     @'
 Usage: make1.ps [clean|dep|reconfig|help]
@@ -137,5 +203,6 @@ switch( $cmd ) {
     "help"              { Help }
     "test"              { Test }
     "doc"               { Doc }
+    "deploy"            { Deploy }
     default             { Build }
 }

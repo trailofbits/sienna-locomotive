@@ -1,8 +1,8 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='sienna-locomotive',
-    version='0.2dev',
+    name='sl2',
+    version='0.2.dev1',
     description='A User-Friendly Fuzzing Tool',
     url='https://github.com/trailofbits/sienna-locomotive',
     author='Trail of Bits',
