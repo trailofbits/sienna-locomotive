@@ -107,11 +107,14 @@ def hexdump(buffer, lines=4, line_len=16):
         print_l("%08X:  %s  | %s" % (address, hexstr + " " * (line_len * 3 - len(hexstr)), asciistr))
 
 
-def sanity_checks():
+def sanity_checks(exit=True):
     """
     Make sure the system is in a state that's nominally ready for fuzzing.
     Exits loudly if a check fails.
     """
+    sane = True
+    errors = []
+
     bad_keys = [
         'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\DebugObjectRPCEnabled',
         'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AeDebug\\Auto',
@@ -123,8 +126,12 @@ def sanity_checks():
             key = winreg.OpenKey(reg, bad_key, 0, (winreg.KEY_WOW64_64KEY + winreg.KEY_READ))
             reg.CloseKey(key)
 
-            print_l("[+] Fatal: Found a registry key that will interfere with fuzzing/triaging:", bad_key)
-            sys.exit()
+            if exit:
+                print_l("[+] Fatal: Found a registry key that will interfere with fuzzing/triaging:", bad_key)
+                sys.exit()
+            else:
+                sane = False
+                errors.append("Registry key {} will interfere with fuzzing/triaging.".format(bad_key))
         except OSError:
             # OSError means the key doesn't exist, which is what we want.
             pass
@@ -138,21 +145,33 @@ def sanity_checks():
         disabled = winreg.QueryValueEx(key, "Disabled")[0]
 
         if disabled != 1:
-            print_l("[+] Fatal: Cowardly refusing to run with WER enabled.")
-            print_l(
-                "[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue.")
-            sys.exit()
+
+            if exit:
+                print_l("[+] Fatal: Cowardly refusing to run with WER enabled.")
+                print_l(
+                    "[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue.")
+                sys.exit()
+            else:
+                sane = False
+                errors.append("WER is enabled, refusing to continue.")
 
         winreg.CloseKey(key)
     except OSError:
         # OSError here means that we *haven't* disabled WER, which is a problem.
-        print_l("[+] Fatal: Cowardly refusing to run with WER enabled.")
-        print_l(
-            "[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue.")
-        sys.exit()
+
+        if exit:
+            print_l("[+] Fatal: Cowardly refusing to run with WER enabled.")
+            print_l(
+                "[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue.")
+            sys.exit()
+        else:
+            sane = False
+            errors.append("WER isn't explicitly disabled, refusing to continue.")
         pass
     except Exception as e:
         print_l("[+] Unexpected exception during sanity checks:", e)
+
+    return sane, errors
 
 
 def _main():
