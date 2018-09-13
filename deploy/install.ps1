@@ -34,16 +34,16 @@ catch {
     InstallPython
 }
 
-try { python -m pip install setuptools }
-catch {
+python -m pip install setuptools
+if ($lastExitCode -ne 0) {
     "Failed to install setuptools! Try running ``pip install setuptools`` in Powershell"
 
     & cmd /c pause
     exit
 }
 
-try { python -m pip install -r requirements.txt }
-catch {
+python -m pip install -r requirements.txt
+if ($lastExitCode -ne 0) {
     "Failed to install Python dependencies!"
 
     & cmd /c pause
