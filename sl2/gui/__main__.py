@@ -15,8 +15,11 @@ from PySide2.QtWidgets import *
 from sqlalchemy import desc
 
 from sl2 import db
+from sl2.harness import config
+from sl2.harness.state import get_target, export_crash_data_to_csv, get_target_slug, TriageExport
+from sl2.harness.threads import ChecksecThread, WizardThread, FuzzerThread, ServerThread
+
 from . import stats
-import triage
 from .config_window import ConfigWindow
 from . import sqlalchemy_model
 from .QtHelpers import QIntVariable, QFloatVariable, QTextAdapter
@@ -27,10 +30,6 @@ from .checkbox_tree import (
     CheckboxTreeSortFilterProxyModel,
     ComboboxTreeItemDelegate,
     mode_labels)
-from sl2.harness import config
-from sl2.harness.state import get_target, export_crash_data_to_csv, get_target_slug
-from sl2.harness.threads import WizardThread, FuzzerThread, ServerThread
-
 
 ##
 # Main window for gui
@@ -55,8 +54,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._layout = QtWidgets.QVBoxLayout(_central_widget)
         _central_widget.setLayout(self._layout)
 
-        # Set up Wizard and Server threads so we don't block the UI
+        # Set up Checksec, Wizard and Server threads so we don't block the UI
         # when they're running
+        self.checksec_thread = ChecksecThread(config.config['target_application_path'])
         self.wizard_thread = WizardThread(config.config)
         self.server_thread = ServerThread()
 
@@ -64,17 +64,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Target info
         self.targetStatus = QtWidgets.QStatusBar()
-
-        targetPath = config.config['target_application_path']
-        checksec = db.Checksec.byExecutable(targetPath)
-        targetString = "Target: {}\t Protections: {}".format(targetPath, checksec.shortString())
-
-        self.targetLabel = QtWidgets.QLabel(targetString)
+        self.targetLabel = QtWidgets.QLabel()
         self.targetStatus.addWidget(self.targetLabel)
         self._layout.addWidget(self.targetStatus)
 
-        # Create wizard button
+        self.checksec_thread.start()
+        self.checksec_thread.resultReady.connect(self.checksec_finished)
 
+        # Create wizard button
         self.wizard_button = QtWidgets.QPushButton("Run Wizard")
         self._layout.addWidget(self.wizard_button)
 
@@ -513,6 +510,11 @@ class MainWindow(QtWidgets.QMainWindow):
         menu.addAction(self.uncheck_action)
         menu.popup(QContextMenuEvent.globalPos())
 
+    def checksec_finished(self, checksec_output):
+        target_path = config.config['target_application_path']
+        target_string = "Target: {}\t Protections: {}".format(target_path, checksec_output)
+        self.targetLabel.setText(target_string)
+
     def wizard_finished(self, wizard_output):
         """ Dump the results of a wizard run to the target file and rebuild the tree """
         self.target_data.set_target_list(wizard_output)
@@ -544,7 +546,8 @@ class MainWindow(QtWidgets.QMainWindow):
         path = QFileDialog.getExistingDirectory(dir=".")
         if len(path) == 0:
             return
-        triageExporter = triage.TriageExport(path)
+
+        triageExporter = TriageExport(path)
         triageExporter.export()
         os.startfile(path)
 

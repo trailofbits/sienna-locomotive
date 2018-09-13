@@ -65,8 +65,8 @@ dburl = os.path.join('sqlite:///%s' % dbpath)
 engine = create_engine(dburl, poolclass=NullPool)
 
 base.Base.metadata.create_all(engine)
-Session = sessionmaker(bind=engine)
-Session = scoped_session(Session)
+session_factory = sessionmaker(bind=engine)
+Session = scoped_session(session_factory)
 Session().commit()
 
 # Checks for version mismatch

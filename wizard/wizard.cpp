@@ -23,6 +23,22 @@ on_thread_exit(void *drcontext)
     SL2_DR_DEBUG("wizard#on_thread_exit\n");
 }
 
+static bool
+on_exception(void *drcontext, dr_exception_t *excpt)
+{
+    SL2_DR_DEBUG("The target application crashed under the wizard!\n");
+
+    json j;
+
+    j["type"] = "error";
+    j["exception"] = exception_to_string(excpt->record->ExceptionCode);
+
+    SL2_LOG_JSONL(j);
+
+    dr_exit_process(1);
+    return true;
+}
+
 /* Clean up after the target binary exits */
 static void
 on_dr_exit(void)
@@ -243,17 +259,10 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     dr_thread_free(drcontext, info, sizeof(client_read_info));
 }
 
-/* Runs every time we load a new module. Wraps functions we can target. See fuzzer.cpp for a more-detailed version */
 static void
 on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 {
-    /*
-        ReadFile is hooked twice, in kernel32 and kernelbase.
-        kernelbase is forwarded to kernel32, so if we want to filter
-            to only one hook make sure we hook kernel32.
-    */
-
-    if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))){
+    if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))) {
         client.baseAddr = (size_t) mod->start;
     }
 
@@ -342,14 +351,16 @@ void wizard(client_id_t id, int argc, const char *argv[])
     dr_set_client_name("Wizard",
                        "https://github.com/trailofbits/sienna-locomotive");
 
-    if (!drmgr_init() || drreg_init(&ops) != DRREG_SUCCESS || !drwrap_init())
+    if (!drmgr_init() || drreg_init(&ops) != DRREG_SUCCESS || !drwrap_init()) {
         DR_ASSERT(false);
+    }
 
     dr_register_exit_event(on_dr_exit);
 
     if (!drmgr_register_module_load_event(on_module_load) ||
         !drmgr_register_thread_init_event(on_thread_init) ||
-        !drmgr_register_thread_exit_event(on_thread_exit))
+        !drmgr_register_thread_exit_event(on_thread_exit) ||
+        !drmgr_register_exception_event(on_exception))
     {
         DR_ASSERT(false);
     }

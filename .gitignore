@@ -24,3 +24,5 @@ config.ini
 pidfile
 doc/
 sienna_locomotive.egg-info/*
+sl2-deploy/*
+sl2.egg-info/*

@@ -114,6 +114,9 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
                                  stdout=stdout,
                                  stderr=stderr)
 
+    arena_id = None
+    if '-a' in config_dict["client_args"]:
+        arena_id = config_dict["client_args"][config_dict["client_args"].index('-a') + 1]
     # Try to get the output from the process, time out if necessary
     try:
         stdout, stderr = popen_obj.communicate(timeout=timeout)
@@ -137,9 +140,6 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
             print_l("Lost connection to server! Restarting...")
             run_id = -1
 
-        arena_id = None
-        if '-a' in config_dict["client_args"]:
-            arena_id = config_dict["client_args"][config_dict["client_args"].index('-a') + 1]
         return DRRun(popen_obj, invoke.seed, run_id, arena_id)
 
     # Handle cases where the program didn't exit in time
@@ -191,7 +191,7 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
 
         popen_obj.timed_out = True
 
-    return DRRun(popen_obj, invoke.seed, run_id)
+    return DRRun(popen_obj, invoke.seed, run_id, arena_id)
 
 
 ## Executes a Triage run
@@ -200,7 +200,7 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
 # can't be used across threads so we end up fetching it from the db in the gui
 # @param cfg Configuration context dictionary
 # @param run_id Run ID (guid)
-def triagerRun(cfg, run_id):
+def triager_run(cfg, run_id):
     tracerOutput, _ = tracer_run(cfg, run_id)
     crashInfo = Crash.factory(run_id, get_target_slug(cfg), cfg['target_application_path'])
     return {"run_id": run_id,
@@ -379,7 +379,7 @@ def fuzz_and_triage(config_dict):
             crashed, run = fuzzer_run(config_dict, targets_file)
             if crashed:
 
-                triagerInfo = triagerRun(config_dict, run.run_id)
+                triagerInfo = triager_run(config_dict, run.run_id)
                 print_l(triagerInfo)
 
                 if config_dict['exit_early']:

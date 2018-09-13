@@ -143,12 +143,19 @@ build\server\Debug\server.exe
 ```
 
 #### Regression Test
-```
-python.exe .\regress.py
-test_main (__main__.Test1) ... ok
+```cmd
+> sl2-test.exe
+
+test_0 (sl2.test.regress.TestWizard) ... ok
+test_2 (sl2.test.regress.TestWizard) ... ok
+test_TheWiz (sl2.test.regress.TestWizard) ... ok
+test_captureStdout (sl2.test.regress.TestWizard) ... ok
+test_quickCrash (sl2.test.regress.TestWizard) ... ok
+test_registry (sl2.test.regress.TestWizard) ... ok
+test_triage (sl2.test.regress.TestWizard) ... ok
 
 ----------------------------------------------------------------------
-Ran 1 test in 0.906s
+Ran 7 tests in 49.421s
 
 OK
 ```

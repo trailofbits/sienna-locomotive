@@ -12,11 +12,8 @@ function Unzip
 
 
 Function InstallDependencies {
-    $deps = @("setuptools", "msgpack", "PySide2", "sqlalchemy")
-    foreach ( $dep in $deps ) {
-        "Installing $dep"
-        pip install "${dep}"
-    }
+    pip install -r requirements.txt
+    python setup.py develop
 }
 
 Function DynamioRioInstall {
@@ -101,6 +98,54 @@ Function Dep {
     SafeDelete "dynamorio"
 }
 
+Function Deploy{
+    "Rebuilding Code Files"
+    Build
+
+    "Creating Deploy Directory"
+    Remove-Item sl2-deploy -Recurse -ErrorAction Ignore
+    mkdir sl2-deploy
+
+    "Creating Binary Directories"
+    New-Item sl2-deploy\build\common -Type Directory
+    New-Item sl2-deploy\build\corpus\test_application -Type Directory
+    New-Item sl2-deploy\build\fuzz_dynamorio -Type Directory
+    New-Item sl2-deploy\build\fuzzgoat -Type Directory
+    New-Item sl2-deploy\build\server -Type Directory
+    New-Item sl2-deploy\build\tracer_dynamorio -Type Directory
+    New-Item sl2-deploy\build\triage -Type Directory
+    New-Item sl2-deploy\build\winchecksec -Type Directory
+    New-Item sl2-deploy\build\wizard -Type Directory
+
+    "Copying Compiled Binaries"
+    Copy-Item build\common\Debug sl2-deploy\build\common -Recurse -Force
+    Copy-Item build\corpus\test_application\Debug sl2-deploy\build\corpus\test_application -Recurse -Force
+    Copy-Item build\fuzz_dynamorio\Debug sl2-deploy\build\fuzz_dynamorio -Recurse -Force
+    Copy-Item build\fuzzgoat\Debug sl2-deploy\build\fuzzgoat -Recurse -Force
+    Copy-Item build\server\Debug sl2-deploy\build\server -Recurse -Force
+    Copy-Item build\tracer_dynamorio\Debug sl2-deploy\build\tracer_dynamorio -Recurse -Force
+    Copy-Item build\triage\Debug sl2-deploy\build\triage -Recurse -Force
+    Copy-Item build\winchecksec\Debug sl2-deploy\build\winchecksec -Recurse -Force
+    Copy-Item build\wizard\Debug sl2-deploy\build\wizard -Recurse -Force
+
+    "Copying DynamoRIO"
+    Copy-Item -Recurse dynamorio sl2-deploy
+
+    "Copying Python Files"
+    Copy-Item sl2 sl2-deploy -Recurse -Force
+
+    "Copying Helper Files"
+    Copy-Item deploy\* sl2-deploy
+    Copy-Item setup.py sl2-deploy
+    Copy-Item README.md sl2-deploy
+    Copy-Item requirements.txt sl2-deploy
+
+    "Compressing Deployment Archive"
+    if (-not (test-path "$env:ProgramFiles\7-Zip\7z.exe")) {throw "$env:ProgramFiles\7-Zip\7z.exe missing"}
+    set-alias zip "$env:ProgramFiles\7-Zip\7z.exe"
+    zip a -r -mx=9 sl2-deploy.zip sl2-deploy\*
+}
+
 Function Help {
     @'
 Usage: make1.ps [clean|dep|reconfig|help]
@@ -124,7 +169,7 @@ help
 
 
 function Regress {
-    python .\regress.py
+    sl2-test
 }
 
 $cmd = $args[0]
@@ -137,5 +182,6 @@ switch( $cmd ) {
     "help"              { Help }
     "test"              { Test }
     "doc"               { Doc }
+    "deploy"            { Deploy }
     default             { Build }
 }

@@ -1086,74 +1086,24 @@ on_exception(void *drcontext, dr_exception_t *excpt)
     return true;
 }
 
-/*
-    The next three functions are used to intercept __fastfail, which Windows
-    provides to allow processes to request immediate termination.
-
-    To get around this, we tell the target that __fastfail isn't avaiable
-    by intercepting IsProcessorFeaturePresent (which we hope they check).
-
-    We then hope that they craft an exception record instead and send it
-    to UnhandledException, where we intercept it and forward it to our
-    exception handler.
-
-    If the target decides to do neither of these, we still miss the exception.
-
-    This trick was cribbed from WinAFL:
-    https://github.com/ivanfratric/winafl/blob/73c7b41/winafl.c#L600
-
-    NOTE(ww): These functions are duplicated across the fuzzer and the tracer.
-    Keep them synced!
-*/
-
-void wrap_pre_IsProcessorFeaturePresent(void *wrapcxt, OUT void **user_data)
+static void wrap_pre_IsProcessorFeaturePresent(void *wrapcxt, OUT void **user_data)
 {
-    #pragma warning(suppress: 4311 4302)
-    DWORD feature = (DWORD) drwrap_get_arg(wrapcxt, 0);
-
-    #pragma warning(suppress: 4312)
-    *user_data = (void *) feature;
+    client.wrap_pre_IsProcessorFeaturePresent(wrapcxt, user_data);
 }
 
-void wrap_post_IsProcessorFeaturePresent(void *wrapcxt, void *user_data)
+static void wrap_post_IsProcessorFeaturePresent(void *wrapcxt, void *user_data)
 {
-    #pragma warning(suppress: 4311 4302)
-    DWORD feature = (DWORD) user_data;
-
-    if (feature == PF_FASTFAIL_AVAILABLE) {
-        SL2_DR_DEBUG("wrap_post_IsProcessorFeaturePresent: got PF_FASTFAIL_AVAILABLE request, masking\n");
-        drwrap_set_retval(wrapcxt, (void *) 0);
-    }
+    client.wrap_post_IsProcessorFeaturePresent(wrapcxt, user_data);
 }
 
-void wrap_pre_UnhandledExceptionFilter(void *wrapcxt, OUT void **user_data)
+static void wrap_pre_UnhandledExceptionFilter(void *wrapcxt, OUT void **user_data)
 {
-    SL2_DR_DEBUG("wrap_pre_UnhandledExceptionFilter: stealing unhandled exception\n");
-
-    EXCEPTION_POINTERS *exception = (EXCEPTION_POINTERS *) drwrap_get_arg(wrapcxt, 0);
-    dr_exception_t excpt = {0};
-
-    excpt.record = exception->ExceptionRecord;
-    on_exception(drwrap_get_drcontext(wrapcxt), &excpt);
+    client.wrap_pre_UnhandledExceptionFilter(wrapcxt, user_data, on_exception);
 }
-
-/*
-    We also intercept VerifierStopMessage and VerifierStopMessageEx,
-    which are supplied by Application Verifier for the purpose of catching
-    heap corruptions.
-*/
 
 static void wrap_pre_VerifierStopMessage(void *wrapcxt, OUT void **user_data)
 {
-    SL2_DR_DEBUG("wrap_pre_VerifierStopMessage: stealing unhandled exception\n");
-
-    EXCEPTION_RECORD record = {0};
-    record.ExceptionCode = STATUS_HEAP_CORRUPTION;
-
-    dr_exception_t excpt = {0};
-    excpt.record = &record;
-
-    on_exception(drwrap_get_drcontext(wrapcxt), &excpt);
+    client.wrap_pre_VerifierStopMessage(wrapcxt, user_data, on_exception);
 }
 
 /*
