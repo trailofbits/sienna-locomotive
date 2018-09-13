@@ -194,8 +194,11 @@ class ConfigWindow(QtWidgets.QDialog):
         if not self.extension_widget.isVisible():
             self.extension_widget.show()
             self.expand_button.setArrowType(Qt.DownArrow)
-            self.adjustSize()
+            self.add_button.setDefault(True)
+            self.okay_button.setDefault(False)
         else:
             self.extension_widget.hide()
             self.expand_button.setArrowType(Qt.RightArrow)
-            self.adjustSize()
+            self.okay_button.setDefault(True)
+            self.add_button.setDefault(False)
+        self.adjustSize()
