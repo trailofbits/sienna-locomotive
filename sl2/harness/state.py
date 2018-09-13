@@ -138,7 +138,6 @@ def get_target_dir(_config):
 
     # Primes the db for checksec for this target if it doesn't already exist
     db.TargetConfig.bySlug(slug, _config['target_application_path'])
-    db.Checksec.byExecutable(_config['target_application_path'])
     return dir_name
 
 

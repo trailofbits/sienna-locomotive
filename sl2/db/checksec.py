@@ -17,6 +17,21 @@ from .utilz import hash_file
 
 ## DB Wrapper for winchecksec
 class Checksec(Base):
+    PROBABILITIES = {
+        'aslr': 0.792031321971442,
+        'authenticode': 0.374942422846614,
+        'cfg': 0.492860432980193,
+        'dynamicBase': 0.796867802855827,
+        'forceIntegrity': 0.0322432058959005,
+        'gs': 0.652003684937817,
+        'highEntropyVA': 0.437586365730078,
+        'isolation': 1.0,
+        'nx': 0.795485951174574,
+        'rfg': 0.0631045601105481,
+        'safeSEH': 0.257254721326578,
+        'seh': 0.913403961308153
+    }
+
     __tablename__ = "checksec"
 
     hash = Column(String(64), primary_key=True, unique=True)
@@ -61,11 +76,12 @@ class Checksec(Base):
     def byExecutable(path):
         cfg = config
         session = db.getSession()
+        session.expire_on_commit = False
 
         ret = session.query(Checksec).filter(Checksec.hash == hash_file(path)).first()
         if ret:
+            session.close()
             return ret
-        ret = None
         checker = cfg.config['checksec_path']
         cmd = [checker, "-j", path]
 
@@ -75,6 +91,7 @@ class Checksec(Base):
             ret = Checksec(ret)
             session.add(ret)
             session.commit()
+            session.close()
         except subprocess.CalledProcessError as x:
             print("Exception", x)
 
@@ -82,25 +99,11 @@ class Checksec(Base):
 
     ## Returns value between 0 and 1 as a percentage of the rarity of protection flags.
     # If a binary has a flag that's rarely implemented (like RFG) it will more quickly increase this value
-    def protectionPercent(self):
-        probabilities = {
-            'aslr': 0.792031321971442,
-            'authenticode': 0.374942422846614,
-            'cfg': 0.492860432980193,
-            'dynamicBase': 0.796867802855827,
-            'forceIntegrity': 0.0322432058959005,
-            'gs': 0.652003684937817,
-            'highEntropyVA': 0.437586365730078,
-            'isolation': 1.0,
-            'nx': 0.795485951174574,
-            'rfg': 0.0631045601105481,
-            'safeSEH': 0.257254721326578,
-            'seh': 0.913403961308153
-        }
-
+    def _protection_percent(self):
         probsMax = 0
         probsSum = 0
-        for k, mean in probabilities.items():
+
+        for k, mean in self.PROBABILITIES.items():
             x = int(self.__getattribute__(k))
             grab = 1 - mean
             if x == 1:
@@ -113,7 +116,7 @@ class Checksec(Base):
     # Returns a strings seperated by pipe symbols that
     # succinctly describes the checksec state of the object
     # @return string
-    def shortString(self):
+    def short_description(self):
         t = []
         if self.aslr:
             t.append("ASLR")
@@ -139,4 +142,4 @@ class Checksec(Base):
             t.append("SafeSEH")
         tags = ' | '.join(t)
 
-        return "%3.0f%% (%s)" % (self.protectionPercent() * 100, tags)
+        return "%3.0f%% (%s)" % (self._protection_percent() * 100, tags)
