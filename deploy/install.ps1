@@ -57,13 +57,14 @@ Function CheckForRegistry{
 "Checking to see if WER is disabled"
 try { CheckForRegistry }
 catch {
-    "You have not disabled Windows Error Reporting! This may interfere with the SL2 Unit Tests. Please follow the instructions in the README to disable it and run install.ps1 again."
+    "You have not disabled Windows Error Reporting! This may interfere with the SL2 Unit Tests. Please follow the instructions in INSTALL.md to disable it and run install.ps1 again."
     & cmd /c pause
     exit
 }
 
 "Installing Dependencies and creating scripts"
 python setup.py install --install-scripts "$cwd\Scripts"
+python setup.py install
 
 "Writing Shortcuts"
 $TargetFile = "`"$cwd\Scripts\sl2.exe`""
