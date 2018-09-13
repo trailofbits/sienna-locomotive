@@ -11,7 +11,6 @@ import concurrent.futures
 import os
 import signal
 import sys
-import winreg
 
 import msgpack
 
@@ -26,6 +25,7 @@ from .instrument import (
     kill
 )
 from .state import (
+    sanity_checks,
     get_target_dir,
     get_all_targets,
     get_runs,
@@ -105,73 +105,6 @@ def hexdump(buffer, lines=4, line_len=16):
         hexstr = " ".join("{:02X}".format(c) for c in buffer[address:address + line_len])
         asciistr = "".join((chr(c) if c in range(31, 127) else '.') for c in buffer[address:address + line_len])
         print_l("%08X:  %s  | %s" % (address, hexstr + " " * (line_len * 3 - len(hexstr)), asciistr))
-
-
-def sanity_checks(exit=True):
-    """
-    Make sure the system is in a state that's nominally ready for fuzzing.
-    Exits loudly if a check fails.
-    """
-    sane = True
-    errors = []
-
-    bad_keys = [
-        'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\DebugObjectRPCEnabled',
-        'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AeDebug\\Auto',
-    ]
-
-    for bad_key in bad_keys:
-        try:
-            reg = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
-            key = winreg.OpenKey(reg, bad_key, 0, (winreg.KEY_WOW64_64KEY + winreg.KEY_READ))
-            reg.CloseKey(key)
-
-            if exit:
-                print_l("[+] Fatal: Found a registry key that will interfere with fuzzing/triaging:", bad_key)
-                sys.exit()
-            else:
-                sane = False
-                errors.append("Registry key {} will interfere with fuzzing/triaging.".format(bad_key))
-        except OSError:
-            # OSError means the key doesn't exist, which is what we want.
-            pass
-        except Exception as e:
-            print_l("[+] Unexpected exception during sanity checks:", e)
-
-    try:
-        reg = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
-        key = winreg.OpenKey(reg, "SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting", 0,
-                             (winreg.KEY_WOW64_64KEY + winreg.KEY_READ))
-        disabled = winreg.QueryValueEx(key, "Disabled")[0]
-
-        if disabled != 1:
-
-            if exit:
-                print_l("[+] Fatal: Cowardly refusing to run with WER enabled.")
-                print_l(
-                    "[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue.")
-                sys.exit()
-            else:
-                sane = False
-                errors.append("WER is enabled, refusing to continue.")
-
-        winreg.CloseKey(key)
-    except OSError:
-        # OSError here means that we *haven't* disabled WER, which is a problem.
-
-        if exit:
-            print_l("[+] Fatal: Cowardly refusing to run with WER enabled.")
-            print_l(
-                "[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue.")
-            sys.exit()
-        else:
-            sane = False
-            errors.append("WER isn't explicitly disabled, refusing to continue.")
-        pass
-    except Exception as e:
-        print_l("[+] Unexpected exception during sanity checks:", e)
-
-    return sane, errors
 
 
 def _main():
