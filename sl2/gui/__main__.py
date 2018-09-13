@@ -16,7 +16,7 @@ from sqlalchemy import desc
 
 from sl2 import db
 from . import stats
-import triage
+from sl2 import triage
 from .config_window import ConfigWindow
 from . import sqlalchemy_model
 from .QtHelpers import QIntVariable, QFloatVariable, QTextAdapter
