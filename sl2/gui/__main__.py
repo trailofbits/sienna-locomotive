@@ -43,7 +43,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Select config profile before starting
         self.cfg = ConfigWindow()
-        self.cfg.exec()
+        if self.cfg.exec() == QtWidgets.QDialog.Rejected:
+            sys.exit(1)
 
         # Set up basic window
         self.setWindowTitle("Sienna Locomotive 2")
