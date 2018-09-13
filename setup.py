@@ -6,7 +6,7 @@ setup(
     description='A User-Friendly Fuzzing Tool',
     url='https://github.com/trailofbits/sienna-locomotive',
     author='Trail of Bits',
-    packages=find_packages(),
+    packages=find_packages() + ['sl2.test'],
     long_description=open('README.md').read(),
     install_requires=[
         'msgpack',
