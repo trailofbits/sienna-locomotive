@@ -102,6 +102,14 @@ on_dr_exit(void)
 {
     SL2_DR_DEBUG("Dynamorio exiting (fuzzer)\n");
 
+    if (coverage_guided) {
+        bool bucketing;
+        uint32_t score;
+        uint32_t tries_remaining;
+        sl2_conn_get_coverage(&sl2_conn, &arena, &bucketing, &score, &tries_remaining);
+        SL2_DR_DEBUG("#COVERAGE:{\"bkt\": %s, \"scr\": %u, \"rem\": %u}\n", bucketing ? "true": "false", score, tries_remaining);
+    }
+
     if (crashed) {
         char run_id_s[SL2_UUID_SIZE];
         sl2_uuid_to_string(sl2_conn.run_id, run_id_s);
