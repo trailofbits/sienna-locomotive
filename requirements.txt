@@ -1,0 +1,4 @@
+setuptools
+msgpack
+PySide2
+sqlalchemy

@@ -12,11 +12,8 @@ function Unzip
 
 
 Function InstallDependencies {
-    $deps = @("setuptools", "msgpack", "PySide2", "sqlalchemy")
-    foreach ( $dep in $deps ) {
-        "Installing $dep"
-        pip install "${dep}"
-    }
+    pip install -r requirements.txt
+    python setup.py develop
 }
 
 Function DynamioRioInstall {
@@ -102,8 +99,6 @@ Function Dep {
 }
 
 Function Deploy{
-    $ErrorActionPreference = "Stop"
-
     "Rebuilding Code Files"
     Build
 
@@ -143,9 +138,12 @@ Function Deploy{
     Copy-Item deploy\* sl2-deploy
     Copy-Item setup.py sl2-deploy
     Copy-Item README.md sl2-deploy
+    Copy-Item requirements.txt sl2-deploy
 
     "Compressing Deployment Archive"
-    Compress-Archive -force sl2-deploy sl2-deploy.zip
+    if (-not (test-path "$env:ProgramFiles\7-Zip\7z.exe")) {throw "$env:ProgramFiles\7-Zip\7z.exe missing"}
+    set-alias zip "$env:ProgramFiles\7-Zip\7z.exe"
+    zip a -r -mx=9 sl2-deploy.zip sl2-deploy\*
 }
 
 Function Help {

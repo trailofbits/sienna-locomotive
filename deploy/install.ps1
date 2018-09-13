@@ -1,3 +1,4 @@
+$ErrorActionPreference = "Stop"
 $cwd=(Get-Item -Path ".\").FullName
 
 Function InstallPython{
@@ -11,7 +12,7 @@ Function InstallPython{
     $exe = "$cwd\python_install.exe"
     $client.DownloadFile($url, $exe)
 
-    .\python_install.exe
+   & .\python_install.exe
 
     "Python has finished installing. Please restart Powershell and run install.ps1 again."
 
@@ -41,9 +42,20 @@ catch {
     exit
 }
 
+try { python -m pip install -r requirements.txt }
+catch {
+    "Failed to install Python dependencies!"
+
+    & cmd /c pause
+    exit
+}
+
+Function CheckForRegistry{
+    Get-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\Windows Error Reporting" -Name "Disabled"
+}
 
 "Checking to see if WER is disabled"
-try { Get-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\Windows Error Reporting" -Name "Disabled" }
+try { CheckForRegistry }
 catch {
     "You have not disabled Windows Error Reporting! This may interfere with the SL2 Unit Tests. Please follow the instructions in the README to disable it and run install.ps1 again."
     & cmd /c pause
