@@ -169,7 +169,7 @@ help
 
 
 function Regress {
-    python .\regress.py
+    sl2-test
 }
 
 $cmd = $args[0]
