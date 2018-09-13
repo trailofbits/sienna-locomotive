@@ -8,6 +8,7 @@ import os
 import random
 import re
 import uuid
+import sys
 from csv import DictWriter
 from hashlib import sha1
 from typing import NamedTuple
@@ -495,7 +496,7 @@ def sanity_checks(exit=True):
             reg.CloseKey(key)
 
             if exit:
-                print_l("[+] Fatal: Found a registry key that will interfere with fuzzing/triaging:", bad_key)
+                print("[+] Fatal: Found a registry key that will interfere with fuzzing/triaging:", bad_key)
                 sys.exit()
             else:
                 sane = False
@@ -504,7 +505,7 @@ def sanity_checks(exit=True):
             # OSError means the key doesn't exist, which is what we want.
             pass
         except Exception as e:
-            print_l("[+] Unexpected exception during sanity checks:", e)
+            print("[+] Unexpected exception during sanity checks:", e)
 
     try:
         reg = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
@@ -515,9 +516,9 @@ def sanity_checks(exit=True):
         if disabled != 1:
 
             if exit:
-                print_l("[+] Fatal: Cowardly refusing to run with WER enabled.")
-                print_l(
-                    "[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue.")
+                print("[+] Fatal: Cowardly refusing to run with WER enabled.")
+                print(
+                      "[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue.")
                 sys.exit()
             else:
                 sane = False
@@ -528,15 +529,15 @@ def sanity_checks(exit=True):
         # OSError here means that we *haven't* disabled WER, which is a problem.
 
         if exit:
-            print_l("[+] Fatal: Cowardly refusing to run with WER enabled.")
-            print_l(
-                "[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue.")
+            print("[+] Fatal: Cowardly refusing to run with WER enabled.")
+            print(
+                  "[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue.")
             sys.exit()
         else:
             sane = False
             errors.append("WER isn't explicitly disabled, refusing to continue.")
         pass
     except Exception as e:
-        print_l("[+] Unexpected exception during sanity checks:", e)
+        print("[+] Unexpected exception during sanity checks:", e)
 
     return sane, errors
