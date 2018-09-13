@@ -413,7 +413,10 @@ class TriageExport:
                      'tracer.formatted',
                      ]
         # TODO: Fix this to account for binary hashes - use SQLAlchemy query so that we can use crash.target_config
-        self.sqlExport = 'select %s from crash left join checksec, tracer, targets on crash.runid = tracer.runid and crash.target_config_slug = targets.target_slug' % ",".join(
+        self.sqlExport = 'select %s from crash left join checksec, tracer, targets on ' \
+                         'crash.runid = tracer.runid and ' \
+                         'crash.target_config_slug = targets.target_slug and ' \
+                         'crash.targetPath = checksec.path' % ",".join(
             self.cols)
 
     ## Exports crash from run directories to appropriate directory structure.  Also generates
