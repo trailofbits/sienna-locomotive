@@ -16,7 +16,7 @@ from sqlalchemy import desc
 
 from sl2 import db
 from sl2.harness import config
-from sl2.harness.state import get_target, export_crash_data_to_csv, get_target_slug, TriageExport
+from sl2.harness.state import sanity_checks, get_target, export_crash_data_to_csv, get_target_slug, TriageExport
 from sl2.harness.threads import ChecksecThread, WizardThread, FuzzerThread, ServerThread
 
 from . import stats
@@ -563,6 +563,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
+    sane, errors = sanity_checks(exit=False)
+
+    if not sane:
+        QtWidgets.QMessageBox.critical(None, "Sanity check failure",
+                                       "\n".join(errors))
+        sys.exit(1)
 
     mainWin = MainWindow()
     mainWin.show()
