@@ -14,9 +14,9 @@ from PySide2.QtGui import QFontDatabase, QMovie, QStandardItem, QBrush, QColor
 from PySide2.QtWidgets import *
 from sqlalchemy import desc
 
-from sl2 import db, triage
+from sl2 import db
 from sl2.harness import config
-from sl2.harness.state import get_target, export_crash_data_to_csv, get_target_slug
+from sl2.harness.state import get_target, export_crash_data_to_csv, get_target_slug, TriageExport
 from sl2.harness.threads import ChecksecThread, WizardThread, FuzzerThread, ServerThread
 
 from . import stats
@@ -546,7 +546,8 @@ class MainWindow(QtWidgets.QMainWindow):
         path = QFileDialog.getExistingDirectory(dir=".")
         if len(path) == 0:
             return
-        triageExporter = triage.TriageExport(path)
+
+        triageExporter = TriageExport(path)
         triageExporter.export()
         os.startfile(path)
 
