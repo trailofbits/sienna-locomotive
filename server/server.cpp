@@ -19,6 +19,7 @@
 // here because strdup is technically nonstandard.
 #define strdup _strdup
 #include "vendor/loguru.hpp"
+#include "vendor/picosha2.h"
 #undef strdup
 
 #include "server.hpp"
@@ -1083,6 +1084,14 @@ static void handle_coverage_info(HANDLE pipe)
 
     if (it == strategy_map.end()) {
         SL2_SERVER_LOG_FATAL("arena ID missing from strategy_map? (map size=%d)", strategy_map.size());
+    }
+
+    sl2_arena arena = it->second.arena;
+    std::string hash_hex_str = picosha2::hash256_hex_string((unsigned char *)&arena.map, (unsigned char *)&arena.map + FUZZ_ARENA_SIZE);
+
+    // Zeroeth, write the hash of the path.
+    if (!WriteFile(pipe, hash_hex_str.c_str(), 64, &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("failed to write path hash");
     }
 
     // First, write whether we're doing bucketing.

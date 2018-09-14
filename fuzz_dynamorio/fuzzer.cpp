@@ -106,8 +106,9 @@ on_dr_exit(void)
         bool bucketing;
         uint32_t score;
         uint32_t tries_remaining;
-        sl2_conn_get_coverage(&sl2_conn, &arena, &bucketing, &score, &tries_remaining);
-        SL2_DR_DEBUG("#COVERAGE:{\"bkt\": %s, \"scr\": %u, \"rem\": %u}\n", bucketing ? "true": "false", score, tries_remaining);
+        unsigned char hash[65] = {0};
+        sl2_conn_get_coverage(&sl2_conn, &arena, hash, &bucketing, &score, &tries_remaining);
+        SL2_DR_DEBUG("#COVERAGE:{\"hash\": \"%s\", \"bkt\": %s, \"scr\": %u, \"rem\": %u}\n", hash, bucketing ? "true": "false", score, tries_remaining);
     }
 
     if (crashed) {

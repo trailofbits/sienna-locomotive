@@ -320,7 +320,7 @@ SL2Response sl2_conn_advise_mutation(sl2_conn *conn, sl2_arena *arena, sl2_mutat
 // Requests information about code coverage so far
 SL2_EXPORT
 SL2Response sl2_conn_get_coverage(sl2_conn *conn, sl2_arena *arena,
- bool *bucketing, uint32_t *score, uint32_t *tries_remaining){
+ unsigned char *path_hash, bool *bucketing, uint32_t *score, uint32_t *tries_remaining){
 
     DWORD txsize;
 
@@ -334,6 +334,7 @@ SL2Response sl2_conn_get_coverage(sl2_conn *conn, sl2_arena *arena,
     // Then, tell the server we want the info from
     sl2_conn_write_prefixed_string(conn, arena->id);
 
+    SL2_CONN_READ(path_hash, 64);
     SL2_CONN_READ(bucketing, sizeof(bool));
     SL2_CONN_READ(score, sizeof(uint32_t));
     SL2_CONN_READ(tries_remaining, sizeof(uint32_t));

@@ -39,7 +39,7 @@ class SessionManager(object):
         self.runs_counted = 0
         self.crash_counter = 0
         self.started = datetime.datetime.utcnow()
-        self.run_dict = {"bkt": False, "scr": -1, "rem": -1}
+        self.run_dict = {"hash": None, "bkt": False, "scr": -1, "rem": -1}
 
     def __enter__(self):
         self.started = datetime.datetime.utcnow()
@@ -64,7 +64,7 @@ class SessionManager(object):
         self.started = datetime.datetime.utcnow()
 
     def run_complete(self, run, found_crash=False):
-        self.run_dict = run.coverage if run.coverage is not None else {"bkt": False, "scr": -1, "rem": -1}
+        self.run_dict = run.coverage if run.coverage is not None else {"hash": None, "bkt": False, "scr": -1, "rem": -1}
         self.runs_counted += 1
         if found_crash:
             self.crash_counter += 1
