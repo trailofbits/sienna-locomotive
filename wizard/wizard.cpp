@@ -141,7 +141,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     wstring_convert<std::codecvt_utf8<wchar_t>> utf8Converter;
 
     client_read_info *info = (client_read_info *) user_data;
-    const char *func_name  = function_to_string(info->function);
+    const char *func_name  = client.function_to_string(info->function);
 
     json j;
     j["type"]               = "id";
@@ -200,8 +200,8 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
         return;
     }
 
-    client_read_info *info   = ((client_read_info *)user_data);
-    const char *func_name = function_to_string(info->function);
+    client_read_info *info = ((client_read_info *)user_data);
+    const char *func_name  = client.function_to_string(info->function);
 
     info->lpBuffer = drwrap_get_retval(wrapcxt);
 

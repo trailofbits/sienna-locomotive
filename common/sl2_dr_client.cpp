@@ -742,28 +742,8 @@ SL2Client::is_sane_post_hook(void *wrapcxt, void *user_data, void **drcontext)
     return true;
 }
 
-
-// TODO(ww): Document the fallback values here.
-SL2_EXPORT
-void from_json(const json& j, targetFunction& t)
-{
-    t.selected      = j.value("selected", false);
-    t.index         = j.value("callCount", -1);
-    t.retAddrCount  = j.value("retAddrCount", -1);
-    t.mode          = j.value("mode", MATCH_INDEX); // TODO - might want to chose a more sensible default
-    t.retAddrOffset = j.value("retAddrOffset", -1);
-    t.functionName  = j.value("func_name", "");
-    t.argHash       = j.value("argHash", "");
-    t.buffer        = j["buffer"].get<vector<uint8_t>>();
-
-    string source        = j.value("source", "");
-    wstring wsource;
-    wsource.assign(source.begin(), source.end());
-    t.source = wsource;
-}
-
-SL2_EXPORT
-const char *function_to_string(Function function)
+const char *
+SL2Client::function_to_string(Function function)
 {
     switch(function) {
         case Function::ReadFile:
@@ -792,6 +772,26 @@ const char *function_to_string(Function function)
 
     return "unknown";
 }
+
+// TODO(ww): Document the fallback values here.
+SL2_EXPORT
+void from_json(const json& j, targetFunction& t)
+{
+    t.selected      = j.value("selected", false);
+    t.index         = j.value("callCount", -1);
+    t.retAddrCount  = j.value("retAddrCount", -1);
+    t.mode          = j.value("mode", MATCH_INDEX); // TODO - might want to chose a more sensible default
+    t.retAddrOffset = j.value("retAddrOffset", -1);
+    t.functionName  = j.value("func_name", "");
+    t.argHash       = j.value("argHash", "");
+    t.buffer        = j["buffer"].get<vector<uint8_t>>();
+
+    string source        = j.value("source", "");
+    wstring wsource;
+    wsource.assign(source.begin(), source.end());
+    t.source = wsource;
+}
+
 
 SL2_EXPORT
 const char *exception_to_string(DWORD exception_code)

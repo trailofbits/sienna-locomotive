@@ -213,15 +213,14 @@ public:
     uint64_t    incrementCallCountForFunction(Function function);
     uint64_t    incrementRetAddrCount(uint64_t retAddr);
 
+
+    // Utility methods.
+    const char  *function_to_string(Function function);
 };
 
 // Converts a JSON object into a `targetFunction`.
 SL2_EXPORT
 void from_json(const json& j, targetFunction& t);
-
-// Returns a C-string corresponding to the requested `function`.
-SL2_EXPORT
-const char *function_to_string(Function function);
 
 // Builds a hash from an fStruct
 SL2_EXPORT
