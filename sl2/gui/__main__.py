@@ -69,6 +69,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.targetStatus.addWidget(self.targetLabel)
         self._layout.addWidget(self.targetStatus)
         self.checksec_thread.start()
+        self.checksec_thread.resultReady.connect(self.checksec_finished)
 
         # Create wizard button
         self.wizard_button = QtWidgets.QPushButton("Run Wizard")
@@ -273,9 +274,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.status_bar.addWidget(self.crash_count)
 
         # CONNECT SIGNALS #
-
-        # Update the text of the checksec readout when checksec finishes running
-        self.checksec_thread.resultReady.connect(self.checksec_finished)
 
         # Update the text of the status bar adapters whenever the underlying variables change
         self.runs.valueChanged.connect(self.run_adapter.update)
