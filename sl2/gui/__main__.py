@@ -68,9 +68,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.targetLabel = QtWidgets.QLabel()
         self.targetStatus.addWidget(self.targetLabel)
         self._layout.addWidget(self.targetStatus)
-
         self.checksec_thread.start()
-        self.checksec_thread.resultReady.connect(self.checksec_finished)
 
         # Create wizard button
         self.wizard_button = QtWidgets.QPushButton("Run Wizard")
@@ -276,6 +274,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # CONNECT SIGNALS #
 
+        # Update the text of the checksec readout when checksec finishes running
+        self.checksec_thread.resultReady.connect(self.checksec_finished)
+
         # Update the text of the status bar adapters whenever the underlying variables change
         self.runs.valueChanged.connect(self.run_adapter.update)
         self.throughput.valueChanged.connect(self.throughput_adapter.update)
@@ -307,10 +308,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.triageExport.clicked.connect(self.triageExportGui)
 
-        # Fuzzer controll buttons for showing the panel and starting a run
+        # Fuzzer control buttons for showing the panel and starting a run
         self.expand_button.clicked.connect(self.toggle_expansion)
         self.fuzzer_button.clicked.connect(self.server_thread.start)
         self.server_thread.finished.connect(self.start_all_threads)
+
+        # If the user checks the pause mode, then we also check the continuous mode
+        self.pause_mode_cbox.stateChanged.connect(self.unify_pause_state)
 
         # Connect the stop button to the thread so we can pause it
         self.stop_button.clicked.connect(self.pause_all_threads)
@@ -538,6 +542,16 @@ class MainWindow(QtWidgets.QMainWindow):
             self.extension_widget.hide()
             self.expand_button.setArrowType(Qt.DownArrow)
             self.adjustSize()
+
+    def unify_pause_state(self, state):
+        """
+            Keeps the state of the "continuous" and "pause" checkboxes consistent:
+
+            "pause" only makes sense under "continuous", so any attempt to enable "pause"
+            also enabled "continuous".
+        """
+        if state == Qt.Checked:
+            self.continuous_mode_cbox.setChecked(True)
 
     def verboseCheckBox_clicked(self):
         state = self.verboseCheckBox.isChecked()
