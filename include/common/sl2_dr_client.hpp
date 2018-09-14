@@ -182,6 +182,7 @@ public:
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Methods
     // Method targeting methods.
+    void        hash_args(char *argHash, fileArgHash *fStruct);
     bool        is_function_targeted(client_read_info *info);
     bool        compare_filenames(targetFunction &t, client_read_info* info);
     bool        compare_indices(targetFunction &t, Function &function);
@@ -221,10 +222,6 @@ public:
 // Converts a JSON object into a `targetFunction`.
 SL2_EXPORT
 void from_json(const json& j, targetFunction& t);
-
-// Builds a hash from an fStruct
-SL2_EXPORT
-void hash_args(char * argHash, fileArgHash * fStruct);
 
 // Returns a C-string corresponding to the given `exception_code`.
 SL2_EXPORT

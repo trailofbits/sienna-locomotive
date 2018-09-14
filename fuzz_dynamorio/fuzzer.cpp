@@ -378,7 +378,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     }
 
     // Create the argHash, now that we have the correct source and nNumberOfBytesToRead.
-    hash_args(info->argHash, &fStruct);
+    client.hash_args(info->argHash, &fStruct);
 
     bool targeted = client.is_function_targeted(info);
     client.incrementCallCountForFunction(info->function);

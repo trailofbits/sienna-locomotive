@@ -245,7 +245,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
         j["start"]   = info->position;
         j["end"]     = end;
 
-        hash_args(info->argHash, &fStruct);
+        client.hash_args(info->argHash, &fStruct);
 
         j["argHash"] = info->argHash;
 
