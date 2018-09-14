@@ -190,6 +190,7 @@ public:
     bool        compare_return_addresses(targetFunction &t, client_read_info* info);
     bool        compare_arg_hashes(targetFunction &t, client_read_info* info);
     bool        compare_arg_buffers(targetFunction &t, client_read_info* info);
+    bool        function_is_in_expected_module(const char *func, const char *mod);
 
     // Crash-diversion mitigation methods.
     void        wrap_pre_IsProcessorFeaturePresent(void *wrapcxt, OUT void **user_data);
@@ -223,12 +224,5 @@ public:
 // Converts a JSON object into a `targetFunction`.
 SL2_EXPORT
 void from_json(const json& j, targetFunction& t);
-
-// Returns a boolean, indicating whether or not the given function is in
-// the module we expected (for hooking).
-// Returns false if the module isn't the one we expect *or* if the function isn't
-// one we care about.
-SL2_EXPORT
-bool function_is_in_expected_module(const char *func, const char *mod);
 
 #endif

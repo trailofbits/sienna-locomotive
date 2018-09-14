@@ -849,6 +849,18 @@ SL2Client::exception_to_string(DWORD exception_code)
     return exception_str;
 }
 
+bool
+SL2Client::function_is_in_expected_module(const char *func, const char *mod)
+{
+    for (int i = 0; i < SL2_FUNCMOD_TABLE_SIZE; i++) {
+        if (STREQ(func, SL2_FUNCMOD_TABLE[i].func) && STREQI(mod, SL2_FUNCMOD_TABLE[i].mod)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 // TODO(ww): Document the fallback values here.
 SL2_EXPORT
 void from_json(const json& j, targetFunction& t)
@@ -868,14 +880,3 @@ void from_json(const json& j, targetFunction& t)
     t.source = wsource;
 }
 
-SL2_EXPORT
-bool function_is_in_expected_module(const char *func, const char *mod)
-{
-    for (int i = 0; i < SL2_FUNCMOD_TABLE_SIZE; i++) {
-        if (STREQ(func, SL2_FUNCMOD_TABLE[i].func) && STREQI(mod, SL2_FUNCMOD_TABLE[i].mod)) {
-            return true;
-        }
-    }
-
-    return false;
-}

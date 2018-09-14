@@ -1381,7 +1381,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
         char *function_name = it->first;
         bool hook = false;
 
-        if (!function_is_in_expected_module(function_name, mod_name)) {
+        if (!client.function_is_in_expected_module(function_name, mod_name)) {
             continue;
         }
 
