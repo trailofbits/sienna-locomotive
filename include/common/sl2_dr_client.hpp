@@ -156,8 +156,8 @@ struct sl2_exception_ctx {
 // Represents a tuple of a function and its expected module.
 struct sl2_funcmod
 {
-    char *func;
-    char *mod;
+    const char *func;
+    const char *mod;
 };
 
 // Declared in sl2_dr_client.cpp; contains pairs of functions and their expected modules.
