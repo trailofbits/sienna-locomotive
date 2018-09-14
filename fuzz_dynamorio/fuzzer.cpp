@@ -89,7 +89,7 @@ on_exception(void *drcontext, dr_exception_t *excpt)
     memcpy(&(fuzz_exception_ctx.record), excpt->record, sizeof(EXCEPTION_RECORD));
 
     json j;
-    j["exception"] = exception_to_string(exception_code);
+    j["exception"] = client.exception_to_string(exception_code);
     SL2_LOG_JSONL(j);
 
     dr_exit_process(1);
@@ -378,7 +378,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     }
 
     // Create the argHash, now that we have the correct source and nNumberOfBytesToRead.
-    hash_args(info->argHash, &fStruct);
+    client.hash_args(info->argHash, &fStruct);
 
     bool targeted = client.is_function_targeted(info);
     client.incrementCallCountForFunction(info->function);
@@ -487,7 +487,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
         char *function_name = it->first;
         bool hook = false;
 
-        if (!function_is_in_expected_module(function_name, mod_name)) {
+        if (!client.function_is_in_expected_module(function_name, mod_name)) {
             continue;
         }
 

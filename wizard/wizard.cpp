@@ -31,7 +31,7 @@ on_exception(void *drcontext, dr_exception_t *excpt)
     json j;
 
     j["type"] = "error";
-    j["exception"] = exception_to_string(excpt->record->ExceptionCode);
+    j["exception"] = client.exception_to_string(excpt->record->ExceptionCode);
 
     SL2_LOG_JSONL(j);
 
@@ -141,7 +141,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     wstring_convert<std::codecvt_utf8<wchar_t>> utf8Converter;
 
     client_read_info *info = (client_read_info *) user_data;
-    const char *func_name  = function_to_string(info->function);
+    const char *func_name  = client.function_to_string(info->function);
 
     json j;
     j["type"]               = "id";
@@ -200,8 +200,8 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
         return;
     }
 
-    client_read_info *info   = ((client_read_info *)user_data);
-    const char *func_name = function_to_string(info->function);
+    client_read_info *info = ((client_read_info *)user_data);
+    const char *func_name  = client.function_to_string(info->function);
 
     info->lpBuffer = drwrap_get_retval(wrapcxt);
 
@@ -245,7 +245,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
         j["start"]   = info->position;
         j["end"]     = end;
 
-        hash_args(info->argHash, &fStruct);
+        client.hash_args(info->argHash, &fStruct);
 
         j["argHash"] = info->argHash;
 
@@ -324,7 +324,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
         app_pc towrap = (app_pc) dr_get_proc_address(mod->handle, function_name);
         const char *mod_name = dr_module_preferred_name(mod);
 
-        if (!function_is_in_expected_module(function_name, mod_name)) {
+        if (!client.function_is_in_expected_module(function_name, mod_name)) {
             continue;
         }
 
