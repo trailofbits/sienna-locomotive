@@ -89,7 +89,7 @@ on_exception(void *drcontext, dr_exception_t *excpt)
     memcpy(&(fuzz_exception_ctx.record), excpt->record, sizeof(EXCEPTION_RECORD));
 
     json j;
-    j["exception"] = exception_to_string(exception_code);
+    j["exception"] = client.exception_to_string(exception_code);
     SL2_LOG_JSONL(j);
 
     dr_exit_process(1);

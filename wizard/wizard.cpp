@@ -31,7 +31,7 @@ on_exception(void *drcontext, dr_exception_t *excpt)
     json j;
 
     j["type"] = "error";
-    j["exception"] = exception_to_string(excpt->record->ExceptionCode);
+    j["exception"] = client.exception_to_string(excpt->record->ExceptionCode);
 
     SL2_LOG_JSONL(j);
 

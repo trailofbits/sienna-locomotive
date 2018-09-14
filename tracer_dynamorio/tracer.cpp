@@ -756,7 +756,7 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
 
     j["score"] = score;
     j["reason"] = reason;
-    j["exception"] = exception_to_string(exception_code);
+    j["exception"] = client.exception_to_string(exception_code);
     j["location"] = (uint64_t) exception_address;
     j["instruction"] = disassembly;
     j["pc_tainted"] = pc_tainted;

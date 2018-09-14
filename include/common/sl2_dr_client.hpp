@@ -217,15 +217,12 @@ public:
 
     // Utility methods.
     const char  *function_to_string(Function function);
+    const char  *exception_to_string(DWORD exception_code);
 };
 
 // Converts a JSON object into a `targetFunction`.
 SL2_EXPORT
 void from_json(const json& j, targetFunction& t);
-
-// Returns a C-string corresponding to the given `exception_code`.
-SL2_EXPORT
-const char *exception_to_string(DWORD exception_code);
 
 // Returns a boolean, indicating whether or not the given function is in
 // the module we expected (for hooking).
