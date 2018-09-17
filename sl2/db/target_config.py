@@ -22,6 +22,7 @@ class TargetConfig(Base):
 
     crashes = relationship("Crash", back_populates="target_config")
     runs = relationship("RunBlock")
+    paths = relationship("PathRecord")
 
     ## Takes the slug referring to the target configuration (including arguments) and the path to the binary
     # @param slug

@@ -6,7 +6,7 @@ import datetime
 
 from sl2 import db
 from .base import Base
-from sl2.db.coverage import CoverageRecord
+from sl2.db.coverage import CoverageRecord, PathRecord
 
 
 class RunBlock(Base):
@@ -65,6 +65,8 @@ class SessionManager(object):
     def run_complete(self, run, found_crash=False):
         self.run_dict = run.coverage if run.coverage is not None else {"hash": None, "bkt": False, "scr": -1, "rem": -1}
         self.runs_counted += 1
+        if self.run_dict["hash"]:
+            PathRecord.incrementPath(self.run_dict["hash"], self.target_slug)
         if found_crash:
             self.crash_counter += 1
 
