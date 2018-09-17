@@ -51,10 +51,9 @@ static uint32_t nmodules = 0;
 // TODO(ww): Benchmark std::set vs std::vector -- how badly is nonlocality of access in sets
 // going to hurt us here?
 // static std::set<module_data_t *, std::less<module_data_t *>, sl2_dr_allocator<module_data_t *>> seen_modules;
-static module_data_t *target_mod;
 
-static bool
-is_blacklisted_coverage_module(app_pc addr)
+static app_pc
+get_base_pc(app_pc addr)
 {
     module_data_t *containing_module = NULL;
 
@@ -70,12 +69,10 @@ is_blacklisted_coverage_module(app_pc addr)
     // fewer than SL2_MAX_MODULES. If it does happen, assume the
     // worst (that it's blacklisted).
     if (!containing_module) {
-        SL2_DR_DEBUG("addr=%lu doesn't have a (covered) module?!\n");
-        return true;
+        return NULL;
     }
 
-    // TODO(ww): We could probably inline this call manually.
-    return !strncmp("C:\\Windows\\", containing_module->full_path, 11);
+    return containing_module->start;
 }
 
 static dr_emit_flags_t
@@ -89,12 +86,13 @@ on_bb_instrument(void *drcontext, void *tag, instrlist_t *bb, instr_t *inst, boo
     }
 
     start_pc = dr_fragment_app_pc(tag);
+    app_pc base_pc = get_base_pc(start_pc);
 
-    if (is_blacklisted_coverage_module(start_pc)) {
+    if (!base_pc) {
         return DR_EMIT_DEFAULT;
     }
 
-    offset = (start_pc - target_mod->start) & (FUZZ_ARENA_SIZE - 1);
+    offset = (start_pc - base_pc) & (FUZZ_ARENA_SIZE - 1);
 
     drreg_reserve_aflags(drcontext, bb, inst);
     // TODO(ww): Is it really necessary to inject an instruction here?
@@ -191,8 +189,6 @@ on_dr_exit(void)
     }
 
     sl2_conn_close(&sl2_conn);
-
-    dr_free_module_data(target_mod);
 
     for (uint32_t i = 0; i < nmodules; ++i) {
         dr_free_module_data(seen_modules[i]);
@@ -438,7 +434,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 static void
 on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 {
-    if (nmodules < SL2_MAX_MODULES - 1) {
+    if (nmodules < SL2_MAX_MODULES - 1 && strncmp("C:\\Windows\\", mod->full_path, 11)) {
         // Add a copy of the module to our seen module map so that we can avoid
         // doing basic block coverage of it later (if necessary).
         seen_modules[nmodules++] = dr_copy_module_data(mod);
@@ -636,10 +632,6 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
 
     // Check whether we can use coverage on this fuzzing run
     coverage_guided = (arena_id_s != "") && !no_coverage;
-
-    // Cache our main module, so that we don't have to retrieve it during each
-    // basic block event.
-    target_mod = dr_get_main_module();
 
     if (coverage_guided) {
         SL2_DR_DEBUG("dr_client_main: arena given, instrumenting BBs!\n");
