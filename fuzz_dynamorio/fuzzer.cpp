@@ -1,4 +1,5 @@
 #include <map>
+#include <set>
 
 #include "common/sl2_dr_client.hpp"
 #include "common/sl2_dr_client_options.hpp"
@@ -41,13 +42,13 @@ static uint32_t mut_count = 0;
 static sl2_arena arena = {0};
 static bool coverage_guided = false;
 static module_data_t *target_mod;
-static std::vector<module_data_t> module_map; // TODO - may need to streamline this if it's too slow
+static std::set<module_data_t *, std::less<module_data_t *>, sl2_dr_allocator<module_data_t *>> module_map;
 
 static app_pc
 get_base_address(app_pc address){
-    for(module_data_t mod: module_map){
-        if (dr_module_contains_addr(&mod, address)){
-            return mod.start;
+    for(module_data_t *mod: module_map){
+        if (dr_module_contains_addr(mod, address)){
+            return mod->start;
         }
     }
     return NULL;
@@ -180,6 +181,9 @@ on_dr_exit(void)
     sl2_conn_close(&sl2_conn);
 
     dr_free_module_data(target_mod);
+    for(module_data_t *mod: module_map){
+        dr_free_module_data(mod);
+    }
 
     // Clean up DynamoRIO
     // TODO(ww): Clean up individual event handlers as well? Since we're about to exit,
@@ -535,7 +539,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 
         // If everything looks good and we've made it this far, wrap the function
         if (towrap != NULL) {
-            module_map.push_back(*mod);
+            module_map.insert(dr_copy_module_data(mod));
             dr_flush_region(towrap, 0x1000);
             bool ok = drwrap_wrap(towrap, pre_hook, post_hook);
             if (ok) {
