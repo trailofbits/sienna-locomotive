@@ -1,4 +1,5 @@
 #include <map>
+#include <set>
 
 #include "common/sl2_dr_client.hpp"
 #include "common/sl2_dr_client_options.hpp"
@@ -40,7 +41,35 @@ static bool crashed = false;
 static uint32_t mut_count = 0;
 static sl2_arena arena = {0};
 static bool coverage_guided = false;
+// TODO(ww): Benchmark std::set vs std::vector -- how badly is nonlocality of access in sets
+// going to hurt us here?
+static std::set<module_data_t *, std::less<module_data_t *>, sl2_dr_allocator<module_data_t *>> seen_modules;
 static module_data_t *target_mod;
+
+static bool
+is_blacklisted_coverage_module(app_pc addr)
+{
+    module_data_t *containing_module = NULL;
+
+    for (module_data_t *mod : seen_modules) {
+        if (dr_module_contains_addr(mod, addr)) {
+            containing_module = mod;
+            break;
+        }
+    }
+
+    // NOTE(ww): This should never happen, since every executable address
+    // should belong to *some* module. If it does happen, assume the
+    // worst (that it's blacklisted), since we might be on the verge of a crash
+    // and we don't want to try instrumenting random memory.
+    if (!containing_module) {
+        SL2_DR_DEBUG("addr=%lu doesn't have a module?!\n");
+        return true;
+    }
+
+    // TODO(ww): We could probably inline this call manually.
+    return !strncmp("C:\\Windows\\", containing_module->full_path, 11);
+}
 
 static dr_emit_flags_t
 on_bb_instrument(void *drcontext, void *tag, instrlist_t *bb, instr_t *inst, bool for_trace, bool translating, void *user_data)
@@ -53,10 +82,8 @@ on_bb_instrument(void *drcontext, void *tag, instrlist_t *bb, instr_t *inst, boo
     }
 
     start_pc = dr_fragment_app_pc(tag);
-    // NOTE(ww): This suffices for a fuzzing target that's a single executable.
-    // For more complex targets, will we need to allow the user to supply a list of modules to
-    // instrument.
-    if (!dr_module_contains_addr(target_mod, start_pc)) {
+
+    if (is_blacklisted_coverage_module(start_pc)) {
         return DR_EMIT_DEFAULT;
     }
 
@@ -159,6 +186,10 @@ on_dr_exit(void)
     sl2_conn_close(&sl2_conn);
 
     dr_free_module_data(target_mod);
+
+    for (module_data_t *mod : seen_modules) {
+        dr_free_module_data(mod);
+    }
 
     // Clean up DynamoRIO
     // TODO(ww): Clean up individual event handlers as well? Since we're about to exit,
@@ -400,6 +431,10 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 static void
 on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 {
+    // Add a copy of the module to our seen module map so that we can avoid
+    // doing basic block coverage of it later (if necessary).
+    seen_modules.insert(dr_copy_module_data(mod));
+
     if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))) {
         client.baseAddr = (uint64_t) mod->start;
     }
