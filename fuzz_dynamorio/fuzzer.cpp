@@ -115,15 +115,6 @@ on_dr_exit(void)
 {
     SL2_DR_DEBUG("Dynamorio exiting (fuzzer)\n");
 
-    if (coverage_guided) {
-        bool bucketing;
-        uint32_t score;
-        uint32_t tries_remaining;
-        unsigned char hash[65] = {0};
-        sl2_conn_get_coverage(&sl2_conn, &arena, hash, &bucketing, &score, &tries_remaining);
-        SL2_DR_DEBUG("#COVERAGE:{\"hash\": \"%s\", \"bkt\": %s, \"scr\": %u, \"rem\": %u}\n", hash, bucketing ? "true": "false", score, tries_remaining);
-    }
-
     if (crashed) {
         char run_id_s[SL2_UUID_SIZE];
         sl2_uuid_to_string(sl2_conn.run_id, run_id_s);
@@ -176,6 +167,13 @@ on_dr_exit(void)
 
     if (coverage_guided) {
         sl2_conn_register_arena(&sl2_conn, &arena);
+
+        bool bucketing;
+        uint32_t score;
+        uint32_t tries_remaining;
+        unsigned char hash[65] = {0};
+        sl2_conn_get_coverage(&sl2_conn, &arena, hash, &bucketing, &score, &tries_remaining);
+        SL2_DR_DEBUG("#COVERAGE:{\"hash\": \"%s\", \"bkt\": %s, \"scr\": %u, \"rem\": %u}\n", hash, bucketing ? "true": "false", score, tries_remaining);
     }
 
     sl2_conn_close(&sl2_conn);
@@ -431,6 +429,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 
     const char *mod_name = dr_module_preferred_name(mod);
     app_pc towrap;
+    module_map.insert(dr_copy_module_data(mod));
 
     sl2_pre_proto_map pre_hooks;
     SL2_PRE_HOOK1(pre_hooks, ReadFile);
@@ -539,7 +538,6 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 
         // If everything looks good and we've made it this far, wrap the function
         if (towrap != NULL) {
-            module_map.insert(dr_copy_module_data(mod));
             dr_flush_region(towrap, 0x1000);
             bool ok = drwrap_wrap(towrap, pre_hook, post_hook);
             if (ok) {

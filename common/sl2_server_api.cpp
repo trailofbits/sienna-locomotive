@@ -218,7 +218,7 @@ SL2Response sl2_conn_request_arena(sl2_conn *conn, sl2_arena *arena)
         return SL2Response::MissingArenaID;
     }
 
-    // First, tell the server that we'd like a coverage arena.
+    // Tell the server to load/create a coverage arena on the disk.
     SL2_CONN_EVT(EVT_GET_ARENA);
 
     // Then, tell the server which coverage arena we'd like.
@@ -226,9 +226,6 @@ SL2Response sl2_conn_request_arena(sl2_conn *conn, sl2_arena *arena)
     // every instance of the fuzzer, meaning that each run on the same target application
     // and function(s) should produce the same identifier.
     sl2_conn_write_prefixed_string(conn, arena->id);
-
-    // Finally, read the arena from the server.
-    SL2_CONN_READ(arena->map, FUZZ_ARENA_SIZE);
 
     return SL2Response::OK;
 }

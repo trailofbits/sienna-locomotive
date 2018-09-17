@@ -759,9 +759,6 @@ static void handle_get_arena(HANDLE pipe)
         wlock.unlock();
     }
 
-    if (!WriteFile(pipe, arena.map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to write arena to pipe");
-    }
 }
 
 static void handle_set_arena(HANDLE pipe)
@@ -802,6 +799,19 @@ static void handle_set_arena(HANDLE pipe)
     }
 
     strategy_state prior = it->second;
+
+    // Record a raw copy of the coverage map for path identification
+    wchar_t wcs[SL2_HASH_LEN + 3];
+    wcscpy_s(wcs, L"R_");
+    wcscat_s(wcs, arena.id);
+    wlock.lock();
+    strategy_map[wcs] = { arena, coverage_score(&arena), prior.strategy, opts.stickiness, prior.success_map };
+
+    // Merge the existing coverage map with the one returned from the fuzzer
+    for(int i = 0; i < FUZZ_ARENA_SIZE; i++){
+        arena.map[i] += strategy_map[arena.id].arena.map[i];
+    }
+    wlock.unlock();
 
     uint32_t score = coverage_score(&arena);
 
@@ -1078,6 +1088,9 @@ static void handle_coverage_info(HANDLE pipe)
     }
 
     SL2_SERVER_LOG_INFO("got arena ID: %S", arena_id);
+    wchar_t raw_arena_id[SL2_HASH_LEN + 3] = {0};
+    wcscpy(raw_arena_id, L"R_");
+    wcscat(raw_arena_id, arena_id);
 
     rlock.lock();
     sl2_strategy_map_t::iterator it = strategy_map.find(arena_id);
@@ -1087,7 +1100,14 @@ static void handle_coverage_info(HANDLE pipe)
     }
 
     sl2_arena arena = it->second.arena;
-    std::string hash_hex_str = picosha2::hash256_hex_string((unsigned char *)&arena.map, (unsigned char *)&arena.map + FUZZ_ARENA_SIZE);
+
+    it = strategy_map.find(raw_arena_id);
+    if (it == strategy_map.end()) {
+        SL2_SERVER_LOG_FATAL("Raw arena ID missing from strategy_map? (map size=%d)", strategy_map.size());
+    }
+    sl2_arena raw_arena = it->second.arena;
+
+    std::string hash_hex_str = picosha2::hash256_hex_string((unsigned char *)&raw_arena.map, (unsigned char *)&raw_arena.map + FUZZ_ARENA_SIZE);
 
     // Zeroeth, write the hash of the path.
     if (!WriteFile(pipe, hash_hex_str.c_str(), 64, &txsize, NULL)) {
