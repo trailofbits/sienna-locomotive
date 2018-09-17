@@ -3,7 +3,6 @@ from sqlalchemy import ForeignKey
 from sqlalchemy.orm import relationship
 
 import datetime
-import struct
 
 from sl2 import db
 from .base import Base

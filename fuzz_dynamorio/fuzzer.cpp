@@ -41,6 +41,17 @@ static uint32_t mut_count = 0;
 static sl2_arena arena = {0};
 static bool coverage_guided = false;
 static module_data_t *target_mod;
+static std::vector<module_data_t> module_map; // TODO - may need to streamline this if it's too slow
+
+static app_pc
+get_base_address(app_pc address){
+    for(module_data_t mod: module_map){
+        if (dr_module_contains_addr(&mod, address)){
+            return mod.start;
+        }
+    }
+    return NULL;
+}
 
 static dr_emit_flags_t
 on_bb_instrument(void *drcontext, void *tag, instrlist_t *bb, instr_t *inst, bool for_trace, bool translating, void *user_data)
@@ -53,14 +64,15 @@ on_bb_instrument(void *drcontext, void *tag, instrlist_t *bb, instr_t *inst, boo
     }
 
     start_pc = dr_fragment_app_pc(tag);
+    app_pc mod_base = get_base_address(start_pc);
     // NOTE(ww): This suffices for a fuzzing target that's a single executable.
     // For more complex targets, will we need to allow the user to supply a list of modules to
     // instrument.
-    if (!dr_module_contains_addr(target_mod, start_pc)) {
+    if (!dr_module_contains_addr(target_mod, start_pc) || !mod_base) {
         return DR_EMIT_DEFAULT;
     }
 
-    offset = (start_pc - target_mod->start) & (FUZZ_ARENA_SIZE - 1);
+    offset = (start_pc - mod_base) & (FUZZ_ARENA_SIZE - 1);
 
     drreg_reserve_aflags(drcontext, bb, inst);
     // TODO(ww): Is it really necessary to inject an instruction here?
@@ -523,6 +535,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 
         // If everything looks good and we've made it this far, wrap the function
         if (towrap != NULL) {
+            module_map.push_back(*mod);
             dr_flush_region(towrap, 0x1000);
             bool ok = drwrap_wrap(towrap, pre_hook, post_hook);
             if (ok) {
