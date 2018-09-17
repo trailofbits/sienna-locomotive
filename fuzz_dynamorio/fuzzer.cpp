@@ -7,6 +7,11 @@
 #include "common/mutation.hpp"
 #include "common/sl2_server_api.hpp"
 
+// NOTE(ww): 1024 seems like a reasonable default here -- most programs won't have
+// more than 1024 modules, and those that do will probably have loaded the ones
+// we want to do coverage for anyways.
+#define SL2_MAX_MODULES 1024
+
 static droption_t<bool> op_no_coverage(
     DROPTION_SCOPE_CLIENT,
     "n",
@@ -41,10 +46,7 @@ static bool crashed = false;
 static uint32_t mut_count = 0;
 static sl2_arena arena = {0};
 static bool coverage_guided = false;
-// NOTE(ww): 1024 seems like a reasonable default here -- most programs won't have
-// more than 1024 modules, and those that do will probably have loaded the ones
-// we want to do coverage for anyways.
-static std::array<module_data_t *, 1024> seen_modules;
+static std::array<module_data_t *, SL2_MAX_MODULES> seen_modules;
 static uint32_t nmodules = 0;
 // TODO(ww): Benchmark std::set vs std::vector -- how badly is nonlocality of access in sets
 // going to hurt us here?
@@ -63,12 +65,12 @@ is_blacklisted_coverage_module(app_pc addr)
         }
     }
 
-    // NOTE(ww): This should never happen, since every executable address
-    // should belong to *some* module. If it does happen, assume the
-    // worst (that it's blacklisted), since we might be on the verge of a crash
-    // and we don't want to try instrumenting random memory.
+    // NOTE(ww): This should (almsot) never happen, since every executable address
+    // should belong to *some* module and the vast majority of programs will have
+    // fewer than SL2_MAX_MODULES. If it does happen, assume the
+    // worst (that it's blacklisted).
     if (!containing_module) {
-        SL2_DR_DEBUG("addr=%lu doesn't have a module?!\n");
+        SL2_DR_DEBUG("addr=%lu doesn't have a (covered) module?!\n");
         return true;
     }
 
@@ -436,9 +438,14 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 static void
 on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 {
-    // Add a copy of the module to our seen module map so that we can avoid
-    // doing basic block coverage of it later (if necessary).
-    seen_modules[nmodules++] = dr_copy_module_data(mod);
+    if (nmodules < SL2_MAX_MODULES - 1) {
+        // Add a copy of the module to our seen module map so that we can avoid
+        // doing basic block coverage of it later (if necessary).
+        seen_modules[nmodules++] = dr_copy_module_data(mod);
+    }
+    else {
+        SL2_DR_DEBUG("fuzzer#on_module_load: Only doing coverage on the first %d.\n", SL2_MAX_MODULES);
+    }
 
     if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))) {
         client.baseAddr = (uint64_t) mod->start;
