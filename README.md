@@ -9,7 +9,6 @@ Skim the following documents to familiarize yourself with the project:
 * Watch the [Demo video](https://drive.google.com/open?id=1njGgRrrfNanYSuaMy5nwLi1rw2bS1rMt)
 * [Interim Technical Report](https://docs.google.com/document/d/1zTUHlu-y_ZLT08saJp0qguYXC69F6CskMPZVLs48IVc/edit)
 * [SL2 Reinception Doc ](https://docs.google.com/document/d/1RwvknJk9PPgecLcsQI1SiXje9SdKB3OuOoSniIDvy68/edit)
-* harness.py (if you're familiar with Python)
 * Read through the [Projects](https://github.com/trailofbits/sienna-locomotive/projects/6) and [Issues](https://github.com/trailofbits/sienna-locomotive/issues) pages on GitHub
 
 ## High level architecture
@@ -166,12 +165,7 @@ The triage system is a separate executable, `triager.exe` that is run by the har
 
 ### Winchecksec
 
-
-### Statistics for different flags across EXEs on Windows 10
-
-| aslr | authenticode | cfg | dynamicBase | forceIntegrity | gs | highEntropyVA |  isolation |  nx |  rfg | safeSEH |  seh |
-| ---- | ------------ | --- | ----------- | -------------- | -- | ------------- | ---------- | --- | ---  | ------- | --- |
-| 79%	| 37% | 49%	| 79% | 3% | 65% | 43% | 100% | 79% | 6% | 25%| 91% |
+Read the [winchecksec README](https://github.com/trailofbits/winchecksec).
 
 ### Exploitability
 
