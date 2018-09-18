@@ -48,9 +48,6 @@ static sl2_arena arena = {0};
 static bool coverage_guided = false;
 static std::array<module_data_t *, SL2_MAX_MODULES> seen_modules;
 static uint32_t nmodules = 0;
-// TODO(ww): Benchmark std::set vs std::vector -- how badly is nonlocality of access in sets
-// going to hurt us here?
-// static std::set<module_data_t *, std::less<module_data_t *>, sl2_dr_allocator<module_data_t *>> seen_modules;
 
 static app_pc
 get_base_pc(app_pc addr)
