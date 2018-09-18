@@ -436,9 +436,6 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
         // doing basic block coverage of it later (if necessary).
         seen_modules[nmodules++] = dr_copy_module_data(mod);
     }
-    else {
-        SL2_DR_DEBUG("fuzzer#on_module_load: Only doing coverage on the first %d.\n", SL2_MAX_MODULES);
-    }
 
     if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))) {
         client.baseAddr = (uint64_t) mod->start;
