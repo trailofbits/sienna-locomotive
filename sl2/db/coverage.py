@@ -48,11 +48,11 @@ class PathRecord(Base):
 
         ret = session.query(PathRecord).filter(PathRecord.hash == pathhash).first()
         if ret:
-            ret.count += 1
+            ret.count = ret.count + 1
             ret.last_seen = datetime.datetime.utcnow()
         else:
             ret = PathRecord(pathhash, target_slug)
+            session.add(ret)
 
-        session.add(ret)
         session.commit()
         session.close()
