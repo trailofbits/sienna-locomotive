@@ -64,10 +64,10 @@ get_base_pc(app_pc addr)
         }
     }
 
-    // NOTE(ww): This should (almsot) never happen, since every executable address
-    // should belong to *some* module and the vast majority of programs will have
-    // fewer than SL2_MAX_MODULES. If it does happen, assume the
-    // worst (that it's blacklisted).
+    // NOTE(ww): This should only happen in two cases:
+    // 1. When the address given is in a module we don't care about (e.g., system DLLs)
+    // 2. When the address given is in a module we aren't tracking
+    //  (i.e., when nmodules == SL2_MAX_MODULES)
     if (!containing_module) {
         return NULL;
     }
