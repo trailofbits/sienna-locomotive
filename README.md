@@ -271,33 +271,8 @@ After the tracer has been run, `triager.exe` is run on the minidump file. It als
 }
 ```
 
-## File Formats
-
-### FKT Format
-
-This format is for recording mutation events for later replay.
-
-`char magic[4] == 'FKT\x00'`
-
-`uint type`, `1 == file`
-
-Variable based on type.
-
-`uint file_size`
-
-`wchar_t path[file_size]`
-
-`size_t position`
-
-`size_t size`
-
-`uchar data[size]`
-
-
-There's a 010 template for this in `misc`
-
 ### Outdated components
-You can safely ignore most of the stuff in `corpus/asm` and `electriage`
+You can safely ignore most of the stuff in `corpus/asm`.
 
 # Changes
 
