@@ -122,6 +122,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Set up fuzzer button
         self.fuzzer_button = QtWidgets.QPushButton("Fuzz selected targets")
+        if not self.target_data.target_list:
+            self.fuzzer_button.setEnabled(False)
 
         # Create checkboxes for continuous mode
         self.continuous_mode_cbox = QtWidgets.QCheckBox("Continuous")
@@ -522,8 +524,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def wizard_finished(self, wizard_output):
         """ Dump the results of a wizard run to the target file and rebuild the tree """
-        self.target_data.set_target_list(wizard_output)
-        self.build_func_tree()
+        if wizard_output:
+            self.target_data.set_target_list(wizard_output)
+            self.build_func_tree()
+            self.fuzzer_button.setEnabled(True)
+        else:
+            QtWidgets.QMessageBox.critical(None, "Wizard failure",
+                                           "No wizard results; is the target 64-bit?")
 
     def save_crashes(self):
         """ Saves a csv of crash data """
