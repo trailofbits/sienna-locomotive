@@ -2,6 +2,7 @@ from sqlalchemy import *
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import relationship
 import datetime
+from functools import reduce
 
 from sl2 import db
 from .base import Base
@@ -56,3 +57,15 @@ class PathRecord(Base):
 
         session.commit()
         session.close()
+
+    @staticmethod
+    def estimate_current_path_coverage(target_slug):
+        session = db.getSession()
+        target_query = session.query(PathRecord).filter(PathRecord.target_config_slug == target_slug)
+        num_paths = target_query.count()
+        num_singletons = target_query.filter(PathRecord.count == 1).count()
+        num_doubletons = target_query.filter(PathRecord.count == 2).count()
+        num_runs = reduce(lambda a, x: a + x.count, target_query.all())
+
+        session.close()
+        return num_paths, num_paths / (num_paths + ((num_runs - 1) / num_runs) * ((num_singletons ** 2) / (2 * num_doubletons)))
