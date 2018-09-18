@@ -311,8 +311,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.fuzzer_button.clicked.connect(self.server_thread.start)
         self.server_thread.finished.connect(self.start_all_threads)
 
-        # If the user checks the pause mode, then we also check the continuous mode
+        # If the user changes the continuous or pause mode, then we make sure the
+        # two are consistent.
         self.pause_mode_cbox.stateChanged.connect(self.unify_pause_state)
+        self.continuous_mode_cbox.stateChanged.connect(self.unify_continuous_state)
 
         # Connect the stop button to the thread so we can pause it
         self.stop_button.clicked.connect(self.pause_all_threads)
@@ -543,13 +545,21 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def unify_pause_state(self, state):
         """
-            Keeps the state of the "continuous" and "pause" checkboxes consistent:
+            Keeps the state of the "continuous" and "pause" checkboxes consistent.
 
-            "pause" only makes sense under "continuous", so any attempt to enable "pause"
-            also enabled "continuous".
+            Any attempt to enable "pause" enables "continuous".
         """
         if state == Qt.Checked:
             self.continuous_mode_cbox.setChecked(True)
+
+    def unify_continuous_state(self, state):
+        """
+            Keeps the state of the "continuous" and "pause" checkboxes consistent.
+
+            Any attempt to disable "continuous" disables "pause".
+        """
+        if state == Qt.Unchecked:
+            self.pause_mode_cbox.setChecked(False)
 
     def verboseCheckBox_clicked(self):
         state = self.verboseCheckBox.isChecked()
