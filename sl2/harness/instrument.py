@@ -17,7 +17,6 @@ import sys
 import threading
 import time
 import traceback
-import struct
 from enum import IntEnum
 from typing import NamedTuple
 
