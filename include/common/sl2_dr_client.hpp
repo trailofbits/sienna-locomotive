@@ -156,8 +156,8 @@ struct sl2_exception_ctx {
 // Represents a tuple of a function and its expected module.
 struct sl2_funcmod
 {
-    char *func;
-    char *mod;
+    const char *func;
+    const char *mod;
 };
 
 // Declared in sl2_dr_client.cpp; contains pairs of functions and their expected modules.
@@ -182,6 +182,7 @@ public:
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Methods
     // Method targeting methods.
+    void        hash_args(char *argHash, fileArgHash *fStruct);
     bool        is_function_targeted(client_read_info *info);
     bool        compare_filenames(targetFunction &t, client_read_info* info);
     bool        compare_indices(targetFunction &t, Function &function);
@@ -189,6 +190,7 @@ public:
     bool        compare_return_addresses(targetFunction &t, client_read_info* info);
     bool        compare_arg_hashes(targetFunction &t, client_read_info* info);
     bool        compare_arg_buffers(targetFunction &t, client_read_info* info);
+    bool        function_is_in_expected_module(const char *func, const char *mod);
 
     // Crash-diversion mitigation methods.
     void        wrap_pre_IsProcessorFeaturePresent(void *wrapcxt, OUT void **user_data);
@@ -213,29 +215,14 @@ public:
     uint64_t    incrementCallCountForFunction(Function function);
     uint64_t    incrementRetAddrCount(uint64_t retAddr);
 
+
+    // Utility methods.
+    const char  *function_to_string(Function function);
+    const char  *exception_to_string(DWORD exception_code);
 };
 
 // Converts a JSON object into a `targetFunction`.
 SL2_EXPORT
 void from_json(const json& j, targetFunction& t);
-
-// Returns a C-string corresponding to the requested `function`.
-SL2_EXPORT
-const char *function_to_string(Function function);
-
-// Builds a hash from an fStruct
-SL2_EXPORT
-void hash_args(char * argHash, fileArgHash * fStruct);
-
-// Returns a C-string corresponding to the given `exception_code`.
-SL2_EXPORT
-const char *exception_to_string(DWORD exception_code);
-
-// Returns a boolean, indicating whether or not the given function is in
-// the module we expected (for hooking).
-// Returns false if the module isn't the one we expect *or* if the function isn't
-// one we care about.
-SL2_EXPORT
-bool function_is_in_expected_module(const char *func, const char *mod);
 
 #endif

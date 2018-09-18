@@ -26,16 +26,6 @@ sl2_funcmod SL2_FUNCMOD_TABLE[] = {
     {"MapViewOfFile", "KERNELBASE.DLL"},
 };
 
-SL2_EXPORT
-void hash_args(char * argHash, fileArgHash * fStruct){
-    std::vector<unsigned char> blob_vec((unsigned char *) fStruct,
-        ((unsigned char *) fStruct) + sizeof(fileArgHash));
-    std::string hash_str;
-    picosha2::hash256_hex_string(blob_vec, hash_str);
-    argHash[SL2_HASH_LEN] = 0;
-    memcpy((void *) argHash, hash_str.c_str(), SL2_HASH_LEN);
-}
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // SL2Client
 //
@@ -46,6 +36,15 @@ SL2Client::SL2Client() {
 
 }
 
+void
+SL2Client::hash_args(char * argHash, fileArgHash * fStruct){
+    std::vector<unsigned char> blob_vec((unsigned char *) fStruct,
+        ((unsigned char *) fStruct) + sizeof(fileArgHash));
+    std::string hash_str;
+    picosha2::hash256_hex_string(blob_vec, hash_str);
+    argHash[SL2_HASH_LEN] = 0;
+    memcpy((void *) argHash, hash_str.c_str(), SL2_HASH_LEN);
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // is_function_targeted()
@@ -742,28 +741,8 @@ SL2Client::is_sane_post_hook(void *wrapcxt, void *user_data, void **drcontext)
     return true;
 }
 
-
-// TODO(ww): Document the fallback values here.
-SL2_EXPORT
-void from_json(const json& j, targetFunction& t)
-{
-    t.selected      = j.value("selected", false);
-    t.index         = j.value("callCount", -1);
-    t.retAddrCount  = j.value("retAddrCount", -1);
-    t.mode          = j.value("mode", MATCH_INDEX); // TODO - might want to chose a more sensible default
-    t.retAddrOffset = j.value("retAddrOffset", -1);
-    t.functionName  = j.value("func_name", "");
-    t.argHash       = j.value("argHash", "");
-    t.buffer        = j["buffer"].get<vector<uint8_t>>();
-
-    string source        = j.value("source", "");
-    wstring wsource;
-    wsource.assign(source.begin(), source.end());
-    t.source = wsource;
-}
-
-SL2_EXPORT
-const char *function_to_string(Function function)
+const char *
+SL2Client::function_to_string(Function function)
 {
     switch(function) {
         case Function::ReadFile:
@@ -793,8 +772,8 @@ const char *function_to_string(Function function)
     return "unknown";
 }
 
-SL2_EXPORT
-const char *exception_to_string(DWORD exception_code)
+const char *
+SL2Client::exception_to_string(DWORD exception_code)
 {
     char *exception_str;
 
@@ -870,8 +849,8 @@ const char *exception_to_string(DWORD exception_code)
     return exception_str;
 }
 
-SL2_EXPORT
-bool function_is_in_expected_module(const char *func, const char *mod)
+bool
+SL2Client::function_is_in_expected_module(const char *func, const char *mod)
 {
     for (int i = 0; i < SL2_FUNCMOD_TABLE_SIZE; i++) {
         if (STREQ(func, SL2_FUNCMOD_TABLE[i].func) && STREQI(mod, SL2_FUNCMOD_TABLE[i].mod)) {
@@ -881,3 +860,23 @@ bool function_is_in_expected_module(const char *func, const char *mod)
 
     return false;
 }
+
+// TODO(ww): Document the fallback values here.
+SL2_EXPORT
+void from_json(const json& j, targetFunction& t)
+{
+    t.selected      = j.value("selected", false);
+    t.index         = j.value("callCount", -1);
+    t.retAddrCount  = j.value("retAddrCount", -1);
+    t.mode          = j.value("mode", MATCH_INDEX); // TODO - might want to chose a more sensible default
+    t.retAddrOffset = j.value("retAddrOffset", -1);
+    t.functionName  = j.value("func_name", "");
+    t.argHash       = j.value("argHash", "");
+    t.buffer        = j["buffer"].get<vector<uint8_t>>();
+
+    string source        = j.value("source", "");
+    wstring wsource;
+    wsource.assign(source.begin(), source.end());
+    t.source = wsource;
+}
+

@@ -1,11 +1,16 @@
 #include <map>
-#include <set>
+#include <array>
 
 #include "common/sl2_dr_client.hpp"
 #include "common/sl2_dr_client_options.hpp"
 #include "vendor/picosha2.h"
 #include "common/mutation.hpp"
 #include "common/sl2_server_api.hpp"
+
+// NOTE(ww): 1024 seems like a reasonable default here -- most programs won't have
+// more than 1024 modules, and those that do will probably have loaded the ones
+// we want to do coverage for anyways.
+#define SL2_MAX_MODULES 1024
 
 static droption_t<bool> op_no_coverage(
     DROPTION_SCOPE_CLIENT,
@@ -41,17 +46,30 @@ static bool crashed = false;
 static uint32_t mut_count = 0;
 static sl2_arena arena = {0};
 static bool coverage_guided = false;
-static module_data_t *target_mod;
-static std::set<module_data_t *, std::less<module_data_t *>, sl2_dr_allocator<module_data_t *>> module_map;
+static std::array<module_data_t *, SL2_MAX_MODULES> seen_modules;
+static uint32_t nmodules = 0;
 
 static app_pc
-get_base_address(app_pc address){
-    for(module_data_t *mod: module_map){
-        if (dr_module_contains_addr(mod, address)){
-            return mod->start;
+get_base_pc(app_pc addr)
+{
+    module_data_t *containing_module = NULL;
+
+    for (uint32_t i = 0; i < nmodules; ++i) {
+        if (dr_module_contains_addr(seen_modules[i], addr)) {
+            containing_module = seen_modules[i];
+            break;
         }
     }
-    return NULL;
+
+    // NOTE(ww): This should only happen in two cases:
+    // 1. When the address given is in a module we don't care about (e.g., system DLLs)
+    // 2. When the address given is in a module we aren't tracking
+    //  (i.e., when nmodules == SL2_MAX_MODULES)
+    if (!containing_module) {
+        return NULL;
+    }
+
+    return containing_module->start;
 }
 
 static dr_emit_flags_t
@@ -65,15 +83,13 @@ on_bb_instrument(void *drcontext, void *tag, instrlist_t *bb, instr_t *inst, boo
     }
 
     start_pc = dr_fragment_app_pc(tag);
-    app_pc mod_base = get_base_address(start_pc);
-    // NOTE(ww): This suffices for a fuzzing target that's a single executable.
-    // For more complex targets, will we need to allow the user to supply a list of modules to
-    // instrument.
-    if (!dr_module_contains_addr(target_mod, start_pc) || !mod_base) {
+    app_pc base_pc = get_base_pc(start_pc);
+
+    if (!base_pc) {
         return DR_EMIT_DEFAULT;
     }
 
-    offset = (start_pc - mod_base) & (FUZZ_ARENA_SIZE - 1);
+    offset = (start_pc - base_pc) & (FUZZ_ARENA_SIZE - 1);
 
     drreg_reserve_aflags(drcontext, bb, inst);
     // TODO(ww): Is it really necessary to inject an instruction here?
@@ -102,7 +118,7 @@ on_exception(void *drcontext, dr_exception_t *excpt)
     memcpy(&(fuzz_exception_ctx.record), excpt->record, sizeof(EXCEPTION_RECORD));
 
     json j;
-    j["exception"] = exception_to_string(exception_code);
+    j["exception"] = client.exception_to_string(exception_code);
     SL2_LOG_JSONL(j);
 
     dr_exit_process(1);
@@ -178,9 +194,8 @@ on_dr_exit(void)
 
     sl2_conn_close(&sl2_conn);
 
-    dr_free_module_data(target_mod);
-    for(module_data_t *mod: module_map){
-        dr_free_module_data(mod);
+    for (uint32_t i = 0; i < nmodules; ++i) {
+        dr_free_module_data(seen_modules[i]);
     }
 
     // Clean up DynamoRIO
@@ -401,7 +416,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     }
 
     // Create the argHash, now that we have the correct source and nNumberOfBytesToRead.
-    hash_args(info->argHash, &fStruct);
+    client.hash_args(info->argHash, &fStruct);
 
     bool targeted = client.is_function_targeted(info);
     client.incrementCallCountForFunction(info->function);
@@ -423,13 +438,18 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 static void
 on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 {
+    if (nmodules < SL2_MAX_MODULES - 1 && strncmp("C:\\Windows\\", mod->full_path, 11)) {
+        // Add a copy of the module to our seen module map so that we can avoid
+        // doing basic block coverage of it later (if necessary).
+        seen_modules[nmodules++] = dr_copy_module_data(mod);
+    }
+
     if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))) {
         client.baseAddr = (uint64_t) mod->start;
     }
 
     const char *mod_name = dr_module_preferred_name(mod);
     app_pc towrap;
-    module_map.insert(dr_copy_module_data(mod));
 
     sl2_pre_proto_map pre_hooks;
     SL2_PRE_HOOK1(pre_hooks, ReadFile);
@@ -511,7 +531,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
         char *function_name = it->first;
         bool hook = false;
 
-        if (!function_is_in_expected_module(function_name, mod_name)) {
+        if (!client.function_is_in_expected_module(function_name, mod_name)) {
             continue;
         }
 
@@ -613,10 +633,6 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
 
     // Check whether we can use coverage on this fuzzing run
     coverage_guided = (arena_id_s != "") && !no_coverage;
-
-    // Cache our main module, so that we don't have to retrieve it during each
-    // basic block event.
-    target_mod = dr_get_main_module();
 
     if (coverage_guided) {
         SL2_DR_DEBUG("dr_client_main: arena given, instrumenting BBs!\n");

@@ -659,19 +659,21 @@ on_bb_instrument(
 static void
 on_thread_init(void *drcontext)
 {
-
+    SL2_DR_DEBUG("tracer#on_thread_init\n");
 }
 
 static void
 on_thread_exit(void *drcontext)
 {
-
+    SL2_DR_DEBUG("tracer#on_thread_exit\n");
 }
 
 /* Clean up registered callbacks before exiting */
 static void
 on_dr_exit(void)
 {
+    SL2_DR_DEBUG("tracer#on_dr_exit: cleaning up and exiting.\n");
+
     if (!op_no_taint.get_value()) {
         if (!drmgr_unregister_bb_insertion_event(on_bb_instrument)) {
             DR_ASSERT(false);
@@ -756,7 +758,7 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
 
     j["score"] = score;
     j["reason"] = reason;
-    j["exception"] = exception_to_string(exception_code);
+    j["exception"] = client.exception_to_string(exception_code);
     j["location"] = (uint64_t) exception_address;
     j["instruction"] = disassembly;
     j["pc_tainted"] = pc_tainted;
@@ -1256,7 +1258,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     }
 
     // Create the argHash, now that we have the correct source and nNumberOfBytesToRead.
-    hash_args(info->argHash, &fStruct);
+    client.hash_args(info->argHash, &fStruct);
 
     bool targeted = client.is_function_targeted(info);
     client.incrementCallCountForFunction(info->function);
@@ -1381,7 +1383,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
         char *function_name = it->first;
         bool hook = false;
 
-        if (!function_is_in_expected_module(function_name, mod_name)) {
+        if (!client.function_is_in_expected_module(function_name, mod_name)) {
             continue;
         }
 

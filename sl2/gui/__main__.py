@@ -16,7 +16,7 @@ from sqlalchemy import desc
 
 from sl2 import db
 from sl2.harness import config
-from sl2.harness.state import get_target, export_crash_data_to_csv, get_target_slug, TriageExport
+from sl2.harness.state import sanity_checks, get_target, export_crash_data_to_csv, get_target_slug, TriageExport
 from sl2.harness.threads import ChecksecThread, WizardThread, FuzzerThread, ServerThread
 
 from . import stats
@@ -43,7 +43,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Select config profile before starting
         self.cfg = ConfigWindow()
-        self.cfg.exec()
+        if self.cfg.exec() == QtWidgets.QDialog.Rejected:
+            sys.exit(1)
 
         # Set up basic window
         self.setWindowTitle("Sienna Locomotive 2")
@@ -67,7 +68,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.targetLabel = QtWidgets.QLabel()
         self.targetStatus.addWidget(self.targetLabel)
         self._layout.addWidget(self.targetStatus)
-
         self.checksec_thread.start()
         self.checksec_thread.resultReady.connect(self.checksec_finished)
 
@@ -122,6 +122,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Set up fuzzer button
         self.fuzzer_button = QtWidgets.QPushButton("Fuzz selected targets")
+        if not self.target_data.target_list:
+            self.fuzzer_button.setEnabled(False)
 
         # Create checkboxes for continuous mode
         self.continuous_mode_cbox = QtWidgets.QCheckBox("Continuous")
@@ -306,10 +308,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.triageExport.clicked.connect(self.triageExportGui)
 
-        # Fuzzer controll buttons for showing the panel and starting a run
+        # Fuzzer control buttons for showing the panel and starting a run
         self.expand_button.clicked.connect(self.toggle_expansion)
         self.fuzzer_button.clicked.connect(self.server_thread.start)
         self.server_thread.finished.connect(self.start_all_threads)
+
+        # If the user changes the continuous or pause mode, then we make sure the
+        # two are consistent.
+        self.pause_mode_cbox.stateChanged.connect(self.unify_pause_state)
+        self.continuous_mode_cbox.stateChanged.connect(self.unify_continuous_state)
 
         # Connect the stop button to the thread so we can pause it
         self.stop_button.clicked.connect(self.pause_all_threads)
@@ -517,8 +524,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def wizard_finished(self, wizard_output):
         """ Dump the results of a wizard run to the target file and rebuild the tree """
-        self.target_data.set_target_list(wizard_output)
-        self.build_func_tree()
+        if wizard_output:
+            self.target_data.set_target_list(wizard_output)
+            self.build_func_tree()
+            self.fuzzer_button.setEnabled(True)
+        else:
+            QtWidgets.QMessageBox.critical(None, "Wizard failure",
+                                           "No wizard results; is the target 64-bit?")
 
     def save_crashes(self):
         """ Saves a csv of crash data """
@@ -537,6 +549,24 @@ class MainWindow(QtWidgets.QMainWindow):
             self.extension_widget.hide()
             self.expand_button.setArrowType(Qt.DownArrow)
             self.adjustSize()
+
+    def unify_pause_state(self, state):
+        """
+            Keeps the state of the "continuous" and "pause" checkboxes consistent.
+
+            Any attempt to enable "pause" enables "continuous".
+        """
+        if state == Qt.Checked:
+            self.continuous_mode_cbox.setChecked(True)
+
+    def unify_continuous_state(self, state):
+        """
+            Keeps the state of the "continuous" and "pause" checkboxes consistent.
+
+            Any attempt to disable "continuous" disables "pause".
+        """
+        if state == Qt.Unchecked:
+            self.pause_mode_cbox.setChecked(False)
 
     def verboseCheckBox_clicked(self):
         state = self.verboseCheckBox.isChecked()
@@ -563,6 +593,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
+    sane, errors = sanity_checks(exit=False)
+
+    if not sane:
+        QtWidgets.QMessageBox.critical(None, "Sanity check failure",
+                                       "\n".join(errors))
+        sys.exit(1)
 
     mainWin = MainWindow()
     mainWin.show()

@@ -100,6 +100,7 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
     Returns a DRRun instance containing the popen object and PRNG seed
     used during the run.
     """
+    fuzzing = run_id and not tracing
     invoke = create_invocation_statement(config_dict, run_id)
 
     if verbose:
@@ -156,6 +157,14 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
                             if verbose:
                                 print_l("Killing child process:", pid)
                             try:
+                                # If we're fuzzing, try a "soft" kill with taskkill first:
+                                # taskkill will send a WM_CLOSE before anything else,
+                                # which will hopefully kill the client more gently
+                                # than a "hard" os.kill
+                                # TODO(ww): Replace this with a direct WM_CLOSE message.
+                                if fuzzing:
+                                    os.system("taskkill /T /PID {}".format(pid))
+                                    time.sleep(1)
                                 os.kill(pid, signal.SIGTERM)
                             except PermissionError as e:
                                 print_l("WARNING: Couldn't kill child process (insufficient privilege?):", e)
