@@ -6,7 +6,7 @@ import datetime
 
 from sl2 import db
 from .base import Base
-from sl2.db.coverage import CoverageRecord, PathRecord
+from sl2.db.coverage import PathRecord
 
 
 class RunBlock(Base):
@@ -16,18 +16,30 @@ class RunBlock(Base):
     target_config_slug = Column(String, ForeignKey("targets.target_slug"))
     target_config = relationship("TargetConfig", back_populates="runs")
 
-    coverage = relationship("CoverageRecord", back_populates="run_block", uselist=False)
+    paths = relationship("PathRecord", back_populates="run_block")
 
     started = Column(DateTime)
     ended = Column(DateTime, default=datetime.datetime.utcnow)
     runs = Column(Integer)
     crashes = Column(Integer)
 
-    def __init__(self, target_slug, started, runs, crashes):
+    bucketing = Column(Boolean)
+    score = Column(Integer)
+    num_tries_remaining = Column(Integer)
+
+    num_paths = Column(Integer)
+    path_coverage = Column(Numeric)
+
+    def __init__(self, target_slug, started, runs, crashes, bucketing, score, num_tries_remaining):
         self.target_config_slug = target_slug
         self.started = started
         self.runs = runs
         self.crashes = crashes
+        self.bucketing = bucketing
+        self.score = score
+        self.num_tries_remaining = num_tries_remaining
+
+        self.num_paths, self.path_coverage = PathRecord.estimate_current_path_coverage(target_slug)
 
 
 class SessionManager(object):
@@ -50,11 +62,10 @@ class SessionManager(object):
     def _handle_completion(self):
         session = db.getSession()
 
-        record = RunBlock(self.target_slug, self.started, self.runs_counted, self.crash_counter)
-        cov = CoverageRecord(record, self.run_dict["bkt"], self.run_dict["scr"], self.run_dict["rem"])
+        record = RunBlock(self.target_slug, self.started, self.runs_counted, self.crash_counter,
+                          self.run_dict["bkt"], self.run_dict["scr"], self.run_dict["rem"])
 
         session.add(record)
-        session.add(cov)
         session.commit()
 
     def _reset(self):

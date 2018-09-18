@@ -2,28 +2,9 @@ from sqlalchemy import *
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import relationship
 import datetime
-from functools import reduce
 
 from sl2 import db
 from .base import Base
-
-
-class CoverageRecord(Base):
-    __tablename__ = 'coverage'
-
-    id = Column(Integer, primary_key=True)
-    run_block_id = Column(String, ForeignKey("runs.id"))
-    run_block = relationship("RunBlock", back_populates="coverage", uselist=False)
-
-    bucketing = Column(Boolean)
-    score = Column(Integer)
-    num_tries_remaining = Column(Integer)
-
-    def __init__(self, run_block, bucketing, score, num_tries_remaining):
-        self.run_block = run_block
-        self.bucketing = bucketing
-        self.score = score
-        self.num_tries_remaining = num_tries_remaining
 
 
 class PathRecord(Base):
@@ -32,6 +13,10 @@ class PathRecord(Base):
     hash = Column(String(64), primary_key=True)
     target_config_slug = Column(String, ForeignKey("targets.target_slug"))
     target_config = relationship("TargetConfig", back_populates="paths")
+
+    run_block_id = Column(String, ForeignKey("runs.id"))
+    run_block = relationship("RunBlock")
+
     # coverage = relationship("CoverageRecord", back_populates="run_block", uselist=False)
     created = Column(DateTime, default=datetime.datetime.utcnow)
     last_seen = Column(DateTime, default=datetime.datetime.utcnow)
@@ -65,7 +50,14 @@ class PathRecord(Base):
         num_paths = target_query.count()
         num_singletons = target_query.filter(PathRecord.count == 1).count()
         num_doubletons = target_query.filter(PathRecord.count == 2).count()
-        num_runs = reduce(lambda a, x: a + x.count, target_query.all())
+        num_runs = sum(x.count for x in target_query.all())
 
         session.close()
-        return num_paths, num_paths / (num_paths + ((num_runs - 1) / num_runs) * ((num_singletons ** 2) / (2 * num_doubletons)))
+        # TODO - is it fair to calculate assuming at least one doubleton here?
+        c = num_paths / (num_paths + ((num_runs - 1) / num_runs) * ((num_singletons ** 2) / (2 * max(num_doubletons, 1))))
+        print("Total Paths:", num_paths,
+              "Singletons:", num_singletons,
+              "Doubletons:", num_doubletons,
+              "Total Runs:", num_runs,
+              "Calculated fraction:", c)
+        return num_paths, c
