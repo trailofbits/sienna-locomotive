@@ -659,19 +659,21 @@ on_bb_instrument(
 static void
 on_thread_init(void *drcontext)
 {
-
+    SL2_DR_DEBUG("tracer#on_thread_init\n");
 }
 
 static void
 on_thread_exit(void *drcontext)
 {
-
+    SL2_DR_DEBUG("tracer#on_thread_exit\n");
 }
 
 /* Clean up registered callbacks before exiting */
 static void
 on_dr_exit(void)
 {
+    SL2_DR_DEBUG("tracer#on_dr_exit: cleaning up and exiting.\n");
+
     if (!op_no_taint.get_value()) {
         if (!drmgr_unregister_bb_insertion_event(on_bb_instrument)) {
             DR_ASSERT(false);
