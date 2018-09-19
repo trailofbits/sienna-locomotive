@@ -211,30 +211,20 @@ on_dr_exit(void)
 // Mutates a function's input buffer, registers the mutation with the server, and writes the
 // buffer into memory for fuzzing.
 static bool
-mutate(Function function, HANDLE hFile, size_t position, void *buffer, size_t bufsize)
+mutate(client_read_info *info)
 {
-    wchar_t resource[MAX_PATH + 1] = {0};
-
-    // Check that ReadFile calls are to something actually valid
-    // TODO(ww): Add fread and fread_s here once the _getosfhandle problem is fixed.
-    if (function == Function::ReadFile) {
-        if (hFile == INVALID_HANDLE_VALUE) {
-            dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#mutate: Invalid source for mutation?\n");
-            return false;
-        }
-
-        GetFinalPathNameByHandle(hFile, resource, MAX_PATH, 0);
-        SL2_DR_DEBUG("mutate: resource: %S\n", resource);
+    if (info->source) {
+        SL2_DR_DEBUG("mutate: info->source: %S\n", info->source);
     }
 
     sl2_mutation mutation = {
-        (uint32_t) function,
+        (uint32_t) info->function,
         mut_count++,
         0, // NOTE(ww): We don't know the mutation type yet.
-        resource,
-        position,
-        bufsize,
-        (uint8_t *) buffer,
+        info->source,
+        info->position,
+        info->nNumberOfBytesToRead,
+        (uint8_t *) info->lpBuffer,
     };
 
     if (coverage_guided) {
@@ -350,16 +340,18 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     void *drcontext = NULL;
 
     if (!client.is_sane_post_hook(wrapcxt, user_data, &drcontext)) {
-        return;
+        goto cleanup;
     }
 
     SL2_DR_DEBUG("<in wrap_post_Generic>\n");
 
     client_read_info *info = (client_read_info *) user_data;
 
-    // Identify whether this is the function we want to target
-    bool targeted = client.is_function_targeted(info);
     client.incrementCallCountForFunction(info->function);
+
+    if (!client.is_function_targeted(info)) {
+        goto cleanup;
+    }
 
     // NOTE(ww): We should never read more bytes than we request, so this is more
     // of a sanity check than anything else.
@@ -367,12 +359,16 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
         info->nNumberOfBytesToRead = *(info->lpNumberOfBytesRead);
     }
 
-    if (targeted) {
-        // If the mutation process fails in any way, consider this fuzzing run a loss.
-        if (!mutate(info->function, info->hFile, info->position, info->lpBuffer, info->nNumberOfBytesToRead)) {
-            crashed = false;
-            dr_exit_process(1);
-        }
+    // If the mutation process fails in any way, consider this fuzzing run a loss.
+    if (!mutate(info)) {
+        crashed = false;
+        dr_exit_process(1);
+    }
+
+    cleanup:
+
+    if (info->source) {
+        dr_thread_free(drcontext, info->source, wcsnlen_s(info->source, MAX_PATH + 1) * sizeof(wchar_t));
     }
 
     if (info->argHash) {
@@ -390,12 +386,19 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     void *drcontext = NULL;
 
     if (!client.is_sane_post_hook(wrapcxt, user_data, &drcontext)) {
-        return;
+        goto cleanup;
     }
 
     SL2_DR_DEBUG("<in wrap_post_MapViewOfFile>\n");
 
     client_read_info *info = (client_read_info *) user_data;
+
+    client.incrementCallCountForFunction(info->function);
+
+    if (!client.is_function_targeted(info)) {
+        goto cleanup;
+    }
+
     info->lpBuffer = drwrap_get_retval(wrapcxt);
     MEMORY_BASIC_INFORMATION memory_info = {0};
 
@@ -416,19 +419,20 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
         dr_exit_process(1);
     }
 
+    // Toss the filename into info, so that `mutate` can send it to the server.
+    info->source = fStruct.fileName;
+
     // Create the argHash, now that we have the correct source and nNumberOfBytesToRead.
     client.hash_args(info->argHash, &fStruct);
 
-    bool targeted = client.is_function_targeted(info);
-    client.incrementCallCountForFunction(info->function);
-
-    if (targeted) {
-        // If the mutation process fails in any way, consider this fuzzing run a loss.
-        if (!mutate(info->function, info->hFile, info->position, info->lpBuffer, info->nNumberOfBytesToRead)) {
-            crashed = false;
-            dr_exit_process(1);
-        }
+    // If the mutation process fails in any way, consider this fuzzing run a loss.
+    if (!mutate(info)) {
+        crashed = false;
+        dr_exit_process(1);
     }
+
+    #pragma warning(suppress: 4533)
+    cleanup:
 
     dr_thread_free(drcontext, info->argHash, SL2_HASH_LEN + 1);
     dr_thread_free(drcontext, info, sizeof(client_read_info));
