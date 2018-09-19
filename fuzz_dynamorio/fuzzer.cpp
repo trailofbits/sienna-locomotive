@@ -395,10 +395,6 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 
     client.incrementCallCountForFunction(info->function);
 
-    if (!client.is_function_targeted(info)) {
-        goto cleanup;
-    }
-
     info->lpBuffer = drwrap_get_retval(wrapcxt);
     MEMORY_BASIC_INFORMATION memory_info = {0};
 
@@ -425,10 +421,12 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     // Create the argHash, now that we have the correct source and nNumberOfBytesToRead.
     client.hash_args(info->argHash, &fStruct);
 
-    // If the mutation process fails in any way, consider this fuzzing run a loss.
-    if (!mutate(info)) {
-        crashed = false;
-        dr_exit_process(1);
+    if (client.is_function_targeted(info)) {
+        // If the mutation process fails in any way, consider this fuzzing run a loss.
+        if (!mutate(info)) {
+            crashed = false;
+            dr_exit_process(1);
+        }
     }
 
     #pragma warning(suppress: 4533)
