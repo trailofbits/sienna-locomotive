@@ -19,7 +19,8 @@ setup(
             'sl2 = sl2.gui.__main__:main',
             'sl2-cli = sl2.harness.__main__:main',
             'sl2-test = sl2.test.__main__:main',
-            'sl2-stats = sl2.stats.__main__:main'
+            'sl2-stats = sl2.stats.__main__:main',
+            'sl2-report = sl2.reporting.__main__:main'
         ],
         'gui_scripts': [
             'sl2-noconsole = sl2.gui.__main__:main'

@@ -20,12 +20,15 @@
 
   <!-- CSS
   –––––––––––––––––––––––––––––––––––––––––––––––––– -->
-  <!-- Normalize.css -->
-  <link rel="stylesheet" href="css/normalize.css">
-  <!-- Skeleton Framework -->
-  <link rel="stylesheet" href="css/skeleton.css">
-  <!-- Custom CSS -->
-  <link rel="stylesheet" href="css/sl2.css">
+  <style>
+  {{ normalize_css }}
+  </style>
+  <style>
+  {{ skeleton_css }}
+  </style>
+  <style>
+  {{ custom_css }}
+  </style>
 
   <!-- Favicon
   –––––––––––––––––––––––––––––––––––––––––––––––––– -->
@@ -38,11 +41,11 @@
     <!-- Header -->
     <div class="row" style="margin-top: 5%">
       <div class="ten columns">
-        <h1>Fuzzing Report for PEParse</h1>
-        <p>Revision 0 -- 2018/09/20 18:30 -- Sienna Locomotive 2 Version 0.2.dev0 </p>
+        <h1>Fuzzing Report for {{ app_name }}</h1>
+        <p>Revision {{ revision }} -- {{ generated }} -- Sienna Locomotive 2 Version {{ version }} </p>
       </div>
       <div class="two columns">
-        <img class="u-max-full-width" src="https://avatars1.githubusercontent.com/u/2314423">
+        <img class="u-max-full-width" src="data:image/png;charset=utf-8;base64 {{ logo }}">
       </div>
     </div>
 
@@ -68,15 +71,15 @@
             </div>
             <div class="row">
               <div class="four columns bignum">
-                7
+                {{ uniq_crash_count }}
               </div>
 
               <div class="four columns bignum">
-                42
+                {{ total_crash_count }}
               </div>
 
               <div class="four columns bignum">
-                0
+                {{ severe_crash_count }}
               </div>
             </div>
             <hr>
@@ -97,15 +100,15 @@
           </div>
           <div class="row">
             <div class="four columns bignum">
-              100,000
+              {{ run_count }}
             </div>
 
             <div class="four columns bignum">
-              60s
+              {{ cpu_time }}s
             </div>
 
             <div class="four columns bignum">
-              1.24
+              {{ (run_count / cpu_time) | round(3) }}
             </div>
           </div>
         </div>
@@ -130,18 +133,18 @@
         </div>
         <div class="row">
           <div class="one-half column bignum">
-            1024
+            {{ path_count }}
           </div>
 
           <div class="one-half column bignum">
-            60%
+            {{ coverage_estimate }}%
           </div>
 
         </div>
       </div>
       <div class="row subsection">
         <div class="twelve columns">
-          <img class="u-max-full-width" src="images/coverage.png">
+          <img class="u-max-full-width" src="data:image/png;charset=utf-8;base64 {{ coverage_graph }}">
         </div>
       </div>
     </div>
