@@ -331,7 +331,7 @@ SL2Response sl2_conn_get_coverage(sl2_conn *conn, sl2_arena *arena,
     // Then, tell the server we want the info from
     sl2_conn_write_prefixed_string(conn, arena->id);
 
-    SL2_CONN_READ(path_hash, 64);
+    SL2_CONN_READ(path_hash, SL2_HASH_LEN);
     SL2_CONN_READ(bucketing, sizeof(bool));
     SL2_CONN_READ(score, sizeof(uint32_t));
     SL2_CONN_READ(tries_remaining, sizeof(uint32_t));
