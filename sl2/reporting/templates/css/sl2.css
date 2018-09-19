@@ -1,0 +1,20 @@
+.section{
+  margin-top: 4%;
+  padding-bottom: 4%;
+  border-bottom: 1px;
+  border-bottom-style: solid;
+}
+
+.subsection{
+  margin-bottom: 2%;
+}
+
+.bignum{
+   text-align: center;
+   font-weight: bold;
+   font-size: 400%;
+}
+
+.statheader{
+  text-align: center;
+}
