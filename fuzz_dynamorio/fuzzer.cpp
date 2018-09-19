@@ -183,6 +183,14 @@ on_dr_exit(void)
 
     if (coverage_guided) {
         sl2_conn_register_arena(&sl2_conn, &arena);
+
+        sl2_coverage_info cov = {0};
+        sl2_conn_get_coverage(&sl2_conn, &arena, & cov);
+        SL2_DR_DEBUG("#COVERAGE:{\"hash\": \"%s\", \"bkt\": %s, \"scr\": %u, \"rem\": %u}\n",
+                     cov.path_hash,
+                     cov.bucketing ? "true": "false",
+                     cov.score,
+                     cov.tries_remaining);
     }
 
     sl2_conn_close(&sl2_conn);
@@ -431,10 +439,17 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 static void
 on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 {
-    if (nmodules < SL2_MAX_MODULES - 1 && strncmp("C:\\Windows\\", mod->full_path, 11)) {
+    if (nmodules < SL2_MAX_MODULES - 1 &&
+        _strnicmp("C:\\Windows\\", mod->full_path, 11) &&
+        !strstr(mod->full_path, "dynamorio.dll") &&
+        !strstr(mod->full_path, "drreg.dll") &&
+        !strstr(mod->full_path, "drwrap.dll") &&
+        !strstr(mod->full_path, "drmgr.dll") &&
+        !strstr(mod->full_path, "fuzzer.dll")) {
         // Add a copy of the module to our seen module map so that we can avoid
         // doing basic block coverage of it later (if necessary).
         seen_modules[nmodules++] = dr_copy_module_data(mod);
+        SL2_DR_DEBUG("Adding %s to seen_modules\n", mod->full_path);
     }
 
     if (!strcmp(dr_get_application_name(), dr_module_preferred_name(mod))) {

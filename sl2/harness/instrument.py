@@ -18,7 +18,6 @@ import threading
 import time
 import traceback
 from enum import IntEnum
-from typing import NamedTuple
 
 import msgpack
 
@@ -56,14 +55,16 @@ class Mode(IntEnum):
     MATCH_RETN_COUNT = 1 << 8
 
 
-class DRRun(NamedTuple):
+class DRRun(object):
     """
     Represents the state returned by a call to run_dr.
     """
-    process: subprocess.Popen
-    seed: str
-    run_id: str
-    last_arena: str
+
+    def __init__(self, process, seed, run_id, coverage=None):
+        self.process: subprocess.Popen = process
+        self.seed: str = seed
+        self.run_id: str = run_id
+        self.coverage: dict = coverage
 
 
 def print_l(*args):
@@ -114,10 +115,6 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
                                  stdout=stdout,
                                  stderr=stderr)
 
-    arena_id = None
-    if '-a' in config_dict["client_args"]:
-        arena_id = config_dict["client_args"][config_dict["client_args"].index('-a') + 1]
-    # Try to get the output from the process, time out if necessary
     try:
         stdout, stderr = popen_obj.communicate(timeout=timeout)
 
@@ -140,7 +137,7 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
             print_l("Lost connection to server! Restarting...")
             run_id = -1
 
-        return DRRun(popen_obj, invoke.seed, run_id, arena_id)
+        return DRRun(popen_obj, invoke.seed, run_id)
 
     # Handle cases where the program didn't exit in time
     except subprocess.TimeoutExpired:
@@ -199,7 +196,7 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
 
         popen_obj.timed_out = True
 
-    return DRRun(popen_obj, invoke.seed, run_id, arena_id)
+    return DRRun(popen_obj, invoke.seed, run_id)
 
 
 ## Executes a Triage run
@@ -316,6 +313,7 @@ def fuzzer_run(config_dict, targets_file):
 
     # Parse crash status from the output.
     crashed = False
+    coverage_info = None
 
     for line in run.process.stderr.split(b'\n'):
         try:
@@ -324,9 +322,14 @@ def fuzzer_run(config_dict, targets_file):
             # Identify whether the fuzzing run resulted in a crash
             if not crashed:
                 crashed, exception = check_fuzz_line_for_crash(line)
+
+            if '#COVERAGE:' in line:
+                coverage_info = json.loads(line.replace('#COVERAGE:', ''))
         except UnicodeDecodeError:
             if config_dict['verbose']:
                 print_l("[!] Not UTF-8:", repr(line))
+
+    run = DRRun(run.process, run.seed, run.run_id, coverage_info)
 
     if crashed:
         print_l('Fuzzing run %s returned %s after raising %s'

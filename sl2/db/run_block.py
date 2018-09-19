@@ -3,11 +3,10 @@ from sqlalchemy import ForeignKey
 from sqlalchemy.orm import relationship
 
 import datetime
-import struct
 
 from sl2 import db
 from .base import Base
-from sl2.db.coverage import CoverageRecord
+from sl2.db.coverage import PathRecord
 
 
 class RunBlock(Base):
@@ -17,45 +16,31 @@ class RunBlock(Base):
     target_config_slug = Column(String, ForeignKey("targets.target_slug"))
     target_config = relationship("TargetConfig", back_populates="runs")
 
-    coverage = relationship("CoverageRecord", back_populates="run_block", uselist=False)
+    paths = relationship("PathRecord", back_populates="run_block")
 
     started = Column(DateTime)
     ended = Column(DateTime, default=datetime.datetime.utcnow)
     runs = Column(Integer)
     crashes = Column(Integer)
 
-    def __init__(self, target_slug, started, runs, crashes):
+    bucketing = Column(Boolean)
+    score = Column(Integer)
+    num_tries_remaining = Column(Integer)
+
+    num_paths = Column(Integer)
+    path_coverage = Column(Numeric)
+
+    def __init__(self, target_slug, started, runs, crashes, bucketing, score, num_tries_remaining):
         self.target_config_slug = target_slug
         self.started = started
         self.runs = runs
         self.crashes = crashes
+        self.bucketing = bucketing
+        self.score = score
+        self.num_tries_remaining = num_tries_remaining
 
-def read_coverage_information(arena_id):
-    if arena_id is not None:
-        msg = arena_id.encode('utf-16')[:-2]
-        # with open(config.sl2_server_pipe_path, 'r+b', 0) as pipe:
-        #     pipe.write(struct.pack('B', 15))
-        #     pipe.seek(0)
-        #
-        #     pipe.write(struct.pack('I', len(msg)) + msg)
-        #     pipe.seek(0)
-        #
-        #     n = struct.unpack('I', pipe.read(4))[0]
-        #     bucketing = pipe.read(n)
-        #     pipe.seek(0)
-        #     n = struct.unpack('I', pipe.read(4))[0]
-        #     score = pipe.read(n)
-        #     pipe.seek(0)
-        #     n = struct.unpack('I', pipe.read(4))[0]
-        #     num_remaining = pipe.read(n)
-        #     pipe.seek(0)
-        #
-        #     print("Bucketing:", bucketing)
-        #     print("Score:", score)
-        #     print("Num Remaining:", num_remaining)
-        #
-        #     return bucketing, score, num_remaining
-    return False, 0, 0
+        self.num_paths, self.path_coverage = PathRecord.estimate_current_path_coverage(target_slug)
+
 
 class SessionManager(object):
 
@@ -65,7 +50,7 @@ class SessionManager(object):
         self.runs_counted = 0
         self.crash_counter = 0
         self.started = datetime.datetime.utcnow()
-        self.last_arena = None
+        self.run_dict = {"hash": None, "bkt": False, "scr": -1, "rem": -1}
 
     def __enter__(self):
         self.started = datetime.datetime.utcnow()
@@ -75,15 +60,12 @@ class SessionManager(object):
         self._handle_completion()
 
     def _handle_completion(self):
-        bucketing, score, remaining = read_coverage_information(self.last_arena)
-
         session = db.getSession()
 
-        record = RunBlock(self.target_slug, self.started, self.runs_counted, self.crash_counter)
-        cov = CoverageRecord(record, bucketing, score, remaining)  # TODO Get coverage
+        record = RunBlock(self.target_slug, self.started, self.runs_counted, self.crash_counter,
+                          self.run_dict["bkt"], self.run_dict["scr"], self.run_dict["rem"])
 
         session.add(record)
-        session.add(cov)
         session.commit()
 
     def _reset(self):
@@ -92,8 +74,10 @@ class SessionManager(object):
         self.started = datetime.datetime.utcnow()
 
     def run_complete(self, run, found_crash=False):
-        self.last_arena = run.last_arena
+        self.run_dict = run.coverage if run.coverage is not None else {"hash": None, "bkt": False, "scr": -1, "rem": -1}
         self.runs_counted += 1
+        if self.run_dict["hash"]:
+            PathRecord.incrementPath(self.run_dict["hash"], self.target_slug)
         if found_crash:
             self.crash_counter += 1
 

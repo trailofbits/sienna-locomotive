@@ -116,4 +116,8 @@ SL2Response sl2_conn_register_pid(sl2_conn *conn, uint64_t pid, bool tracing);
 SL2_EXPORT
 SL2Response sl2_conn_advise_mutation(sl2_conn *conn, sl2_arena *arena, sl2_mutation_advice *advice);
 
+// Requests information about code coverage so far
+SL2_EXPORT
+SL2Response sl2_conn_get_coverage(sl2_conn *conn, sl2_arena *arena, sl2_coverage_info * cov);
+
 #endif

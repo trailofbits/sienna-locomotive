@@ -19,6 +19,7 @@
 // here because strdup is technically nonstandard.
 #define strdup _strdup
 #include "vendor/loguru.hpp"
+#include "vendor/picosha2.h"
 #undef strdup
 
 #include "server.hpp"
@@ -64,8 +65,6 @@ static wchar_t FUZZ_ARENAS_PATH[MAX_PATH] = L"";
 static wchar_t FUZZ_LOG[MAX_PATH] = L"";
 
 static std::shared_mutex strategy_mutex;
-static std::unique_lock<std::shared_mutex> wlock(strategy_mutex, std::defer_lock);
-static std::shared_lock<std::shared_mutex> rlock(strategy_mutex, std::defer_lock);
 static sl2_strategy_map_t strategy_map;
 
 // Gets the processor affinity mask for the given process ID.
@@ -720,9 +719,9 @@ static void handle_get_arena(HANDLE pipe)
     // need to load it from disk again.
     // Otherwise, we attempt to load the arena from disk, creating it if we don't
     // have one, and then add it to our strategy map.
-    rlock.lock();
+    std::unique_lock<std::shared_mutex> strategy_lock(strategy_mutex);
     sl2_strategy_map_t::iterator it = strategy_map.find(arena.id);
-    rlock.unlock();
+
     if (it != strategy_map.end()) {
         memcpy_s(arena.map, FUZZ_ARENA_SIZE, it->second.arena.map, FUZZ_ARENA_SIZE);
     }
@@ -753,13 +752,7 @@ static void handle_get_arena(HANDLE pipe)
         // NOTE(ww): Start at strategy #0, because why not.
         // In the future, we should grab the last strategy tried
         // from the FKT and start with that.
-        wlock.lock();
         strategy_map[arena.id] = { arena, score, 0, opts.stickiness };
-        wlock.unlock();
-    }
-
-    if (!WriteFile(pipe, arena.map, FUZZ_ARENA_SIZE, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to write arena to pipe");
     }
 }
 
@@ -791,9 +784,8 @@ static void handle_set_arena(HANDLE pipe)
         SL2_SERVER_LOG_FATAL("failed to read arena");
     }
 
-    rlock.lock();
+    std::unique_lock<std::shared_mutex> strategy_lock(strategy_mutex);
     sl2_strategy_map_t::iterator it = strategy_map.find(arena.id);
-    rlock.unlock();
 
     // This should never happen, as the fuzzer always requests an arena before sending one back.
     if (it == strategy_map.end()) {
@@ -801,6 +793,17 @@ static void handle_set_arena(HANDLE pipe)
     }
 
     strategy_state prior = it->second;
+
+    // Record a raw copy of the coverage map for path identification
+    wchar_t wcs[SL2_HASH_LEN + 3];
+    wcscpy_s(wcs, L"R_");
+    wcscat_s(wcs, arena.id);
+    strategy_map[wcs] = { arena, coverage_score(&arena), prior.strategy, opts.stickiness, prior.success_map };
+
+    // Merge the existing coverage map with the one returned from the fuzzer
+    for(int i = 0; i < FUZZ_ARENA_SIZE; i++){
+        arena.map[i] += strategy_map[arena.id].arena.map[i];
+    }
 
     uint32_t score = coverage_score(&arena);
 
@@ -813,10 +816,8 @@ static void handle_set_arena(HANDLE pipe)
     if (score > prior.score) {
         SL2_SERVER_LOG_INFO("coverage score increased, continuing with strategy=%d", prior.strategy);
 
-        wlock.lock();
         prior.success_map[prior.strategy]++;
         strategy_map[arena.id] = { arena, score, prior.strategy, opts.stickiness, prior.success_map };
-        wlock.unlock();
     }
     else {
         SL2_SERVER_LOG_INFO("coverage score did NOT increase!");
@@ -856,17 +857,13 @@ static void handle_set_arena(HANDLE pipe)
 
             SL2_SERVER_LOG_INFO("no tries left, changing strategy (%d)!", strategy);
 
-            wlock.lock();
             prior.success_map[prior.strategy]--;
             strategy_map[arena.id] = { arena, score, strategy, opts.stickiness, prior.success_map };
-            wlock.unlock();
         }
         else {
             SL2_SERVER_LOG_INFO("%d tries for strategy %d left", prior.tries_remaining - 1, prior.strategy);
 
-            wlock.lock();
             strategy_map[arena.id] = { arena, score, prior.strategy, prior.tries_remaining - 1, prior.success_map };
-            wlock.unlock();
         }
     }
 
@@ -1044,15 +1041,14 @@ static void handle_advise_mutation(HANDLE pipe)
 
     SL2_SERVER_LOG_INFO("got arena ID: %S", arena_id);
 
-    rlock.lock();
+    std::unique_lock<std::shared_mutex> strategy_lock(strategy_mutex);
     sl2_strategy_map_t::iterator it = strategy_map.find(arena_id);
-    rlock.unlock();
+
     if (it == strategy_map.end()) {
         SL2_SERVER_LOG_FATAL("arena ID missing from strategy_map? (map size=%d)", strategy_map.size());
     }
 
     table_idx = it->second.strategy;
-
     if (!WriteFile(pipe, &table_idx, sizeof(table_idx), &txsize, NULL)) {
         SL2_SERVER_LOG_FATAL("failed to write strategy advice");
     }
@@ -1077,30 +1073,37 @@ static void handle_coverage_info(HANDLE pipe)
     }
 
     SL2_SERVER_LOG_INFO("got arena ID: %S", arena_id);
+    wchar_t raw_arena_id[SL2_HASH_LEN + 3] = {0};
+    wcscpy(raw_arena_id, L"R_");
+    wcscat(raw_arena_id, arena_id);
 
-    rlock.lock();
+    std::unique_lock<std::shared_mutex> strategy_lock(strategy_mutex);
     sl2_strategy_map_t::iterator it = strategy_map.find(arena_id);
 
     if (it == strategy_map.end()) {
         SL2_SERVER_LOG_FATAL("arena ID missing from strategy_map? (map size=%d)", strategy_map.size());
     }
 
-    // First, write whether we're doing bucketing.
-    if (!WriteFile(pipe, &opts.bucketing, sizeof(opts.bucketing), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to write bucketing status");
-    }
+    sl2_arena arena = it->second.arena;
 
-    // Then, write our current coverage score for the arena.
-    if (!WriteFile(pipe, &(it->second.score), sizeof(it->second.score), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to write coverage score");
+    it = strategy_map.find(raw_arena_id);
+    if (it == strategy_map.end()) {
+        SL2_SERVER_LOG_FATAL("Raw arena ID missing from strategy_map? (map size=%d)", strategy_map.size());
     }
+    sl2_arena raw_arena = it->second.arena;
 
-    // Then, write the number of tries remaining for the current strategy.
-    if (!WriteFile(pipe, &(it->second.tries_remaining), sizeof(it->second.tries_remaining), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to write number of tries remaining");
+    std::string hash_hex_str = picosha2::hash256_hex_string((unsigned char *)&raw_arena.map, (unsigned char *)&raw_arena.map + FUZZ_ARENA_SIZE);
+
+    sl2_coverage_info cov = {0};
+    memcpy(cov.path_hash, hash_hex_str.c_str(), SL2_HASH_LEN);
+    cov.bucketing = opts.bucketing;
+    cov.score = it->second.score;
+    cov.tries_remaining = it->second.tries_remaining;
+
+    // Zeroeth, write the coverage info scruct
+    if (!WriteFile(pipe, &cov, sizeof(sl2_coverage_info), &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("Failed to write coverage information structure");
     }
-
-    rlock.unlock();
 }
 
 /* Handles incoming connections from clients */

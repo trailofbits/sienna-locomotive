@@ -218,7 +218,7 @@ SL2Response sl2_conn_request_arena(sl2_conn *conn, sl2_arena *arena)
         return SL2Response::MissingArenaID;
     }
 
-    // First, tell the server that we'd like a coverage arena.
+    // Tell the server to load/create a coverage arena on the disk.
     SL2_CONN_EVT(EVT_GET_ARENA);
 
     // Then, tell the server which coverage arena we'd like.
@@ -226,9 +226,6 @@ SL2Response sl2_conn_request_arena(sl2_conn *conn, sl2_arena *arena)
     // every instance of the fuzzer, meaning that each run on the same target application
     // and function(s) should produce the same identifier.
     sl2_conn_write_prefixed_string(conn, arena->id);
-
-    // Finally, read the arena from the server.
-    SL2_CONN_READ(arena->map, FUZZ_ARENA_SIZE);
 
     return SL2Response::OK;
 }
@@ -313,6 +310,28 @@ SL2Response sl2_conn_advise_mutation(sl2_conn *conn, sl2_arena *arena, sl2_mutat
     advice->table_idx %= SL2_NUM_STRATEGIES;
 
     advice->strategy = SL2_STRATEGY_TABLE[advice->table_idx];
+
+    return SL2Response::OK;
+}
+
+// Requests information about code coverage so far
+SL2_EXPORT
+SL2Response sl2_conn_get_coverage(sl2_conn *conn, sl2_arena *arena,
+ sl2_coverage_info * cov){
+
+    DWORD txsize;
+
+    if (!arena->id) {
+        return SL2Response::MissingArenaID;
+    }
+
+    // First, tell the server that we want coverage info.
+    SL2_CONN_EVT(EVT_COVERAGE_INFO);
+
+    // Then, tell the server we want the info from
+    sl2_conn_write_prefixed_string(conn, arena->id);
+
+    SL2_CONN_READ(cov, sizeof(sl2_coverage_info));
 
     return SL2Response::OK;
 }
