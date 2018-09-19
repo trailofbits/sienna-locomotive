@@ -184,12 +184,13 @@ on_dr_exit(void)
     if (coverage_guided) {
         sl2_conn_register_arena(&sl2_conn, &arena);
 
-        bool bucketing;
-        uint32_t score;
-        uint32_t tries_remaining;
-        unsigned char hash[SL2_HASH_LEN + 1] = {0};
-        sl2_conn_get_coverage(&sl2_conn, &arena, hash, &bucketing, &score, &tries_remaining);
-        SL2_DR_DEBUG("#COVERAGE:{\"hash\": \"%s\", \"bkt\": %s, \"scr\": %u, \"rem\": %u}\n", hash, bucketing ? "true": "false", score, tries_remaining);
+        sl2_coverage_info cov = {0};
+        sl2_conn_get_coverage(&sl2_conn, &arena, & cov);
+        SL2_DR_DEBUG("#COVERAGE:{\"hash\": \"%s\", \"bkt\": %s, \"scr\": %u, \"rem\": %u}\n",
+                     cov.path_hash,
+                     cov.bucketing ? "true": "false",
+                     cov.score,
+                     cov.tries_remaining);
     }
 
     sl2_conn_close(&sl2_conn);

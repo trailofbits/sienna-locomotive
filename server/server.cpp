@@ -1094,24 +1094,15 @@ static void handle_coverage_info(HANDLE pipe)
 
     std::string hash_hex_str = picosha2::hash256_hex_string((unsigned char *)&raw_arena.map, (unsigned char *)&raw_arena.map + FUZZ_ARENA_SIZE);
 
-    // Zeroeth, write the hash of the path.
-    if (!WriteFile(pipe, hash_hex_str.c_str(), 64, &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to write path hash");
-    }
+    sl2_coverage_info cov = {0};
+    memcpy(cov.path_hash, hash_hex_str.c_str(), SL2_HASH_LEN);
+    cov.bucketing = opts.bucketing;
+    cov.score = it->second.score;
+    cov.tries_remaining = it->second.tries_remaining;
 
-    // First, write whether we're doing bucketing.
-    if (!WriteFile(pipe, &opts.bucketing, sizeof(opts.bucketing), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to write bucketing status");
-    }
-
-    // Then, write our current coverage score for the arena.
-    if (!WriteFile(pipe, &(it->second.score), sizeof(it->second.score), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to write coverage score");
-    }
-
-    // Then, write the number of tries remaining for the current strategy.
-    if (!WriteFile(pipe, &(it->second.tries_remaining), sizeof(it->second.tries_remaining), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("failed to write number of tries remaining");
+    // Zeroeth, write the coverage info scruct
+    if (!WriteFile(pipe, &cov, sizeof(sl2_coverage_info), &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("Failed to write coverage information structure");
     }
 }
 

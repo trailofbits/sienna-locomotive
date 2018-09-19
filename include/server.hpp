@@ -115,4 +115,11 @@ struct sl2_arena {
     uint8_t map[FUZZ_ARENA_SIZE];
 };
 
+struct sl2_coverage_info {
+    unsigned char path_hash[SL2_HASH_LEN+1];
+    bool bucketing;
+    uint32_t score;
+    uint32_t tries_remaining;
+};
+
 #endif
