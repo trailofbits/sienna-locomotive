@@ -59,12 +59,6 @@ def plot_discovered_paths(target_slug):
 
 
 def main():
-    app = QtWidgets.QApplication([])
-
-    cfg = ConfigWindow()
-    if cfg.exec() == QtWidgets.QDialog.Rejected:
-        return
-
     slug = get_target_slug(config.config)
     print("Getting stats for", slug)
 
