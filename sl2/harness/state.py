@@ -483,7 +483,6 @@ def sanity_checks(exit=True):
     """
     sane = True
     errors = []
-    return sane, errors
 
     bad_keys = [
         'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\DebugObjectRPCEnabled',
