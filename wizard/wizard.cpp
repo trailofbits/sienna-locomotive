@@ -135,6 +135,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     void *drcontext = NULL;
 
     if (!client.is_sane_post_hook(wrapcxt, user_data, &drcontext)) {
+        // TODO(ww): Use a goto here and fix the C++ initialization errors.
         return;
     }
 
@@ -197,6 +198,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     bool interesting_call = true;
 
     if (!client.is_sane_post_hook(wrapcxt, user_data, &drcontext)) {
+        // TODO(ww): Use a goto here and fix the C++ initialization errors.
         return;
     }
 
