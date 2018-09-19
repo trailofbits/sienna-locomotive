@@ -1187,7 +1187,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     void *drcontext = NULL;
 
     if (!client.is_sane_post_hook(wrapcxt, user_data, &drcontext)) {
-        return;
+        goto cleanup;
     }
 
     SL2_DR_DEBUG("<in wrap_post_Generic>\n");
@@ -1219,6 +1219,8 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
         dr_mutex_unlock(mutatex);
     }
 
+    cleanup:
+
     if (info->argHash) {
         dr_thread_free(drcontext, info->argHash, SL2_HASH_LEN + 1);
     }
@@ -1232,7 +1234,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     void *drcontext = NULL;
 
     if (!client.is_sane_post_hook(wrapcxt, user_data, &drcontext)) {
-        return;
+        goto cleanup;
     }
 
     SL2_DR_DEBUG("<in wrap_post_MapViewOfFile>\n");
@@ -1282,6 +1284,9 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 
         dr_mutex_unlock(mutatex);
     }
+
+    #pragma warning(suppress: 4533)
+    cleanup:
 
     dr_thread_free(drcontext, info->argHash, SL2_HASH_LEN + 1);
     dr_thread_free(drcontext, info, sizeof(client_read_info));
