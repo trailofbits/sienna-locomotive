@@ -363,6 +363,7 @@ class MainWindow(QtWidgets.QMainWindow):
         fuzzer_thread.runComplete.connect(self.check_for_completion)
         fuzzer_thread.foundCrash.connect(self.handle_new_crash)
         fuzzer_thread.server_crashed.connect(self.handle_server_crash)
+        fuzzer_thread.tracer_failed.connect(self.handle_tracer_failure)
 
         self.continuous_mode_cbox.stateChanged.connect(fuzzer_thread.continuous_state_changed)
         self.pause_mode_cbox.stateChanged.connect(fuzzer_thread.pause_state_changed)
@@ -399,6 +400,12 @@ class MainWindow(QtWidgets.QMainWindow):
         """ Pauses fuzzing threads and attempts to restart the server if it crashes """
         self.pause_all_threads()
         self.server_thread.start()
+
+    def handle_tracer_failure(self):
+        """ Alert the user if a tracer run fails. """
+        # TODO(ww): Does it make sense to pause the fuzzing threads here?
+        QtWidgets.QMessageBox.critical(None, "Tracer failure",
+                                       "Found a crash but couldn't trace it.\nTry running the tracer manually via sl2-cli?")
 
     def build_func_tree(self):
         """ Build the function target display tree """

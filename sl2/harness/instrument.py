@@ -25,7 +25,7 @@ from sl2.db import Crash, Tracer
 from . import config
 from . import named_mutex
 from .state import (
-    parse_tracer_output,
+    parse_tracer_crash_files,
     generate_run_id,
     write_output_files,
     create_invocation_statement,
@@ -207,11 +207,15 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
 # @param run_id Run ID (guid)
 def triager_run(cfg, run_id):
     tracerOutput, _ = tracer_run(cfg, run_id)
-    crashInfo = Crash.factory(run_id, get_target_slug(cfg), cfg['target_application_path'])
-    return {"run_id": run_id,
-            "tracerOutput": tracerOutput,
-            "crashInfo": crashInfo
-            }
+
+    if tracerOutput:
+        crashInfo = Crash.factory(run_id, get_target_slug(cfg), cfg['target_application_path'])
+        return {"run_id": run_id,
+                "tracerOutput": tracerOutput,
+                "crashInfo": crashInfo
+                }
+    else:
+        return None
 
 
 def wizard_run(config_dict):
@@ -369,9 +373,27 @@ def tracer_run(config_dict, run_id):
     # Write stdout and stderr to files
     write_output_files(run, run_id, 'triage')
 
-    formatted, raw = parse_tracer_output(run_id)
-    Tracer.factory(run_id, formatted, raw)
-    return formatted, raw
+    success = False
+    message = None
+
+    for line in run.process.stderr.split(b'\n'):
+        try:
+            obj = json.loads(line.decode('utf-8'))
+
+            if obj["run_id"] == str(run_id) and "success" in obj:
+                success = obj["success"]
+                message = obj["message"]
+                break
+        except Exception:
+            pass
+
+    if success:
+        formatted, raw = parse_tracer_crash_files(run_id)
+        Tracer.factory(run_id, formatted, raw)
+        return formatted, raw
+    else:
+        print_l("[!] Tracer failure:", message)
+        return None, None
 
 
 ## Fuzzing run followed by triage
@@ -391,7 +413,11 @@ def fuzz_and_triage(config_dict):
             if crashed:
 
                 triagerInfo = triager_run(config_dict, run.run_id)
-                print_l(triagerInfo)
+
+                if triagerInfo:
+                    print_l(triagerInfo)
+                else:
+                    print_l("[!] Triage failure?")
 
                 if config_dict['exit_early']:
                     # Prevent other threads from starting new fuzzing runs

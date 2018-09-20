@@ -260,9 +260,9 @@ def write_output_files(run, run_id, stage_name):
         print("Couldn't find an output directory for run %s" % run_id)
 
 
-def parse_tracer_output(run_id):
+def parse_tracer_crash_files(run_id):
     """
-    Parses the results of a tracer run and prints them in
+    Parses the results of a tracer run and returns them in
     human-readable form.
     """
     crash_files = get_paths_to_run_file(run_id, 'crash.*.json')
