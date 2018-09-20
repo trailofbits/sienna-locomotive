@@ -18,6 +18,7 @@ extern "C" {
 static SL2Client client;
 static sl2_conn sl2_conn;
 static sl2_exception_ctx trace_exception_ctx;
+static std::string run_id_s;
 static void *mutatex;
 static bool replay = false;
 static bool no_mutate = false;
@@ -675,6 +676,7 @@ on_dr_exit(void)
 {
     json j;
     j["success"] = crashed;
+    j["run_id"] = run_id_s;
 
     SL2_DR_DEBUG("tracer#on_dr_exit: cleaning up and exiting.\n");
 
@@ -1461,7 +1463,7 @@ void tracer(client_id_t id, int argc, const char *argv[])
     replay = false;
     mutate_count = 0;
 
-    std::string run_id_s = op_replay.get_value();
+    run_id_s = op_replay.get_value();
     UUID run_id;
 
     if (run_id_s.length() > 0) {
