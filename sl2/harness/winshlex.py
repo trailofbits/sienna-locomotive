@@ -6,7 +6,7 @@ _CommandLineToArgvW.argtypes = [wintypes.LPCWSTR, ctypes.POINTER(ctypes.c_int)]
 _CommandLineToArgvW.restype = ctypes.POINTER(wintypes.LPCWSTR)
 
 
-def winshlex(args):
+def split(args):
     """
     Converts a string of command-line arguments into a list
     via CommandLineToArgvW.

@@ -321,7 +321,7 @@ def update_config_from_args():
 
     # Convert command line strings into lists
     for opt in ARGS_KEYS:
-        config[opt] = [] if (len(config[opt]) == 0) else winshlex.winshlex(config[opt])
+        config[opt] = [] if (len(config[opt]) == 0) else winshlex.split(config[opt])
 
     if args.target_application_path is not None and len(config['target_args']) > 0:
         config['target_args'] = []
