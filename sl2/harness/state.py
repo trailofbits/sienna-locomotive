@@ -97,7 +97,7 @@ def stringify_program_array(target_application_path, target_args_array):
     return out
 
 
-# TODO: Use shlex or something similar here.
+# TODO: Use winshlex here.
 def unstringify_program_array(stringified):
     """
     Turn a stringified program array back into the tokens that went in.
