@@ -271,8 +271,9 @@ def parse_tracer_output(run_id):
         message = "The tracer tool exited improperly during run {}, \
 but no crash files could be found. It may have timed out. \
 To retry it manually, run \
-`python harness.py -v -e TRIAGE -p {} --run_id {}`"
-        return message.format(run_id, config.profile, run_id), None
+`python harness.py -v -e TRIAGE -p {} --run_id {}`".format(run_id, config.profile, run_id)
+        print(message)
+        return 'ERROR', None
 
     # TODO(ww): Parse all crash files, not just the first.
     crash_file = crash_files[0]

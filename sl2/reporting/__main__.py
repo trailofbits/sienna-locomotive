@@ -15,9 +15,12 @@ from sl2.db.crash import Crash
 from sl2.db.run_block import RunBlock
 from sl2.db.coverage import PathRecord
 
+def comma_ify(value):
+    return "{:,}".format(value)
 
 def main():
     env = Environment(loader=PackageLoader('sl2', 'reporting/templates'))
+    env.filters['comma_ify'] = comma_ify
     template = env.get_template('index.html')
 
     target_dir = get_target_dir(sl2.harness.config.config)

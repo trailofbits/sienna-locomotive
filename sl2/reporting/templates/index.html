@@ -63,15 +63,15 @@
             </div>
             <div class="row">
               <div class="four columns bignum">
-                {{ uniq_crash_count }}
+                {{ uniq_crash_count | comma_ify}}
               </div>
 
               <div class="four columns bignum">
-                {{ total_crash_count }}
+                {{ total_crash_count | comma_ify}}
               </div>
 
               <div class="four columns bignum">
-                {{ severe_crash_count }}
+                {{ severe_crash_count | comma_ify}}
               </div>
             </div>
             <hr>
@@ -92,11 +92,11 @@
           </div>
           <div class="row">
             <div class="four columns bignum">
-              {{ run_count }}
+              {{ run_count  | comma_ify}}
             </div>
 
             <div class="four columns bignum">
-              {{ cpu_time | round(1) }}s
+              {{ cpu_time | round(1) | comma_ify }}s
             </div>
 
             <div class="four columns bignum">
@@ -125,7 +125,7 @@
         </div>
         <div class="row">
           <div class="one-half column bignum">
-            {{ path_count }}
+            {{ path_count | comma_ify}}
           </div>
 
           <div class="one-half column bignum">

@@ -370,7 +370,8 @@ def tracer_run(config_dict, run_id):
     write_output_files(run, run_id, 'triage')
 
     formatted, raw = parse_tracer_output(run_id)
-    Tracer.factory(run_id, formatted, raw)
+    if raw is not None:
+        Tracer.factory(run_id, formatted, raw)
     return formatted, raw
 
 
