@@ -4,8 +4,6 @@ import statistics
 from sl2 import db
 from sl2.db.run_block import RunBlock
 from sl2.harness import config
-from sl2.gui.config_window import ConfigWindow
-from PySide2 import QtWidgets
 from sl2.harness.state import get_target_slug
 
 
@@ -38,6 +36,7 @@ def plot_run_rate(target_slug):
     plt.xlabel("Seconds spent fuzzing")
     plt.ylabel("Runs/Second (single threaded)")
     plt.show()
+    return plt
 
 
 def plot_discovered_paths(target_slug):
@@ -55,7 +54,7 @@ def plot_discovered_paths(target_slug):
     percentage.set_ylabel("Estimated path completion percentage")
 
     figure.tight_layout()
-    plt.show()
+    return plt
 
 
 def main():
@@ -63,5 +62,7 @@ def main():
     print("Getting stats for", slug)
 
     plot_run_rate(slug)
+    plt.show()
     plot_discovered_paths(slug)
+    plt.show()
 
