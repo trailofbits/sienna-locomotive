@@ -10,6 +10,10 @@ from jinja2 import Environment, PackageLoader
 import sl2.harness.config
 from sl2.harness.state import get_target_slug, get_target_dir
 from sl2.stats.__main__ import plot_discovered_paths
+from sl2 import db
+from sl2.db.crash import Crash
+from sl2.db.run_block import RunBlock
+from sl2.db.coverage import PathRecord
 
 
 def main():
@@ -20,10 +24,17 @@ def main():
     found = [int(f.split('Report_v')[1].replace('.html', '')) for f in glob.glob(os.path.join(target_dir, 'Report_v*.html'))]
     revision = 0 if len(found) == 0 else max(found) + 1
 
+    slug = get_target_slug(sl2.harness.config.config)
     coverage_img = io.BytesIO()
-    plt = plot_discovered_paths(get_target_slug(sl2.harness.config.config))
+    plt = plot_discovered_paths(slug)
     plt.savefig(coverage_img, format='png', dpi=200)
     coverage_graph = b64encode(coverage_img.getvalue()).decode('utf-8')
+
+    num_paths, coverage_estimate = PathRecord.estimate_current_path_coverage(slug)
+
+    session = db.getSession()
+    run_blocks = session.query(RunBlock).filter(RunBlock.target_config_slug == slug).all()
+    crash_base = session.query(Crash).filter(Crash.target_config_slug == slug)
 
     vars = {
         'normalize_css': env.get_template('css/normalize.css').render(),
@@ -34,13 +45,15 @@ def main():
         'revision': revision,
         'generated': datetime.datetime.now().isoformat(timespec='minutes'),
         'version': pkg_resources.require("sl2")[0].version,
-        'uniq_crash_count': 7,
-        'total_crash_count': 42,
-        'severe_crash_count': 0,
-        'run_count': 100000,
-        'cpu_time': 80645,
-        'path_count': 1024,
-        'coverage_estimate': 42.123456789,
+        'uniq_crash_count': crash_base.distinct(Crash.crashash).group_by(Crash.crashash).count(),
+        'total_crash_count': crash_base.count(),
+        'severe_crash_count': crash_base.filter(Crash.exploitability != "None",
+                                                Crash.exploitability != "Unknown",
+                                                Crash.exploitability != "Low").count(),
+        'run_count': sum(x.runs for x in run_blocks),
+        'cpu_time': sum(((block.ended - block.started).total_seconds()) for block in run_blocks),
+        'path_count': num_paths,
+        'coverage_estimate': coverage_estimate * 100,
         'coverage_graph': coverage_graph
     }
 

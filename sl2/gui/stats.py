@@ -80,7 +80,7 @@ class StatsWidget(QtWidgets.QWidget):
         self.ranksMedian = 0
 
         if self.crashesCnt > 0:
-            self.uniquesCnt = session.query(Crash).distinct(Crash.rank).group_by(Crash.rank).count()
+            self.uniquesCnt = session.query(Crash).distinct(Crash.crashash).group_by(Crash.crashash).count()
             self.dupesCount = self.crashesCnt - self.uniquesCnt
             self.ranks = [_.rank for _ in self.crashes]
             self.ranksMean = statistics.mean(self.ranks)

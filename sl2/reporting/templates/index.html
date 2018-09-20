@@ -12,9 +12,6 @@
   <!-- Mobile Specific Metas -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- FONT -->
-  <link href="https://fonts.googleapis.com/css?family=Raleway:400,300,600" rel="stylesheet" type="text/css">
-
   <!-- CSS -->
   <style>
   {{ normalize_css }}
@@ -30,7 +27,7 @@
   <link rel="icon" type="image/png" src="data:image/png;charset=utf-8;base64,{{ logo | safe}}">
 
 </head>
-<body>
+<body style="font-feature-settings: 'lnum' 1">
 
   <div class="container">
     <!-- Header -->
@@ -99,7 +96,7 @@
             </div>
 
             <div class="four columns bignum">
-              {{ cpu_time }}s
+              {{ cpu_time | round(1) }}s
             </div>
 
             <div class="four columns bignum">
