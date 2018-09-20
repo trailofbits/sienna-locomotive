@@ -400,9 +400,17 @@ static void get_bytes_fkt(wchar_t *target_file, uint8_t *buf, size_t size)
         SL2_SERVER_LOG_FATAL("failed to open FKT: %S", target_file);
     }
 
-    // TODO(ww): We shouldn't be hardcoding this offset.
-    SetFilePointer(fkt, 0x1c, NULL, FILE_BEGIN);
-    if (!ReadFile(fkt, &buf_size, 4, &txsize, NULL)) {
+    // Read size of file path from fkt file
+    uint64_t pathSize;
+    SetFilePointer(fkt, 0xc, NULL, FILE_BEGIN);
+    if (!ReadFile(fkt, &pathSize, sizeof(int64_t), &txsize, NULL)) {
+        SL2_SERVER_LOG_FATAL("failed to read file path size from FKT");
+    }
+    // Skip over the file path and position
+    SetFilePointer(fkt, pathSize*sizeof(wchar_t) + sizeof(int64_t), NULL, FILE_CURRENT);
+
+    // Read Buffer Size
+    if (!ReadFile(fkt, &buf_size, sizeof(buf_size), &txsize, NULL)) {
         SL2_SERVER_LOG_FATAL("failed to read replay buffer size from FKT");
     }
 
