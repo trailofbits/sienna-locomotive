@@ -31,9 +31,8 @@ Triage
   Output score and JSON info about crash
 
 Mutation Server
-  Sent bytes by fuzzing harness
-  Figures out mutations for bytes
-  Sends back mutations
+  Sent bytes and coverage statistics by fuzzing harness
+  Sends back mutation advice
   Responsible for logging information about corrupted inputs
 
 Python harness

@@ -10,8 +10,9 @@
 import argparse
 import configparser
 import os
-import shlex
 import sys
+
+from . import winshlex
 
 ## Schematizes the SL2 configuration.
 # Every configuration key has a 'test' function, an 'expected'
@@ -320,7 +321,7 @@ def update_config_from_args():
 
     # Convert command line strings into lists
     for opt in ARGS_KEYS:
-        config[opt] = [] if (len(config[opt]) == 0) else shlex.split(config[opt], posix=False)
+        config[opt] = [] if (len(config[opt]) == 0) else winshlex.split(config[opt])
 
     if args.target_application_path is not None and len(config['target_args']) > 0:
         config['target_args'] = []
