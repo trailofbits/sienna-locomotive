@@ -12,5 +12,6 @@ def split(args):
     via CommandLineToArgvW.
     """
     argc = ctypes.c_int(0)
+    # NOTE(ww): This leaks memory, as we don't call LocalFree.
     argvw = _CommandLineToArgvW(args, ctypes.byref(argc))
     return [argvw[i] for i in range(0, argc.value)]
