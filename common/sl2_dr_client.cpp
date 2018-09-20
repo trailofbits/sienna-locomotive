@@ -281,6 +281,7 @@ SL2Client::wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
     info->lpNumberOfBytesRead  = pnBytesRead;
     info->position             = 0;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->source               = NULL;
 
     fileArgHash fStruct = {0};
 
@@ -328,6 +329,7 @@ SL2Client::wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
         info->lpNumberOfBytesRead  = lpcbData;
         info->position             = 0;
         info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+        info->source               = NULL;
 
         fileArgHash fStruct = {0};
 
@@ -380,6 +382,7 @@ SL2Client::wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
     info->lpNumberOfBytesRead  = pdwBytesRead;
     info->position             = 0;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->source               = NULL;
 
     fileArgHash fStruct = {0};
 
@@ -424,6 +427,7 @@ SL2Client::wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
     info->lpNumberOfBytesRead  = lpNumberOfBytesRead;
     info->position             = 0;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->source               = NULL;
 
     fileArgHash fStruct = {0};
 
@@ -468,6 +472,7 @@ SL2Client::wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
     info->lpNumberOfBytesRead  = lpNumberOfBytesRead;
     info->position             = 0;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->source               = NULL;
 
     fileArgHash fStruct = {0};
 
@@ -510,6 +515,7 @@ SL2Client::wrap_pre_recv(void *wrapcxt, OUT void **user_data)
     info->lpNumberOfBytesRead  = NULL;
     info->position             = 0;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->source               = NULL;
 
     fileArgHash fStruct = {0};
 
@@ -593,6 +599,7 @@ SL2Client::wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
     info->lpNumberOfBytesRead  = NULL;
     info->position             = 0;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->source               = NULL;
 
     fileArgHash fStruct = {0};
 
@@ -630,6 +637,7 @@ SL2Client::wrap_pre_fread(void *wrapcxt, OUT void **user_data)
     info->lpNumberOfBytesRead  = NULL;
     info->position             = 0;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->source               = NULL;
 
     fileArgHash fStruct = {0};
 
@@ -666,6 +674,7 @@ SL2Client::wrap_pre__read(void *wrapcxt, OUT void **user_data)
     info->lpNumberOfBytesRead  = NULL;
     info->position             = 0;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->source               = NULL;
 
     fileArgHash fStruct = {0};
 
@@ -693,16 +702,15 @@ SL2Client::wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
 
-    info->function = Function::MapViewOfFile;
-    info->hFile = hFileMappingObject;
+    info->function             = Function::MapViewOfFile;
+    info->hFile                = hFileMappingObject;
     // NOTE(ww): dwNumberOfBytesToMap=0 is a special case here, since 0 indicates that the
     // entire file is being mapped into memory. We handle this case in the post-hook
     // with a VirtualQuery call.
     info->nNumberOfBytesToRead = dwNumberOfBytesToMap;
-    info->position = 0;
-    info->retAddrOffset = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
-
-    info->source = NULL;
+    info->position             = 0;
+    info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
+    info->source               = NULL;
 
     // NOTE(ww): We populate these in the post-hook, when necessary.
     info->lpBuffer = NULL;
