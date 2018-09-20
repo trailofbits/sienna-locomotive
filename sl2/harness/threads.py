@@ -40,6 +40,7 @@ class FuzzerThread(QThread):
     runComplete = Signal()
     paused = Signal()
     server_crashed = Signal()
+    tracer_failed = Signal()
 
     def __init__(self, config_dict, target_file):
         QThread.__init__(self)
@@ -70,7 +71,11 @@ class FuzzerThread(QThread):
                             self.pause()
                         # We can't pass this object to another thread since it's database, so just returning the runid
                         triagerInfo = triager_run(self.config_dict, run.run_id)
-                        self.foundCrash.emit(self, str(run.run_id))
+
+                        if triagerInfo:
+                            self.foundCrash.emit(self, str(run.run_id))
+                        else:
+                            self.tracer_failed.emit()
 
                     if not self.config_dict['continuous']:
                         self.pause()
