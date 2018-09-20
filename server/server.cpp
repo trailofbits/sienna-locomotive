@@ -54,16 +54,15 @@ typedef std::map<std::wstring, strategy_state> sl2_strategy_map_t;
 
 static server_opts opts = {0};
 
-// TODO(ww): Replace these with std::shared_mutex.
-static CRITICAL_SECTION pid_lock;
-static CRITICAL_SECTION fkt_lock;
-static CRITICAL_SECTION arena_lock;
 static HANDLE process_mutex = INVALID_HANDLE_VALUE;
 
 static wchar_t FUZZ_WORKING_PATH[MAX_PATH] = L"";
 static wchar_t FUZZ_ARENAS_PATH[MAX_PATH] = L"";
 static wchar_t FUZZ_LOG[MAX_PATH] = L"";
 
+static std::shared_mutex pid_mutex;
+static std::shared_mutex fkt_mutex;
+static std::shared_mutex arena_mutex;
 static std::shared_mutex strategy_mutex;
 static sl2_strategy_map_t strategy_map;
 
@@ -252,9 +251,6 @@ static void server_cleanup()
     // no point -- the process is about to be destroyed anyways.
     ReleaseMutex(process_mutex);
     CloseHandle(process_mutex);
-    DeleteCriticalSection(&pid_lock);
-    DeleteCriticalSection(&fkt_lock);
-    DeleteCriticalSection(&arena_lock);
 }
 
 // Called on session termination.
@@ -316,7 +312,7 @@ static uint8_t write_fkt(wchar_t *target_file, uint32_t type, uint32_t mutation_
     uint8_t rc = 0;
     DWORD txsize;
 
-    EnterCriticalSection(&fkt_lock);
+    std::unique_lock<std::shared_mutex> fkt_lock(fkt_mutex);
 
     HANDLE fkt = CreateFile(target_file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
@@ -382,7 +378,6 @@ static uint8_t write_fkt(wchar_t *target_file, uint32_t type, uint32_t mutation_
 
     cleanup:
 
-    LeaveCriticalSection(&fkt_lock);
     return rc;
 }
 
@@ -392,7 +387,9 @@ static void get_bytes_fkt(wchar_t *target_file, uint8_t *buf, size_t size)
     DWORD txsize;
     size_t buf_size = 0;
 
-    EnterCriticalSection(&fkt_lock);
+    // NOTE(ww): Multiple threads are allowed to read from FKTs at once,
+    // so we use a shared lock here.
+    std::shared_lock<std::shared_mutex> fkt_lock(fkt_mutex);
 
     HANDLE fkt = CreateFile(target_file, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 
@@ -421,13 +418,11 @@ static void get_bytes_fkt(wchar_t *target_file, uint8_t *buf, size_t size)
     if (!CloseHandle(fkt)) {
         SL2_SERVER_LOG_FATAL("failed to close FKT");
     }
-
-    LeaveCriticalSection(&fkt_lock);
 }
 
 static void dump_arena_to_disk(wchar_t *arena_path, sl2_arena *arena)
 {
-    EnterCriticalSection(&arena_lock);
+    std::unique_lock<std::shared_mutex> arena_lock(arena_mutex);
 
     DWORD txsize;
     HANDLE file = CreateFile(
@@ -454,8 +449,6 @@ static void dump_arena_to_disk(wchar_t *arena_path, sl2_arena *arena)
     else {
         SL2_SERVER_LOG_ERROR("failed to open arena_path=%S, skipping dump!", arena_path);
     }
-
-    LeaveCriticalSection(&arena_lock);
 }
 
 static bool load_arena_from_disk(wchar_t *arena_path, sl2_arena *arena)
@@ -463,7 +456,7 @@ static bool load_arena_from_disk(wchar_t *arena_path, sl2_arena *arena)
     bool rc = true;
     DWORD txsize;
 
-    EnterCriticalSection(&arena_lock);
+    std::unique_lock<std::shared_mutex> arena_lock(arena_mutex);
 
     HANDLE file = CreateFile(
         arena_path,
@@ -498,8 +491,6 @@ static bool load_arena_from_disk(wchar_t *arena_path, sl2_arena *arena)
     }
 
     cleanup:
-
-    LeaveCriticalSection(&arena_lock);
 
     return rc;
 }
@@ -994,7 +985,7 @@ static void handle_register_pid(HANDLE pipe)
 
     RpcStringFree((RPC_WSTR *)&run_id_s);
 
-    EnterCriticalSection(&pid_lock);
+    std::unique_lock<std::shared_mutex> pid_lock(pid_mutex);
 
     HANDLE file = CreateFile(
         pids_file,
@@ -1016,8 +1007,6 @@ static void handle_register_pid(HANDLE pipe)
     else {
         SL2_SERVER_LOG_ERROR("failed to open pids_file=%S, not recording pid!", pids_file);
     }
-
-    LeaveCriticalSection(&pid_lock);
 }
 
 static void handle_advise_mutation(HANDLE pipe)
@@ -1244,10 +1233,6 @@ int main(int argc, char **argv)
 
     SL2_SERVER_LOG_INFO("dump_mut_buffer=%d, pinned=%d, bucketing=%d, stickiness=%d",
         opts.dump_mut_buffer, opts.pinned, opts.bucketing, opts.stickiness);
-
-    InitializeCriticalSection(&pid_lock);
-    InitializeCriticalSection(&fkt_lock);
-    InitializeCriticalSection(&arena_lock);
 
     while (1) {
         HANDLE pipe = CreateNamedPipe(
