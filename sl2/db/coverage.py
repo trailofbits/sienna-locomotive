@@ -56,8 +56,8 @@ class PathRecord(Base):
         # TODO - is it fair to calculate assuming at least one doubleton here?
         c = num_paths / (num_paths + ((num_runs - 1) / num_runs) * ((num_singletons ** 2) / (2 * max(num_doubletons, 1))))
         print("Total Paths:", num_paths,
-              "Singletons:", num_singletons,
-              "Doubletons:", num_doubletons,
+              # "Singletons:", num_singletons,
+              # "Doubletons:", num_doubletons,
               "Total Runs:", num_runs,
-              "Calculated fraction:", c)
+              "Estimated Path Fraction:", c)
         return num_paths, c

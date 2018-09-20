@@ -5,7 +5,7 @@
 import os
 import sys
 import time
-from functools import partial
+from functools import partial, reduce
 from multiprocessing import cpu_count
 
 from PySide2 import QtWidgets
@@ -339,8 +339,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.fuzzer_button.setDisabled(True)
         self.busy_label.show()
 
-        for thread in self.thread_holder[:int(self.thread_count.value())]:
-            thread.start()
+        focus_threads = self.thread_holder[:int(self.thread_count.value())]
+        while not reduce(lambda a, x: x.isRunning() and x.should_fuzz and a, focus_threads):
+            for thread in focus_threads:
+                if not thread.isRunning():
+                    thread.start()
         self.stop_button.show()
 
     def all_threads_paused(self):
