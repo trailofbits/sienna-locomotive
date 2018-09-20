@@ -19,9 +19,10 @@ static SL2Client client;
 static sl2_conn sl2_conn;
 static sl2_exception_ctx trace_exception_ctx;
 static void *mutatex;
-static bool replay;
-static bool no_mutate;
-static uint32_t mutate_count;
+static bool replay = false;
+static bool no_mutate = false;
+static bool crashed = false;
+static uint32_t mutate_count = 0;
 
 static std::set<reg_id_t, std::less<reg_id_t>, sl2_dr_allocator<reg_id_t>> tainted_regs;
 static std::set<app_pc, std::less<app_pc>, sl2_dr_allocator<app_pc>> tainted_mems;
@@ -672,7 +673,21 @@ on_thread_exit(void *drcontext)
 static void
 on_dr_exit(void)
 {
+    json j;
+    j["success"] = crashed;
+
     SL2_DR_DEBUG("tracer#on_dr_exit: cleaning up and exiting.\n");
+
+    if (!crashed) {
+        SL2_DR_DEBUG("tracer#on_dr_exit: target did NOT crash on replay!\n");
+
+        j["message"] = "replay did not cause a crash";
+    }
+    else {
+        j["message"] = "replay caused a crash";
+    }
+
+    SL2_LOG_JSONL(j);
 
     if (!op_no_taint.get_value()) {
         if (!drmgr_unregister_bb_insertion_event(on_bb_instrument)) {
@@ -915,6 +930,8 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
 static bool
 on_exception(void *drcontext, dr_exception_t *excpt)
 {
+    crashed = true;
+
     DWORD exception_code = excpt->record->ExceptionCode;
 
     dr_switch_to_app_state(drcontext);
