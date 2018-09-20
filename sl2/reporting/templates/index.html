@@ -3,23 +3,19 @@
 <!-- THIS DOCUMENT WAS AUTOMATICALLY GENERATED -->
 <head>
 
-  <!-- Basic Page Needs
-  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+  <!-- Basic Page Needs -->
   <meta charset="utf-8">
   <title>SL2 Fuzzing Report</title>
   <meta name="description" content="">
   <meta name="author" content="Trail of Bits">
 
-  <!-- Mobile Specific Metas
-  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+  <!-- Mobile Specific Metas -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- FONT
-  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
-  <link href="//fonts.googleapis.com/css?family=Raleway:400,300,600" rel="stylesheet" type="text/css">
+  <!-- FONT -->
+  <link href="https://fonts.googleapis.com/css?family=Raleway:400,300,600" rel="stylesheet" type="text/css">
 
-  <!-- CSS
-  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+  <!-- CSS -->
   <style>
   {{ normalize_css }}
   </style>
@@ -30,9 +26,8 @@
   {{ custom_css }}
   </style>
 
-  <!-- Favicon
-  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
-  <link rel="icon" type="image/png" href="images/favicon.png">
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" src="data:image/png;charset=utf-8;base64,{{ logo | safe}}">
 
 </head>
 <body>
@@ -45,7 +40,7 @@
         <p>Revision {{ revision }} -- {{ generated }} -- Sienna Locomotive 2 Version {{ version }} </p>
       </div>
       <div class="two columns">
-        <img class="u-max-full-width" src="data:image/png;charset=utf-8;base64 {{ logo }}">
+        <img class="u-max-full-width" src="data:image/png;charset=utf-8;base64,{{ logo | safe}}">
       </div>
     </div>
 
@@ -137,14 +132,14 @@
           </div>
 
           <div class="one-half column bignum">
-            {{ coverage_estimate }}%
+            {{ coverage_estimate | round(3) }}%
           </div>
 
         </div>
       </div>
       <div class="row subsection">
         <div class="twelve columns">
-          <img class="u-max-full-width" src="data:image/png;charset=utf-8;base64 {{ coverage_graph }}">
+          <img class="u-max-full-width" src="data:image/png;charset=utf-8;base64,{{ coverage_graph | safe}}">
         </div>
       </div>
     </div>
@@ -159,7 +154,6 @@
 
   </div>
 
-<!-- End Document
-  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+<!-- End Document -->
 </body>
 </html>

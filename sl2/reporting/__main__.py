@@ -1,24 +1,46 @@
-import matplotlib.pyplot as plt
-import statistics
-
-from sl2 import db
-from sl2.db.run_block import RunBlock
-from sl2.harness import config
-from sl2.gui.config_window import ConfigWindow
-from PySide2 import QtWidgets
-from sl2.harness.state import get_target_slug
+import datetime
+import pkg_resources
+import os
+import glob
 
 from jinja2 import Environment, PackageLoader
+
+import sl2.harness.config
+from sl2.harness.state import get_target_slug, get_target_dir
 
 
 def main():
     env = Environment(loader=PackageLoader('sl2', 'reporting/templates'))
     template = env.get_template('index.html')
 
+    target_dir = get_target_dir(sl2.harness.config.config)
+    found = [int(f.split('Report_v')[1].replace('.html', '')) for f in glob.glob(os.path.join(target_dir, 'Report_v*.html'))]
+
+    revision = 0 if len(found) == 0 else max(found) + 1
+
     vars = {
-        'app_name': 'PEParse',
+        'normalize_css': env.get_template('css/normalize.css').render(),
+        'skeleton_css': env.get_template('css/skeleton.css').render(),
+        'custom_css': env.get_template('css/sl2.css').render(),
+        'logo': env.get_template('images/logo.png.b64').render(),
+        'app_name': sl2.harness.config.profile,
+        'revision': revision,
+        'generated': datetime.datetime.now().isoformat(timespec='minutes'),
+        'version': pkg_resources.require("sl2")[0].version,
+        'uniq_crash_count': 7,
+        'total_crash_count': 42,
+        'severe_crash_count': 0,
         'run_count': 100000,
         'cpu_time': 80645,
+        'path_count': 1024,
+        'coverage_estimate': 42.123456789,
+        'coverage_graph': None
     }
 
-    print(template.render(**vars))
+    fname = os.path.join(target_dir, 'Report_v{}.html'.format(revision))
+
+    with open(fname, 'w') as outfile:
+        outfile.write(template.render(**vars))
+
+    print("Written to", fname)
+    os.startfile(fname)
