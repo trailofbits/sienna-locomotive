@@ -38,7 +38,6 @@ static app_pc last_insns[LAST_COUNT] = { 0 };
 static app_pc module_start = 0;
 static app_pc module_end = 0;
 static size_t baseAddr;
-static bool crashed = false;
 
 
 
@@ -680,9 +679,6 @@ on_dr_exit(void)
     j["run_id"] = run_id_s;
 
     SL2_DR_DEBUG("tracer#on_dr_exit: cleaning up and exiting.\n");
-    if (!crashed){
-        SL2_DR_DEBUG("[!] WARNING: The tracer did not encounter any exceptions!\n");
-    }
 
     if (!crashed) {
         SL2_DR_DEBUG("tracer#on_dr_exit: target did NOT crash on replay!\n");
