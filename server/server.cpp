@@ -1091,7 +1091,10 @@ static void handle_coverage_info(HANDLE pipe)
 
     // Zeroeth, write the coverage info scruct
     if (!WriteFile(pipe, &cov, sizeof(sl2_coverage_info), &txsize, NULL)) {
-        SL2_SERVER_LOG_FATAL("Failed to write coverage information structure");
+        // NOTE(ww): Failing to write the coverage to the fuzzer is bad,
+        // but not fatal: we've already received the fuzzer's arena, so
+        // future runs will be able sufficiently informed.
+        SL2_SERVER_LOG_WARN("Failed to write coverage information structure");
     }
 }
 
