@@ -402,6 +402,9 @@ def fuzz_and_triage(config_dict):
                         # Prevent other threads from starting new fuzzing runs
                         can_fuzz = False
 
+                if run.run_id == -1:
+                    start_server()
+
                 if not config_dict['continuous']:
                     return
 
