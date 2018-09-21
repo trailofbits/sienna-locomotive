@@ -52,7 +52,7 @@ def main():
         'total_crash_count': crash_base.count(),
         'severe_crash_count': crash_base.filter(Crash.exploitability != "None",
                                                 Crash.exploitability != "Unknown",
-                                                Crash.exploitability != "Low").count(),
+                                                Crash.exploitability != "Low").group_by(Crash.crashash).count(),
         'run_count': sum(x.runs for x in run_blocks),
         'cpu_time': sum(((block.ended - block.started).total_seconds()) for block in run_blocks),
         'path_count': num_paths,
