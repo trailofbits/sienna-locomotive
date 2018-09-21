@@ -22,6 +22,7 @@ from enum import IntEnum
 import msgpack
 
 from sl2.db import Crash, Tracer
+from sl2.db.run_block import SessionManager
 from . import config
 from . import named_mutex
 from .state import (
@@ -390,7 +391,8 @@ def tracer_run(config_dict, run_id):
 
     if success:
         formatted, raw = parse_tracer_crash_files(run_id)
-        Tracer.factory(run_id, formatted, raw)
+        if raw is not None:
+            Tracer.factory(run_id, formatted, raw)
         return formatted, raw
     else:
         print_l("[!] Tracer failure:", message)
@@ -408,27 +410,33 @@ def fuzz_and_triage(config_dict):
     targets_file = os.path.join(get_target_dir(config_dict), "targets.msg")
 
     # TODO: Move try/except so we can start new runs after an exception
-    try:
+    with SessionManager(get_target_slug(config_dict)) as manager:
         while can_fuzz:
-            crashed, run = fuzzer_run(config_dict, targets_file)
-            if crashed:
+            try:
+                crashed, run = fuzzer_run(config_dict, targets_file)
+                manager.run_complete(run, found_crash=crashed)
 
-                triagerInfo = triager_run(config_dict, run.run_id)
+                if crashed:
 
-                if triagerInfo:
-                    print_l(triagerInfo)
-                else:
-                    print_l("[!] Triage failure?")
+                    triagerInfo = triager_run(config_dict, run.run_id)
 
-                if config_dict['exit_early']:
-                    # Prevent other threads from starting new fuzzing runs
-                    can_fuzz = False
+                    if triagerInfo:
+                        print_l(triagerInfo)
+                    else:
+                        print_l("[!] Triage failure?")
 
-            if not config_dict['continuous']:
-                return
+                    if config_dict['exit_early']:
+                        # Prevent other threads from starting new fuzzing runs
+                        can_fuzz = False
 
-    except Exception:
-        traceback.print_exc()
+                if run.run_id == -1:
+                    start_server()
+
+                if not config_dict['continuous']:
+                    return
+
+            except Exception:
+                traceback.print_exc()
 
 
 def kill():

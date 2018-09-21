@@ -933,7 +933,6 @@ static bool
 on_exception(void *drcontext, dr_exception_t *excpt)
 {
     crashed = true;
-
     DWORD exception_code = excpt->record->ExceptionCode;
 
     dr_switch_to_app_state(drcontext);

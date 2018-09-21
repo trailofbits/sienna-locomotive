@@ -5,7 +5,7 @@
 import os
 import sys
 import time
-from functools import partial
+from functools import partial, reduce
 from multiprocessing import cpu_count
 
 from PySide2 import QtWidgets
@@ -18,6 +18,7 @@ from sl2 import db
 from sl2.harness import config
 from sl2.harness.state import sanity_checks, get_target, export_crash_data_to_csv, get_target_slug, TriageExport
 from sl2.harness.threads import ChecksecThread, WizardThread, FuzzerThread, ServerThread
+from sl2.reporting.__main__ import generate_report
 
 from . import stats
 from .config_window import ConfigWindow
@@ -235,7 +236,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.crashBrowser.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self._layout.addWidget(self.crashBrowser)
 
-        self.statsWidget = stats.StatsWidget()
+        self.statsWidget = stats.StatsWidget(get_target_slug(config.config))
         self._layout.addWidget(self.statsWidget)
 
         # Set up stop button (and hide it)
@@ -339,8 +340,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.fuzzer_button.setDisabled(True)
         self.busy_label.show()
 
-        for thread in self.thread_holder[:int(self.thread_count.value())]:
-            thread.start()
+        focus_threads = self.thread_holder[:int(self.thread_count.value())]
+        while not reduce(lambda a, x: x.isRunning() and x.should_fuzz and a, focus_threads):
+            for thread in focus_threads:
+                if not thread.isRunning():
+                    thread.start()
         self.stop_button.show()
 
     def all_threads_paused(self):
@@ -584,9 +588,9 @@ class MainWindow(QtWidgets.QMainWindow):
         if len(path) == 0:
             return
 
-        triageExporter = TriageExport(path)
+        triageExporter = TriageExport(path, get_target_slug(config.config))
         triageExporter.export()
-        os.startfile(path)
+        generate_report(dest=path)
 
     ## Clicked on Crash
     # When a cell is clicked in the crashes table, find the row

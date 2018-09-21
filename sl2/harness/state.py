@@ -17,11 +17,10 @@ import shutil
 from shutil import ignore_patterns
 import winreg
 
-import sqlite3
-from PySide2.QtWidgets import QFileDialog
 import msgpack
 
 from sl2 import db
+from sl2.db import Crash, Tracer, Checksec
 from . import config
 
 uuid_regex = re.compile("[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}")
@@ -271,8 +270,9 @@ def parse_tracer_crash_files(run_id):
         message = "The tracer tool exited improperly during run {}, \
 but no crash files could be found. It may have timed out. \
 To retry it manually, run \
-`python harness.py -v -e TRIAGE -p {} --run_id {}`"
-        return message.format(run_id, config.profile, run_id), None
+`python harness.py -v -e TRIAGE -p {} --run_id {}`".format(run_id, config.profile, run_id)
+        print(message)
+        return 'ERROR', None
 
     # TODO(ww): Parse all crash files, not just the first.
     crash_file = crash_files[0]
@@ -349,93 +349,90 @@ class TriageExport:
 
     ## Constructor to export triage results
     # @param exportDir Directory to export all crashes
-    def __init__(self, exportDir):
+    def __init__(self, exportDir, slug):
         self.exportDir = exportDir
-        self.cols = [
+        self.slug = slug
+        self.checksec_cols = [
                      # Checksec table.
-                     'checksec.aslr',
-                     'checksec.authenticode',
-                     'checksec.cfg',
-                     'checksec.dynamicBase',
-                     'checksec.forceIntegrity',
-                     'checksec.gs',
-                     'checksec.highEntropyVA',
-                     'checksec.isolation',
-                     'checksec.nx',
-                     'checksec.rfg',
-                     'checksec.safeSEH',
-                     'checksec.seh',
-                     'checksec.path',
+                     'aslr',
+                     'authenticode',
+                     'cfg',
+                     'dynamicBase',
+                     'forceIntegrity',
+                     'gs',
+                     'highEntropyVA',
+                     'isolation',
+                     'nx',
+                     'rfg',
+                     'safeSEH',
+                     'seh',
+                     'path']
 
+        self.crash_cols = [
                      # Crash table.
-                     'crash.runid',
-                     'crash.crashAddressString',
-                     'crash.crashReason',
-                     'crash.crashash',
-                     'crash.exploitability',
-                     'crash.instructionPointerString',
-                     'crash.minidumpPath',
-                     'crash.ranksString',
-                     'crash.stackPointerString',
-                     'crash.timestamp',
-                     'crash.tag',
-                     'crash.cs',
-                     'crash.dr0',
-                     'crash.dr1',
-                     'crash.dr2',
-                     'crash.dr3',
-                     'crash.dr6',
-                     'crash.dr7',
-                     'crash.ds',
-                     'crash.eflags',
-                     'crash.es',
-                     'crash.fs',
-                     'crash.gs',
-                     'crash.mx_csr',
-                     'crash.r8',
-                     'crash.r9',
-                     'crash.r10',
-                     'crash.r11',
-                     'crash.r12',
-                     'crash.r13',
-                     'crash.r14',
-                     'crash.r15',
-                     'crash.rax',
-                     'crash.rbp',
-                     'crash.rbx',
-                     'crash.rcx',
-                     'crash.rdi',
-                     'crash.rdx',
-                     'crash.rip',
-                     'crash.rsi',
-                     'crash.rsp',
-                     'crash.ss',
-
-                     # Tracer table.
-                     'tracer.formatted',
-                     ]
-        # TODO: Fix this to account for binary hashes - use SQLAlchemy query so that we can use crash.target_config
-        self.sqlExport = 'select %s from crash left join checksec, tracer, targets on ' \
-                         'crash.runid = tracer.runid and ' \
-                         'crash.target_config_slug = targets.target_slug and ' \
-                         'crash.targetPath = checksec.path' % ",".join(
-            self.cols)
+                     'runid',
+                     'crashAddressString',
+                     'crashReason',
+                     'crashash',
+                     'exploitability',
+                     'instructionPointerString',
+                     'minidumpPath',
+                     'ranksString',
+                     'stackPointerString',
+                     'timestamp',
+                     'tag',
+                     'cs',
+                     'dr0',
+                     'dr1',
+                     'dr2',
+                     'dr3',
+                     'dr6',
+                     'dr7',
+                     'ds',
+                     'eflags',
+                     'es',
+                     'fs',
+                     'gs',
+                     'mx_csr',
+                     'r8',
+                     'r9',
+                     'r10',
+                     'r11',
+                     'r12',
+                     'r13',
+                     'r14',
+                     'r15',
+                     'rax',
+                     'rbp',
+                     'rbx',
+                     'rcx',
+                     'rdi',
+                     'rdx',
+                     'rip',
+                     'rsi',
+                     'rsp',
+                     'ss']
 
     ## Exports crash from run directories to appropriate directory structure.  Also generates
     # triage.csv file with summary of crashes
     def export(self):
         csvPath = os.path.join(self.exportDir, "triage.csv")
-        with sqlite3.connect(db.dbpath) as conn:
-            with open(csvPath, "w") as f:
-                csvWriter = csv.writer(f, lineterminator='\n')
-                cur = conn.cursor()
-                cur = cur.execute(self.sqlExport)
-                rows = cur.fetchall()
-                csvWriter.writerow(self.cols)
-                csvWriter.writerows(rows)
-                f.close()
+        with open(csvPath, "w") as f:
+            csvWriter = csv.writer(f, lineterminator='\n')
+            csvWriter.writerow(self.checksec_cols + self.crash_cols + ['tracer.formatted'])
+            session = db.getSession()
+            for crash in session.query(Crash).filter(Crash.target_config_slug == self.slug).all():
+                checksec = session.query(Checksec).filter(Checksec.hash == crash.target_config_slug).first()
+                tracer = session.query(Tracer).filter(Tracer.runid == crash.runid).first()
+                row = []
+                for col in self.checksec_cols:
+                    row.append(getattr(checksec, col, None))
+                for col in self.crash_cols:
+                    row.append(getattr(crash, col, None))
+                row.append(tracer.formatted)
+                csvWriter.writerow(row)
 
-        crashies = db.Crash.getAll()
+        crashies = db.getSession().query(Crash).filter(Crash.target_config_slug == self.slug).all()
         for crash in crashies:
             try:
                 dstdir = os.path.join(self.exportDir,
@@ -449,15 +446,6 @@ class TriageExport:
                 shutil.copytree(srcdir, dstdir, ignore=ignore_patterns("mem*.dmp"))
             except FileExistsError as x:
                 print("File already exists for crash ", crash.minidumpPath, x)
-
-    ## Mutator and gui code for setting the export directory
-    def setExportDir(self):
-        path = QFileDialog.getExistingDirectory(dir='.')
-        if len(path) == 0:
-            return
-        self.exportDir = path
-        # self.process()
-        raise NotImplementedError("Exporting isn't finished yet")
 
     @staticmethod
     def checksecToExploitabilityRank(targetPath):

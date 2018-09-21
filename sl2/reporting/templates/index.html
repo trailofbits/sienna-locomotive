@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<!-- THIS DOCUMENT WAS AUTOMATICALLY GENERATED -->
+<head>
+
+  <!-- Basic Page Needs -->
+  <meta charset="utf-8">
+  <title>SL2 Fuzzing Report</title>
+  <meta name="description" content="">
+  <meta name="author" content="Trail of Bits">
+
+  <!-- Mobile Specific Metas -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- CSS -->
+  <style>
+  {{ normalize_css }}
+  </style>
+  <style>
+  {{ skeleton_css }}
+  </style>
+  <style>
+  {{ custom_css }}
+  </style>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" src="data:image/png;charset=utf-8;base64,{{ logo | safe}}">
+
+</head>
+<body style="font-feature-settings: 'lnum' 1">
+
+  <div class="container">
+    <!-- Header -->
+    <div class="row" style="margin-top: 5%">
+      <div class="ten columns">
+        <h1>Fuzzing Report for {{ app_name }}</h1>
+        <p>Revision {{ revision }} -- {{ generated }} -- Sienna Locomotive 2 Version {{ version }} </p>
+      </div>
+      <div class="two columns">
+        <img class="u-max-full-width" src="data:image/png;charset=utf-8;base64,{{ logo | safe}}">
+      </div>
+    </div>
+
+    <!-- Basic Information -->
+
+    <div class="row section">
+      <div>
+        <h2>Summary</h3>
+      </div>
+          <div class="row subsection">
+            <div class="row">
+              <div class="four columns">
+                <div class="statheader">
+                  <h4>Unique Crashes Found</h4>
+                </div>
+                <div class="bignum">{{ uniq_crash_count | comma_ify}}</div>
+              </div>
+
+              <div class="four columns">
+                <div class="statheader">
+                  <h4>Total Crashes Found</h4>
+                </div>
+                <div class="bignum">{{ total_crash_count | comma_ify}}</div>
+              </div>
+
+              <div class="four columns">
+                <div class="statheader">
+                  <h4>Medium/High Crashes</h4>
+                </div>
+                <div class="bignum">{{ severe_crash_count | comma_ify}}</div>
+              </div>
+            </div>
+            <hr>
+        </div>
+        <div class="row subsection">
+          <div class="row">
+            <div class="four columns">
+              <div class="statheader">
+                <h4>Test Cases Evaluated</h4>
+              </div>
+              <div class="bignum">{{ run_count  | comma_ify}}</div>
+            </div>
+
+            <div class="four columns">
+              <div class="statheader">
+                <h4>CPU Time Spent</h4>
+              </div>
+              <div class="bignum">{{ cpu_time | round(1) | comma_ify }}s</div>
+            </div>
+
+            <div class="four columns">
+              <div class="statheader">
+                <h4>Test Cases/s per CPU</h4>
+              </div>
+              <div class="bignum">{{ (run_count / cpu_time) | round(3) }}</div>
+            </div>
+          </div>
+        </div>
+    </div>
+
+    <!-- Path Coverage -->
+
+    <div class="row section">
+      <div>
+        <h3>Coverage</h3>
+      </div>
+      <div class="row subsection">
+        <div class="row">
+          <div class="one-half column">
+            <div class="statheader"><h4>Unique Paths Discovered</h4></div>
+            <div class="bignum">{{ path_count | comma_ify}}</div>
+          </div>
+          <div class="one-half column">
+            <div class="statheader"><h4>Estimated Path Coverage</h4></div>
+            <div class="bignum">{{ coverage_estimate | round(3) }}%</div>
+          </div>
+        </div>
+      </div>
+      <div class="row subsection">
+        <div class="twelve columns">
+          <img class="u-max-full-width" src="data:image/png;charset=utf-8;base64,{{ coverage_graph | safe}}">
+        </div>
+      </div>
+    </div>
+
+    <!-- Crash Summary -->
+
+    <div class="row section">
+      <div>
+        <h3>Crashes</h3>
+      </div>
+      <table class="u-full-width">
+        <thead>
+          <tr>
+            <th>Reason</th>
+            <th>Exploitability</th>
+            <!-- <th>First Seen After</th> --> <!-- Leaving out for now because the database isn't well-structured for it -->
+            <th>Occurrences</th>
+            <th>First Run ID</th>
+            <th>Hash</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for crash in crashes %}
+          <tr>
+            <td>{{ crash.crashReason }}</td>
+            <td>{{ crash.exploitability }}</td>
+            <!-- <td>{{ crash.runcount }} runs</td> -->
+            <td>{{ crash.occurrences }}</td>
+            <td>{{ crash.runid }}</td>
+            <td>{{ crash.crashash }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+<!-- End Document -->
+</body>
+</html>
