@@ -22,6 +22,7 @@ from enum import IntEnum
 import msgpack
 
 from sl2.db import Crash, Tracer
+from sl2.db.run_block import SessionManager
 from . import config
 from . import named_mutex
 from .state import (
@@ -386,23 +387,26 @@ def fuzz_and_triage(config_dict):
     targets_file = os.path.join(get_target_dir(config_dict), "targets.msg")
 
     # TODO: Move try/except so we can start new runs after an exception
-    try:
+    with SessionManager(get_target_slug(config_dict)) as manager:
         while can_fuzz:
-            crashed, run = fuzzer_run(config_dict, targets_file)
-            if crashed:
+            try:
+                crashed, run = fuzzer_run(config_dict, targets_file)
+                manager.run_complete(run, found_crash=crashed)
 
-                triagerInfo = triager_run(config_dict, run.run_id)
-                print_l(triagerInfo)
+                if crashed:
 
-                if config_dict['exit_early']:
-                    # Prevent other threads from starting new fuzzing runs
-                    can_fuzz = False
+                    triagerInfo = triager_run(config_dict, run.run_id)
+                    print_l(triagerInfo)
 
-            if not config_dict['continuous']:
-                return
+                    if config_dict['exit_early']:
+                        # Prevent other threads from starting new fuzzing runs
+                        can_fuzz = False
 
-    except Exception:
-        traceback.print_exc()
+                if not config_dict['continuous']:
+                    return
+
+            except Exception:
+                traceback.print_exc()
 
 
 def kill():
