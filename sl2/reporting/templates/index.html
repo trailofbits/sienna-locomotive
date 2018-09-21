@@ -49,58 +49,50 @@
       </div>
           <div class="row subsection">
             <div class="row">
-              <div class="four columns statheader">
-                <h4>Unique Crashes Found</h4>
+              <div class="four columns">
+                <div class="statheader">
+                  <h4>Unique Crashes Found</h4>
+                </div>
+                <div class="bignum">{{ uniq_crash_count | comma_ify}}</div>
               </div>
 
-              <div class="four columns statheader">
-                <h4>Total Crashes Found</h4>
+              <div class="four columns">
+                <div class="statheader">
+                  <h4>Total Crashes Found</h4>
+                </div>
+                <div class="bignum">{{ total_crash_count | comma_ify}}</div>
               </div>
 
-              <div class="four columns statheader">
-                <h4>Unique Crashes with Medium or High Exploitability</h4>
-              </div>
-            </div>
-            <div class="row">
-              <div class="four columns bignum">
-                {{ uniq_crash_count | comma_ify}}
-              </div>
-
-              <div class="four columns bignum">
-                {{ total_crash_count | comma_ify}}
-              </div>
-
-              <div class="four columns bignum">
-                {{ severe_crash_count | comma_ify}}
+              <div class="four columns">
+                <div class="statheader">
+                  <h4>Medium/High Crashes</h4>
+                </div>
+                <div class="bignum">{{ severe_crash_count | comma_ify}}</div>
               </div>
             </div>
             <hr>
         </div>
         <div class="row subsection">
           <div class="row">
-            <div class="four columns statheader">
-              <h4>Test Cases Evaluated</h4>
+            <div class="four columns">
+              <div class="statheader">
+                <h4>Test Cases Evaluated</h4>
+              </div>
+              <div class="bignum">{{ run_count  | comma_ify}}</div>
             </div>
 
-            <div class="four columns statheader">
-              <h4>CPU Time Spent Fuzzing</h4>
+            <div class="four columns">
+              <div class="statheader">
+                <h4>CPU Time Spent</h4>
+              </div>
+              <div class="bignum">{{ cpu_time | round(1) | comma_ify }}s</div>
             </div>
 
-            <div class="four columns statheader">
-              <h4>Test Cases per Second per CPU</h4>
-            </div>
-          </div>
-          <div class="row">
-            <div class="four columns bignum">
-              {{ run_count  | comma_ify}}
-            </div>
-
-            <div class="four columns bignum">
-              {{ cpu_time | round(1) | comma_ify }}s
-            </div>
-
-            <div class="four columns bignum">
-              {{ (run_count / cpu_time) | round(3) }}
+            <div class="four columns">
+              <div class="statheader">
+                <h4>Test Cases/s per CPU</h4>
+              </div>
+              <div class="bignum">{{ (run_count / cpu_time) | round(3) }}</div>
             </div>
           </div>
         </div>
@@ -114,24 +106,14 @@
       </div>
       <div class="row subsection">
         <div class="row">
-          <div class="one-half column statheader">
-            <h4>Unique Paths Discovered</h4>
+          <div class="one-half column">
+            <div class="statheader"><h4>Unique Paths Discovered</h4></div>
+            <div class="bignum">{{ path_count | comma_ify}}</div>
           </div>
-
-          <div class="one-half column statheader">
-            <h4>Estimated Path Coverage</h4>
+          <div class="one-half column">
+            <div class="statheader"><h4>Estimated Path Coverage</h4></div>
+            <div class="bignum">{{ coverage_estimate | round(3) }}%</div>
           </div>
-
-        </div>
-        <div class="row">
-          <div class="one-half column bignum">
-            {{ path_count | comma_ify}}
-          </div>
-
-          <div class="one-half column bignum">
-            {{ coverage_estimate | round(3) }}%
-          </div>
-
         </div>
       </div>
       <div class="row subsection">
