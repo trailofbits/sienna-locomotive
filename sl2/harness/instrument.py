@@ -157,15 +157,16 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
                             if verbose:
                                 print_l("Killing child process:", pid)
                             try:
-                                # If we're fuzzing, try a "soft" kill with taskkill first:
+                                # If we're fuzzing or triaging, try a "soft" kill with taskkill:
                                 # taskkill will send a WM_CLOSE before anything else,
                                 # which will hopefully kill the client more gently
-                                # than a "hard" os.kill
+                                # than a "hard" os.kill (which will prevent the client's
+                                # exit handlers from running).
                                 # TODO(ww): Replace this with a direct WM_CLOSE message.
-                                if fuzzing:
+                                if fuzzing or tracing:
                                     os.system("taskkill /T /PID {}".format(pid))
-                                    time.sleep(1)
-                                os.kill(pid, signal.SIGTERM)
+                                else:
+                                    os.kill(pid, signal.SIGTERM)
                             except PermissionError as e:
                                 print_l("WARNING: Couldn't kill child process (insufficient privilege?):", e)
                                 print_l("Try running the harness as an Administrator.")
