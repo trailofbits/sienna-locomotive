@@ -59,7 +59,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # when they're running
         self.checksec_thread = ChecksecThread(config.config['target_application_path'])
         self.wizard_thread = WizardThread(config.config)
-        self.server_thread = ServerThread()
+        self.server_thread = ServerThread(close_on_exit=True)
 
         # CREATE WIDGETS #
 

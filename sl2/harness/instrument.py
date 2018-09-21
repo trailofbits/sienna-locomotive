@@ -75,21 +75,24 @@ def print_l(*args):
         print(*args)
 
 
-def ps_run(command):
+def ps_run(command, close_on_exit=False):
     """
     Runs the given command in a new PowerShell session.
     """
-    subprocess.Popen(["powershell", "start", "powershell", "{-NoExit", "-Command", "\"{}\"}}".format(command)])
+    if close_on_exit:
+        subprocess.Popen(["powershell", "start", "powershell", "{", "-Command", "\"{}\"}}".format(command)])
+    else:
+        subprocess.Popen(["powershell", "start", "powershell", "{-NoExit", "-Command", "\"{}\"}}".format(command)])
 
 
-def start_server():
+def start_server(close_on_exit=False):
     """
     Start the server, if it's not already running.
     """
     # NOTE(ww): This is technically a TOCTOU, but it's probably reliable enough for our purposes.
     server_cmd = ' '.join([config.config['server_path'], *config.config['server_args']])
     if named_mutex.test_named_mutex('fuzz_server_mutex'):
-        ps_run(server_cmd)
+        ps_run(server_cmd, close_on_exit=close_on_exit)
     named_mutex.spin_named_mutex('fuzz_server_mutex')
 
 
