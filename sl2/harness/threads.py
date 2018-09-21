@@ -30,9 +30,12 @@ class WizardThread(QThread):
 
 
 class ServerThread(QThread):
+    def __init__(self, close_on_exit=False):
+        QThread.__init__(self)
+        self.close_on_exit = close_on_exit
 
     def run(self):
-        start_server()
+        start_server(close_on_exit=self.close_on_exit)
 
 
 class FuzzerThread(QThread):
