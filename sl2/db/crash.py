@@ -167,6 +167,15 @@ class Crash(Base):
         except KeyError:
             raise Exception("Was unable to parse crash json from triager")
 
+    @property
+    def int_exploitability(self):
+        return {'High': 10, 'Medium': 20, 'Low': 30, 'Unknown': 40}[self.exploitability]
+
+    @property
+    def occurrences(self):
+        session = db.getSession()
+        return session.query(Crash).filter(Crash.crashash == self.crashash).count()
+
     ## Converts integer rank to exploitability string
     # @param rank integer rank
     # @return string

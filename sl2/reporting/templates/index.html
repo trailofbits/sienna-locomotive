@@ -129,6 +129,30 @@
       <div>
         <h3>Crashes</h3>
       </div>
+      <table class="u-full-width">
+        <thead>
+          <tr>
+            <th>Reason</th>
+            <th>Exploitability</th>
+            <!-- <th>First Seen After</th> --> <!-- Leaving out for now because the database isn't well-structured for it -->
+            <th>Occurrences</th>
+            <th>First Run ID</th>
+            <th>Hash</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for crash in crashes %}
+          <tr>
+            <td>{{ crash.crashReason }}</td>
+            <td>{{ crash.exploitability }}</td>
+            <!-- <td>{{ crash.runcount }} runs</td> -->
+            <td>{{ crash.occurrences }}</td>
+            <td>{{ crash.runid }}</td>
+            <td>{{ crash.crashash }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
 
   </div>

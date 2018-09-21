@@ -7,6 +7,9 @@ import io
 from base64 import b64encode
 from jinja2 import Environment, PackageLoader
 
+from sqlalchemy.sql import label
+from sqlalchemy import func
+
 import sl2.harness.config
 from sl2.harness.state import get_target_slug, get_target_dir
 from sl2.stats.__main__ import plot_discovered_paths
@@ -57,7 +60,11 @@ def main():
         'cpu_time': sum(((block.ended - block.started).total_seconds()) for block in run_blocks),
         'path_count': num_paths,
         'coverage_estimate': coverage_estimate * 100,
-        'coverage_graph': coverage_graph
+        'coverage_graph': coverage_graph,
+        'crashes': sorted(session.query(Crash)
+                          .filter(Crash.target_config_slug == slug)
+                          .group_by(Crash.crashash).all(),
+                          key=lambda crash: crash.int_exploitability)
     }
 
     fname = os.path.join(target_dir, 'Report_v{}.html'.format(revision))
