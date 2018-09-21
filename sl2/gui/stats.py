@@ -11,7 +11,7 @@ from sl2.db import Crash, getSession
 class StatsWidget(QtWidgets.QWidget):
 
     ## Constructor for stats widget
-    def __init__(self):
+    def __init__(self, target_slug):
         QtWidgets.QWidget.__init__(self)
         self.layout = QtWidgets.QVBoxLayout()
         self.web = QtWidgets.QTextBrowser()
@@ -19,6 +19,7 @@ class StatsWidget(QtWidgets.QWidget):
         self.web.setOpenLinks(True)
         self.layout.addWidget(self.web)
         self.setLayout(self.layout)
+        self.target_slug = target_slug
 
         self.update()
 
@@ -63,8 +64,9 @@ class StatsWidget(QtWidgets.QWidget):
     ## Requeries the database and updates the table
     def update(self):
         session = getSession()
+        basequery = session.query(Crash).filter(Crash.target_config_slug == self.target_slug)
 
-        self.crashes = Crash.getAll()
+        self.crashes = basequery.all()
         self.crashesCnt = len(self.crashes)
         self.exploitabilityCnts = {
             'High': 0,
@@ -80,16 +82,16 @@ class StatsWidget(QtWidgets.QWidget):
         self.ranksMedian = 0
 
         if self.crashesCnt > 0:
-            self.uniquesCnt = session.query(Crash).distinct(Crash.crashash).group_by(Crash.crashash).count()
+            self.uniquesCnt = basequery.distinct(Crash.crashash).group_by(Crash.crashash).count()
             self.dupesCount = self.crashesCnt - self.uniquesCnt
             self.ranks = [_.rank for _ in self.crashes]
             self.ranksMean = statistics.mean(self.ranks)
             self.ranksMedian = statistics.median(self.ranks)
-            self.exploitabilityCnts['High'] = session.query(Crash).filter(Crash.rank == 4).count()
-            self.exploitabilityCnts['Medium'] = session.query(Crash).filter(Crash.rank == 3).count()
-            self.exploitabilityCnts['Low'] = session.query(Crash).filter(Crash.rank == 2).count()
-            self.exploitabilityCnts['Unknown'] = session.query(Crash).filter(Crash.rank == 1).count()
-            self.exploitabilityCnts['None'] = session.query(Crash).filter(Crash.rank == 0).count()
+            self.exploitabilityCnts['High'] = basequery.filter(Crash.rank == 4).count()
+            self.exploitabilityCnts['Medium'] = basequery.filter(Crash.rank == 3).count()
+            self.exploitabilityCnts['Low'] = basequery.filter(Crash.rank == 2).count()
+            self.exploitabilityCnts['Unknown'] = basequery.filter(Crash.rank == 1).count()
+            self.exploitabilityCnts['None'] = basequery.filter(Crash.rank == 0).count()
 
         html = self.toHTML()
         self.web.setText(html)

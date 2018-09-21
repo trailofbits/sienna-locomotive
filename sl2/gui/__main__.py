@@ -235,7 +235,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.crashBrowser.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self._layout.addWidget(self.crashBrowser)
 
-        self.statsWidget = stats.StatsWidget()
+        self.statsWidget = stats.StatsWidget(get_target_slug(config.config))
         self._layout.addWidget(self.statsWidget)
 
         # Set up stop button (and hide it)
