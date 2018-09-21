@@ -18,6 +18,7 @@ from sl2 import db
 from sl2.harness import config
 from sl2.harness.state import sanity_checks, get_target, export_crash_data_to_csv, get_target_slug, TriageExport
 from sl2.harness.threads import ChecksecThread, WizardThread, FuzzerThread, ServerThread
+from sl2.reporting.__main__ import generate_report
 
 from . import stats
 from .config_window import ConfigWindow
@@ -587,9 +588,9 @@ class MainWindow(QtWidgets.QMainWindow):
         if len(path) == 0:
             return
 
-        triageExporter = TriageExport(path)
+        triageExporter = TriageExport(path, get_target_slug(config.config))
         triageExporter.export()
-        os.startfile(path)
+        generate_report(dest=path)
 
     ## Clicked on Crash
     # When a cell is clicked in the crashes table, find the row

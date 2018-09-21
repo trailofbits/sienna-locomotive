@@ -74,6 +74,8 @@ def generate_report(dest=None):
         outfile.write(template.render(**vars))
 
     if dest is not None:
+        if '.html' not in dest:
+            dest = os.path.join(dest, 'Report_v{}.html'.format(revision))
         copyfile(fname, dest)
         os.startfile(dest)
     else:
