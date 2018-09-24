@@ -41,7 +41,7 @@ class ServerThread(QThread):
 class FuzzerThread(QThread):
     foundCrash = Signal(QThread, str)
     runComplete = Signal()
-    paused = Signal()
+    paused = Signal(object)
     server_crashed = Signal()
     tracer_failed = Signal()
 
@@ -59,7 +59,7 @@ class FuzzerThread(QThread):
 
     def pause(self):
         self.should_fuzz = False
-        self.paused.emit()
+        self.paused.emit(self)
 
     def run(self):
         self.should_fuzz = True
