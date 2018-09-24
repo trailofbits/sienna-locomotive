@@ -5,7 +5,7 @@
 import os
 import sys
 import time
-from functools import partial, reduce
+from functools import partial
 from multiprocessing import cpu_count
 
 from PySide2 import QtWidgets
@@ -40,6 +40,7 @@ class MainWindow(QtWidgets.QMainWindow):
         QtWidgets.QMainWindow.__init__(self)
         self.crashes = []
         self.thread_holder = []
+        self.paused_fuzzer_threads = []
         self.start_time = None
 
         # Select config profile before starting
@@ -341,10 +342,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.busy_label.show()
 
         focus_threads = self.thread_holder[:int(self.thread_count.value())]
-        while not reduce(lambda a, x: x.isRunning() and x.should_fuzz and a, focus_threads):
-            for thread in focus_threads:
-                if not thread.isRunning():
-                    thread.start()
+
+        for thread in focus_threads:
+            if (not thread.isRunning() and thread.should_fuzz) or thread in self.paused_fuzzer_threads:
+                thread.start()
+
+        self.paused_fuzzer_threads.clear()
         self.stop_button.show()
 
     def all_threads_paused(self):
@@ -365,6 +368,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Update the run/crash/throughput variables after every fuzzing run
         fuzzer_thread.runComplete.connect(self.calculate_throughput)
         fuzzer_thread.runComplete.connect(self.check_for_completion)
+        fuzzer_thread.paused.connect(self.handle_paused_fuzzer_thread)
         fuzzer_thread.foundCrash.connect(self.handle_new_crash)
         fuzzer_thread.server_crashed.connect(self.handle_server_crash)
         fuzzer_thread.tracer_failed.connect(self.handle_tracer_failure)
@@ -384,6 +388,10 @@ class MainWindow(QtWidgets.QMainWindow):
         """ Calculate our current runs/second. """
         self.runs.increment()
         self.throughput.update(self.runs.value / float(time.time() - self.start_time))
+
+    def handle_paused_fuzzer_thread(self, fuzzer_thread):
+        if fuzzer_thread not in self.paused_fuzzer_threads:
+            self.paused_fuzzer_threads.append(fuzzer_thread)
 
     def handle_new_crash(self, thread, run_id):
         """ Updates the crash counter and pauses other threads if specified """
