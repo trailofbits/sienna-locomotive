@@ -53,6 +53,8 @@ SL2Client::~SL2Client() {
     }
 }
 
+// NOTE(ww): We assign main_module here instead of in the constructor because
+// dr_get_main_module() returns NULL if called before DR finishes loading.
 void
 SL2Client::load_main_module()
 {
