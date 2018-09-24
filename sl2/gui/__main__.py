@@ -563,10 +563,11 @@ class MainWindow(QtWidgets.QMainWindow):
         if not self.extension_widget.isVisible():
             self.extension_widget.show()
             self.expand_button.setArrowType(Qt.UpArrow)
-            self.adjustSize()
         else:
             self.extension_widget.hide()
             self.expand_button.setArrowType(Qt.DownArrow)
+
+        if not self.sizeHint().isValid():
             self.adjustSize()
 
     def unify_pause_state(self, state):
