@@ -9,21 +9,33 @@ using namespace std;
 // TODO(ww): Since we iterate over these, order them by likelihood of occurrence?
 sl2_funcmod SL2_FUNCMOD_TABLE[] = {
     {"ReadFile", "KERNELBASE.DLL"},
+    {"ReadFile", "KERNEL32.DLL"},
     {"recv", "WS2_32.DLL"},                     // TODO(ww): Is this right?
     {"WinHttpReadData", "WINHTTP.DLL"},         // TODO(ww): Is this right?
     {"InternetReadFile", "WININET.DLL"},        // TODO(ww): Is this right?
     {"WinHttpWebSocketReceive", "WINHTTP.DLL"}, // TODO(ww): Is this right?
     {"RegQueryValueExA", "KERNELBASE.DLL"},
+    {"RegQueryValueExA", "ADVAPI32.DLL"},
     {"RegQueryValueExW", "KERNELBASE.DLL"},
+    {"RegQueryValueExW", "ADVAPI32.DLL"},
     {"ReadEventLogA", "KERNELBASE.DLL"},
+    {"ReadEventLogA", "ADVAPI32.DLL"},
     {"ReadEventLogW", "KERNELBASE.DLL"},
+    {"ReadEventLogW", "ADVAPI32.DLL"},
     {"fread", "UCRTBASE.DLL"},
     {"fread", "UCRTBASED.DLL"},
+    {"fread", "MSVCRT.DLL"},
+    {"fread", "MSVCRTD.DLL"},
     {"fread_s", "UCRTBASE.DLL"},
     {"fread_s", "UCRTBASED.DLL"},
+    {"fread_s", "MSVCRT.DLL"},
+    {"fread_s", "MSVCRTD.DLL"},
     {"_read", "UCRTBASE.DLL"},
     {"_read", "UCRTBASED.DLL"},
+    {"_read", "MSVCRT.DLL"},
+    {"_read", "MSVCRTD.DLL"},
     {"MapViewOfFile", "KERNELBASE.DLL"},
+    {"MapViewOfFile", "KERNEL32.DLL"},
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,7 +45,20 @@ sl2_funcmod SL2_FUNCMOD_TABLE[] = {
 // the DR build process eventually and be the superclass of Fuzzer and Tracer subclasses.
 /////////////////////////////////////////////////////////////////////////////////////////////////
 SL2Client::SL2Client() {
+}
 
+SL2Client::~SL2Client() {
+    if (main_module) {
+        dr_free_module_data(main_module);
+    }
+}
+
+void
+SL2Client::load_main_module()
+{
+    if (!main_module) {
+        main_module = dr_get_main_module();
+    }
 }
 
 void
@@ -860,6 +885,10 @@ SL2Client::exception_to_string(DWORD exception_code)
 bool
 SL2Client::function_is_in_expected_module(const char *func, const char *mod)
 {
+    if (STREQI(dr_module_preferred_name(main_module), mod)) {
+        return true;
+    }
+
     for (int i = 0; i < SL2_FUNCMOD_TABLE_SIZE; i++) {
         if (STREQ(func, SL2_FUNCMOD_TABLE[i].func) && STREQI(mod, SL2_FUNCMOD_TABLE[i].mod)) {
             return true;

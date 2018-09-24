@@ -1502,6 +1502,7 @@ void tracer(client_id_t id, int argc, const char *argv[])
     }
 
     dr_log(NULL, DR_LOG_ALL, 1, "Client 'instrace' initializing\n");
+    client.load_main_module();
 }
 
 DR_EXPORT void

@@ -657,4 +657,5 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
     drmgr_register_exception_event(on_exception);
     dr_register_exit_event(on_dr_exit);
     drmgr_register_module_load_event(on_module_load);
+    client.load_main_module();
 }
