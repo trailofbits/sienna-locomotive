@@ -649,7 +649,10 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         SL2_DR_DEBUG("dr_client_main: arena given, instrumenting BBs!\n");
         mbstowcs_s(NULL, arena.id, SL2_HASH_LEN + 1, arena_id_s.c_str(), SL2_HASH_LEN);
         sl2_conn_request_arena(&sl2_conn, &arena);
-        drmgr_register_bb_instrumentation_event(NULL, on_bb_instrument, NULL);
+
+        if (!drmgr_register_bb_instrumentation_event(NULL, on_bb_instrument, NULL)) {
+            DR_ASSERT(false);
+        }
     }
     else {
         SL2_DR_DEBUG("dr_client_main: no arena given OR user requested dumb fuzzing!\n");
