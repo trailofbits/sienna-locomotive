@@ -1482,11 +1482,7 @@ void tracer(client_id_t id, int argc, const char *argv[])
     // If taint tracing is enabled, register the propagate_taint callback
     if (!op_no_taint.get_value()) {
         // http://dynamorio.org/docs/group__drmgr.html#ga83a5fc96944e10bd7356e0c492c93966
-        if (!drmgr_register_bb_instrumentation_event(
-                                                NULL,
-                                                on_bb_instrument,
-                                                NULL))
-        {
+        if (!drmgr_register_bb_instrumentation_event(NULL, on_bb_instrument, NULL)) {
             DR_ASSERT(false);
         }
     }
