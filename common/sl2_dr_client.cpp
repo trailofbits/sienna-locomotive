@@ -47,22 +47,6 @@ sl2_funcmod SL2_FUNCMOD_TABLE[] = {
 SL2Client::SL2Client() {
 }
 
-SL2Client::~SL2Client() {
-    if (main_module) {
-        dr_free_module_data(main_module);
-    }
-}
-
-// NOTE(ww): We assign main_module here instead of in the constructor because
-// dr_get_main_module() returns NULL if called before DR finishes loading.
-void
-SL2Client::load_main_module()
-{
-    if (!main_module) {
-        main_module = dr_get_main_module();
-    }
-}
-
 void
 SL2Client::hash_args(char * argHash, fileArgHash * fStruct){
     std::vector<unsigned char> blob_vec((unsigned char *) fStruct,
@@ -887,10 +871,6 @@ SL2Client::exception_to_string(DWORD exception_code)
 bool
 SL2Client::function_is_in_expected_module(const char *func, const char *mod)
 {
-    if (STREQI(dr_module_preferred_name(main_module), mod)) {
-        return true;
-    }
-
     for (int i = 0; i < SL2_FUNCMOD_TABLE_SIZE; i++) {
         if (STREQ(func, SL2_FUNCMOD_TABLE[i].func) && STREQI(mod, SL2_FUNCMOD_TABLE[i].mod)) {
             return true;

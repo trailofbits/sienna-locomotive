@@ -170,19 +170,14 @@ class SL2Client {
 
 public:
     SL2Client();
-    ~SL2Client();
 
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Variables
     // TODO(ww): Subsume sl2_conn under SL2Client.
-    module_data_t               *main_module;
     map<Function, uint64_t>     call_counts;
     map<uint64_t, uint64_t>     ret_addr_counts;
     json                        parsedJson;
     uint64_t                    baseAddr;
-
-    // Auxiliary instantiation.
-    void        load_main_module();
 
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Methods

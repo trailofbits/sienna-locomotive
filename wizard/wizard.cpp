@@ -368,7 +368,6 @@ void wizard(client_id_t id, int argc, const char *argv[])
     }
 
     dr_log(NULL, DR_LOG_ALL, 1, "Client 'Wizard' initializing\n");
-    client.load_main_module();
 }
 
 /* Parses options and calls wizard helper */
