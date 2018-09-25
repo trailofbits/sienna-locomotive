@@ -634,12 +634,13 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
 
     sl2_conn_register_pid(&sl2_conn, dr_get_process_id(), false);
 
-    // TODO(ww): Guard these initializations.
-    drmgr_init();
-    drwrap_init();
-
     drreg_options_t opts = {sizeof(opts), 3, false};
-    drreg_init(&opts);
+
+    if (!drmgr_init()
+        || drreg_init(&opts) != DRREG_SUCCESS
+        || !drwrap_init()) {
+        DR_ASSERT(false);
+    }
 
     // Check whether we can use coverage on this fuzzing run
     coverage_guided = (arena_id_s != "") && !no_coverage;
