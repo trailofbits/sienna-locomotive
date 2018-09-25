@@ -877,20 +877,20 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
     if (replay) {
         sl2_conn_request_crash_paths(&sl2_conn, dr_get_process_id(), &crash_paths);
 
-        HANDLE hCrashFile = CreateFile(crash_paths.crash_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        HANDLE dump_file = CreateFile(crash_paths.crash_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
-        if (hCrashFile == INVALID_HANDLE_VALUE) {
+        if (dump_file == INVALID_HANDLE_VALUE) {
             SL2_DR_DEBUG("tracer#dump_crash: could not open the crash file (%x)\n", GetLastError());
             dr_abort();
         }
 
         DWORD txsize;
-        if (!WriteFile(hCrashFile, crash_json.c_str(), (DWORD) crash_json.length(), &txsize, NULL)) {
+        if (!WriteFile(dump_file, crash_json.c_str(), (DWORD) crash_json.length(), &txsize, NULL)) {
             SL2_DR_DEBUG("tracer#dump_crash: could not write to the crash file (%x)\n", GetLastError());
             dr_abort();
         }
 
-        CloseHandle(hCrashFile);
+        CloseHandle(dump_file);
 
         HANDLE hDumpFile = CreateFile(crash_paths.mem_dump_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
