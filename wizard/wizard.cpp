@@ -217,9 +217,9 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     j["retAddrOffset"]      = (uint64_t) info->retAddrOffset;
     j["func_name"]          = func_name;
 
-    fileArgHash fStruct = {0};
+    hash_context hash_ctx = {0};
 
-    if (!GetMappedFileName(GetCurrentProcess(), info->lpBuffer, fStruct.fileName, MAX_PATH)) {
+    if (!GetMappedFileName(GetCurrentProcess(), info->lpBuffer, hash_ctx.fileName, MAX_PATH)) {
         // NOTE(ww): This can happen when a memory-mapped object doesn't have a real file
         // backing it, e.g. when the mapping is of the page file or some other
         // kernel-managed resource. When that happens, we assume it's not something
@@ -240,15 +240,15 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
             info->nNumberOfBytesToRead = memory_info.RegionSize;
         }
 
-        fStruct.readSize = info->nNumberOfBytesToRead;
+        hash_ctx.readSize = info->nNumberOfBytesToRead;
 
-        j["source"]  = utf8Converter.to_bytes(wstring(fStruct.fileName));
+        j["source"]  = utf8Converter.to_bytes(wstring(hash_ctx.fileName));
 
         size_t end   = info->position + info->nNumberOfBytesToRead;
         j["start"]   = info->position;
         j["end"]     = end;
 
-        client.hash_args(info->argHash, &fStruct);
+        client.hash_args(info->argHash, &hash_ctx);
 
         j["argHash"] = info->argHash;
 

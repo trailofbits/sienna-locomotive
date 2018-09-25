@@ -1266,18 +1266,18 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
         info->nNumberOfBytesToRead = memory_info.RegionSize;
     }
 
-    fileArgHash fStruct = {0};
-    fStruct.readSize = info->nNumberOfBytesToRead;
+    hash_context hash_ctx = {0};
+    hash_ctx.readSize = info->nNumberOfBytesToRead;
 
     // NOTE(ww): The wizard should weed these failures out for us; if it happens
     // here, there's not much we can do.
-    if (!GetMappedFileName(GetCurrentProcess(), info->lpBuffer, fStruct.fileName, MAX_PATH)) {
+    if (!GetMappedFileName(GetCurrentProcess(), info->lpBuffer, hash_ctx.fileName, MAX_PATH)) {
         SL2_DR_DEBUG("Fatal: Couldn't get filename for memory map! Aborting.\n");
         dr_exit_process(1);
     }
 
     // Create the argHash, now that we have the correct source and nNumberOfBytesToRead.
-    client.hash_args(info->argHash, &fStruct);
+    client.hash_args(info->argHash, &hash_ctx);
 
     bool targeted = client.is_function_targeted(info);
     client.increment_call_count(info->function);
