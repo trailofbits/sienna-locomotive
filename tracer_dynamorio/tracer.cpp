@@ -881,13 +881,13 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
 
         if (hCrashFile == INVALID_HANDLE_VALUE) {
             SL2_DR_DEBUG("tracer#dump_crash: could not open the crash file (%x)\n", GetLastError());
-            exit(1);
+            dr_abort();
         }
 
         DWORD txsize;
         if (!WriteFile(hCrashFile, crash_json.c_str(), (DWORD) crash_json.length(), &txsize, NULL)) {
             SL2_DR_DEBUG("tracer#dump_crash: could not write to the crash file (%x)\n", GetLastError());
-            exit(1);
+            dr_abort();
         }
 
         CloseHandle(hCrashFile);
