@@ -954,8 +954,7 @@ on_exception(void *drcontext, dr_exception_t *excpt)
     uint8_t score = 50;
     std::string disassembly = "";
 
-    // TODO - remove use of IsBadReadPtr
-    // https://msdn.microsoft.com/en-us/library/windows/desktop/aa366713(v=vs.85).aspx
+    // TODO(ww): Can we use dr_memory_is_readable here?
     if (IsBadReadPtr(exception_address, 1))
     {
         if (pc_tainted) {
