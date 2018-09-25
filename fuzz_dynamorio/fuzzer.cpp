@@ -404,22 +404,22 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
         info->nNumberOfBytesToRead = memory_info.RegionSize;
     }
 
-    fileArgHash fStruct = {0};
-    fStruct.readSize = info->nNumberOfBytesToRead;
+    hash_context hash_ctx = {0};
+    hash_ctx.readSize = info->nNumberOfBytesToRead;
 
     // NOTE(ww): The wizard should weed these failures out for us; if it happens
     // here, there's not much we can do.
-    if (!GetMappedFileName(GetCurrentProcess(), info->lpBuffer, fStruct.fileName, MAX_PATH)) {
+    if (!GetMappedFileName(GetCurrentProcess(), info->lpBuffer, hash_ctx.fileName, MAX_PATH)) {
         SL2_DR_DEBUG("Fatal: Couldn't get filename for memory map! Aborting.\n");
         crashed = false;
         dr_exit_process(1);
     }
 
     // Toss the filename into info, so that `mutate` can send it to the server.
-    info->source = fStruct.fileName;
+    info->source = hash_ctx.fileName;
 
     // Create the argHash, now that we have the correct source and nNumberOfBytesToRead.
-    client.hash_args(info->argHash, &fStruct);
+    client.hash_args(info->argHash, &hash_ctx);
 
     if (client.is_function_targeted(info)) {
         // If the mutation process fails in any way, consider this fuzzing run a loss.

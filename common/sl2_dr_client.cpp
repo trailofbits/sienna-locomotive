@@ -48,9 +48,9 @@ SL2Client::SL2Client() {
 }
 
 void
-SL2Client::hash_args(char * argHash, fileArgHash * fStruct){
-    std::vector<unsigned char> blob_vec((unsigned char *) fStruct,
-        ((unsigned char *) fStruct) + sizeof(fileArgHash));
+SL2Client::hash_args(char * argHash, hash_context *hash_ctx){
+    std::vector<unsigned char> blob_vec((unsigned char *) hash_ctx,
+        ((unsigned char *) hash_ctx) + sizeof(hash_context));
     std::string hash_str;
     picosha2::hash256_hex_string(blob_vec, hash_str);
     argHash[SL2_HASH_LEN] = 0;
@@ -294,14 +294,14 @@ SL2Client::wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->source               = NULL;
 
-    fileArgHash fStruct = {0};
+    hash_context hash_ctx = {0};
 
-    GetFinalPathNameByHandle(hEventLog, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
-    fStruct.position = dwRecordOffset;
-    fStruct.readSize = nNumberOfBytesToRead;
+    GetFinalPathNameByHandle(hEventLog, hash_ctx.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
+    hash_ctx.position = dwRecordOffset;
+    hash_ctx.readSize = nNumberOfBytesToRead;
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    hash_args(info->argHash, &fStruct);
+    hash_args(info->argHash, &hash_ctx);
 }
 
 
@@ -342,13 +342,13 @@ SL2Client::wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
         info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
         info->source               = NULL;
 
-        fileArgHash fStruct = {0};
+        hash_context hash_ctx = {0};
 
-//        mbstowcs_s(fStruct.fileName, , lpValueName, MAX_PATH);
-        fStruct.readSize = *lpcbData;
+//        mbstowcs_s(hash_ctx.fileName, , lpValueName, MAX_PATH);
+        hash_ctx.readSize = *lpcbData;
 
         info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-        hash_args(info->argHash, &fStruct);
+        hash_args(info->argHash, &hash_ctx);
     } else {
         *user_data = NULL;
     }
@@ -395,13 +395,13 @@ SL2Client::wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->source               = NULL;
 
-    fileArgHash fStruct = {0};
+    hash_context hash_ctx = {0};
 
-//    fStruct.fileName[0] = (wchar_t) s;
-    fStruct.readSize = dwBufferLength;
+//    hash_ctx.fileName[0] = (wchar_t) s;
+    hash_ctx.readSize = dwBufferLength;
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    hash_args(info->argHash, &fStruct);
+    hash_args(info->argHash, &hash_ctx);
 }
 
 /*
@@ -440,13 +440,13 @@ SL2Client::wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->source               = NULL;
 
-    fileArgHash fStruct = {0};
+    hash_context hash_ctx = {0};
 
-//    fStruct.fileName[0] = (wchar_t) s;
-    fStruct.readSize = nNumberOfBytesToRead;
+//    hash_ctx.fileName[0] = (wchar_t) s;
+    hash_ctx.readSize = nNumberOfBytesToRead;
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    hash_args(info->argHash, &fStruct);
+    hash_args(info->argHash, &hash_ctx);
 }
 
 /*
@@ -485,13 +485,13 @@ SL2Client::wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->source               = NULL;
 
-    fileArgHash fStruct = {0};
+    hash_context hash_ctx = {0};
 
-//    fStruct.fileName[0] = (wchar_t) s;
-    fStruct.readSize = nNumberOfBytesToRead;
+//    hash_ctx.fileName[0] = (wchar_t) s;
+    hash_ctx.readSize = nNumberOfBytesToRead;
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    hash_args(info->argHash, &fStruct);
+    hash_args(info->argHash, &hash_ctx);
 }
 
 
@@ -528,13 +528,13 @@ SL2Client::wrap_pre_recv(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->source               = NULL;
 
-    fileArgHash fStruct = {0};
+    hash_context hash_ctx = {0};
 
-    fStruct.fileName[0] = (wchar_t) s;
-    fStruct.readSize = len;
+    hash_ctx.fileName[0] = (wchar_t) s;
+    hash_ctx.readSize = len;
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    hash_args(info->argHash, &fStruct);
+    hash_args(info->argHash, &hash_ctx);
 }
 
 /*
@@ -558,15 +558,15 @@ SL2Client::wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
     DWORD *lpNumberOfBytesRead = (DWORD*)drwrap_get_arg(wrapcxt, 3);
 
-    fileArgHash fStruct = {0};
+    hash_context hash_ctx = {0};
 
     LARGE_INTEGER offset = {0};
     LARGE_INTEGER position = {0};
     SetFilePointerEx(hFile, offset, &position, FILE_CURRENT);
 
-    GetFinalPathNameByHandle(hFile, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
-    fStruct.position = position.QuadPart;
-    fStruct.readSize = nNumberOfBytesToRead;
+    GetFinalPathNameByHandle(hFile, hash_ctx.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
+    hash_ctx.position = position.QuadPart;
+    hash_ctx.readSize = nNumberOfBytesToRead;
 
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
@@ -576,14 +576,14 @@ SL2Client::wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
     info->lpNumberOfBytesRead  = lpNumberOfBytesRead;
-    info->position             = fStruct.position;
+    info->position             = hash_ctx.position;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
-    info->source = (wchar_t *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(fStruct.fileName));
-    memcpy(info->source, fStruct.fileName, sizeof(fStruct.fileName));
+    info->source = (wchar_t *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(hash_ctx.fileName));
+    memcpy(info->source, hash_ctx.fileName, sizeof(hash_ctx.fileName));
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    hash_args(info->argHash, &fStruct);
+    hash_args(info->argHash, &hash_ctx);
 }
 
 void
@@ -612,16 +612,16 @@ SL2Client::wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->source               = NULL;
 
-    fileArgHash fStruct = {0};
+    hash_context hash_ctx = {0};
 
-    fStruct.fileName[0] = (wchar_t) _fileno(file);
+    hash_ctx.fileName[0] = (wchar_t) _fileno(file);
 
-    fStruct.position = bufsize;  // Field names don't actually matter
-    fStruct.readSize = size;
-    fStruct.count = count;
+    hash_ctx.position = bufsize;  // Field names don't actually matter
+    hash_ctx.readSize = size;
+    hash_ctx.count = count;
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    hash_args(info->argHash, &fStruct);
+    hash_args(info->argHash, &hash_ctx);
 }
 
 void
@@ -650,16 +650,16 @@ SL2Client::wrap_pre_fread(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->source               = NULL;
 
-    fileArgHash fStruct = {0};
+    hash_context hash_ctx = {0};
 
-    fStruct.fileName[0] = (wchar_t) _fileno(file);
+    hash_ctx.fileName[0] = (wchar_t) _fileno(file);
 
-//    fStruct.position = ftell(fpointer);  // This instantly crashes DynamoRIO
-    fStruct.readSize = size;
-    fStruct.count = count;
+//    hash_ctx.position = ftell(fpointer);  // This instantly crashes DynamoRIO
+    hash_ctx.readSize = size;
+    hash_ctx.count = count;
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    hash_args(info->argHash, &fStruct);
+    hash_args(info->argHash, &hash_ctx);
 }
 
 void
@@ -687,13 +687,13 @@ SL2Client::wrap_pre__read(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->source               = NULL;
 
-    fileArgHash fStruct = {0};
+    hash_context hash_ctx = {0};
 
-    fStruct.fileName[0] = (wchar_t) fd;
-    fStruct.count= count;
+    hash_ctx.fileName[0] = (wchar_t) fd;
+    hash_ctx.count= count;
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    hash_args(info->argHash, &fStruct);
+    hash_args(info->argHash, &hash_ctx);
 }
 
 void

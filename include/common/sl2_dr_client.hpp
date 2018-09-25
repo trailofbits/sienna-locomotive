@@ -100,7 +100,7 @@ enum {
 
 // The struct filled with function information for hashing.
 // See `MATCH_ARG_HASH`.
-struct fileArgHash {
+struct hash_context {
   wchar_t fileName[MAX_PATH + 1];
   size_t count;
   size_t position;
@@ -188,7 +188,7 @@ public:
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Methods
     // Method targeting methods.
-    void        hash_args(char *argHash, fileArgHash *fStruct);
+    void        hash_args(char *argHash, hash_context *fStruct);
     bool        is_function_targeted(client_read_info *info);
     bool        compare_filenames(targetFunction &t, client_read_info* info);
     bool        compare_indices(targetFunction &t, Function &function);
