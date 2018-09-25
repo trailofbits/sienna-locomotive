@@ -147,8 +147,8 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 
     json j;
     j["type"]               = "id";
-    j["callCount"]          = client.incrementCallCountForFunction(info->function);
-    j["retAddrCount"]       = client.incrementRetAddrCount(info->retAddrOffset);
+    j["callCount"]          = client.increment_call_count(info->function);
+    j["retAddrCount"]       = client.increment_retaddr_count(info->retAddrOffset);
     j["retAddrOffset"]      = (uint64_t) info->retAddrOffset;
     j["func_name"]          = func_name;
 
@@ -212,8 +212,8 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 
     json j;
     j["type"]               = "id";
-    j["callCount"]          = client.incrementCallCountForFunction(info->function);
-    j["retAddrCount"]       = client.incrementRetAddrCount(info->retAddrOffset);
+    j["callCount"]          = client.increment_call_count(info->function);
+    j["retAddrCount"]       = client.increment_retaddr_count(info->retAddrOffset);
     j["retAddrOffset"]      = (uint64_t) info->retAddrOffset;
     j["func_name"]          = func_name;
 

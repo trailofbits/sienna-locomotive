@@ -1213,7 +1213,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 
     // Identify whether this is the function we want to target
     bool targeted = client.is_function_targeted(info);
-    client.incrementCallCountForFunction(info->function);
+    client.increment_call_count(info->function);
 
     // Mark the targeted memory as tainted
     if (targeted) {
@@ -1280,7 +1280,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     client.hash_args(info->argHash, &fStruct);
 
     bool targeted = client.is_function_targeted(info);
-    client.incrementCallCountForFunction(info->function);
+    client.increment_call_count(info->function);
 
     if (targeted) {
         taint_mem((app_pc) info->lpBuffer, info->nNumberOfBytesToRead);

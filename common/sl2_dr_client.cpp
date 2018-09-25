@@ -132,16 +132,16 @@ bool SL2Client::compare_arg_buffers(targetFunction &t, client_read_info* info){ 
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-// incrementCallCountForFunction()
+// increment_call_count()
 //
 // Increments the total number of call counts for this function
 uint64_t    SL2Client::
-incrementCallCountForFunction(Function function) {
+increment_call_count(Function function) {
     return call_counts[function]++;
 }
 
 uint64_t    SL2Client::
-incrementRetAddrCount(uint64_t retAddr) {
+increment_retaddr_count(uint64_t retAddr) {
     return ret_addr_counts[retAddr]++;
 }
 

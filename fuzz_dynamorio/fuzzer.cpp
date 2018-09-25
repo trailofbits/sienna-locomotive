@@ -347,7 +347,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 
     client_read_info *info = (client_read_info *) user_data;
 
-    client.incrementCallCountForFunction(info->function);
+    client.increment_call_count(info->function);
 
     if (!client.is_function_targeted(info)) {
         goto cleanup;
@@ -393,7 +393,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 
     client_read_info *info = (client_read_info *) user_data;
 
-    client.incrementCallCountForFunction(info->function);
+    client.increment_call_count(info->function);
 
     info->lpBuffer = drwrap_get_retval(wrapcxt);
     MEMORY_BASIC_INFORMATION memory_info = {0};
