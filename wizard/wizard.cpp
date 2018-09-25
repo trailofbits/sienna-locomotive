@@ -45,10 +45,11 @@ on_dr_exit(void)
 {
     SL2_DR_DEBUG("wizard#on_dr_exit\n");
 
-    if (!drmgr_unregister_thread_init_event(on_thread_init) ||
-        !drmgr_unregister_thread_exit_event(on_thread_exit) ||
-        drreg_exit() != DRREG_SUCCESS)
-    {
+    drwrap_exit();
+
+    if (!drmgr_unregister_thread_init_event(on_thread_init)
+        || !drmgr_unregister_thread_exit_event(on_thread_exit)
+        || !drreg_exit()) {
         DR_ASSERT(false);
     }
 
@@ -353,17 +354,18 @@ void wizard(client_id_t id, int argc, const char *argv[])
     dr_set_client_name("Wizard",
                        "https://github.com/trailofbits/sienna-locomotive");
 
-    if (!drmgr_init() || drreg_init(&ops) != DRREG_SUCCESS || !drwrap_init()) {
+    if (!drmgr_init()
+        || drreg_init(&ops) != DRREG_SUCCESS
+        || !drwrap_init()) {
         DR_ASSERT(false);
     }
 
     dr_register_exit_event(on_dr_exit);
 
-    if (!drmgr_register_module_load_event(on_module_load) ||
-        !drmgr_register_thread_init_event(on_thread_init) ||
-        !drmgr_register_thread_exit_event(on_thread_exit) ||
-        !drmgr_register_exception_event(on_exception))
-    {
+    if (!drmgr_register_module_load_event(on_module_load)
+        || !drmgr_register_thread_init_event(on_thread_init)
+        || !drmgr_register_thread_exit_event(on_thread_exit)
+        || !drmgr_register_exception_event(on_exception)) {
         DR_ASSERT(false);
     }
 
