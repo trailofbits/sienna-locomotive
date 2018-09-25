@@ -1453,8 +1453,9 @@ void tracer(client_id_t id, int argc, const char *argv[])
     dr_set_client_name("Tracer",
                        "https://github.com/trailofbits/sienna-locomotive");
 
-    if (!drmgr_init() || drreg_init(&ops) != DRREG_SUCCESS || !drwrap_init()) {
-        SL2_DR_DEBUG("failed to init drmgr/drreg/drwrap!\n");
+    if (!drmgr_init()
+        || !drwrap_init()
+        || drreg_init(&ops) != DRREG_SUCCESS) {
         DR_ASSERT(false);
     }
 
@@ -1486,17 +1487,15 @@ void tracer(client_id_t id, int argc, const char *argv[])
                                                 on_bb_instrument,
                                                 NULL))
         {
-            SL2_DR_DEBUG("failed to register basic block event!\n");
             DR_ASSERT(false);
         }
     }
 
-    if (!drmgr_register_module_load_event(on_module_load) ||
-        !drmgr_register_thread_init_event(on_thread_init) ||
-        !drmgr_register_thread_exit_event(on_thread_exit) ||
-        !drmgr_register_exception_event(on_exception))
+    if (!drmgr_register_module_load_event(on_module_load)
+        || !drmgr_register_thread_init_event(on_thread_init)
+        || !drmgr_register_thread_exit_event(on_thread_exit)
+        || !drmgr_register_exception_event(on_exception))
     {
-        SL2_DR_DEBUG("failed to register module/thread/exception event!\n");
         DR_ASSERT(false);
     }
 
