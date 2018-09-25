@@ -49,7 +49,7 @@ on_dr_exit(void)
 
     if (!drmgr_unregister_thread_init_event(on_thread_init)
         || !drmgr_unregister_thread_exit_event(on_thread_exit)
-        || !drreg_exit()) {
+        || drreg_exit() != DRREG_SUCCESS) {
         DR_ASSERT(false);
     }
 
