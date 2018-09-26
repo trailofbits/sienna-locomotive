@@ -2,7 +2,6 @@
 ## @package gui
 # Code for the QT gui
 
-import os
 import sys
 import time
 from functools import partial
@@ -71,10 +70,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.change_profile_action = self.file_menu.addAction("Change Profile")
 
         # Target info
-        self.targetStatus = QtWidgets.QStatusBar()
-        self.targetLabel = QtWidgets.QLabel()
-        self.targetStatus.addWidget(self.targetLabel)
-        self._layout.addWidget(self.targetStatus)
+        self.target_status = QtWidgets.QStatusBar()
+        self.target_label = QtWidgets.QLabel()
+        self.target_status.addWidget(self.target_label)
+        self._layout.addWidget(self.target_status)
         self.checksec_thread.start()
         self.checksec_thread.resultReady.connect(self.checksec_finished)
 
@@ -204,7 +203,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Crashes table
         session = db.getSession()
-        self.crashesModel = sqlalchemy_model.SqlalchemyModel(
+        self.crashes_model = sqlalchemy_model.SqlalchemyModel(
             session,
             db.Crash,
             [
@@ -227,23 +226,23 @@ class MainWindow(QtWidgets.QMainWindow):
             ],
             orderBy=desc(db.Crash.timestamp),
             filters={"target_config_slug": get_target_slug(config.config)})
-        self.crashesTable = QTableView()
-        self.crashesTable.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
-        self.crashesTable.setModel(self.crashesModel)
-        self._layout.addWidget(self.crashesTable)
-        self.crashesTable.horizontalHeader().setStretchLastSection(True)
-        self.crashesTable.resizeColumnsToContents()
-        self.crashesTable.show()
-        self.crashesTable.clicked.connect(self.crashClicked)
+        self.crashes_table = QTableView()
+        self.crashes_table.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+        self.crashes_table.setModel(self.crashes_model)
+        self._layout.addWidget(self.crashes_table)
+        self.crashes_table.horizontalHeader().setStretchLastSection(True)
+        self.crashes_table.resizeColumnsToContents()
+        self.crashes_table.show()
+        self.crashes_table.clicked.connect(self.crashClicked)
 
         # Crash Browser, details about a crash
-        self.crashBrowser = QTextBrowser()
-        self.crashBrowser.setText("<NO CRASH SELECTED>")
-        self.crashBrowser.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
-        self._layout.addWidget(self.crashBrowser)
+        self.crash_browser = QTextBrowser()
+        self.crash_browser.setText("<NO CRASH SELECTED>")
+        self.crash_browser.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+        self._layout.addWidget(self.crash_browser)
 
-        self.statsWidget = stats.StatsWidget(get_target_slug(config.config))
-        self._layout.addWidget(self.statsWidget)
+        self.stats_widget = stats.StatsWidget(get_target_slug(config.config))
+        self._layout.addWidget(self.stats_widget)
 
         # Set up stop button (and hide it)
         self.stop_button = QtWidgets.QPushButton("Stop Fuzzing")
@@ -411,9 +410,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def handle_new_crash(self, thread, run_id):
         """ Updates the crash counter and pauses other threads if specified """
-        self.crashesModel.update()
-        self.crashesTable.resizeColumnsToContents()
-        self.statsWidget.update()
+        self.crashes_model.update()
+        self.crashes_table.resizeColumnsToContents()
+        self.stats_widget.update()
         self.crash_counter.increment()
         crash = db.Crash.factory(run_id, get_target_slug(config.config))
         if not crash:
@@ -555,7 +554,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def checksec_finished(self, checksec_output):
         target_path = config.config['target_application_path']
         target_string = "Target: {}\t Protections: {}".format(target_path, checksec_output)
-        self.targetLabel.setText(target_string)
+        self.target_label.setText(target_string)
 
     def wizard_finished(self, wizard_output):
         """ Dump the results of a wizard run to the target file and rebuild the tree """
@@ -569,7 +568,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def save_crashes(self):
         """ Saves a csv of crash data """
-        self.crashesModel.update()
+        self.crashes_model.update()
         savefile, not_canceled = QFileDialog.getSaveFileName(self, filter="*.csv")
         if not_canceled:
             export_crash_data_to_csv(self.crashes, savefile)
@@ -624,7 +623,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # row, col = a.row(), a.column()
         data = a.data(Qt.UserRole)
         crash = db.Crash.factory(data.runid)
-        self.crashBrowser.setText(crash.output)
+        self.crash_browser.setText(crash.output)
 
 
 def main():
