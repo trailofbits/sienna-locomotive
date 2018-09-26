@@ -8,9 +8,8 @@ from functools import partial
 from multiprocessing import cpu_count
 
 from PySide2 import QtWidgets
-from PySide2.QtCore import *
+from PySide2.QtCore import Qt, QSize
 from PySide2.QtGui import QFontDatabase, QMovie, QStandardItem, QBrush, QColor
-from PySide2.QtWidgets import *
 from sqlalchemy import desc
 
 from sl2 import db
@@ -109,10 +108,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self._func_tree.resizeColumnToContents(3)
 
         # Create menu items for the context menu
-        self.expand_action = QAction("Expand All")
-        self.collapse_action = QAction("Collapse All")
-        self.check_action = QAction("Check All")
-        self.uncheck_action = QAction("Uncheck All")
+        self.expand_action = QtWidgets.QAction("Expand All")
+        self.collapse_action = QtWidgets.QAction("Collapse All")
+        self.check_action = QtWidgets.QAction("Check All")
+        self.uncheck_action = QtWidgets.QAction("Uncheck All")
 
         # Build layout for function filter text boxes
         self.filter_layout = QtWidgets.QHBoxLayout()
@@ -226,7 +225,7 @@ class MainWindow(QtWidgets.QMainWindow):
             ],
             orderBy=desc(db.Crash.timestamp),
             filters={"target_config_slug": get_target_slug(config.config)})
-        self.crashes_table = QTableView()
+        self.crashes_table = QtWidgets.QTableView()
         self.crashes_table.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self.crashes_table.setModel(self.crashes_model)
         self._layout.addWidget(self.crashes_table)
@@ -236,7 +235,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.crashes_table.clicked.connect(self.crashClicked)
 
         # Crash Browser, details about a crash
-        self.crash_browser = QTextBrowser()
+        self.crash_browser = QtWidgets.QTextBrowser()
         self.crash_browser.setText("<NO CRASH SELECTED>")
         self.crash_browser.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self._layout.addWidget(self.crash_browser)
@@ -544,7 +543,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def contextMenuEvent(self, QContextMenuEvent):
         """ Displays the right-click menu """
-        menu = QMenu(self)
+        menu = QtWidgets.QMenu(self)
         menu.addAction(self.expand_action)
         menu.addAction(self.collapse_action)
         menu.addAction(self.check_action)
@@ -569,7 +568,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def save_crashes(self):
         """ Saves a csv of crash data """
         self.crashes_model.update()
-        savefile, not_canceled = QFileDialog.getSaveFileName(self, filter="*.csv")
+        savefile, not_canceled = QtWidgets.QFileDialog.getSaveFileName(self, filter="*.csv")
         if not_canceled:
             export_crash_data_to_csv(self.crashes, savefile)
 
@@ -608,7 +607,7 @@ class MainWindow(QtWidgets.QMainWindow):
         config.config['verbose'] = 2 if state else False
 
     def triageExportGui(self):
-        path = QFileDialog.getExistingDirectory(dir=".")
+        path = QtWidgets.QFileDialog.getExistingDirectory(dir=".")
         if len(path) == 0:
             return
 
