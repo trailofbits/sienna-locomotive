@@ -65,6 +65,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # CREATE WIDGETS #
 
+        # Menu bar
+        self.menu_bar = self.menuBar()
+        self.file_menu = self.menu_bar.addMenu("&File")
+        self.change_profile_action = self.file_menu.addAction("Change Profile")
+
         # Target info
         self.targetStatus = QtWidgets.QStatusBar()
         self.targetLabel = QtWidgets.QLabel()
@@ -278,6 +283,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.status_bar.addWidget(self.crash_count)
 
         # CONNECT SIGNALS #
+        self.change_profile_action.triggered.connect(self.change_profile)
 
         # Update the text of the status bar adapters whenever the underlying variables change
         self.runs.valueChanged.connect(self.run_adapter.update)
@@ -328,6 +334,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.change_thread_count(self.thread_count.value())
         self.customContextMenuRequested.connect(self.contextMenuEvent)
 
+    def change_profile(self):
+        self.close()
+        main_window = MainWindow()
+        main_window.show()
+
     def change_thread_count(self, new_count):
         """ Creates new threads if we don't have as many as the user wants """
         if len(self.thread_holder) < new_count:
@@ -337,6 +348,10 @@ class MainWindow(QtWidgets.QMainWindow):
     def start_all_threads(self):
         """ Maps over the thread list and starts all the threads """
         self.start_time = self.start_time if self.start_time is not None else time.time()
+
+        # Don't allow the user to change profiles while running fuzzer threads.
+        self.change_profile_action.setDisabled(True)
+
         self.thread_count.setDisabled(True)
         self.fuzzer_button.setDisabled(True)
         self.busy_label.show()
@@ -352,6 +367,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def all_threads_paused(self):
         """ Updates the UI after we've sent the pause signal to all the threads"""
+        self.change_profile_action.setDisabled(False)
         self.fuzzer_button.setDisabled(False)
         self.thread_count.setDisabled(False)
         self.stop_button.hide()
