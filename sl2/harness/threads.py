@@ -7,7 +7,7 @@ from sl2.db.run_block import SessionManager
 
 
 class ChecksecThread(QThread):
-    resultReady = Signal(str)
+    result_ready = Signal(str)
 
     def __init__(self, target_path):
         QThread.__init__(self)
@@ -15,18 +15,18 @@ class ChecksecThread(QThread):
 
     def run(self):
         checksec_output = db.Checksec.byExecutable(self.target_path).short_description()
-        self.resultReady.emit(checksec_output)
+        self.result_ready.emit(checksec_output)
 
 
 class WizardThread(QThread):
-    resultReady = Signal(list)
+    result_ready = Signal(list)
 
     def __init__(self, config_dict):
         QThread.__init__(self)
         self.config_dict = config_dict
 
     def run(self):
-        self.resultReady.emit(wizard_run(self.config_dict))
+        self.result_ready.emit(wizard_run(self.config_dict))
 
 
 class ServerThread(QThread):
@@ -39,8 +39,8 @@ class ServerThread(QThread):
 
 
 class FuzzerThread(QThread):
-    foundCrash = Signal(QThread, str)
-    runComplete = Signal()
+    found_crash = Signal(QThread, str)
+    run_complete = Signal()
     paused = Signal(object)
     server_crashed = Signal()
     tracer_failed = Signal()
@@ -76,7 +76,7 @@ class FuzzerThread(QThread):
                         triagerInfo = triager_run(self.config_dict, run.run_id)
 
                         if triagerInfo:
-                            self.foundCrash.emit(self, str(run.run_id))
+                            self.found_crash.emit(self, str(run.run_id))
                         else:
                             self.tracer_failed.emit()
 
@@ -86,7 +86,7 @@ class FuzzerThread(QThread):
                     if run.run_id == -1:
                         self.server_crashed.emit()
                         self.pause()
-                    self.runComplete.emit()
+                    self.run_complete.emit()
 
     def continuous_state_changed(self, new_state):
         self.config_dict['continuous'] = (new_state == Qt.Checked)

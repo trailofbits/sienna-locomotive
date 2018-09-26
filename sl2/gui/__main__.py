@@ -74,7 +74,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.target_status.addWidget(self.target_label)
         self._layout.addWidget(self.target_status)
         self.checksec_thread.start()
-        self.checksec_thread.resultReady.connect(self.checksec_finished)
+        self.checksec_thread.result_ready.connect(self.checksec_finished)
 
         # Create wizard button
         self.wizard_button = QtWidgets.QPushButton("Run Wizard")
@@ -296,7 +296,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.wizard_button.clicked.connect(self.wizard_thread.start)
         self.wizard_thread.started.connect(partial(self.setCursor, Qt.WaitCursor))
         self.wizard_thread.finished.connect(self.unsetCursor)
-        self.wizard_thread.resultReady.connect(self.wizard_finished)
+        self.wizard_thread.result_ready.connect(self.wizard_finished)
 
         # Connect the context menu buttons
         self.expand_action.triggered.connect(self._func_tree.expandAll)
@@ -380,10 +380,10 @@ class MainWindow(QtWidgets.QMainWindow):
     def connect_thread_callbacks(self, fuzzer_thread):
         """ Sets up callbacks that should fire when any thread emits a signal (or should be received by all threads """
         # Update the run/crash/throughput variables after every fuzzing run
-        fuzzer_thread.runComplete.connect(self.calculate_throughput)
-        fuzzer_thread.runComplete.connect(self.check_for_completion)
+        fuzzer_thread.run_complete.connect(self.calculate_throughput)
+        fuzzer_thread.run_complete.connect(self.check_for_completion)
         fuzzer_thread.paused.connect(self.handle_paused_fuzzer_thread)
-        fuzzer_thread.foundCrash.connect(self.handle_new_crash)
+        fuzzer_thread.found_crash.connect(self.handle_new_crash)
         fuzzer_thread.server_crashed.connect(self.handle_server_crash)
         fuzzer_thread.tracer_failed.connect(self.handle_tracer_failure)
 
