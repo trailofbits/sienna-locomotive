@@ -907,6 +907,8 @@ static void handle_crash_paths(HANDLE pipe)
         SL2_SERVER_LOG_FATAL("failed to write crash.json path to pipe");
     }
 
+    SL2_SERVER_LOG_INFO("wrote crash.json path: %S", target_path);
+
     memset(target_file, 0, (MAX_PATH + 1) * sizeof(wchar_t));
     memset(target_path, 0, (MAX_PATH + 1) * sizeof(wchar_t));
     StringCchPrintfW(target_file, MAX_PATH, FUZZ_RUN_MEM_DMP_FMT, pid);
@@ -922,6 +924,8 @@ static void handle_crash_paths(HANDLE pipe)
         SL2_SERVER_LOG_FATAL("failed to write mem.dmp path to pipe");
     }
 
+    SL2_SERVER_LOG_INFO("wrote mem.dmp path: %S", target_path);
+
     memset(target_file, 0, (MAX_PATH + 1) * sizeof(wchar_t));
     memset(target_path, 0, (MAX_PATH + 1) * sizeof(wchar_t));
     StringCchPrintfW(target_file, MAX_PATH, FUZZ_RUN_INITIAL_DMP_FMT, pid);
@@ -936,6 +940,8 @@ static void handle_crash_paths(HANDLE pipe)
     if (!WriteFile(pipe, &target_path, (DWORD)size, &txsize, NULL)) {
         SL2_SERVER_LOG_FATAL("failed to write initial.dmp path to pipe");
     }
+
+    SL2_SERVER_LOG_INFO("wrote initial.dmp path: %S", target_path);
 
     RpcStringFree((RPC_WSTR *)&run_id_s);
 }
