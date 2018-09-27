@@ -399,6 +399,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     MEMORY_BASIC_INFORMATION memory_info = {0};
 
     if (!info->nNumberOfBytesToRead) {
+        SL2_DR_DEBUG("MapViewOfFile called with dwNumberOfBytesToMap=0, querying memory!\n");
         dr_virtual_query((byte *) info->lpBuffer, &memory_info, sizeof(memory_info));
 
         info->nNumberOfBytesToRead = memory_info.RegionSize;
@@ -410,7 +411,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     // NOTE(ww): The wizard should weed these failures out for us; if it happens
     // here, there's not much we can do.
     if (!GetMappedFileName(GetCurrentProcess(), info->lpBuffer, hash_ctx.fileName, MAX_PATH)) {
-        SL2_DR_DEBUG("Fatal: Couldn't get filename for memory map (GLE=%d)! Aborting.\n", GetLastError());
+        SL2_DR_DEBUG("Fatal: Couldn't get filename for memory map (size=%lu) (GLE=%d)! Aborting.\n", info->nNumberOfBytesToRead, GetLastError());
         crashed = false;
         dr_exit_process(1);
     }
