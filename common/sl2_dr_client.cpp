@@ -9,19 +9,14 @@ using namespace std;
 // TODO(ww): Since we iterate over these, order them by likelihood of occurrence?
 sl2_funcmod SL2_FUNCMOD_TABLE[] = {
     {"ReadFile", "KERNELBASE.DLL"},
-    {"ReadFile", "KERNEL32.DLL"},
     {"recv", "WS2_32.DLL"},                     // TODO(ww): Is this right?
     {"WinHttpReadData", "WINHTTP.DLL"},         // TODO(ww): Is this right?
     {"InternetReadFile", "WININET.DLL"},        // TODO(ww): Is this right?
     {"WinHttpWebSocketReceive", "WINHTTP.DLL"}, // TODO(ww): Is this right?
     {"RegQueryValueExA", "KERNELBASE.DLL"},
-    {"RegQueryValueExA", "ADVAPI32.DLL"},
     {"RegQueryValueExW", "KERNELBASE.DLL"},
-    {"RegQueryValueExW", "ADVAPI32.DLL"},
     {"ReadEventLogA", "KERNELBASE.DLL"},
-    {"ReadEventLogA", "ADVAPI32.DLL"},
     {"ReadEventLogW", "KERNELBASE.DLL"},
-    {"ReadEventLogW", "ADVAPI32.DLL"},
     {"fread", "UCRTBASE.DLL"},
     {"fread", "UCRTBASED.DLL"},
     {"fread", "MSVCRT.DLL"},
@@ -35,7 +30,6 @@ sl2_funcmod SL2_FUNCMOD_TABLE[] = {
     {"_read", "MSVCRT.DLL"},
     {"_read", "MSVCRTD.DLL"},
     {"MapViewOfFile", "KERNELBASE.DLL"},
-    {"MapViewOfFile", "KERNEL32.DLL"},
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
