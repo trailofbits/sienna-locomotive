@@ -410,7 +410,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     // NOTE(ww): The wizard should weed these failures out for us; if it happens
     // here, there's not much we can do.
     if (!GetMappedFileName(GetCurrentProcess(), info->lpBuffer, hash_ctx.fileName, MAX_PATH)) {
-        SL2_DR_DEBUG("Fatal: Couldn't get filename for memory map! Aborting.\n");
+        SL2_DR_DEBUG("Fatal: Couldn't get filename for memory map (GLE=%d)! Aborting.\n", GetLastError());
         crashed = false;
         dr_exit_process(1);
     }
