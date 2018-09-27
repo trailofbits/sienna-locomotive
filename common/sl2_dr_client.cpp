@@ -9,19 +9,14 @@ using namespace std;
 // TODO(ww): Since we iterate over these, order them by likelihood of occurrence?
 sl2_funcmod SL2_FUNCMOD_TABLE[] = {
     {"ReadFile", "KERNELBASE.DLL"},
-    {"ReadFile", "KERNEL32.DLL"},
     {"recv", "WS2_32.DLL"},                     // TODO(ww): Is this right?
     {"WinHttpReadData", "WINHTTP.DLL"},         // TODO(ww): Is this right?
     {"InternetReadFile", "WININET.DLL"},        // TODO(ww): Is this right?
     {"WinHttpWebSocketReceive", "WINHTTP.DLL"}, // TODO(ww): Is this right?
     {"RegQueryValueExA", "KERNELBASE.DLL"},
-    {"RegQueryValueExA", "ADVAPI32.DLL"},
     {"RegQueryValueExW", "KERNELBASE.DLL"},
-    {"RegQueryValueExW", "ADVAPI32.DLL"},
     {"ReadEventLogA", "KERNELBASE.DLL"},
-    {"ReadEventLogA", "ADVAPI32.DLL"},
     {"ReadEventLogW", "KERNELBASE.DLL"},
-    {"ReadEventLogW", "ADVAPI32.DLL"},
     {"fread", "UCRTBASE.DLL"},
     {"fread", "UCRTBASED.DLL"},
     {"fread", "MSVCRT.DLL"},
@@ -35,7 +30,6 @@ sl2_funcmod SL2_FUNCMOD_TABLE[] = {
     {"_read", "MSVCRT.DLL"},
     {"_read", "MSVCRTD.DLL"},
     {"MapViewOfFile", "KERNELBASE.DLL"},
-    {"MapViewOfFile", "KERNEL32.DLL"},
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -69,26 +63,45 @@ is_function_targeted(client_read_info* info)
 
     for (targetFunction t : parsedJson){
         if (t.selected && STREQ(t.functionName.c_str(), func_name)) {
-                if (t.mode & MATCH_INDEX)           { if (compare_indices(t, function)) {return true;}}
-                if (t.mode & MATCH_RETN_ADDRESS)    { if (compare_return_addresses(t, info)) {return true;}}
-                if (t.mode & MATCH_ARG_HASH)        { if (compare_arg_hashes(t, info)) {return true;}}
-                if (t.mode & MATCH_ARG_COMPARE)     { if (compare_arg_buffers(t, info)) {return true;}}
-                if (t.mode & MATCH_FILENAMES)       { if (compare_filenames(t, info)) {return true;}}
-                if (t.mode & MATCH_RETN_COUNT)      { if (compare_index_at_retaddr(t, info)) {return true;}}
-                if (t.mode & LOW_PRECISION) {
-                    if (info->source) { // if filename is available
-                        if (compare_filenames(t, info)) {return true;}
-                    } else {
-                        if (compare_return_addresses(t, info) && compare_arg_buffers(t, info)) {return true;}
+            if (t.mode & MATCH_INDEX && compare_indices(t, function)) {
+                return true;
+            }
+            if (t.mode & MATCH_RETN_ADDRESS && compare_return_addresses(t, info)) {
+                return true;
+            }
+            if (t.mode & MATCH_ARG_HASH && compare_arg_hashes(t, info)) {
+                return true;
+            }
+            if (t.mode & MATCH_ARG_COMPARE && compare_arg_buffers(t, info)) {
+                return true;
+            }
+            if (t.mode & MATCH_FILENAMES && compare_filenames(t, info)) {
+                return true;
+            }
+            if (t.mode & MATCH_RETN_COUNT && compare_index_at_retaddr(t, info)) {
+                return true;
+            }
+            if (t.mode & LOW_PRECISION) {
+                // if filename is available
+                if (info->source && compare_filenames(t, info)) {
+                    if (compare_filenames(t, info)) {
+                        return true;
                     }
                 }
-                if (t.mode & MEDIUM_PRECISION) {
-                    if (compare_arg_hashes(t, info) && compare_return_addresses(t, info)) {return true;}
+                if (compare_return_addresses(t, info) && compare_arg_buffers(t, info)) {
+                    return true;
                 }
-                if (t.mode & HIGH_PRECISION) {
-                    if (compare_arg_hashes(t, info) && compare_index_at_retaddr(t, info)) {return true;}
+            }
+            if (t.mode & MEDIUM_PRECISION) {
+                if (compare_arg_hashes(t, info) && compare_return_addresses(t, info)) {
+                    return true;
                 }
-                else {return false;}
+            }
+            if (t.mode & HIGH_PRECISION) {
+                if (compare_arg_hashes(t, info) && compare_index_at_retaddr(t, info)) {
+                    return true;
+                }
+            }
         }
     }
     return false;

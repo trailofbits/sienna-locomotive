@@ -880,13 +880,13 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
         HANDLE dump_file = CreateFile(crash_paths.crash_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
         if (dump_file == INVALID_HANDLE_VALUE) {
-            SL2_DR_DEBUG("tracer#dump_crash: could not open the crash file (%x)\n", GetLastError());
+            SL2_DR_DEBUG("tracer#dump_crash: could not open the crash file (crash_path=%S) (GLE=%d)\n", crash_paths.crash_path, GetLastError());
             dr_abort();
         }
 
         DWORD txsize;
         if (!WriteFile(dump_file, crash_json.c_str(), (DWORD) crash_json.length(), &txsize, NULL)) {
-            SL2_DR_DEBUG("tracer#dump_crash: could not write to the crash file (%x)\n", GetLastError());
+            SL2_DR_DEBUG("tracer#dump_crash: could not write to the crash file (GLE=%d)\n", GetLastError());
             dr_abort();
         }
 
@@ -895,7 +895,7 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
         HANDLE hDumpFile = CreateFile(crash_paths.mem_dump_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
         if (hDumpFile == INVALID_HANDLE_VALUE) {
-            SL2_DR_DEBUG("tracer#dump_crash: could not open the dump file (%x)\n", GetLastError());
+            SL2_DR_DEBUG("tracer#dump_crash: could not open the dump file (GLE=%d)\n", GetLastError());
         }
 
         EXCEPTION_POINTERS exception_pointers = {0};
@@ -1249,6 +1249,7 @@ static void
 wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 {
     void *drcontext = NULL;
+    bool interesting_call = true;
 
     if (!client.is_sane_post_hook(wrapcxt, user_data, &drcontext)) {
         goto cleanup;
@@ -1272,8 +1273,8 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     // NOTE(ww): The wizard should weed these failures out for us; if it happens
     // here, there's not much we can do.
     if (!GetMappedFileName(GetCurrentProcess(), info->lpBuffer, hash_ctx.fileName, MAX_PATH)) {
-        SL2_DR_DEBUG("Fatal: Couldn't get filename for memory map! Aborting.\n");
-        dr_exit_process(1);
+        SL2_DR_DEBUG("Couldn't get filename for memory map (size=%lu) (GLE=%d)! Assuming uninteresting.\n", info->nNumberOfBytesToRead, GetLastError());
+        interesting_call = false;
     }
 
     // Create the argHash, now that we have the correct source and nNumberOfBytesToRead.
@@ -1287,7 +1288,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     }
 
     // Talk to the server, get the stored mutation from the fuzzing run, and write it into memory.
-    if (replay && targeted) {
+    if (interesting_call && replay && targeted) {
         dr_mutex_lock(mutatex);
 
         if (no_mutate) {
@@ -1458,9 +1459,6 @@ void tracer(client_id_t id, int argc, const char *argv[])
         || drreg_init(&ops) != DRREG_SUCCESS) {
         DR_ASSERT(false);
     }
-
-    replay = false;
-    mutate_count = 0;
 
     run_id_s = op_replay.get_value();
     UUID run_id;

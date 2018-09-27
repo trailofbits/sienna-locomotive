@@ -116,7 +116,7 @@ typedef struct targetFunction {
     uint64_t                retAddrCount;
     string                  functionName;
     string                  argHash;
-    wstring                  source;
+    wstring                 source;
     vector<uint8_t>         buffer;
 } TargetFunction;
 
