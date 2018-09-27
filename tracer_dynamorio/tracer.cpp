@@ -1249,6 +1249,7 @@ static void
 wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 {
     void *drcontext = NULL;
+    bool interesting_call = true;
 
     if (!client.is_sane_post_hook(wrapcxt, user_data, &drcontext)) {
         goto cleanup;
@@ -1272,8 +1273,8 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     // NOTE(ww): The wizard should weed these failures out for us; if it happens
     // here, there's not much we can do.
     if (!GetMappedFileName(GetCurrentProcess(), info->lpBuffer, hash_ctx.fileName, MAX_PATH)) {
-        SL2_DR_DEBUG("Fatal: Couldn't get filename for memory map! Aborting.\n");
-        dr_exit_process(1);
+        SL2_DR_DEBUG("Couldn't get filename for memory map (size=%lu) (GLE=%d)! Assuming uninteresting.\n", info->nNumberOfBytesToRead, GetLastError());
+        interesting_call = false;
     }
 
     // Create the argHash, now that we have the correct source and nNumberOfBytesToRead.
@@ -1287,7 +1288,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     }
 
     // Talk to the server, get the stored mutation from the fuzzing run, and write it into memory.
-    if (replay && targeted) {
+    if (interesting_call && replay && targeted) {
         dr_mutex_lock(mutatex);
 
         if (no_mutate) {

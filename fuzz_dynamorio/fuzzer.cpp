@@ -384,6 +384,7 @@ static void
 wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 {
     void *drcontext = NULL;
+    bool interesting_call = true;
 
     if (!client.is_sane_post_hook(wrapcxt, user_data, &drcontext)) {
         goto cleanup;
@@ -408,12 +409,9 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     hash_context hash_ctx = {0};
     hash_ctx.readSize = info->nNumberOfBytesToRead;
 
-    // NOTE(ww): The wizard should weed these failures out for us; if it happens
-    // here, there's not much we can do.
     if (!GetMappedFileName(GetCurrentProcess(), info->lpBuffer, hash_ctx.fileName, MAX_PATH)) {
-        SL2_DR_DEBUG("Fatal: Couldn't get filename for memory map (size=%lu) (GLE=%d)! Aborting.\n", info->nNumberOfBytesToRead, GetLastError());
-        crashed = false;
-        dr_exit_process(1);
+        SL2_DR_DEBUG("Couldn't get filename for memory map (size=%lu) (GLE=%d)! Assuming uninteresting.\n", info->nNumberOfBytesToRead, GetLastError());
+        interesting_call = false;
     }
 
     // Toss the filename into info, so that `mutate` can send it to the server.
@@ -422,7 +420,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     // Create the argHash, now that we have the correct source and nNumberOfBytesToRead.
     client.hash_args(info->argHash, &hash_ctx);
 
-    if (client.is_function_targeted(info)) {
+    if (interesting_call && client.is_function_targeted(info)) {
         // If the mutation process fails in any way, consider this fuzzing run a loss.
         if (!mutate(info)) {
             crashed = false;
