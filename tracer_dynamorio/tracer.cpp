@@ -880,13 +880,13 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
         HANDLE dump_file = CreateFile(crash_paths.crash_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
         if (dump_file == INVALID_HANDLE_VALUE) {
-            SL2_DR_DEBUG("tracer#dump_crash: could not open the crash file (%x)\n", GetLastError());
+            SL2_DR_DEBUG("tracer#dump_crash: could not open the crash file (GLE=%d)\n", GetLastError());
             dr_abort();
         }
 
         DWORD txsize;
         if (!WriteFile(dump_file, crash_json.c_str(), (DWORD) crash_json.length(), &txsize, NULL)) {
-            SL2_DR_DEBUG("tracer#dump_crash: could not write to the crash file (%x)\n", GetLastError());
+            SL2_DR_DEBUG("tracer#dump_crash: could not write to the crash file (GLE=%d)\n", GetLastError());
             dr_abort();
         }
 
@@ -895,7 +895,7 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
         HANDLE hDumpFile = CreateFile(crash_paths.mem_dump_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
         if (hDumpFile == INVALID_HANDLE_VALUE) {
-            SL2_DR_DEBUG("tracer#dump_crash: could not open the dump file (%x)\n", GetLastError());
+            SL2_DR_DEBUG("tracer#dump_crash: could not open the dump file (GLE=%d)\n", GetLastError());
         }
 
         EXCEPTION_POINTERS exception_pointers = {0};
