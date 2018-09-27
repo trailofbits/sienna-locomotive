@@ -880,7 +880,7 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
         HANDLE dump_file = CreateFile(crash_paths.crash_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
         if (dump_file == INVALID_HANDLE_VALUE) {
-            SL2_DR_DEBUG("tracer#dump_crash: could not open the crash file (GLE=%d)\n", GetLastError());
+            SL2_DR_DEBUG("tracer#dump_crash: could not open the crash file (crash_path=%S) (GLE=%d)\n", crash_paths.crash_path, GetLastError());
             dr_abort();
         }
 
@@ -1459,9 +1459,6 @@ void tracer(client_id_t id, int argc, const char *argv[])
         || drreg_init(&ops) != DRREG_SUCCESS) {
         DR_ASSERT(false);
     }
-
-    replay = false;
-    mutate_count = 0;
 
     run_id_s = op_replay.get_value();
     UUID run_id;
