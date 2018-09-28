@@ -39,8 +39,6 @@ static app_pc module_start = 0;
 static app_pc module_end = 0;
 static size_t baseAddr;
 
-
-
 /* Mostly used to debug if taint tracking is too slow */
 static droption_t<unsigned int> op_no_taint(
     DROPTION_SCOPE_CLIENT,
@@ -1447,9 +1445,39 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     }
 }
 
-// register callbacks
-void tracer(client_id_t id, int argc, const char *argv[])
+DR_EXPORT void
+dr_client_main(client_id_t id, int argc, const char *argv[])
 {
+    // parse client options
+    std::string parse_err;
+    int last_idx = 0;
+    if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
+        SL2_DR_DEBUG("tracer#main: usage error: %s", parse_err.c_str());
+        dr_abort();
+    }
+
+    // target is mandatory
+    std::string target = op_target.get_value();
+    if (target == "") {
+        SL2_DR_DEBUG("tracer#main: ERROR: arg -t (target) required");
+        dr_abort();
+    }
+
+    if (!client.loadJson(target)) {
+        SL2_DR_DEBUG("Failed to load targets!\n");
+        dr_abort();
+    }
+
+    // NOTE(ww): We open the client's connection to the server here,
+    // but the client isn't ready to use until it's been given a run ID.
+    // See inside of `tracer` for that.
+    if (sl2_conn_open(&sl2_conn) != SL2Response::OK) {
+        SL2_DR_DEBUG("ERROR: Couldn't open a connection to the server!\n");
+        dr_abort();
+    }
+
+    dr_enable_console_printing();
+
     drreg_options_t ops = {sizeof(ops), 3, false};
     dr_set_client_name("Tracer",
                        "https://github.com/trailofbits/sienna-locomotive");
@@ -1493,41 +1521,5 @@ void tracer(client_id_t id, int argc, const char *argv[])
         DR_ASSERT(false);
     }
 
-    dr_log(NULL, DR_LOG_ALL, 1, "Client 'instrace' initializing\n");
-}
-
-DR_EXPORT void
-dr_client_main(client_id_t id, int argc, const char *argv[])
-{
-    // parse client options
-    std::string parse_err;
-    int last_idx = 0;
-    if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
-        SL2_DR_DEBUG("tracer#main: usage error: %s", parse_err.c_str());
-        dr_abort();
-    }
-
-    // target is mandatory
-    std::string target = op_target.get_value();
-    if (target == "") {
-        SL2_DR_DEBUG("tracer#main: ERROR: arg -t (target) required");
-        dr_abort();
-    }
-
-    if (!client.loadJson(target)) {
-        SL2_DR_DEBUG("Failed to load targets!\n");
-        dr_abort();
-    }
-
-    // NOTE(ww): We open the client's connection to the server here,
-    // but the client isn't ready to use until it's been given a run ID.
-    // See inside of `tracer` for that.
-    if (sl2_conn_open(&sl2_conn) != SL2Response::OK) {
-        SL2_DR_DEBUG("ERROR: Couldn't open a connection to the server!\n");
-        dr_abort();
-    }
-
-    dr_enable_console_printing();
-
-    tracer(id, argc, argv);
+    dr_log(NULL, DR_LOG_ALL, 1, "Client 'tracer' initializing\n");
 }

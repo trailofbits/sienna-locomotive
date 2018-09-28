@@ -347,9 +347,20 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     }
 }
 
-/* registers event callbacks and initializes DynamoRIO */
-void wizard(client_id_t id, int argc, const char *argv[])
+/* Parses options and calls wizard helper */
+DR_EXPORT void
+dr_client_main(client_id_t id, int argc, const char *argv[])
 {
+    std::string parse_err;
+    int last_idx = 0;
+
+    if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
+        SL2_DR_DEBUG("wizard#main: usage error: %s", parse_err.c_str());
+        dr_abort();
+    }
+
+    dr_enable_console_printing();
+
     drreg_options_t ops = {sizeof(ops), 3, false};
     dr_set_client_name("Wizard",
                        "https://github.com/trailofbits/sienna-locomotive");
@@ -370,20 +381,4 @@ void wizard(client_id_t id, int argc, const char *argv[])
     }
 
     dr_log(NULL, DR_LOG_ALL, 1, "Client 'Wizard' initializing\n");
-}
-
-/* Parses options and calls wizard helper */
-DR_EXPORT void
-dr_client_main(client_id_t id, int argc, const char *argv[])
-{
-    std::string parse_err;
-    int last_idx = 0;
-
-    if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
-        SL2_DR_DEBUG("wizard#main: usage error: %s", parse_err.c_str());
-        dr_abort();
-    }
-
-    dr_enable_console_printing();
-    wizard(id, argc, argv);
 }
