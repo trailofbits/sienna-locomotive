@@ -4,7 +4,7 @@
 # 1: Check if the config file exists. If not, create it with sensible defaults.
 # 2: If the config file exists, read in the contents.
 # 3: If the user has provided any arguments that overwrite the values in the
-# config file, use those instead.
+#     config file, use those instead.
 
 
 import argparse

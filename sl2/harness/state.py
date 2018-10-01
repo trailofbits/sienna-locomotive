@@ -26,11 +26,9 @@ from . import config
 uuid_regex = re.compile("[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}")
 
 
+## Represents the state created by a call to
+#     create_invocation_statement.
 class InvocationState(NamedTuple):
-    """
-    Represents the state created by a call to
-    create_invocation_statement.
-    """
     cmd_arr: list
     cmd_str: str
     seed: str
@@ -43,11 +41,9 @@ def esc_quote_paren(raw):
         return "\"{}\"".format(raw)
 
 
+## Returns an InvocationState containing the command run
+#     and the PRNG seed used.
 def create_invocation_statement(config_dict, run_id):
-    """
-    Returns an InvocationState containing the command run
-    and the PRNG seed used.
-    """
     seed = str(generate_seed(run_id))
     program_arr = [
         config_dict['drrun_path'],
@@ -70,12 +66,10 @@ def create_invocation_statement(config_dict, run_id):
     )
 
 
+## Takes a UUID, strips out the non-random bits, and returns the rest as an int
+#     :param run_id:
+#     :return: 120-bit random int
 def generate_seed(run_id):
-    """
-    Takes a UUID, strips out the non-random bits, and returns the rest as an int
-    :param run_id:
-    :return: 120-bit random int
-    """
     if re.match(uuid_regex, str(run_id)):
         parsed = str(run_id).replace('-', '')
         parsed = parsed[:12] + parsed[13:16] + parsed[17:]  # Strip the non-random bits
@@ -84,10 +78,9 @@ def generate_seed(run_id):
         return random.getrandbits(120)
 
 
+## Escape paths with spaces in them by surrounding them with quotes.
 def stringify_program_array(target_application_path, target_args_array):
-    """
-    Escape paths with spaces in them by surrounding them with quotes.
-    """
+
     out = "{} {}\n".format(
         esc_quote_paren(target_application_path),
         ' '.join(esc_quote_paren(k) for k in target_args_array)
@@ -96,13 +89,11 @@ def stringify_program_array(target_application_path, target_args_array):
     return out
 
 
+## Turn a stringified program array back into the tokens that went in.
+# Treats quoted entities as atomic,
+# splits all others on spaces.
 # TODO: Use winshlex here.
 def unstringify_program_array(stringified):
-    """
-    Turn a stringified program array back into the tokens that went in.
-    Treats quoted entities as atomic,
-    splits all others on spaces.
-    """
     invoke = []
     # TODO use this for config file parsing
     split = re.split('(\".*?\")', stringified)
@@ -116,6 +107,8 @@ def unstringify_program_array(stringified):
     return invoke[0], invoke[1:]
 
 
+## Transform a given config dict into a target slug usable as a universal identifier
+#  @return target_slug: str
 def get_target_slug(_config):
     # TODO(ww): Use os.path.basename for this?
 
@@ -126,6 +119,8 @@ def get_target_slug(_config):
     return "{}_{}".format(exe_name, dir_hash)
 
 
+## Calculate the target slug and return the directory for it. Create the directory if it doesn't exist
+#  @return dir_name: str
 def get_target_dir(_config):
     """
     Gets (or creates) the path to a target directory for the current
@@ -147,6 +142,8 @@ def get_target_dir(_config):
     return dir_name
 
 
+## class TargetAdapter
+# Stores a list of targets and writes changes back to a target file on the disk
 class TargetAdapter(object):
 
     def __init__(self, target_list, filename):
@@ -158,6 +155,7 @@ class TargetAdapter(object):
     def __iter__(self):
         return self.target_list.__iter__()
 
+    ## Update a single target. Save to the disk if not paused.
     def update(self, index, **kwargs):
         for key in kwargs:
             self.target_list[index][key] = kwargs[key]
@@ -165,18 +163,22 @@ class TargetAdapter(object):
         if not self.pause_saving:
             self.save()
 
+    ## Temporarily refrain from writing back to disk. Good for bulk writes.
     def pause(self):
         self.pause_saving = True
 
+    ## Write on each change once again. Sync any pending changes to the disk.
     def unpause(self):
         self.pause_saving = False
         self.save()
 
+    ## Initialize with a list of targets
     def set_target_list(self, new_targets):
         self.target_list = new_targets
         if not self.pause_saving:
             self.save()
 
+    ## Write the file to the disk
     def save(self):
         with open(self.filename, 'wb') as msgfile:
             msgpack.dump(list(filter(lambda k: k['selected'], self.target_list)), msgfile)
@@ -184,6 +186,8 @@ class TargetAdapter(object):
             msgpack.dump(self.target_list, msgfile)
 
 
+## Get the target adapter for a given config
+# @return adapter: TargetAdapter
 def get_target(_config):
     target_file = os.path.join(get_target_dir(_config), 'targets.msg')
     try:
@@ -193,10 +197,11 @@ def get_target(_config):
         return TargetAdapter([], target_file)
 
 
+## Get a list of all the target directories on the disk
+#  @return targets - a dict mapping target directories to the contents of the argument file.
 def get_all_targets():
     """
-    Returns a dict mapping target directories to the contents of the
-    argument file.
+
     """
     targets = {}
     for _dir in glob.glob(os.path.join(config.sl2_targets_dir, '*')):
@@ -209,9 +214,10 @@ def get_all_targets():
     return targets
 
 
+## Get the existing run id's from the disk
+# @return runs - Returns a dict mapping run ID's to the contents of the argument file.
 def get_runs(run_id=None):
     """
-    Returns a dict mapping run ID's to the contents of the argument file.
     """
     runs = {}
     for _dir in glob.glob(os.path.join(config.sl2_runs_dir, '*' if run_id is None else run_id)):
@@ -224,28 +230,19 @@ def get_runs(run_id=None):
     return runs
 
 
+## @return path: str - the full path to the given filename within the given run's directory.
 def get_path_to_run_file(run_id, filename):
-    """
-    Returns the full path to the given filename within
-    the given run's directory.
-    """
     return os.path.join(config.sl2_runs_dir, str(run_id), filename)
 
 
+## @return glob: List[str] - Returns all paths under the given run's directory that match the given pattern glob.
 def get_paths_to_run_file(run_id, pattern):
-    """
-    Returns all paths under the given run's directory
-    that match the given pattern glob.
-    """
     pattern = os.path.join(config.sl2_runs_dir, str(run_id), pattern)
     return glob.glob(pattern)
 
 
+## Writes the PRNG seed, stdout, and stderr buffers for a particular stage into a run's directory.
 def write_output_files(run, run_id, stage_name):
-    """
-    Writes the PRNG seed, stdout, and stderr buffers for a particular stage
-    into a run's directory.
-    """
     try:
         with open(get_path_to_run_file(run_id, '{}.seed'.format(stage_name)), 'w') as seedfile:
             seedfile.write(run.seed)
@@ -259,11 +256,8 @@ def write_output_files(run, run_id, stage_name):
         print("Couldn't find an output directory for run %s" % run_id)
 
 
+## Parses the results of a tracer run and returns them in human-readable form.
 def parse_tracer_crash_files(run_id):
-    """
-    Parses the results of a tracer run and returns them in
-    human-readable form.
-    """
     crash_files = get_paths_to_run_file(run_id, 'crash.*.json')
 
     if not crash_files:
@@ -284,7 +278,7 @@ To retry it manually, run \
         formatted += ("\n\t0x{location:02x}: {instruction}".format(**results))
         return formatted, results
 
-
+## (DEPRECATED) Dumps the crash data for a given set of crashs to a CSV file. Not currently used.
 def export_crash_data_to_csv(crashes, csv_filename):
     fields = [
         'score',
@@ -302,6 +296,8 @@ def export_crash_data_to_csv(crashes, csv_filename):
         writer.writerows(crashes)
 
 
+## Creates a new Run ID from a given config dict
+#  @return run_id: str - hex-encoded uuid4
 def generate_run_id(config_dict):
     run_id = uuid.uuid4() if 'run_id' not in config_dict else config_dict['run_id']
 
@@ -317,13 +313,10 @@ def generate_run_id(config_dict):
 
     return run_id
 
-
+## Attempt to parse a line as JSON, returning a tuple of the crash state
+#  and the exception code. If no crash can be detected in the line, return
+#  False, None.
 def check_fuzz_line_for_crash(line):
-    """
-    Attempt to parse a line as JSON, returning a tuple of the crash state
-    and the exception code. If no crash can be detected in the line, return
-    False, None.
-    """
     try:
         obj = json.loads(line)
         if obj["exception"]:
@@ -416,6 +409,8 @@ class TriageExport:
         }
         return attrmap
 
+
+## Checks a number of registry keys to make sure the user hasn't enabled anything that's likely to break the fuzzer. s
 def sanity_checks(exit=True):
     """
     Make sure the system is in a state that's nominally ready for fuzzing.

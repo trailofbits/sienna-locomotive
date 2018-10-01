@@ -19,12 +19,10 @@ _CloseHandle.argtypes = [wintypes.HANDLE]
 _CloseHandle.restype = wintypes.BOOL
 
 
+## Tests the given mutex handle, returning True if the mutex
+# is acquirable (at time of return) and False if the mutex is
+# already acquired (at time of return).
 def _test_handle(handle):
-    """
-    Tests the given mutex handle, returning True if the mutex
-    is acquirable (at time of return) and False if the mutex is
-    already acquired (at time of return).
-    """
     status = _WaitForSingleObject(handle, 0)
 
     if status in (0x0, 0x80):
@@ -36,13 +34,10 @@ def _test_handle(handle):
         raise wintypes.WinError()
 
 
+## Tests the given named mutex, returning True if the mutex
+#  is acquirable and False if already acquired.
+#  Note: This function is susceptible to TOCTOU.
 def test_named_mutex(name):
-    """
-    Tests the given named mutex, returning True if the mutex
-    is acquirable and False if already acquired.
-
-    Note: This function is susceptible to TOCTOU.
-    """
     handle = _CreateMutex(None, False, name)
 
     if not handle:
@@ -55,11 +50,9 @@ def test_named_mutex(name):
     return status
 
 
+## Repeatedly acquires and releases the given named mutex,
+#  until someone else steals it.
 def spin_named_mutex(name):
-    """
-    Repeatedly acquires and releases the given named mutex,
-    until someone else steals it.
-    """
     handle = _CreateMutex(None, False, name)
 
     if not handle:

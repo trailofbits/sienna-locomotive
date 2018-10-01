@@ -39,23 +39,34 @@ from .state import (
 print_lock = threading.Lock()
 can_fuzz = True
 
-
+## class Mode
+#  Enum storing bit flags that control how the fuzzer and tracer target functions
 class Mode(IntEnum):
     """
     Function selection modes.
     KEEP THIS UP-TO-DATE with common/enums.h
     """
+    ## Match the number of times a given target-able function has been called
     MATCH_INDEX = 1 << 0
+    ## Match the return address of the targetable function
     MATCH_RETN_ADDRESS = 1 << 1
+    ## Match the hash of the arguments of the function
     MATCH_ARG_HASH = 1 << 2
+    ## Match the bytewise comparison of the argument buffer
     MATCH_ARG_COMPARE = 1 << 3
+    ## Hybrid algorithm - fuzzy
     LOW_PRECISION = 1 << 4
+    ## Hybrid algorithm - precise, can be applied to multiple instances of identical calls
     MEDIUM_PRECISION = 1 << 5
+    ## Hybrid algorithm - precise, can only be applied once
     HIGH_PRECISION = 1 << 6
+    ## Match a comparison of the filename (if available)
     MATCH_FILENAMES = 1 << 7
+    ## Match the number of times the client has encountered a given return address
     MATCH_RETN_COUNT = 1 << 8
 
 
+## Named tuple for storing information about a call to run_dr
 class DRRun(object):
     """
     Represents the state returned by a call to run_dr.
@@ -67,7 +78,8 @@ class DRRun(object):
         self.run_id: str = run_id
         self.coverage: dict = coverage
 
-
+## Safe printing
+#  TODO - we should switch to the logging module to make this simpler
 def print_l(*args):
     """
     Prints the given arguments in a thread-safe manner.
@@ -76,6 +88,7 @@ def print_l(*args):
         print(*args)
 
 
+## Run a command in a powershell wrapper so a new window pops up
 def ps_run(command, close_on_exit=False):
     """
     Runs the given command in a new PowerShell session.
@@ -86,6 +99,7 @@ def ps_run(command, close_on_exit=False):
         subprocess.Popen(["powershell", "start", "powershell", "{-NoExit", "-Command", "\"{}\"}}".format(command)])
 
 
+## Run the server in a new powershell window, if it's not already running
 def start_server(close_on_exit=False):
     """
     Start the server, if it's not already running.
@@ -97,6 +111,12 @@ def start_server(close_on_exit=False):
     named_mutex.spin_named_mutex('fuzz_server_mutex')
 
 
+## Helper for arbitrary runs of dynamorio - wizard, fuzzer, and tracer
+#  @param config_dict - a set of key:value pairs from the config module
+#  @param verbose - verbosity level
+#  @param timeout - number of seconds to wait before killing drrun
+#  @param run_id - specify the run id to pass to the client
+#  @param tracing - indicate whether this run is a tracer run
 def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
     """
     Runs dynamorio with the given config.
@@ -222,11 +242,9 @@ def triager_run(cfg, run_id):
     else:
         return None
 
-
+## Runs the wizard and lets the user select a target function.
+#  @return wizard_findings: List[Dict] - list of targetable functions
 def wizard_run(config_dict):
-    """
-    Runs the wizard and lets the user select a target function.
-    """
     run = run_dr(
         {
             'drrun_path': config_dict['drrun_path'],
@@ -278,6 +296,8 @@ def wizard_run(config_dict):
     return wizard_findings
 
 
+## Runs the fuzzer with a given config dict and targets file.
+#  @return (crashed, run): Tuple(bool, DRRun) - whether the program crashed, and the run metadata
 def fuzzer_run(config_dict, targets_file):
     """ Runs the fuzzer """
 
