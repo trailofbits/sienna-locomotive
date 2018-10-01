@@ -199,9 +199,6 @@ on_dr_exit(void)
         dr_free_module_data(seen_modules[i]);
     }
 
-    // Clean up DynamoRIO
-    // TODO(ww): Clean up individual event handlers as well? Since we're about to exit,
-    // do we really need to? The wizard and tracer do (for the most part).
     dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#on_dr_exit: Dynamorio Exiting\n");
     drwrap_exit();
     drmgr_exit();
