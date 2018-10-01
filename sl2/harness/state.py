@@ -354,64 +354,16 @@ class TriageExport:
         self.slug = slug
         self.checksec_cols = [
                      # Checksec table.
-                     'aslr',
-                     'authenticode',
-                     'cfg',
-                     'dynamicBase',
-                     'forceIntegrity',
-                     'gs',
-                     'highEntropyVA',
-                     'isolation',
-                     'nx',
-                     'rfg',
-                     'safeSEH',
-                     'seh',
-                     'path']
+                     'aslr', 'authenticode', 'cfg', 'dynamicBase', 'forceIntegrity', 'gs', 'highEntropyVA',
+                     'isolation', 'nx', 'rfg', 'safeSEH', 'seh', 'path']
 
         self.crash_cols = [
                      # Crash table.
-                     'runid',
-                     'crashAddressString',
-                     'crashReason',
-                     'crashash',
-                     'exploitability',
-                     'instructionPointerString',
-                     'minidumpPath',
-                     'ranksString',
-                     'stackPointerString',
-                     'timestamp',
-                     'tag',
-                     'cs',
-                     'dr0',
-                     'dr1',
-                     'dr2',
-                     'dr3',
-                     'dr6',
-                     'dr7',
-                     'ds',
-                     'eflags',
-                     'es',
-                     'fs',
-                     'gs',
-                     'mx_csr',
-                     'r8',
-                     'r9',
-                     'r10',
-                     'r11',
-                     'r12',
-                     'r13',
-                     'r14',
-                     'r15',
-                     'rax',
-                     'rbp',
-                     'rbx',
-                     'rcx',
-                     'rdi',
-                     'rdx',
-                     'rip',
-                     'rsi',
-                     'rsp',
-                     'ss']
+                     'runid', 'crashAddressString', 'crashReason', 'crashash', 'exploitability',
+                     'instructionPointerString', 'minidumpPath', 'ranksString', 'stackPointerString', 'timestamp', 'tag',
+                     'cs', 'dr0', 'dr1', 'dr2', 'dr3', 'dr6', 'dr7', 'ds', 'eflags', 'es', 'fs', 'gs', 'mx_csr', 'r8',
+                     'r9', 'r10', 'r11', 'r12', 'r13', 'r14', 'r15', 'rax', 'rbp', 'rbx', 'rcx', 'rdi', 'rdx', 'rip',
+                     'rsi', 'rsp', 'ss']
 
     ## Exports crash from run directories to appropriate directory structure.  Also generates
     # triage.csv file with summary of crashes
