@@ -1468,9 +1468,6 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_abort();
     }
 
-    // NOTE(ww): We open the client's connection to the server here,
-    // but the client isn't ready to use until it's been given a run ID.
-    // See inside of `tracer` for that.
     if (sl2_conn_open(&sl2_conn) != SL2Response::OK) {
         SL2_DR_DEBUG("ERROR: Couldn't open a connection to the server!\n");
         dr_abort();
