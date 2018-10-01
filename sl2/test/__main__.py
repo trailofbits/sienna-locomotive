@@ -36,7 +36,7 @@ def runAndCaptureOutput(cmd):
 ## Main class for testing
 class TestWizard(unittest.TestCase):
 
-    ## Basic test for wizard.dll
+    ## Tests that the wizard can succesfully capture the buffer from ReadFile
     def test_0(self):
         cmd = [r'dynamorio\bin64\drrun.exe',
                r'-c',
@@ -49,7 +49,7 @@ class TestWizard(unittest.TestCase):
         out = runAndCaptureOutput(cmd)
         self.assertTrue(r'buffer":[65,65,65,65,65,65,65,65]' in out)
 
-    ## Another wizard test with another usecase
+    ## Tests wizard buffer capture from WinHTTPReadData
     def test_2(self):
 
         cmd = [r'dynamorio\bin64\drrun.exe',
@@ -63,14 +63,14 @@ class TestWizard(unittest.TestCase):
         out = runAndCaptureOutput(cmd)
         self.assertTrue(r'[60,104,116,109,108,62,10,32]' in out)
 
-    ## Checks wizard and registry functionalty
+    ## Tests that the wizard can capture Registry Queries
     def test_registry(self):
         cmd = r'sl2-cli -fn 0 -r3 -l -v -e WIZARD -t ' + TEST_APPLICATION + ' -a 4 -f'
         out = runAndCaptureOutput(cmd)
         self.assertFalse('0) RegQueryValueEx' in out)
         self.assertTrue('CRASH PTR' in out)
 
-    ## Makes sure we can capture stdout
+    ## Tests whether we can capture stdout from the wizard/fuzzer
     def test_captureStdout(self):
         targetString = 'XXXWWWXXX'
         # First version have -l, inlining stdout for us to capture.   String "XXXWWWXXX" should appear
@@ -82,13 +82,13 @@ class TestWizard(unittest.TestCase):
         out = runAndCaptureOutput(cmd)
         self.assertFalse(targetString in out)
 
-    ## Basic stages testing in harness
+    ## Test single-stage harness running
     def test_TheWiz(self):
         cmd = r'sl2-cli -v -fn 0'
         out = runAndCaptureOutput(cmd)
         self.assertTrue('Process completed after' in out)
 
-    ## Test case #10, that an application actually crashes and that we catch the appropriate information
+    ## est case #10, that an application actually crashes and that we catch the appropriate informationT
     def test_quickCrash(self):
         cmd = r'sl2-cli -fn 0 -c -x -l -v -t ' + TEST_APPLICATION + ' -a 10 -f'
         out = runAndCaptureOutput(cmd)
@@ -127,6 +127,7 @@ class TestWizard(unittest.TestCase):
     #     self.assertRegex( out, r'0[)] ReadFile from.*validObject' )
 
 
+## Runs unit tests
 def main():
     global DEBUG
     if len(sys.argv) == 1:
@@ -141,5 +142,5 @@ def main():
 
 if __name__ == '__main__':
     print("Make sure to  ./make reconfig  first.")
-    print("You can also pass a specific test class to run on the command line like  regress.py TestMinidump")
+    print("You can also pass a specific test class to run on the command line like `sl2-test test_triage`")
     main()
