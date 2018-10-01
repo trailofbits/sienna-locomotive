@@ -160,12 +160,11 @@ increment_retaddr_count(uint64_t retAddr) {
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-// loadJson()
+// loadTargets()
 //
-// Loads json blob into client
-// TODO(ww): Rename to loadTargets, to reflect the fact that we're not using JSON anymore?
+// Loads the msgpack blob containing target information into the client.
 bool SL2Client::
-loadJson(string path)
+loadTargets(string path)
 {
     file_t targets = dr_open_file(path.c_str(), DR_FILE_READ);
     size_t targets_size;
