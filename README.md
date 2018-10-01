@@ -4,14 +4,7 @@ Sienna Locomotive is a fuzzing and crash triage system with usability features t
 
 ## Getting Started
 
-### The project
-Skim the following documents to familiarize yourself with the project:
-* Watch the [Demo video](https://drive.google.com/open?id=1njGgRrrfNanYSuaMy5nwLi1rw2bS1rMt)
-* [Interim Technical Report](https://docs.google.com/document/d/1zTUHlu-y_ZLT08saJp0qguYXC69F6CskMPZVLs48IVc/edit)
-* [SL2 Reinception Doc ](https://docs.google.com/document/d/1RwvknJk9PPgecLcsQI1SiXje9SdKB3OuOoSniIDvy68/edit)
-* Read through the [Projects](https://github.com/trailofbits/sienna-locomotive/projects/6) and [Issues](https://github.com/trailofbits/sienna-locomotive/issues) pages on GitHub
-
-## High level architecture
+### High level architecture
 
 ```
 Wizard
@@ -60,9 +53,11 @@ In powershell, run make.ps1:
 
 This should download and install DynamoRIO in the sienna-locomotive directive if it does not already exist.  It will then compile the project.
 
-If you're not familiar with cmake - the first invocation configures it, the second compiles the project. To recompile, just run the final command again.
-
 You might need to use the Visual Studio Developer Command Prompt in order for cmake to be able to see the VS compiler.
+
+Next, run the following to configure the python environment:
+
+`python setup.py develop`
 
 Use `.\make.ps1 clean` for a clean build .
 
@@ -94,24 +89,22 @@ If you want to build the doxygen documents.
   1. Look in `doc/html/index.html`
 
 ### Configuring
-Open up powershell in the project root and run harness.py for the first time.
+Open up powershell in the project root and run the gui for the first time.
 
-`PS C:\proj\sl2\sienna-locomotive> python .\harness.py`
+`PS C:\proj\sl2\sienna-locomotive> sl2`
 
-:warning: Python version 3 is required, although on some systems this could be `python.exe` or `python3.exe` .
-
-It'll create a default configuration file in `%APPDATA\Trail of Bits\fuzzkit\`. You can leave everything in there and it will work, but you might want to update the file paths to be relative to C: so that you can invoke it from anywhere. If you want to create a new profile, just copy the default one and change the name. Then you can use the `-p` flag to harness.py to change which profile it pulls settings from.
+It'll create a default configuration file in `%APPDATA\Trail of Bits\fuzzkit\`. You can leave everything in there and it will work, but you might want to update the file paths to be relative to C: so that you can invoke it from anywhere. If you want to create a new profile, just copy the default one and change the name. Then you can use the `-p` flag to `sl2` to change which profile it pulls settings from.
 
 Using -h on the harness will print out the list of command line options it supports. You can set a number of things permanently by adding lines to the configuration file. As a general rule though, the command line parameters will overwrite what's in the config file if you explicitly pass them in. This isn't the case for everything, so if a command isn't working the way you expect, run fuzzer_config.py with the same arguments to see exactly what settings are getting passed to the harness.
 
 ### Running
 
 #### Via the GUI
-`python3 gui.py` will run the Qt frontend for the fuzzer. While it provides a convenient way of invoking the components, it doesn't provide as many configuration options. Fortunately, it accepts most of the same command line arguments as the harness, so you can simply pass these in when you invoke the GUI.
-For example: `python3 gui.py -f 15 -i 360` will run the gui such that it invokes the fuzzer with a timeout of 15 seconds for each fuzzing run and a timeout of 360 seconds for each triage run. However, it does NOT respect the -e flag, nor any of the flags that would be overwritten from the config file if invoked on the harness.
+`sl2` will run the Qt frontend for the fuzzer. While it provides a convenient way of invoking the components, it doesn't provide as many configuration options. Fortunately, it accepts most of the same command line arguments as the harness, so you can simply pass these in when you invoke the GUI.
+For example: `sl2 -f 15 -i 360` will run the gui such that it invokes the fuzzer with a timeout of 15 seconds for each fuzzing run and a timeout of 360 seconds for each triage run. However, it does NOT respect the -e flag, nor any of the flags that would be overwritten from the config file if invoked on the harness.
 
 #### Via the harness
-`python3 harness.py` will run the test application in fuzzing mode. By default, the test application will crash after a few fuzzing attempts, so if it doesn't do so when you need it to, you can pass `-a 0` to the harness (as the last argument) and it will crash every time. Play around with the command flags to see what else you can do.
+`sl2-cli` will run the test application in fuzzing mode. By default, the test application will crash after a few fuzzing attempts, so if it doesn't do so when you need it to, you can pass `-a 0` to the harness (as the last argument) and it will crash every time. Play around with the command flags to see what else you can do.
 
 #### To run individual components manually
 From the root of the project -
