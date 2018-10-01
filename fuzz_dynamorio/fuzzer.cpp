@@ -610,7 +610,7 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_abort();
     }
 
-    if (!client.loadJson(target)) {
+    if (!client.loadTargets(target)) {
         SL2_DR_DEBUG("Failed to load targets!\n");
         dr_abort();
     }
