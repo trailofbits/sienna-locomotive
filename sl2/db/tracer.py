@@ -74,51 +74,94 @@ class Tracer(Base):
     ## The exploitability rank based solely on tracer
     rank = Column(Integer)
 
+    ## The string-ified exception code
     exception = Column(String)
+    ## Disassembly of the instruction that caused the crash
     instruction = Column(String)
+    ## Brief explanation of the exception
     reason = Column(String)
 
+    ## Address of the most recent function call
     call0 = Column(String(20))
+    ## Address of the second most recent function call
     call1 = Column(String(20))
+    ## Address of the 3rd most recent function call
     call2 = Column(String(20))
+    ## Address of the 4th most recent function call
     call3 = Column(String(20))
+    ## Address of the 5th most recent function call
     call4 = Column(String(20))
 
+    ## Address of the most recent instuction
     insn0 = Column(String(20))
+    ## Address of the second most recent instruction
     insn1 = Column(String(20))
+    ## Address of the 3rd most recent instruction
     insn2 = Column(String(20))
+    ## Address of the 4th most recent instruction
     insn3 = Column(String(20))
+    ## Address of the 5th most recent instruction
     insn4 = Column(String(20))
 
+    # Contents of the rax register
     rax = Column(String(20))
+    # Contents of the rbx register
     rbx = Column(String(20))
+    # Contents of the rcx register
     rcx = Column(String(20))
+    # Contents of the rdx register
     rdx = Column(String(20))
+    # Contents of the rsp register
     rsp = Column(String(20))
+    # Contents of the rbp register
     rbp = Column(String(20))
+    # Contents of the rsi register
     rsi = Column(String(20))
+    # Contents of the rdi register
     rdi = Column(String(20))
+    # Contents of the r8 register
     r8 = Column(String(20))
+    # Contents of the r9 register
     r9 = Column(String(20))
+    # Contents of the r10 register
     r10 = Column(String(20))
+    # Contents of the r11 register
     r11 = Column(String(20))
+    # Contents of the r12 register
     r12 = Column(String(20))
+    # Contents of the r13 register
     r13 = Column(String(20))
+    # Contents of the r14 register
     r14 = Column(String(20))
+    # Contents of the r15 register
     r15 = Column(String(20))
+    # Contents of the rip register
     rip = Column(String(20))
 
+    ## A bitmap containing the taint state of each register in the following order:
+    ## "rax", "rbx", "rcx", "rdx", "rsp", "rbp", "rsi", "rdi",
+    ## "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "rip"
     regTaint = Column(Integer)
 
+    ## Result of the `pc_tainted` check performed by the tracer -- Indicates whether RIP is tainted
     pc_tainted = Column(Boolean)
+    ## Result of the `stack_tainted` check performed by the tracer -- Indicates whether the stack pointer is tainted
     stack_tainted = Column(Boolean)
+    ## Result of the `is_ret` check performed by the tracer -- Indicates whether the crashing instruction is a return
     is_ret = Column(Boolean)
+    ## Result of the `is_indirect` check performed by the tracer -- Indicates whether the crash is on an indirect branch
     is_indirect = Column(Boolean)
+    ## Result of the `is_direct` check performed by the tracer -- Indicates whether the crash is on a direct branch
     is_direct = Column(Boolean)
+    ## Result of the `is_call` check performed by the tracer -- Indicates whether the crash is on a call
     is_call = Column(Boolean)
+    ## Result of the `mem_write` check performed by the tracer -- Indicates whether the crash occurs on a memory write
     mem_write = Column(Boolean)
+    ## Result of the `mem_read` check performed by the tracer -- Indicates whether the crash occurs on a memory read
     mem_read = Column(Boolean)
+    ## Result of the `tainted_src` check performed by the tracer -- Indicates whether the src of a memory r/w is tainted
     tainted_src = Column(Boolean)
+    ## Result of the `tainted_dst` check performed by the tracer -- Indicates whether the dst of a memory r/w is tainted
     tainted_dst = Column(Boolean)
 
     ## Constructor for a Tracer object

@@ -12,16 +12,23 @@ from .base import Base
 from .utilz import hash_file
 
 
-## DB Wrapper for Target Config Files
+## Class TargetConfig
+# DB Wrapper for Target Config Files
 class TargetConfig(Base):
     __tablename__ = "targets"
 
+    ## Slug for the directory containing the target info
     target_slug = Column(String, primary_key=True, unique=True)
+    ## SHA256 hash of the target binary
     hash = Column(String(64), ForeignKey("checksec.hash"))
+    ## Stores the path to the target binary
     path = Column(String)
 
+    ## Virtual member that relates target to children via the ORM
     crashes = relationship("Crash", back_populates="target_config")
+    ## Virtual member that relates target to children via the ORM
     runs = relationship("RunBlock")
+    ## Virtual member that relates target to children via the ORM
     paths = relationship("PathRecord")
 
     ## Takes the slug referring to the target configuration (including arguments) and the path to the binary

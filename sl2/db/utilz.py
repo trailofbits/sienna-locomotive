@@ -35,8 +35,11 @@ def runidToDumpPath(runid):
     return dumpPath
 
 
+## Takes the sha256 hash of a file
+#  @param filename: str -- Path to the file
+#  @return str -- hex-encoded SHA256 hash
 @lru_cache()
-def hash_file(filename):
+def hash_file(filename: str):
     m = sha256()
     with open(filename, 'rb') as f:
         while True:

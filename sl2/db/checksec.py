@@ -15,7 +15,9 @@ from .base import Base
 from .utilz import hash_file
 
 
-## DB Wrapper for winchecksec
+## class Checksec
+# Encodes the information output by WinCheckSec into the database.
+# See https://github.com/trailofbits/winchecksec for more information
 class Checksec(Base):
     PROBABILITIES = {
         'aslr': 0.792031321971442,
@@ -34,7 +36,9 @@ class Checksec(Base):
 
     __tablename__ = "checksec"
 
+    ## Hash of the binary -- serves as the primary key for this executable throughout all child tables
     hash = Column(String(64), primary_key=True, unique=True)
+
     aslr = Column(Boolean)
     authenticode = Column(Boolean)
     cfg = Column(Boolean)
