@@ -562,7 +562,6 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
         pre_hook = it->second;
         post_hook = post_hooks[function_name];
 
-        // Only hook ReadFile calls from the kernel (TODO - investigate fuzzgoat results)
         towrap = (app_pc) dr_get_proc_address(mod->handle, function_name);
 
         // If everything looks good and we've made it this far, wrap the function
