@@ -39,8 +39,6 @@ static app_pc module_start = 0;
 static app_pc module_end = 0;
 static size_t baseAddr;
 
-
-
 /* Mostly used to debug if taint tracking is too slow */
 static droption_t<unsigned int> op_no_taint(
     DROPTION_SCOPE_CLIENT,
@@ -877,25 +875,25 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
     if (replay) {
         sl2_conn_request_crash_paths(&sl2_conn, dr_get_process_id(), &crash_paths);
 
-        HANDLE hCrashFile = CreateFile(crash_paths.crash_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        HANDLE dump_file = CreateFile(crash_paths.crash_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
-        if (hCrashFile == INVALID_HANDLE_VALUE) {
-            SL2_DR_DEBUG("tracer#dump_crash: could not open the crash file (%x)\n", GetLastError());
-            exit(1);
+        if (dump_file == INVALID_HANDLE_VALUE) {
+            SL2_DR_DEBUG("tracer#dump_crash: could not open the crash file (crash_path=%S) (GLE=%d)\n", crash_paths.crash_path, GetLastError());
+            dr_abort();
         }
 
         DWORD txsize;
-        if (!WriteFile(hCrashFile, crash_json.c_str(), (DWORD) crash_json.length(), &txsize, NULL)) {
-            SL2_DR_DEBUG("tracer#dump_crash: could not write to the crash file (%x)\n", GetLastError());
-            exit(1);
+        if (!WriteFile(dump_file, crash_json.c_str(), (DWORD) crash_json.length(), &txsize, NULL)) {
+            SL2_DR_DEBUG("tracer#dump_crash: could not write to the crash file (GLE=%d)\n", GetLastError());
+            dr_abort();
         }
 
-        CloseHandle(hCrashFile);
+        CloseHandle(dump_file);
 
         HANDLE hDumpFile = CreateFile(crash_paths.mem_dump_path, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
         if (hDumpFile == INVALID_HANDLE_VALUE) {
-            SL2_DR_DEBUG("tracer#dump_crash: could not open the dump file (%x)\n", GetLastError());
+            SL2_DR_DEBUG("tracer#dump_crash: could not open the dump file (GLE=%d)\n", GetLastError());
         }
 
         EXCEPTION_POINTERS exception_pointers = {0};
@@ -954,8 +952,7 @@ on_exception(void *drcontext, dr_exception_t *excpt)
     uint8_t score = 50;
     std::string disassembly = "";
 
-    // TODO - remove use of IsBadReadPtr
-    // https://msdn.microsoft.com/en-us/library/windows/desktop/aa366713(v=vs.85).aspx
+    // TODO(ww): Can we use dr_memory_is_readable here?
     if (IsBadReadPtr(exception_address, 1))
     {
         if (pc_tainted) {
@@ -1214,7 +1211,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 
     // Identify whether this is the function we want to target
     bool targeted = client.is_function_targeted(info);
-    client.incrementCallCountForFunction(info->function);
+    client.increment_call_count(info->function);
 
     // Mark the targeted memory as tainted
     if (targeted) {
@@ -1250,6 +1247,7 @@ static void
 wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 {
     void *drcontext = NULL;
+    bool interesting_call = true;
 
     if (!client.is_sane_post_hook(wrapcxt, user_data, &drcontext)) {
         goto cleanup;
@@ -1267,28 +1265,28 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
         info->nNumberOfBytesToRead = memory_info.RegionSize;
     }
 
-    fileArgHash fStruct = {0};
-    fStruct.readSize = info->nNumberOfBytesToRead;
+    hash_context hash_ctx = {0};
+    hash_ctx.readSize = info->nNumberOfBytesToRead;
 
     // NOTE(ww): The wizard should weed these failures out for us; if it happens
     // here, there's not much we can do.
-    if (!GetMappedFileName(GetCurrentProcess(), info->lpBuffer, fStruct.fileName, MAX_PATH)) {
-        SL2_DR_DEBUG("Fatal: Couldn't get filename for memory map! Aborting.\n");
-        dr_exit_process(1);
+    if (!GetMappedFileName(GetCurrentProcess(), info->lpBuffer, hash_ctx.fileName, MAX_PATH)) {
+        SL2_DR_DEBUG("Couldn't get filename for memory map (size=%lu) (GLE=%d)! Assuming uninteresting.\n", info->nNumberOfBytesToRead, GetLastError());
+        interesting_call = false;
     }
 
     // Create the argHash, now that we have the correct source and nNumberOfBytesToRead.
-    client.hash_args(info->argHash, &fStruct);
+    client.hash_args(info->argHash, &hash_ctx);
 
     bool targeted = client.is_function_targeted(info);
-    client.incrementCallCountForFunction(info->function);
+    client.increment_call_count(info->function);
 
     if (targeted) {
         taint_mem((app_pc) info->lpBuffer, info->nNumberOfBytesToRead);
     }
 
     // Talk to the server, get the stored mutation from the fuzzing run, and write it into memory.
-    if (replay && targeted) {
+    if (interesting_call && replay && targeted) {
         dr_mutex_lock(mutatex);
 
         if (no_mutate) {
@@ -1447,20 +1445,45 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     }
 }
 
-// register callbacks
-void tracer(client_id_t id, int argc, const char *argv[])
+DR_EXPORT void
+dr_client_main(client_id_t id, int argc, const char *argv[])
 {
+    // parse client options
+    std::string parse_err;
+    int last_idx = 0;
+    if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
+        SL2_DR_DEBUG("tracer#main: usage error: %s", parse_err.c_str());
+        dr_abort();
+    }
+
+    // target is mandatory
+    std::string target = op_target.get_value();
+    if (target == "") {
+        SL2_DR_DEBUG("tracer#main: ERROR: arg -t (target) required");
+        dr_abort();
+    }
+
+    if (!client.loadTargets(target)) {
+        SL2_DR_DEBUG("Failed to load targets!\n");
+        dr_abort();
+    }
+
+    if (sl2_conn_open(&sl2_conn) != SL2Response::OK) {
+        SL2_DR_DEBUG("ERROR: Couldn't open a connection to the server!\n");
+        dr_abort();
+    }
+
+    dr_enable_console_printing();
+
     drreg_options_t ops = {sizeof(ops), 3, false};
     dr_set_client_name("Tracer",
                        "https://github.com/trailofbits/sienna-locomotive");
 
-    if (!drmgr_init() || drreg_init(&ops) != DRREG_SUCCESS || !drwrap_init()) {
-        SL2_DR_DEBUG("failed to init drmgr/drreg/drwrap!\n");
+    if (!drmgr_init()
+        || !drwrap_init()
+        || drreg_init(&ops) != DRREG_SUCCESS) {
         DR_ASSERT(false);
     }
-
-    replay = false;
-    mutate_count = 0;
 
     run_id_s = op_replay.get_value();
     UUID run_id;
@@ -1482,60 +1505,18 @@ void tracer(client_id_t id, int argc, const char *argv[])
     // If taint tracing is enabled, register the propagate_taint callback
     if (!op_no_taint.get_value()) {
         // http://dynamorio.org/docs/group__drmgr.html#ga83a5fc96944e10bd7356e0c492c93966
-        if (!drmgr_register_bb_instrumentation_event(
-                                                NULL,
-                                                on_bb_instrument,
-                                                NULL))
-        {
-            SL2_DR_DEBUG("failed to register basic block event!\n");
+        if (!drmgr_register_bb_instrumentation_event(NULL, on_bb_instrument, NULL)) {
             DR_ASSERT(false);
         }
     }
 
-    if (!drmgr_register_module_load_event(on_module_load) ||
-        !drmgr_register_thread_init_event(on_thread_init) ||
-        !drmgr_register_thread_exit_event(on_thread_exit) ||
-        !drmgr_register_exception_event(on_exception))
+    if (!drmgr_register_module_load_event(on_module_load)
+        || !drmgr_register_thread_init_event(on_thread_init)
+        || !drmgr_register_thread_exit_event(on_thread_exit)
+        || !drmgr_register_exception_event(on_exception))
     {
-        SL2_DR_DEBUG("failed to register module/thread/exception event!\n");
         DR_ASSERT(false);
     }
 
-    dr_log(NULL, DR_LOG_ALL, 1, "Client 'instrace' initializing\n");
-}
-
-DR_EXPORT void
-dr_client_main(client_id_t id, int argc, const char *argv[])
-{
-    // parse client options
-    std::string parse_err;
-    int last_idx = 0;
-    if (!droption_parser_t::parse_argv(DROPTION_SCOPE_CLIENT, argc, argv, &parse_err, &last_idx)) {
-        SL2_DR_DEBUG("tracer#main: usage error: %s", parse_err.c_str());
-        dr_abort();
-    }
-
-    // target is mandatory
-    std::string target = op_target.get_value();
-    if (target == "") {
-        SL2_DR_DEBUG("tracer#main: ERROR: arg -t (target) required");
-        dr_abort();
-    }
-
-    if (!client.loadJson(target)) {
-        SL2_DR_DEBUG("Failed to load targets!\n");
-        dr_abort();
-    }
-
-    // NOTE(ww): We open the client's connection to the server here,
-    // but the client isn't ready to use until it's been given a run ID.
-    // See inside of `tracer` for that.
-    if (sl2_conn_open(&sl2_conn) != SL2Response::OK) {
-        SL2_DR_DEBUG("ERROR: Couldn't open a connection to the server!\n");
-        dr_abort();
-    }
-
-    dr_enable_console_printing();
-
-    tracer(id, argc, argv);
+    dr_log(NULL, DR_LOG_ALL, 1, "Client 'tracer' initializing\n");
 }

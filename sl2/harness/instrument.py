@@ -88,6 +88,14 @@ def print_l(*args):
         print(*args)
 
 
+def perror(*args):
+    print_l("[E]", *args)
+
+
+def pwarning(*args):
+    print_l("[W]", *args)
+
+
 ## Run a command in a powershell wrapper so a new window pops up
 def ps_run(command, close_on_exit=False):
     """
@@ -156,11 +164,6 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
             except UnicodeDecodeError:
                 pass
 
-        # If the server wasn't running
-        if b'ERROR' in popen_obj.stderr and b'connection' in popen_obj.stderr:
-            print_l("Lost connection to server! Restarting...")
-            run_id = -1
-
         return DRRun(popen_obj, invoke.seed, run_id)
 
     # Handle cases where the program didn't exit in time
@@ -192,16 +195,16 @@ def run_dr(config_dict, verbose=0, timeout=None, run_id=None, tracing=False):
                                 else:
                                     os.kill(pid, signal.SIGTERM)
                             except PermissionError as e:
-                                print_l("WARNING: Couldn't kill child process (insufficient privilege?):", e)
-                                print_l("Try running the harness as an Administrator.")
+                                pwarning("Couldn't kill child process (insufficient privilege?):", e)
+                                pwarning("Try running the harness as an Administrator.")
                             except OSError as e:
-                                print_l("WARNING: Couldn't kill child process (maybe already dead?):", e)
+                                pwarning("Couldn't kill child process (maybe already dead?):", e)
             except FileNotFoundError:
-                print_l("The PID file was missing so we couldn't kill the child process.")
-                print_l("Most likely this is due to a server crash.")
+                perror("The PID file was missing so we couldn't kill the child process.")
+                perror("Most likely this is due to a server crash.")
                 run_id = -1
         else:
-            print_l("WARNING: No run ID, so not looking for PIDs to kill.")
+            pwarning("No run ID, so not looking for PIDs to kill.")
 
         # Try to get the output again
         try:
@@ -267,7 +270,7 @@ def wizard_run(config_dict):
             line = line.decode('utf-8')
 
             if re.match(r'ERROR: Target process .* is for the wrong architecture', line):
-                print_l("[!] Bad architecture for target application:", config_dict['target_application_path'])
+                perror("Bad architecture for target application:", config_dict['target_application_path'])
                 return []
 
             obj = json.loads(line)
@@ -287,11 +290,11 @@ def wizard_run(config_dict):
                 wizard_findings.append(obj)
         except UnicodeDecodeError:
             if config_dict["verbose"]:
-                print_l("[!] Not UTF-8:", repr(line))
+                pwarning("Not UTF-8:", repr(line))
         except json.JSONDecodeError:
             pass
         except Exception as e:
-            print_l("[!] Unexpected exception:", e)
+            perror("Unexpected exception:", e)
 
     return wizard_findings
 
@@ -302,7 +305,7 @@ def fuzzer_run(config_dict, targets_file):
     """ Runs the fuzzer """
 
     if not os.path.isfile(targets_file):
-        print_l('[!] Nonexistent targets file:', targets_file)
+        perror('Nonexistent targets file:', targets_file)
 
     with open(targets_file, 'rb') as targets_msg:
         targets = msgpack.load(targets_msg)
@@ -356,7 +359,7 @@ def fuzzer_run(config_dict, targets_file):
                 coverage_info = json.loads(line.replace('#COVERAGE:', ''))
         except UnicodeDecodeError:
             if config_dict['verbose']:
-                print_l("[!] Not UTF-8:", repr(line))
+                perror("Not UTF-8:", repr(line))
 
     run = DRRun(run.process, run.seed, run.run_id, coverage_info)
 
@@ -418,7 +421,7 @@ def tracer_run(config_dict, run_id):
             Tracer.factory(run_id, formatted, raw)
         return formatted, raw
     else:
-        print_l("[!] Tracer failure:", message)
+        perror("Tracer failure:", message)
         return None, None
 
 
@@ -446,7 +449,7 @@ def fuzz_and_triage(config_dict):
                     if triagerInfo:
                         print_l(triagerInfo)
                     else:
-                        print_l("[!] Triage failure?")
+                        perror("Triage failure?")
 
                     if config_dict['exit_early']:
                         # Prevent other threads from starting new fuzzing runs

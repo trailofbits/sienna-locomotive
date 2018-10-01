@@ -327,6 +327,7 @@ def check_fuzz_line_for_crash(line):
         print("[!] Unexpected exception while checking for crash:", e)
     return False, None
 
+
 ## strips out characters in a string that could be harmful for filenames or paths
 # @param s strings to sanitize
 # @return sanitized string

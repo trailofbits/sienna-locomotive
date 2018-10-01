@@ -60,18 +60,6 @@ extern "C" {
 #define SL2_POST_HOOK1(map, func) (map[#func] = wrap_post_##func)
 #define SL2_POST_HOOK2(map, func, hook_func) (map[#func] = wrap_post_##hook_func)
 
-// Typedefs for common types.
-typedef void(*sl2_pre_proto)(void *, void **);
-typedef void(*sl2_post_proto)(void *, void *);
-
-typedef std::map<char *, sl2_pre_proto, std::less<char *>,
-    sl2_dr_allocator<std::pair<const char *, sl2_pre_proto>>> sl2_pre_proto_map;
-typedef std::map<char *, sl2_post_proto, std::less<char *>,
-    sl2_dr_allocator<std::pair<const char *, sl2_post_proto>>> sl2_post_proto_map;
-
-typedef nlohmann::basic_json<std::map, std::vector, std::string,
-    bool, int64_t, uint64_t, double, sl2_dr_allocator> json;
-
 // The set of currently supported functions.
 enum class Function {
     ReadFile,
@@ -112,7 +100,7 @@ enum {
 
 // The struct filled with function information for hashing.
 // See `MATCH_ARG_HASH`.
-struct fileArgHash {
+struct hash_context {
   wchar_t fileName[MAX_PATH + 1];
   size_t count;
   size_t position;
@@ -128,7 +116,7 @@ typedef struct targetFunction {
     uint64_t                retAddrCount;
     string                  functionName;
     string                  argHash;
-    wstring                  source;
+    wstring                 source;
     vector<uint8_t>         buffer;
 } TargetFunction;
 
@@ -160,6 +148,24 @@ struct sl2_funcmod
     const char *mod;
 };
 
+// Typedefs for common types.
+typedef void(*sl2_pre_proto)(void *, void **);
+typedef void(*sl2_post_proto)(void *, void *);
+
+typedef std::map<char *, sl2_pre_proto, std::less<char *>,
+    sl2_dr_allocator<std::pair<const char *, sl2_pre_proto>>> sl2_pre_proto_map;
+typedef std::map<char *, sl2_post_proto, std::less<char *>,
+    sl2_dr_allocator<std::pair<const char *, sl2_post_proto>>> sl2_post_proto_map;
+
+typedef std::map<Function, uint64_t, std::less<Function>,
+    sl2_dr_allocator<std::pair<Function, uint64_t>>> sl2_call_counts_map;
+
+typedef std::map<uint64_t, uint64_t, std::less<uint64_t>,
+    sl2_dr_allocator<std::pair<uint64_t, uint64_t>>> sl2_retaddr_counts_map;
+
+typedef nlohmann::basic_json<std::map, std::vector, std::string,
+    bool, int64_t, uint64_t, double, sl2_dr_allocator> json;
+
 // Declared in sl2_dr_client.cpp; contains pairs of functions and their expected modules.
 extern sl2_funcmod SL2_FUNCMOD_TABLE[];
 
@@ -174,15 +180,15 @@ public:
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Variables
     // TODO(ww): Subsume sl2_conn under SL2Client.
-    map<Function, uint64_t>     call_counts;
-    map<uint64_t, uint64_t>     ret_addr_counts;
+    sl2_call_counts_map         call_counts;
+    sl2_retaddr_counts_map      ret_addr_counts;
     json                        parsedJson;
     uint64_t                    baseAddr;
 
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Methods
     // Method targeting methods.
-    void        hash_args(char *argHash, fileArgHash *fStruct);
+    void        hash_args(char *argHash, hash_context *fStruct);
     bool        is_function_targeted(client_read_info *info);
     bool        compare_filenames(targetFunction &t, client_read_info* info);
     bool        compare_indices(targetFunction &t, Function &function);
@@ -211,9 +217,9 @@ public:
     void        wrap_pre__read(void *wrapcxt, OUT void **user_data);
     void        wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data);
     bool        is_sane_post_hook(void *wrapcxt, void *user_data, void **drcontext);
-    bool        loadJson(string json);
-    uint64_t    incrementCallCountForFunction(Function function);
-    uint64_t    incrementRetAddrCount(uint64_t retAddr);
+    bool        loadTargets(string json);
+    uint64_t    increment_call_count(Function function);
+    uint64_t    increment_retaddr_count(uint64_t retAddr);
 
 
     // Utility methods.

@@ -199,9 +199,6 @@ on_dr_exit(void)
         dr_free_module_data(seen_modules[i]);
     }
 
-    // Clean up DynamoRIO
-    // TODO(ww): Clean up individual event handlers as well? Since we're about to exit,
-    // do we really need to? The wizard and tracer do (for the most part).
     dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#on_dr_exit: Dynamorio Exiting\n");
     drwrap_exit();
     drmgr_exit();
@@ -347,7 +344,7 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 
     client_read_info *info = (client_read_info *) user_data;
 
-    client.incrementCallCountForFunction(info->function);
+    client.increment_call_count(info->function);
 
     if (!client.is_function_targeted(info)) {
         goto cleanup;
@@ -384,6 +381,7 @@ static void
 wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 {
     void *drcontext = NULL;
+    bool interesting_call = true;
 
     if (!client.is_sane_post_hook(wrapcxt, user_data, &drcontext)) {
         goto cleanup;
@@ -393,35 +391,33 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 
     client_read_info *info = (client_read_info *) user_data;
 
-    client.incrementCallCountForFunction(info->function);
+    client.increment_call_count(info->function);
 
     info->lpBuffer = drwrap_get_retval(wrapcxt);
     MEMORY_BASIC_INFORMATION memory_info = {0};
 
     if (!info->nNumberOfBytesToRead) {
+        SL2_DR_DEBUG("MapViewOfFile called with dwNumberOfBytesToMap=0, querying memory!\n");
         dr_virtual_query((byte *) info->lpBuffer, &memory_info, sizeof(memory_info));
 
         info->nNumberOfBytesToRead = memory_info.RegionSize;
     }
 
-    fileArgHash fStruct = {0};
-    fStruct.readSize = info->nNumberOfBytesToRead;
+    hash_context hash_ctx = {0};
+    hash_ctx.readSize = info->nNumberOfBytesToRead;
 
-    // NOTE(ww): The wizard should weed these failures out for us; if it happens
-    // here, there's not much we can do.
-    if (!GetMappedFileName(GetCurrentProcess(), info->lpBuffer, fStruct.fileName, MAX_PATH)) {
-        SL2_DR_DEBUG("Fatal: Couldn't get filename for memory map! Aborting.\n");
-        crashed = false;
-        dr_exit_process(1);
+    if (!GetMappedFileName(GetCurrentProcess(), info->lpBuffer, hash_ctx.fileName, MAX_PATH)) {
+        SL2_DR_DEBUG("Couldn't get filename for memory map (size=%lu) (GLE=%d)! Assuming uninteresting.\n", info->nNumberOfBytesToRead, GetLastError());
+        interesting_call = false;
     }
 
     // Toss the filename into info, so that `mutate` can send it to the server.
-    info->source = fStruct.fileName;
+    info->source = hash_ctx.fileName;
 
     // Create the argHash, now that we have the correct source and nNumberOfBytesToRead.
-    client.hash_args(info->argHash, &fStruct);
+    client.hash_args(info->argHash, &hash_ctx);
 
-    if (client.is_function_targeted(info)) {
+    if (interesting_call && client.is_function_targeted(info)) {
         // If the mutation process fails in any way, consider this fuzzing run a loss.
         if (!mutate(info)) {
             crashed = false;
@@ -563,7 +559,6 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
         pre_hook = it->second;
         post_hook = post_hooks[function_name];
 
-        // Only hook ReadFile calls from the kernel (TODO - investigate fuzzgoat results)
         towrap = (app_pc) dr_get_proc_address(mod->handle, function_name);
 
         // If everything looks good and we've made it this far, wrap the function
@@ -611,7 +606,7 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         dr_abort();
     }
 
-    if (!client.loadJson(target)) {
+    if (!client.loadTargets(target)) {
         SL2_DR_DEBUG("Failed to load targets!\n");
         dr_abort();
     }
@@ -634,12 +629,13 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
 
     sl2_conn_register_pid(&sl2_conn, dr_get_process_id(), false);
 
-    // TODO(ww): Guard these initializations.
-    drmgr_init();
-    drwrap_init();
-
     drreg_options_t opts = {sizeof(opts), 3, false};
-    drreg_init(&opts);
+
+    if (!drmgr_init()
+        || drreg_init(&opts) != DRREG_SUCCESS
+        || !drwrap_init()) {
+        DR_ASSERT(false);
+    }
 
     // Check whether we can use coverage on this fuzzing run
     coverage_guided = (arena_id_s != "") && !no_coverage;
@@ -648,7 +644,10 @@ DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
         SL2_DR_DEBUG("dr_client_main: arena given, instrumenting BBs!\n");
         mbstowcs_s(NULL, arena.id, SL2_HASH_LEN + 1, arena_id_s.c_str(), SL2_HASH_LEN);
         sl2_conn_request_arena(&sl2_conn, &arena);
-        drmgr_register_bb_instrumentation_event(NULL, on_bb_instrument, NULL);
+
+        if (!drmgr_register_bb_instrumentation_event(NULL, on_bb_instrument, NULL)) {
+            DR_ASSERT(false);
+        }
     }
     else {
         SL2_DR_DEBUG("dr_client_main: no arena given OR user requested dumb fuzzing!\n");

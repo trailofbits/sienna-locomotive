@@ -45,10 +45,11 @@ on_dr_exit(void)
 {
     SL2_DR_DEBUG("wizard#on_dr_exit\n");
 
-    if (!drmgr_unregister_thread_init_event(on_thread_init) ||
-        !drmgr_unregister_thread_exit_event(on_thread_exit) ||
-        drreg_exit() != DRREG_SUCCESS)
-    {
+    drwrap_exit();
+
+    if (!drmgr_unregister_thread_init_event(on_thread_init)
+        || !drmgr_unregister_thread_exit_event(on_thread_exit)
+        || drreg_exit() != DRREG_SUCCESS) {
         DR_ASSERT(false);
     }
 
@@ -146,8 +147,8 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
 
     json j;
     j["type"]               = "id";
-    j["callCount"]          = client.incrementCallCountForFunction(info->function);
-    j["retAddrCount"]       = client.incrementRetAddrCount(info->retAddrOffset);
+    j["callCount"]          = client.increment_call_count(info->function);
+    j["retAddrCount"]       = client.increment_retaddr_count(info->retAddrOffset);
     j["retAddrOffset"]      = (uint64_t) info->retAddrOffset;
     j["func_name"]          = func_name;
 
@@ -211,14 +212,14 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 
     json j;
     j["type"]               = "id";
-    j["callCount"]          = client.incrementCallCountForFunction(info->function);
-    j["retAddrCount"]       = client.incrementRetAddrCount(info->retAddrOffset);
+    j["callCount"]          = client.increment_call_count(info->function);
+    j["retAddrCount"]       = client.increment_retaddr_count(info->retAddrOffset);
     j["retAddrOffset"]      = (uint64_t) info->retAddrOffset;
     j["func_name"]          = func_name;
 
-    fileArgHash fStruct = {0};
+    hash_context hash_ctx = {0};
 
-    if (!GetMappedFileName(GetCurrentProcess(), info->lpBuffer, fStruct.fileName, MAX_PATH)) {
+    if (!GetMappedFileName(GetCurrentProcess(), info->lpBuffer, hash_ctx.fileName, MAX_PATH)) {
         // NOTE(ww): This can happen when a memory-mapped object doesn't have a real file
         // backing it, e.g. when the mapping is of the page file or some other
         // kernel-managed resource. When that happens, we assume it's not something
@@ -239,15 +240,15 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
             info->nNumberOfBytesToRead = memory_info.RegionSize;
         }
 
-        fStruct.readSize = info->nNumberOfBytesToRead;
+        hash_ctx.readSize = info->nNumberOfBytesToRead;
 
-        j["source"]  = utf8Converter.to_bytes(wstring(fStruct.fileName));
+        j["source"]  = utf8Converter.to_bytes(wstring(hash_ctx.fileName));
 
         size_t end   = info->position + info->nNumberOfBytesToRead;
         j["start"]   = info->position;
         j["end"]     = end;
 
-        client.hash_args(info->argHash, &fStruct);
+        client.hash_args(info->argHash, &hash_ctx);
 
         j["argHash"] = info->argHash;
 
@@ -346,30 +347,6 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     }
 }
 
-/* registers event callbacks and initializes DynamoRIO */
-void wizard(client_id_t id, int argc, const char *argv[])
-{
-    drreg_options_t ops = {sizeof(ops), 3, false};
-    dr_set_client_name("Wizard",
-                       "https://github.com/trailofbits/sienna-locomotive");
-
-    if (!drmgr_init() || drreg_init(&ops) != DRREG_SUCCESS || !drwrap_init()) {
-        DR_ASSERT(false);
-    }
-
-    dr_register_exit_event(on_dr_exit);
-
-    if (!drmgr_register_module_load_event(on_module_load) ||
-        !drmgr_register_thread_init_event(on_thread_init) ||
-        !drmgr_register_thread_exit_event(on_thread_exit) ||
-        !drmgr_register_exception_event(on_exception))
-    {
-        DR_ASSERT(false);
-    }
-
-    dr_log(NULL, DR_LOG_ALL, 1, "Client 'Wizard' initializing\n");
-}
-
 /* Parses options and calls wizard helper */
 DR_EXPORT void
 dr_client_main(client_id_t id, int argc, const char *argv[])
@@ -383,5 +360,25 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
     }
 
     dr_enable_console_printing();
-    wizard(id, argc, argv);
+
+    drreg_options_t ops = {sizeof(ops), 3, false};
+    dr_set_client_name("Wizard",
+                       "https://github.com/trailofbits/sienna-locomotive");
+
+    if (!drmgr_init()
+        || drreg_init(&ops) != DRREG_SUCCESS
+        || !drwrap_init()) {
+        DR_ASSERT(false);
+    }
+
+    dr_register_exit_event(on_dr_exit);
+
+    if (!drmgr_register_module_load_event(on_module_load)
+        || !drmgr_register_thread_init_event(on_thread_init)
+        || !drmgr_register_thread_exit_event(on_thread_exit)
+        || !drmgr_register_exception_event(on_exception)) {
+        DR_ASSERT(false);
+    }
+
+    dr_log(NULL, DR_LOG_ALL, 1, "Client 'Wizard' initializing\n");
 }

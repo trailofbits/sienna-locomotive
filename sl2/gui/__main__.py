@@ -2,16 +2,14 @@
 ## @package gui
 # Code for the QT gui
 
-import os
 import sys
 import time
 from functools import partial
 from multiprocessing import cpu_count
 
 from PySide2 import QtWidgets
-from PySide2.QtCore import *
+from PySide2.QtCore import Qt, QSize
 from PySide2.QtGui import QFontDatabase, QMovie, QStandardItem, QBrush, QColor
-from PySide2.QtWidgets import *
 from sqlalchemy import desc
 
 from sl2 import db
@@ -66,13 +64,18 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # CREATE WIDGETS #
 
+        # Menu bar
+        self.menu_bar = self.menuBar()
+        self.file_menu = self.menu_bar.addMenu("&File")
+        self.change_profile_action = self.file_menu.addAction("Change Profile")
+
         # Target info
-        self.targetStatus = QtWidgets.QStatusBar()
-        self.targetLabel = QtWidgets.QLabel()
-        self.targetStatus.addWidget(self.targetLabel)
-        self._layout.addWidget(self.targetStatus)
+        self.target_status = QtWidgets.QStatusBar()
+        self.target_label = QtWidgets.QLabel()
+        self.target_status.addWidget(self.target_label)
+        self._layout.addWidget(self.target_status)
         self.checksec_thread.start()
-        self.checksec_thread.resultReady.connect(self.checksec_finished)
+        self.checksec_thread.result_ready.connect(self.checksec_finished)
 
         # Create wizard button
         self.wizard_button = QtWidgets.QPushButton("Run Wizard")
@@ -106,10 +109,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self._func_tree.resizeColumnToContents(3)
 
         # Create menu items for the context menu
-        self.expand_action = QAction("Expand All")
-        self.collapse_action = QAction("Collapse All")
-        self.check_action = QAction("Check All")
-        self.uncheck_action = QAction("Uncheck All")
+        self.expand_action = QtWidgets.QAction("Expand All")
+        self.collapse_action = QtWidgets.QAction("Collapse All")
+        self.check_action = QtWidgets.QAction("Check All")
+        self.uncheck_action = QtWidgets.QAction("Uncheck All")
 
         # Build layout for function filter text boxes
         self.filter_layout = QtWidgets.QHBoxLayout()
@@ -200,7 +203,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Crashes table
         session = db.getSession()
-        self.crashesModel = sqlalchemy_model.SqlalchemyModel(
+        self.crashes_model = sqlalchemy_model.SqlalchemyModel(
             session,
             db.Crash,
             [
@@ -223,23 +226,23 @@ class MainWindow(QtWidgets.QMainWindow):
             ],
             orderBy=desc(db.Crash.timestamp),
             filters={"target_config_slug": get_target_slug(config.config)})
-        self.crashesTable = QTableView()
-        self.crashesTable.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
-        self.crashesTable.setModel(self.crashesModel)
-        self._layout.addWidget(self.crashesTable)
-        self.crashesTable.horizontalHeader().setStretchLastSection(True)
-        self.crashesTable.resizeColumnsToContents()
-        self.crashesTable.show()
-        self.crashesTable.clicked.connect(self.crashClicked)
+        self.crashes_table = QtWidgets.QTableView()
+        self.crashes_table.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+        self.crashes_table.setModel(self.crashes_model)
+        self._layout.addWidget(self.crashes_table)
+        self.crashes_table.horizontalHeader().setStretchLastSection(True)
+        self.crashes_table.resizeColumnsToContents()
+        self.crashes_table.show()
+        self.crashes_table.clicked.connect(self.crashClicked)
 
         # Crash Browser, details about a crash
-        self.crashBrowser = QTextBrowser()
-        self.crashBrowser.setText("<NO CRASH SELECTED>")
-        self.crashBrowser.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
-        self._layout.addWidget(self.crashBrowser)
+        self.crash_browser = QtWidgets.QTextBrowser()
+        self.crash_browser.setText("<NO CRASH SELECTED>")
+        self.crash_browser.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+        self._layout.addWidget(self.crash_browser)
 
-        self.statsWidget = stats.StatsWidget(get_target_slug(config.config))
-        self._layout.addWidget(self.statsWidget)
+        self.stats_widget = stats.StatsWidget(get_target_slug(config.config))
+        self._layout.addWidget(self.stats_widget)
 
         # Set up stop button (and hide it)
         self.stop_button = QtWidgets.QPushButton("Stop Fuzzing")
@@ -279,6 +282,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.status_bar.addWidget(self.crash_count)
 
         # CONNECT SIGNALS #
+        self.change_profile_action.triggered.connect(self.change_profile)
 
         # Update the text of the status bar adapters whenever the underlying variables change
         self.runs.valueChanged.connect(self.run_adapter.update)
@@ -293,7 +297,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.wizard_button.clicked.connect(self.wizard_thread.start)
         self.wizard_thread.started.connect(partial(self.setCursor, Qt.WaitCursor))
         self.wizard_thread.finished.connect(self.unsetCursor)
-        self.wizard_thread.resultReady.connect(self.wizard_finished)
+        self.wizard_thread.result_ready.connect(self.wizard_finished)
 
         # Connect the context menu buttons
         self.expand_action.triggered.connect(self._func_tree.expandAll)
@@ -329,6 +333,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.change_thread_count(self.thread_count.value())
         self.customContextMenuRequested.connect(self.contextMenuEvent)
 
+    def change_profile(self):
+        self.close()
+        main_window = MainWindow()
+        main_window.show()
+
     ## Signal handler that updates the thread count based on the gui
     def change_thread_count(self, new_count):
         """ Creates new threads if we don't have as many as the user wants """
@@ -340,6 +349,10 @@ class MainWindow(QtWidgets.QMainWindow):
     def start_all_threads(self):
         """ Maps over the thread list and starts all the threads """
         self.start_time = self.start_time if self.start_time is not None else time.time()
+
+        # Don't allow the user to change profiles while running fuzzer threads.
+        self.change_profile_action.setDisabled(True)
+
         self.thread_count.setDisabled(True)
         self.fuzzer_button.setDisabled(True)
         self.busy_label.show()
@@ -356,6 +369,7 @@ class MainWindow(QtWidgets.QMainWindow):
     ## Callback that fires when all threads are paused. Changes the UI state to allow clicking buttons
     def all_threads_paused(self):
         """ Updates the UI after we've sent the pause signal to all the threads"""
+        self.change_profile_action.setDisabled(False)
         self.fuzzer_button.setDisabled(False)
         self.thread_count.setDisabled(False)
         self.stop_button.hide()
@@ -373,10 +387,10 @@ class MainWindow(QtWidgets.QMainWindow):
     def connect_thread_callbacks(self, fuzzer_thread):
         """ Sets up callbacks that should fire when any thread emits a signal (or should be received by all threads """
         # Update the run/crash/throughput variables after every fuzzing run
-        fuzzer_thread.runComplete.connect(self.calculate_throughput)
-        fuzzer_thread.runComplete.connect(self.check_for_completion)
+        fuzzer_thread.run_complete.connect(self.calculate_throughput)
+        fuzzer_thread.run_complete.connect(self.check_for_completion)
         fuzzer_thread.paused.connect(self.handle_paused_fuzzer_thread)
-        fuzzer_thread.foundCrash.connect(self.handle_new_crash)
+        fuzzer_thread.found_crash.connect(self.handle_new_crash)
         fuzzer_thread.server_crashed.connect(self.handle_server_crash)
         fuzzer_thread.tracer_failed.connect(self.handle_tracer_failure)
 
@@ -406,9 +420,9 @@ class MainWindow(QtWidgets.QMainWindow):
     ## Signal handler that automatically retrieves data for a new crash whenver one is found
     def handle_new_crash(self, thread, run_id):
         """ Updates the crash counter and pauses other threads if specified """
-        self.crashesModel.update()
-        self.crashesTable.resizeColumnsToContents()
-        self.statsWidget.update()
+        self.crashes_model.update()
+        self.crashes_table.resizeColumnsToContents()
+        self.stats_widget.update()
         self.crash_counter.increment()
         crash = db.Crash.factory(run_id, get_target_slug(config.config))
         if not crash:
@@ -548,7 +562,7 @@ class MainWindow(QtWidgets.QMainWindow):
     ## Handler for displaying a custom context menu
     def contextMenuEvent(self, QContextMenuEvent):
         """ Displays the right-click menu """
-        menu = QMenu(self)
+        menu = QtWidgets.QMenu(self)
         menu.addAction(self.expand_action)
         menu.addAction(self.collapse_action)
         menu.addAction(self.check_action)
@@ -559,7 +573,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def checksec_finished(self, checksec_output):
         target_path = config.config['target_application_path']
         target_string = "Target: {}\t Protections: {}".format(target_path, checksec_output)
-        self.targetLabel.setText(target_string)
+        self.target_label.setText(target_string)
 
     ## Signal handler that handles wizard results after the executable finishes.
     def wizard_finished(self, wizard_output):
@@ -575,8 +589,8 @@ class MainWindow(QtWidgets.QMainWindow):
     ## (DEPRECATED) saves a csv file of the crash results. No longer used.
     def save_crashes(self):
         """ Saves a csv of crash data """
-        self.crashesModel.update()
-        savefile, not_canceled = QFileDialog.getSaveFileName(self, filter="*.csv")
+        self.crashes_model.update()
+        savefile, not_canceled = QtWidgets.QFileDialog.getSaveFileName(self, filter="*.csv")
         if not_canceled:
             export_crash_data_to_csv(self.crashes, savefile)
 
@@ -620,7 +634,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     ## Button callback that allows the user to select a location to save a csv file and a fuzzing report
     def triageExportGui(self):
-        path = QFileDialog.getExistingDirectory(dir=".")
+        path = QtWidgets.QFileDialog.getExistingDirectory(dir=".")
         if len(path) == 0:
             return
 
@@ -635,7 +649,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # row, col = a.row(), a.column()
         data = a.data(Qt.UserRole)
         crash = db.Crash.factory(data.runid)
-        self.crashBrowser.setText(crash.output)
+        self.crash_browser.setText(crash.output)
 
 ## Build a GUI window and display it to the user.
 def main():

@@ -19,10 +19,16 @@ sl2_funcmod SL2_FUNCMOD_TABLE[] = {
     {"ReadEventLogW", "KERNELBASE.DLL"},
     {"fread", "UCRTBASE.DLL"},
     {"fread", "UCRTBASED.DLL"},
+    {"fread", "MSVCRT.DLL"},
+    {"fread", "MSVCRTD.DLL"},
     {"fread_s", "UCRTBASE.DLL"},
     {"fread_s", "UCRTBASED.DLL"},
+    {"fread_s", "MSVCRT.DLL"},
+    {"fread_s", "MSVCRTD.DLL"},
     {"_read", "UCRTBASE.DLL"},
     {"_read", "UCRTBASED.DLL"},
+    {"_read", "MSVCRT.DLL"},
+    {"_read", "MSVCRTD.DLL"},
     {"MapViewOfFile", "KERNELBASE.DLL"},
 };
 
@@ -33,13 +39,12 @@ sl2_funcmod SL2_FUNCMOD_TABLE[] = {
 // the DR build process eventually and be the superclass of Fuzzer and Tracer subclasses.
 /////////////////////////////////////////////////////////////////////////////////////////////////
 SL2Client::SL2Client() {
-
 }
 
 void
-SL2Client::hash_args(char * argHash, fileArgHash * fStruct){
-    std::vector<unsigned char> blob_vec((unsigned char *) fStruct,
-        ((unsigned char *) fStruct) + sizeof(fileArgHash));
+SL2Client::hash_args(char * argHash, hash_context *hash_ctx){
+    std::vector<unsigned char> blob_vec((unsigned char *) hash_ctx,
+        ((unsigned char *) hash_ctx) + sizeof(hash_context));
     std::string hash_str;
     picosha2::hash256_hex_string(blob_vec, hash_str);
     argHash[SL2_HASH_LEN] = 0;
@@ -58,26 +63,45 @@ is_function_targeted(client_read_info* info)
 
     for (targetFunction t : parsedJson){
         if (t.selected && STREQ(t.functionName.c_str(), func_name)) {
-                if (t.mode & MATCH_INDEX)           { if (compare_indices(t, function)) {return true;}}
-                if (t.mode & MATCH_RETN_ADDRESS)    { if (compare_return_addresses(t, info)) {return true;}}
-                if (t.mode & MATCH_ARG_HASH)        { if (compare_arg_hashes(t, info)) {return true;}}
-                if (t.mode & MATCH_ARG_COMPARE)     { if (compare_arg_buffers(t, info)) {return true;}}
-                if (t.mode & MATCH_FILENAMES)       { if (compare_filenames(t, info)) {return true;}}
-                if (t.mode & MATCH_RETN_COUNT)      { if (compare_index_at_retaddr(t, info)) {return true;}}
-                if (t.mode & LOW_PRECISION) {
-                    if (info->source) { // if filename is available
-                        if (compare_filenames(t, info)) {return true;}
-                    } else {
-                        if (compare_return_addresses(t, info) && compare_arg_buffers(t, info)) {return true;}
+            if (t.mode & MATCH_INDEX && compare_indices(t, function)) {
+                return true;
+            }
+            if (t.mode & MATCH_RETN_ADDRESS && compare_return_addresses(t, info)) {
+                return true;
+            }
+            if (t.mode & MATCH_ARG_HASH && compare_arg_hashes(t, info)) {
+                return true;
+            }
+            if (t.mode & MATCH_ARG_COMPARE && compare_arg_buffers(t, info)) {
+                return true;
+            }
+            if (t.mode & MATCH_FILENAMES && compare_filenames(t, info)) {
+                return true;
+            }
+            if (t.mode & MATCH_RETN_COUNT && compare_index_at_retaddr(t, info)) {
+                return true;
+            }
+            if (t.mode & LOW_PRECISION) {
+                // if filename is available
+                if (info->source && compare_filenames(t, info)) {
+                    if (compare_filenames(t, info)) {
+                        return true;
                     }
                 }
-                if (t.mode & MEDIUM_PRECISION) {
-                    if (compare_arg_hashes(t, info) && compare_return_addresses(t, info)) {return true;}
+                if (compare_return_addresses(t, info) && compare_arg_buffers(t, info)) {
+                    return true;
                 }
-                if (t.mode & HIGH_PRECISION) {
-                    if (compare_arg_hashes(t, info) && compare_index_at_retaddr(t, info)) {return true;}
+            }
+            if (t.mode & MEDIUM_PRECISION) {
+                if (compare_arg_hashes(t, info) && compare_return_addresses(t, info)) {
+                    return true;
                 }
-                else {return false;}
+            }
+            if (t.mode & HIGH_PRECISION) {
+                if (compare_arg_hashes(t, info) && compare_index_at_retaddr(t, info)) {
+                    return true;
+                }
+            }
         }
     }
     return false;
@@ -121,27 +145,26 @@ bool SL2Client::compare_arg_buffers(targetFunction &t, client_read_info* info){ 
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-// incrementCallCountForFunction()
+// increment_call_count()
 //
 // Increments the total number of call counts for this function
 uint64_t    SL2Client::
-incrementCallCountForFunction(Function function) {
+increment_call_count(Function function) {
     return call_counts[function]++;
 }
 
 uint64_t    SL2Client::
-incrementRetAddrCount(uint64_t retAddr) {
+increment_retaddr_count(uint64_t retAddr) {
     return ret_addr_counts[retAddr]++;
 }
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-// loadJson()
+// loadTargets()
 //
-// Loads json blob into client
-// TODO(ww): Rename to loadTargets, to reflect the fact that we're not using JSON anymore?
+// Loads the msgpack blob containing target information into the client.
 bool SL2Client::
-loadJson(string path)
+loadTargets(string path)
 {
     file_t targets = dr_open_file(path.c_str(), DR_FILE_READ);
     size_t targets_size;
@@ -283,14 +306,14 @@ SL2Client::wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->source               = NULL;
 
-    fileArgHash fStruct = {0};
+    hash_context hash_ctx = {0};
 
-    GetFinalPathNameByHandle(hEventLog, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
-    fStruct.position = dwRecordOffset;
-    fStruct.readSize = nNumberOfBytesToRead;
+    GetFinalPathNameByHandle(hEventLog, hash_ctx.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
+    hash_ctx.position = dwRecordOffset;
+    hash_ctx.readSize = nNumberOfBytesToRead;
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    hash_args(info->argHash, &fStruct);
+    hash_args(info->argHash, &hash_ctx);
 }
 
 
@@ -331,13 +354,13 @@ SL2Client::wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
         info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
         info->source               = NULL;
 
-        fileArgHash fStruct = {0};
+        hash_context hash_ctx = {0};
 
-//        mbstowcs_s(fStruct.fileName, , lpValueName, MAX_PATH);
-        fStruct.readSize = *lpcbData;
+//        mbstowcs_s(hash_ctx.fileName, , lpValueName, MAX_PATH);
+        hash_ctx.readSize = *lpcbData;
 
         info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-        hash_args(info->argHash, &fStruct);
+        hash_args(info->argHash, &hash_ctx);
     } else {
         *user_data = NULL;
     }
@@ -384,13 +407,13 @@ SL2Client::wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->source               = NULL;
 
-    fileArgHash fStruct = {0};
+    hash_context hash_ctx = {0};
 
-//    fStruct.fileName[0] = (wchar_t) s;
-    fStruct.readSize = dwBufferLength;
+//    hash_ctx.fileName[0] = (wchar_t) s;
+    hash_ctx.readSize = dwBufferLength;
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    hash_args(info->argHash, &fStruct);
+    hash_args(info->argHash, &hash_ctx);
 }
 
 /*
@@ -429,13 +452,13 @@ SL2Client::wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->source               = NULL;
 
-    fileArgHash fStruct = {0};
+    hash_context hash_ctx = {0};
 
-//    fStruct.fileName[0] = (wchar_t) s;
-    fStruct.readSize = nNumberOfBytesToRead;
+//    hash_ctx.fileName[0] = (wchar_t) s;
+    hash_ctx.readSize = nNumberOfBytesToRead;
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    hash_args(info->argHash, &fStruct);
+    hash_args(info->argHash, &hash_ctx);
 }
 
 /*
@@ -474,13 +497,13 @@ SL2Client::wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->source               = NULL;
 
-    fileArgHash fStruct = {0};
+    hash_context hash_ctx = {0};
 
-//    fStruct.fileName[0] = (wchar_t) s;
-    fStruct.readSize = nNumberOfBytesToRead;
+//    hash_ctx.fileName[0] = (wchar_t) s;
+    hash_ctx.readSize = nNumberOfBytesToRead;
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    hash_args(info->argHash, &fStruct);
+    hash_args(info->argHash, &hash_ctx);
 }
 
 
@@ -517,13 +540,13 @@ SL2Client::wrap_pre_recv(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->source               = NULL;
 
-    fileArgHash fStruct = {0};
+    hash_context hash_ctx = {0};
 
-    fStruct.fileName[0] = (wchar_t) s;
-    fStruct.readSize = len;
+    hash_ctx.fileName[0] = (wchar_t) s;
+    hash_ctx.readSize = len;
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    hash_args(info->argHash, &fStruct);
+    hash_args(info->argHash, &hash_ctx);
 }
 
 /*
@@ -547,15 +570,15 @@ SL2Client::wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     DWORD nNumberOfBytesToRead  = (DWORD)drwrap_get_arg(wrapcxt, 2);
     DWORD *lpNumberOfBytesRead = (DWORD*)drwrap_get_arg(wrapcxt, 3);
 
-    fileArgHash fStruct = {0};
+    hash_context hash_ctx = {0};
 
     LARGE_INTEGER offset = {0};
     LARGE_INTEGER position = {0};
     SetFilePointerEx(hFile, offset, &position, FILE_CURRENT);
 
-    GetFinalPathNameByHandle(hFile, fStruct.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
-    fStruct.position = position.QuadPart;
-    fStruct.readSize = nNumberOfBytesToRead;
+    GetFinalPathNameByHandle(hFile, hash_ctx.fileName, MAX_PATH, FILE_NAME_NORMALIZED);
+    hash_ctx.position = position.QuadPart;
+    hash_ctx.readSize = nNumberOfBytesToRead;
 
     *user_data             = dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(client_read_info));
     client_read_info *info = (client_read_info *) *user_data;
@@ -565,14 +588,14 @@ SL2Client::wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     info->lpBuffer             = lpBuffer;
     info->nNumberOfBytesToRead = nNumberOfBytesToRead;
     info->lpNumberOfBytesRead  = lpNumberOfBytesRead;
-    info->position             = fStruct.position;
+    info->position             = hash_ctx.position;
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
 
-    info->source = (wchar_t *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(fStruct.fileName));
-    memcpy(info->source, fStruct.fileName, sizeof(fStruct.fileName));
+    info->source = (wchar_t *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), sizeof(hash_ctx.fileName));
+    memcpy(info->source, hash_ctx.fileName, sizeof(hash_ctx.fileName));
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    hash_args(info->argHash, &fStruct);
+    hash_args(info->argHash, &hash_ctx);
 }
 
 void
@@ -601,16 +624,16 @@ SL2Client::wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->source               = NULL;
 
-    fileArgHash fStruct = {0};
+    hash_context hash_ctx = {0};
 
-    fStruct.fileName[0] = (wchar_t) _fileno(file);
+    hash_ctx.fileName[0] = (wchar_t) _fileno(file);
 
-    fStruct.position = bufsize;  // Field names don't actually matter
-    fStruct.readSize = size;
-    fStruct.count = count;
+    hash_ctx.position = bufsize;  // Field names don't actually matter
+    hash_ctx.readSize = size;
+    hash_ctx.count = count;
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    hash_args(info->argHash, &fStruct);
+    hash_args(info->argHash, &hash_ctx);
 }
 
 void
@@ -639,16 +662,16 @@ SL2Client::wrap_pre_fread(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->source               = NULL;
 
-    fileArgHash fStruct = {0};
+    hash_context hash_ctx = {0};
 
-    fStruct.fileName[0] = (wchar_t) _fileno(file);
+    hash_ctx.fileName[0] = (wchar_t) _fileno(file);
 
-//    fStruct.position = ftell(fpointer);  // This instantly crashes DynamoRIO
-    fStruct.readSize = size;
-    fStruct.count = count;
+//    hash_ctx.position = ftell(fpointer);  // This instantly crashes DynamoRIO
+    hash_ctx.readSize = size;
+    hash_ctx.count = count;
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    hash_args(info->argHash, &fStruct);
+    hash_args(info->argHash, &hash_ctx);
 }
 
 void
@@ -676,13 +699,13 @@ SL2Client::wrap_pre__read(void *wrapcxt, OUT void **user_data)
     info->retAddrOffset        = (uint64_t) drwrap_get_retaddr(wrapcxt) - baseAddr;
     info->source               = NULL;
 
-    fileArgHash fStruct = {0};
+    hash_context hash_ctx = {0};
 
-    fStruct.fileName[0] = (wchar_t) fd;
-    fStruct.count= count;
+    hash_ctx.fileName[0] = (wchar_t) fd;
+    hash_ctx.count= count;
 
     info->argHash = (char *) dr_thread_alloc(drwrap_get_drcontext(wrapcxt), SL2_HASH_LEN + 1);
-    hash_args(info->argHash, &fStruct);
+    hash_args(info->argHash, &hash_ctx);
 }
 
 void
