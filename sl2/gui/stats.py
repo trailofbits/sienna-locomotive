@@ -7,7 +7,8 @@ from PySide2 import QtWidgets
 from sl2.db import Crash, getSession
 
 
-## Widget for crash statistics
+## class StatsWidget
+# Widget for crash statistics - renders databse queries to HTML and displays them in a web view
 class StatsWidget(QtWidgets.QWidget):
 
     ## Constructor for stats widget
@@ -24,7 +25,7 @@ class StatsWidget(QtWidgets.QWidget):
         self.update()
 
     ## Returns html string representation of object with # crashes, unique & duplicate crashes, and exploitability stats
-    def toHTML(self):
+    def toHTML(self):  # TODO - switch this to use Jinja
         return """
 <html>
     <head>
@@ -63,9 +64,11 @@ class StatsWidget(QtWidgets.QWidget):
 
     ## Requeries the database and updates the table
     def update(self):
+        # create a query for the current target
         session = getSession()
         basequery = session.query(Crash).filter(Crash.target_config_slug == self.target_slug)
 
+        # Set default values
         self.crashes = basequery.all()
         self.crashesCnt = len(self.crashes)
         self.exploitabilityCnts = {
@@ -81,6 +84,7 @@ class StatsWidget(QtWidgets.QWidget):
         self.ranksMean = 0
         self.ranksMedian = 0
 
+        # if there are crashes, update the rest of the counters
         if self.crashesCnt > 0:
             self.uniquesCnt = basequery.distinct(Crash.crashash).group_by(Crash.crashash).count()
             self.dupesCount = self.crashesCnt - self.uniquesCnt

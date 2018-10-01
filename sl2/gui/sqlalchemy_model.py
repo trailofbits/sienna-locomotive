@@ -5,7 +5,8 @@ from PySide2.QtCore import Qt
 from PySide2.QtSql import QSqlTableModel
 
 
-## Sqlalchemy to QT Table adapter
+## class SqlalchemyModel
+# Sqlalchemy to QT Table adapter
 # Acts as a model of a sqlalchemy object to a QSqlTableModel.  Allows for sorting,
 # column headers
 class SqlalchemyModel(QSqlTableModel):
