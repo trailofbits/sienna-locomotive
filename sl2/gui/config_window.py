@@ -171,8 +171,10 @@ class ConfigWindow(QtWidgets.QDialog):
 
         if not good:
             self.bad_dr_path_warning.show()
+            self.add_button.setEnabled(False)
         else:
             self.bad_dr_path_warning.hide()
+            self.add_button.setEnabled(True)
 
     def validate_build_path(self, new_path):
         paths = ['server\\Debug\\server.exe',
@@ -187,8 +189,10 @@ class ConfigWindow(QtWidgets.QDialog):
             self.bad_build_dir_warning.show()
             self.bad_build_dir_warning.setToolTip(
                 "This build root is missing some expected child paths: " + '\n'.join(missing))
+            self.add_button.setEnabled(False)
         else:
             self.bad_build_dir_warning.hide()
+            self.add_button.setEnabled(True)
 
     def toggle_expansion(self):
         if not self.extension_widget.isVisible():
