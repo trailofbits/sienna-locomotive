@@ -67,6 +67,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.menu_bar = self.menuBar()
         self.file_menu = self.menu_bar.addMenu("&File")
         self.change_profile_action = self.file_menu.addAction("Change Profile")
+        self.open_report_in_browser = QtWidgets.QAction("Open exported report in browser",
+                                                        self, checkable=True)
+        self.file_menu.addAction(self.open_report_in_browser)
+        self.open_report_in_browser.setChecked(True)
 
         # Target info
         self.target_status = QtWidgets.QStatusBar()
@@ -613,7 +617,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         triageExporter = TriageExport(path, get_target_slug(config.config))
         triageExporter.export()
-        generate_report(dest=path)
+        generate_report(dest=path, browser=self.open_report_in_browser.isChecked())
 
     ## Clicked on Crash
     # When a cell is clicked in the crashes table, find the row
