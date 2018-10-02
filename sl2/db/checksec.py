@@ -142,4 +142,4 @@ class Checksec(Base):
             t.append("SafeSEH")
         tags = ' | '.join(t)
 
-        return "%3.0f%% (%s)" % (self._protection_percent() * 100, tags)
+        return "{0:3.0f}% ({1})".format(self._protection_percent() * 100, tags)
