@@ -20,7 +20,7 @@ import winreg
 import msgpack
 
 from sl2 import db
-from sl2.db import Crash, Tracer, Checksec
+from sl2.db import Crash, Tracer, Checksec, TargetConfig
 from . import config
 
 uuid_regex = re.compile("[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}")
@@ -365,11 +365,20 @@ class TriageExport:
         csvPath = os.path.join(self.exportDir, "triage.csv")
         with open(csvPath, "w") as f:
             csvWriter = csv.writer(f, lineterminator='\n')
-            csvWriter.writerow(self.checksec_cols + self.crash_cols + ['tracer.formatted'])
+            checksec_no_gs = self.checksec_cols.copy()
+            checksec_no_gs[checksec_no_gs.index('gs')] = 'guardStack'
+            csvWriter.writerow(checksec_no_gs + self.crash_cols + ['tracer.formatted'])
             session = db.getSession()
+            target = session.query(TargetConfig).filter(TargetConfig.target_slug == self.slug).first()
+            if not target:
+                print("[!] Could not retrieve target config!")
+            checksec = session.query(Checksec).filter(Checksec.hash == target.hash).first()
+            if not checksec:
+                print("[!} Could not retrieve Checksec results!")
             for crash in session.query(Crash).filter(Crash.target_config_slug == self.slug).all():
-                checksec = session.query(Checksec).filter(Checksec.hash == crash.target_config_slug).first()
                 tracer = session.query(Tracer).filter(Tracer.runid == crash.runid).first()
+                if not tracer:
+                    print("[!] Could not retrive Tracer results!")
                 row = []
                 for col in self.checksec_cols:
                     row.append(getattr(checksec, col, None))
