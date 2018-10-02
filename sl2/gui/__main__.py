@@ -434,8 +434,9 @@ class MainWindow(QtWidgets.QMainWindow):
     def handle_tracer_failure(self):
         """ Alert the user if a tracer run fails. """
         # TODO(ww): Does it make sense to pause the fuzzing threads here?
-        QtWidgets.QMessageBox.critical(None, "Tracer failure",
-                                       "Found a crash but couldn't trace it.\nTry running the tracer manually via sl2-cli?")
+        QtWidgets.QMessageBox.critical(
+            None, "Tracer failure",
+            "Found a crash but couldn't trace it.\nTry running the tracer manually via sl2-cli?")
 
     def build_func_tree(self):
         """ Build the function target display tree """
