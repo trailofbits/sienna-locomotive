@@ -67,7 +67,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.menu_bar = self.menuBar()
         self.file_menu = self.menu_bar.addMenu("&File")
         self.change_profile_action = self.file_menu.addAction("Change Profile")
-        self.open_report_in_browser = QtWidgets.QAction("Open triage report in browser",
+        self.open_report_in_browser = QtWidgets.QAction("Open exported report in browser",
                                                         self, checkable=True)
         self.file_menu.addAction(self.open_report_in_browser)
         self.open_report_in_browser.setChecked(True)
