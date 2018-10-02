@@ -21,7 +21,7 @@ def comma_ify(value):
     return "{:,}".format(value)
 
 
-def generate_report(dest=None):
+def generate_report(dest=None, browser=True):
     env = Environment(loader=PackageLoader('sl2', 'reporting/templates'))
     env.filters['comma_ify'] = comma_ify
     template = env.get_template('index.html')
@@ -77,10 +77,12 @@ def generate_report(dest=None):
         if '.html' not in dest:
             dest = os.path.join(dest, 'Report_v{}.html'.format(revision))
         copyfile(fname, dest)
-        os.startfile(dest)
+        if browser:
+            os.startfile(dest)
     else:
         print("Written to", fname)
-        os.startfile(fname)
+        if browser:
+            os.startfile(fname)
 
 
 def main():
