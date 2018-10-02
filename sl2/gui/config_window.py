@@ -1,4 +1,5 @@
 import os
+import re
 
 from PySide2 import QtWidgets
 from PySide2.QtCore import Qt, QSize
@@ -74,6 +75,11 @@ class ConfigWindow(QtWidgets.QDialog):
         self.build_dir_button = QtWidgets.QPushButton("Choose Directory")
         self.target_path_button = QtWidgets.QPushButton("Choose Target")
 
+        icon = self.style().standardIcon(QStyle.SP_MessageBoxCritical)
+        self.bad_profile_name_warning = QtWidgets.QLabel()
+        self.bad_profile_name_warning.setPixmap(icon.pixmap(32, 32))
+        self.bad_profile_name_warning.hide()
+
         # Create warning messages for incorrect paths
         icon = self.style().standardIcon(QStyle.SP_MessageBoxWarning)
         self.bad_dr_path_warning = QtWidgets.QLabel()
@@ -85,13 +91,17 @@ class ConfigWindow(QtWidgets.QDialog):
         icon = self.style().standardIcon(QStyle.SP_MessageBoxCritical)
         self.bad_build_dir_warning = QtWidgets.QLabel()
         self.bad_build_dir_warning.setPixmap(icon.pixmap(32, 32))
-        self.bad_build_dir_warning.setToolTip("This build root is missing some expected child paths")
+        self.bad_build_dir_warning.setToolTip("This build root is missing some expected child paths.")
         self.bad_build_dir_warning.hide()
 
+        profile_name_layout = QtWidgets.QHBoxLayout()
         # Create layouts for adding the new profile UI components
         drrun_path_layout = QtWidgets.QHBoxLayout()
         build_dir_layout = QtWidgets.QHBoxLayout()
         target_path_layout = QtWidgets.QHBoxLayout()
+
+        profile_name_layout.addWidget(self.profile_name)
+        profile_name_layout.addWidget(self.bad_profile_name_warning)
 
         drrun_path_layout.addWidget(self.drrun_path)
         drrun_path_layout.addWidget(self.drrun_path_button)
@@ -104,7 +114,7 @@ class ConfigWindow(QtWidgets.QDialog):
         target_path_layout.addWidget(self.target_path)
         target_path_layout.addWidget(self.target_path_button)
 
-        self.extension_layout.addWidget(self.profile_name)
+        self.extension_layout.addLayout(profile_name_layout)
         self.extension_layout.addLayout(drrun_path_layout)
         self.extension_layout.addLayout(build_dir_layout)
         self.extension_layout.addLayout(target_path_layout)
@@ -123,6 +133,7 @@ class ConfigWindow(QtWidgets.QDialog):
         self.drrun_path_button.clicked.connect(self.get_drrun_path)
         self.build_dir_button.clicked.connect(self.get_build_dir)
         self.target_path_button.clicked.connect(self.get_target_path)
+        self.profile_name.textChanged.connect(self.validate_profile_name)
         self.drrun_path.textChanged.connect(self.validate_drrun_path)
         self.build_dir.textChanged.connect(self.validate_build_path)
 
@@ -178,6 +189,20 @@ class ConfigWindow(QtWidgets.QDialog):
         if len(path) > 0:
             self.build_dir.setText(path)
 
+    def validate_profile_name(self, new_profile_name):
+        if len(new_profile_name) > 32:
+            self.bad_profile_name_warning.show()
+            self.bad_profile_name_warning.setToolTip(
+                "Profile name is too long ({} > 32).".format(len(new_profile_name)))
+            self.add_button.setEnabled(False)
+        elif not re.match("^[a-zA-Z1-9]+$", new_profile_name):
+            self.bad_profile_name_warning.show()
+            self.bad_profile_name_warning.setToolTip("Profile name isn't alphanumeric.")
+            self.add_button.setEnabled(False)
+        else:
+            self.bad_profile_name_warning.hide()
+            self.add_button.setEnabled(True)
+
     ## Validate the path to drrun.exe
     def validate_drrun_path(self, new_path):
         good = 'drrun.exe' in new_path
@@ -186,8 +211,10 @@ class ConfigWindow(QtWidgets.QDialog):
 
         if not good:
             self.bad_dr_path_warning.show()
+            self.add_button.setEnabled(False)
         else:
             self.bad_dr_path_warning.hide()
+            self.add_button.setEnabled(True)
 
     ## Validate the path to the build directory
     def validate_build_path(self, new_path):
@@ -203,8 +230,10 @@ class ConfigWindow(QtWidgets.QDialog):
             self.bad_build_dir_warning.show()
             self.bad_build_dir_warning.setToolTip(
                 "This build root is missing some expected child paths: " + '\n'.join(missing))
+            self.add_button.setEnabled(False)
         else:
             self.bad_build_dir_warning.hide()
+            self.add_button.setEnabled(True)
 
     ## Show and hide the 'new profile' dialog
     def toggle_expansion(self):

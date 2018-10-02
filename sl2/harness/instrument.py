@@ -399,7 +399,7 @@ def tracer_run(config_dict, run_id):
     )
 
     # Write stdout and stderr to files
-    write_output_files(run, run_id, 'triage')
+    write_output_files(run, run_id, 'trace')
 
     success = False
     message = None

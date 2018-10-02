@@ -21,9 +21,8 @@ from sl2.db.coverage import PathRecord
 def comma_ify(value):
     return "{:,}".format(value)
 
-
 ## Create an HTML report for a given target from the database.
-def generate_report(dest=None):
+def generate_report(dest=None, browser=True):
     # Create the template environment
     env = Environment(loader=PackageLoader('sl2', 'reporting/templates'))
     env.filters['comma_ify'] = comma_ify  # Pass in the comma_ify filter so we can use it when rendering
@@ -93,10 +92,12 @@ def generate_report(dest=None):
         if '.html' not in dest:
             dest = os.path.join(dest, 'Report_v{}.html'.format(revision))
         copyfile(fname, dest)
-        os.startfile(dest)
+        if browser:
+            os.startfile(dest)
     else:
         print("Written to", fname)
-        os.startfile(fname)
+        if browser:
+            os.startfile(fname)
 
 ## Generates a fuzzing report. Takes the `-p` parameter to indicate which config profile to use
 def main():
