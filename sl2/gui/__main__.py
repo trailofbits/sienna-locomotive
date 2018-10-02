@@ -30,10 +30,11 @@ from .checkbox_tree import (
     ComboboxTreeItemDelegate,
     mode_labels)
 
-##
+## class MainWindow
 # Main window for gui
 class MainWindow(QtWidgets.QMainWindow):
 
+    ## Creates Widgets, Connects Signals, Draws Window
     def __init__(self):
         QtWidgets.QMainWindow.__init__(self)
         self.crashes = []
@@ -341,12 +342,14 @@ class MainWindow(QtWidgets.QMainWindow):
         main_window = MainWindow()
         main_window.show()
 
+    ## Signal handler that updates the thread count based on the gui
     def change_thread_count(self, new_count):
         """ Creates new threads if we don't have as many as the user wants """
         if len(self.thread_holder) < new_count:
             self.thread_holder.append(FuzzerThread(config.config, self.target_data.filename))
             self.connect_thread_callbacks(self.thread_holder[-1])
 
+    ## Signal handler that starts all the selected threads
     def start_all_threads(self):
         """ Maps over the thread list and starts all the threads """
         self.start_time = self.start_time if self.start_time is not None else time.time()
@@ -367,6 +370,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.paused_fuzzer_threads.clear()
         self.stop_button.show()
 
+    ## Callback that fires when all threads are paused. Changes the UI state to allow clicking buttons
     def all_threads_paused(self):
         """ Updates the UI after we've sent the pause signal to all the threads"""
         self.change_profile_action.setDisabled(False)
@@ -375,12 +379,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stop_button.hide()
         self.busy_label.hide()
 
+    ## Signal handler that pauses all the threads
     def pause_all_threads(self):
         """ Maps over the thread list and send the pause signal to all the threads"""
         for thread in self.thread_holder:
             thread.pause()
         self.all_threads_paused()
 
+    ## Helper method to connect all the necessary callbacks to a given fuzzer thread
+    #  @param fuzzer_thread - thread to connect callbacks to
     def connect_thread_callbacks(self, fuzzer_thread):
         """ Sets up callbacks that should fire when any thread emits a signal (or should be received by all threads """
         # Update the run/crash/throughput variables after every fuzzing run
@@ -396,21 +403,25 @@ class MainWindow(QtWidgets.QMainWindow):
         self.fuzz_timeout_box.valueChanged.connect(fuzzer_thread.fuzz_timeout_changed)
         self.tracer_timeout_box.valueChanged.connect(fuzzer_thread.tracer_timeout_changed)
 
+    ## Signal handler that checks to see if anny threads are running
     def check_for_completion(self):
         """ Filters the threads and checks if any are still running """
         still_running = list(filter(lambda k: k.should_fuzz, self.thread_holder))
         if len(still_running) == 0:
             self.all_threads_paused()
 
+    ## Signal handler that calculates runs/second
     def calculate_throughput(self):
         """ Calculate our current runs/second. """
         self.runs.increment()
         self.throughput.update(self.runs.value / float(time.time() - self.start_time))
 
+    ## Signal handler that helps avoid race conditions when restarting threads
     def handle_paused_fuzzer_thread(self, fuzzer_thread):
         if fuzzer_thread not in self.paused_fuzzer_threads:
             self.paused_fuzzer_threads.append(fuzzer_thread)
 
+    ## Signal handler that automatically retrieves data for a new crash whenver one is found
     def handle_new_crash(self, thread, run_id):
         """ Updates the crash counter and pauses other threads if specified """
         self.crashes_model.update()
@@ -426,11 +437,13 @@ class MainWindow(QtWidgets.QMainWindow):
         # self.triage_output.append(str(crash))
         self.crashes.append(crash)
 
+    ## Signal handler that pauses fuzzing threads and restarts the server in the event that it crashes or hangs up
     def handle_server_crash(self):
         """ Pauses fuzzing threads and attempts to restart the server if it crashes """
         self.pause_all_threads()
         self.server_thread.start()
 
+    ## Signal handler that displays a warning if for some reason the tracer fails.
     def handle_tracer_failure(self):
         """ Alert the user if a tracer run fails. """
         # TODO(ww): Does it make sense to pause the fuzzing threads here?
@@ -438,6 +451,7 @@ class MainWindow(QtWidgets.QMainWindow):
             None, "Tracer failure",
             "Found a crash but couldn't trace it.\nTry running the tracer manually via sl2-cli?")
 
+    ## Builds the tree of targetable functions to display
     def build_func_tree(self):
         """ Build the function target display tree """
         self._func_tree.setSortingEnabled(False)
@@ -520,10 +534,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self._func_tree.sortByColumn(3, Qt.AscendingOrder)
         self._func_tree.setSortingEnabled(True)
 
+    ## Signal handler that updates the target file on the disk whenever a checkbox in the tree is clicked
     def tree_changed(self, widget, is_checked):
         """ Handle when an item in the function tree is checked """
         self.target_data.update(widget.index, selected=is_checked)
 
+    ## Maps indices of items shown in the filtered tree currently displayed to indices in the underlying model
     def get_visible_indices(self):
         """ Get the indices in the root model of all the visible items in the tree view """
         for row in range(self.module_proxy_model.rowCount()):
@@ -532,6 +548,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     self.module_proxy_model.mapToSource(
                         self.module_proxy_model.index(row, 0))))
 
+    ## Checks/Unchecks all members of the function targeting tree
     def check_all(self):
         """ Check all the visible boxes in the tree view """
         self.target_data.pause()
@@ -539,6 +556,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.model.itemFromIndex(index).setCheckState(Qt.Checked)
         self.target_data.unpause()
 
+    ## Checks/Unchecks all members of the function targeting tree
     def uncheck_all(self):
         """ The opposite of check_all """
         self.target_data.pause()
@@ -546,6 +564,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.model.itemFromIndex(index).setCheckState(Qt.Unchecked)
         self.target_data.unpause()
 
+    ## Handler for displaying a custom context menu
     def contextMenuEvent(self, QContextMenuEvent):
         """ Displays the right-click menu """
         menu = QtWidgets.QMenu(self)
@@ -555,11 +574,13 @@ class MainWindow(QtWidgets.QMainWindow):
         menu.addAction(self.uncheck_action)
         menu.popup(QContextMenuEvent.globalPos())
 
+    ## Signal handler that handles checksec results after the executable finishes.
     def checksec_finished(self, checksec_output):
         target_path = config.config['target_application_path']
         target_string = "Target: {}\t Protections: {}".format(target_path, checksec_output)
         self.target_label.setText(target_string)
 
+    ## Signal handler that handles wizard results after the executable finishes.
     def wizard_finished(self, wizard_output):
         """ Dump the results of a wizard run to the target file and rebuild the tree """
         if wizard_output:
@@ -570,6 +591,7 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.critical(None, "Wizard failure",
                                            "No wizard results; is the target 64-bit?")
 
+    ## (DEPRECATED) saves a csv file of the crash results. No longer used.
     def save_crashes(self):
         """ Saves a csv of crash data """
         self.crashes_model.update()
@@ -577,6 +599,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if not_canceled:
             export_crash_data_to_csv(self.crashes, savefile)
 
+    ## Expands/Un-Expands all the items in the function targeting tree
     def toggle_expansion(self):
         """ Toggles whether or not the extended fuzzing controls are shown """
         if not self.extension_widget.isVisible():
@@ -589,6 +612,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if not self.sizeHint().isValid():
             self.adjustSize()
 
+    ## Prevent the race condition when stopping/restarting fuzzer threads
     def unify_pause_state(self, state):
         """
             Keeps the state of the "continuous" and "pause" checkboxes consistent.
@@ -598,6 +622,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if state == Qt.Checked:
             self.continuous_mode_cbox.setChecked(True)
 
+    ## Prevent the race condition when stopping/restarting fuzzer threads
     def unify_continuous_state(self, state):
         """
             Keeps the state of the "continuous" and "pause" checkboxes consistent.
@@ -607,10 +632,12 @@ class MainWindow(QtWidgets.QMainWindow):
         if state == Qt.Unchecked:
             self.pause_mode_cbox.setChecked(False)
 
+    ## Signal handler that updates the verbosity state when the checkbox in the gui is clicked
     def verboseCheckBox_clicked(self):
         state = self.verboseCheckBox.isChecked()
         config.config['verbose'] = 2 if state else False
 
+    ## Button callback that allows the user to select a location to save a csv file and a fuzzing report
     def triageExportGui(self):
         path = QtWidgets.QFileDialog.getExistingDirectory(dir=".")
         if len(path) == 0:
@@ -629,7 +656,7 @@ class MainWindow(QtWidgets.QMainWindow):
         crash = db.Crash.factory(data.runid)
         self.crash_browser.setText(crash.output)
 
-
+## Build a GUI window and display it to the user.
 def main():
     app = QtWidgets.QApplication(sys.argv)
     sane, errors = sanity_checks(exit=False)

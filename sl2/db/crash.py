@@ -19,7 +19,6 @@ from .base import Base
 from sl2 import db
 
 
-## Crash class
 # Holds information about a specific crash
 # Example json
 # <pre>
@@ -82,36 +81,67 @@ class Crash(Base):
     ## Timestamp of the crash
     timestamp = Column(DateTime, default=func.now())
     ## register follow
+    ## The contents of the cs register at the time of the crash
     cs = Column(String(20))
+    ## The contents of the dr0 register at the time of the crash
     dr0 = Column(String(20))
+    ## The contents of the dr1 register at the time of the crash
     dr1 = Column(String(20))
+    ## The contents of the dr2 register at the time of the crash
     dr2 = Column(String(20))
+    ## The contents of the dr3 register at the time of the crash
     dr3 = Column(String(20))
+    ## The contents of the dr6 register at the time of the crash
     dr6 = Column(String(20))
+    ## The contents of the dr7 register at the time of the crash
     dr7 = Column(String(20))
+    ## The contents of the ds register at the time of the crash
     ds = Column(String(20))
+    ## The contents of the eflags register at the time of the crash
     eflags = Column(String(20))
+    ## The contents of the es register at the time of the crash
     es = Column(String(20))
+    ## The contents of the fs register at the time of the crash
     fs = Column(String(20))
+    ## The contents of the gs register at the time of the crash
     gs = Column(String(20))
+    ## The contents of the mx_csr register at the time of the crash
     mx_csr = Column(String(20))
+    ## The contents of the r10 register at the time of the crash
     r10 = Column(String(20))
+    ## The contents of the r11 register at the time of the crash
     r11 = Column(String(20))
+    ## The contents of the r12 register at the time of the crash
     r12 = Column(String(20))
+    ## The contents of the r13 register at the time of the crash
     r13 = Column(String(20))
+    ## The contents of the r14 register at the time of the crash
     r14 = Column(String(20))
+    ## The contents of the r15 register at the time of the crash
     r15 = Column(String(20))
+    ## The contents of the r8 register at the time of the crash
     r8 = Column(String(20))
+    ## The contents of the r9 register at the time of the crash
     r9 = Column(String(20))
+    ## The contents of the rax register at the time of the crash
     rax = Column(String(20))
+    ## The contents of the rbp register at the time of the crash
     rbp = Column(String(20))
+    ## The contents of the rbx register at the time of the crash
     rbx = Column(String(20))
+    ## The contents of the rcx register at the time of the crash
     rcx = Column(String(20))
+    ## The contents of the rdi register at the time of the crash
     rdi = Column(String(20))
+    ## The contents of the rdx register at the time of the crash
     rdx = Column(String(20))
+    ## The contents of the rip register at the time of the crash
     rip = Column(String(20))
+    ## The contents of the rsi register at the time of the crash
     rsi = Column(String(20))
+    ## The contents of the rsp register at the time of the crash
     rsp = Column(String(20))
+    ## The contents of the ss register at the time of the crash
     ss = Column(String(20))
 
     ## Constructor for crash object

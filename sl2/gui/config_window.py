@@ -8,8 +8,11 @@ from PySide2.QtWidgets import QFileDialog, QStyle
 from sl2.harness import config
 
 
+## class ConfigWindow
+#  Helper gui window for selecting an existing target configuration or creating a new one
 class ConfigWindow(QtWidgets.QDialog):
 
+    ## build window, add widgets, connect callbacks
     def __init__(self):
         QtWidgets.QDialog.__init__(self)
 
@@ -18,7 +21,6 @@ class ConfigWindow(QtWidgets.QDialog):
         # Set up basic window
         self.setWindowTitle("Configure SL2")
         self.setMinimumSize(QSize(800, 200))
-
         self._layout = QtWidgets.QVBoxLayout()
         self.setLayout(self._layout)
         self._layout.setAlignment(Qt.AlignTop)
@@ -26,6 +28,7 @@ class ConfigWindow(QtWidgets.QDialog):
         # CREATE WIDGETS #
         cbox_layout = QtWidgets.QHBoxLayout()
 
+        # Create widgets for profile selection
         self.okay_button = QtWidgets.QPushButton("Use Profile")
         self.okay_button.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Preferred)
         self.okay_button.clicked.connect(self.accept)
@@ -37,6 +40,7 @@ class ConfigWindow(QtWidgets.QDialog):
         cbox_layout.addWidget(self.okay_button)
         self._layout.addLayout(cbox_layout)
 
+        # Create layout and widgets for adding a new profile
         expansion_layout = QtWidgets.QHBoxLayout()
         expansion_layout.setAlignment(Qt.AlignLeft)
         add_label = QtWidgets.QLabel("Add Profile ")
@@ -55,6 +59,7 @@ class ConfigWindow(QtWidgets.QDialog):
         self.target_path = QtWidgets.QLineEdit()
         self.target_args = QtWidgets.QLineEdit()
 
+        # set placeholder text in path text boxes
         self.profile_name.setPlaceholderText("Profile Name")
         # self.drrun_path.setPlaceholderText("Path to drrun.exe")
         self.drrun_path.setText(config._config['DEFAULT']['drrun_path'])
@@ -65,6 +70,7 @@ class ConfigWindow(QtWidgets.QDialog):
         self.target_path.setPlaceholderText("Path to target application")
         self.target_args.setPlaceholderText("Target arguments")
 
+        # Create buttons for adding paths
         self.drrun_path_button = QtWidgets.QPushButton("Choose Path")
         self.build_dir_button = QtWidgets.QPushButton("Choose Directory")
         self.target_path_button = QtWidgets.QPushButton("Choose Target")
@@ -74,6 +80,7 @@ class ConfigWindow(QtWidgets.QDialog):
         self.bad_profile_name_warning.setPixmap(icon.pixmap(32, 32))
         self.bad_profile_name_warning.hide()
 
+        # Create warning messages for incorrect paths
         icon = self.style().standardIcon(QStyle.SP_MessageBoxWarning)
         self.bad_dr_path_warning = QtWidgets.QLabel()
         self.bad_dr_path_warning.setPixmap(icon.pixmap(32, 32))
@@ -88,6 +95,7 @@ class ConfigWindow(QtWidgets.QDialog):
         self.bad_build_dir_warning.hide()
 
         profile_name_layout = QtWidgets.QHBoxLayout()
+        # Create layouts for adding the new profile UI components
         drrun_path_layout = QtWidgets.QHBoxLayout()
         build_dir_layout = QtWidgets.QHBoxLayout()
         target_path_layout = QtWidgets.QHBoxLayout()
@@ -119,6 +127,7 @@ class ConfigWindow(QtWidgets.QDialog):
         self._layout.addWidget(self.extension_widget)
         self.extension_widget.hide()
 
+        # Connect the signals to the callbacks
         self.expand_button.clicked.connect(self.toggle_expansion)
         self.add_button.clicked.connect(self.add_config)
         self.drrun_path_button.clicked.connect(self.get_drrun_path)
@@ -132,6 +141,7 @@ class ConfigWindow(QtWidgets.QDialog):
         if config.profile != 'DEFAULT':
             self.profiles.setCurrentText(config.profile)
 
+    ## When the "Add Config" button is clicked, read the values from the text boxes and write them into the config file
     def add_config(self, *_args):
         name = self.profile_name.text()
         if len(name) == 0:
@@ -156,20 +166,24 @@ class ConfigWindow(QtWidgets.QDialog):
         self.profiles.setCurrentIndex(profile_names.index(name))
         self.expand_button.click()
 
+    ## Push the current profile into the config module
     def done(self, *args):
         config.set_profile(self.profiles.currentText())
         super().done(*args)
 
+    ## Get the path returned by the Qt dialog
     def get_drrun_path(self):
         path, good = QFileDialog.getOpenFileName(filter="*.exe", dir=config._config['DEFAULT']['drrun_path'])
         if good:
             self.drrun_path.setText(path)
 
+    ## Get the path returned by the Qt dialog
     def get_target_path(self):
         path, good = QFileDialog.getOpenFileName(filter="*.exe")
         if good:
             self.target_path.setText(path)
 
+    ## Get the path returned by the Qt dialog
     def get_build_dir(self):
         path = QFileDialog.getExistingDirectory(dir='build')
         if len(path) > 0:
@@ -189,6 +203,7 @@ class ConfigWindow(QtWidgets.QDialog):
             self.bad_profile_name_warning.hide()
             self.add_button.setEnabled(True)
 
+    ## Validate the path to drrun.exe
     def validate_drrun_path(self, new_path):
         good = 'drrun.exe' in new_path
         good = good and ('bin32' in new_path or 'bin64' in new_path)
@@ -201,6 +216,7 @@ class ConfigWindow(QtWidgets.QDialog):
             self.bad_dr_path_warning.hide()
             self.add_button.setEnabled(True)
 
+    ## Validate the path to the build directory
     def validate_build_path(self, new_path):
         paths = ['server\\Debug\\server.exe',
                  'fuzz_dynamorio\\Debug\\fuzzer.dll',
@@ -219,6 +235,7 @@ class ConfigWindow(QtWidgets.QDialog):
             self.bad_build_dir_warning.hide()
             self.add_button.setEnabled(True)
 
+    ## Show and hide the 'new profile' dialog
     def toggle_expansion(self):
         if not self.extension_widget.isVisible():
             self.extension_widget.show()

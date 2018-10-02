@@ -102,6 +102,9 @@ Function Deploy{
     "Rebuilding Code Files"
     Build
 
+    "Rebuilding Documentation"
+    Doc
+
     "Creating Deploy Directory"
     Remove-Item sl2-deploy -Recurse -ErrorAction Ignore
     mkdir sl2-deploy
@@ -127,6 +130,10 @@ Function Deploy{
     Copy-Item build\triage\Debug sl2-deploy\build\triage -Recurse -Force
     Copy-Item build\winchecksec\Debug sl2-deploy\build\winchecksec -Recurse -Force
     Copy-Item build\wizard\Debug sl2-deploy\build\wizard -Recurse -Force
+
+    "Copying Documentation"
+    New-Item sl2-deploy\doc -Type Directory
+    Copy-Item doc\html sl2-deploy\doc -Recurse -Force
 
     "Copying DynamoRIO"
     Copy-Item -Recurse dynamorio sl2-deploy

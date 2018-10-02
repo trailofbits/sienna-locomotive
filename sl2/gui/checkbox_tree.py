@@ -13,10 +13,9 @@ mode_labels = {1 << 0: "Nth Call",
                1 << 8: "Nth Call @ Address"}
 
 
-# Inverse mapping so we can cheaply get bit flags out of text labels
-# mode_labels.update(dict(reversed(item) for item in mode_labels.items()))
-
-
+## class ComboboxTreeItemDelegate
+# Delegate for editing targeting granularity
+# Overwrites the default text box editor with a combobox
 class ComboboxTreeItemDelegate(QStyledItemDelegate):
 
     def __init__(self, adapter, *args):
@@ -24,6 +23,7 @@ class ComboboxTreeItemDelegate(QStyledItemDelegate):
         self.adapter = adapter
         self.combobox = None
 
+    ## Create the combobox and fill it with labels
     def createEditor(self, parent, option, index):
         self.combobox = QComboBox(parent)
         for sft in [4, 5, 6]:
@@ -31,16 +31,20 @@ class ComboboxTreeItemDelegate(QStyledItemDelegate):
 
         return self.combobox
 
+    ## Render the editor based on the data in the model
     def setEditorData(self, editor, index):
         val = index.model().data(index, role=Qt.UserRole)
         self.combobox.setCurrentText(mode_labels[val])
 
+    ## Write back newly selected items into the model
     def setModelData(self, editor, model, index):
         model.setData(index, self.combobox.currentData(), role=Qt.UserRole)
         model.setData(index, self.combobox.currentText())
         self.adapter.update(model.data(index, role=Qt.UserRole + 1), mode=self.combobox.currentData())
 
 
+## class CheckboxTreeWidgetItem
+#  check-able QStandardItem for supporting the function targeting tree
 class CheckboxTreeWidgetItem(QStandardItem):
 
     def __init__(self, parent, index, *args):
@@ -51,6 +55,7 @@ class CheckboxTreeWidgetItem(QStandardItem):
         self.setCheckable(True)
         self.setEditable(False)
 
+    ## Handle state changes in the check state, only emitting the signal when the box was just checked or just uncheked
     def setData(self, value, role):
         should_emit = (role == Qt.CheckStateRole) and \
                       (self.data(role) is not None) and \
@@ -62,12 +67,14 @@ class CheckboxTreeWidgetItem(QStandardItem):
                 parent.itemCheckedStateChanged.emit(self, True if self.checkState() == Qt.Checked else False)
 
 
+## Custom model - doesn't do anything different than a QStandardItemModel. Used if we need a custom model in the future
 class CheckboxTreeModel(QStandardItemModel):
 
     def __init__(self):
         super().__init__()
 
 
+## Adds a signal to the QTreeView so we can handle cases when the checkbox state is changed
 class CheckboxTreeWidget(QTreeView):
     itemCheckedStateChanged = Signal(CheckboxTreeWidgetItem, bool)
 
@@ -75,12 +82,15 @@ class CheckboxTreeWidget(QTreeView):
         super().__init__(*args)
 
 
+## class CheckboxTreeSortFilterProxyModel
+#  Sort filter proxy model that allows us to implement custom sorting behavior
 class CheckboxTreeSortFilterProxyModel(QSortFilterProxyModel):
 
     def __init__(self, *args):
         self.inverted = False
         super().__init__(*args)
 
+    ## Convert strings into ints before sorting (if possible)
     def lessThan(self, QModelIndex_l, QModelIndex_r):
         """ Convert strings to ints before sorting (if possible) """
         try:
@@ -91,6 +101,7 @@ class CheckboxTreeSortFilterProxyModel(QSortFilterProxyModel):
         except ValueError:
             return super().lessThan(QModelIndex_l, QModelIndex_r)
 
+    ## Don't eliminate the child rows from view - only filter the top-level items
     def filterAcceptsRow(self, p_int, QModelIndex):
         """ Keep child rows when we filter on the top-level items """
         super_accepts = super().filterAcceptsRow(p_int, QModelIndex)
@@ -103,6 +114,7 @@ class CheckboxTreeSortFilterProxyModel(QSortFilterProxyModel):
 
         return super_accepts or (is_child and accepts_parent)
 
+    ## Invert the filter if it's prefixed with '!'
     def setFilterFixedString(self, p_str):
         if len(p_str) > 0 and p_str[0] == '!':
             self.inverted = True

@@ -5,7 +5,8 @@ from .instrument import wizard_run, fuzzer_run, start_server, triager_run
 from sl2 import db
 from sl2.db.run_block import SessionManager
 
-
+## class ChecksecThread
+#  Runs Checksec once in a background thread so as not to stall the GUI
 class ChecksecThread(QThread):
     result_ready = Signal(str)
 
@@ -17,7 +18,8 @@ class ChecksecThread(QThread):
         checksec_output = db.Checksec.byExecutable(self.target_path).short_description()
         self.result_ready.emit(checksec_output)
 
-
+## class WizardThread
+#  Runs the Wizard once in a background thread so as not to stall the GUI
 class WizardThread(QThread):
     result_ready = Signal(list)
 
@@ -28,7 +30,8 @@ class WizardThread(QThread):
     def run(self):
         self.result_ready.emit(wizard_run(self.config_dict))
 
-
+## class ServerThread
+#  Runs the Server once in a background thread so as not to stall the GUI
 class ServerThread(QThread):
     def __init__(self, close_on_exit=False):
         QThread.__init__(self)
@@ -38,6 +41,9 @@ class ServerThread(QThread):
         start_server(close_on_exit=self.close_on_exit)
 
 
+## class FuzzerThread
+#  Duplicates the functionality of instrument.fuzz_and_triage. Runs the fuzzer in a loop, automatically triaging once we
+#  find a crash.
 class FuzzerThread(QThread):
     found_crash = Signal(QThread, str)
     run_complete = Signal()
@@ -57,10 +63,12 @@ class FuzzerThread(QThread):
     def __del__(self):
         self.should_fuzz = False
 
+    ## Marks this object as paused and emits the paused signal
     def pause(self):
         self.should_fuzz = False
         self.paused.emit(self)
 
+    ## Creates a session manager and records runs in a loop, triaging where necessary
     def run(self):
         self.should_fuzz = True
 
@@ -88,14 +96,18 @@ class FuzzerThread(QThread):
                         self.pause()
                     self.run_complete.emit()
 
+    ## Writes changes in the continuous state to the config dict
     def continuous_state_changed(self, new_state):
         self.config_dict['continuous'] = (new_state == Qt.Checked)
 
+    ## Writes changes in the pause state to the config dict
     def pause_state_changed(self, new_state):
         self.config_dict['exit_early'] = (new_state == Qt.Checked)
 
+    ## Writes changes in the fuzz timeout to the config dict
     def fuzz_timeout_changed(self, new_timeout):
         self.config_dict['fuzz_timeout'] = None if int(new_timeout) == 0 else int(new_timeout)
 
+    ## Writes changes in the tracer timeout to the config dict
     def tracer_timeout_changed(self, new_timeout):
         self.config_dict['tracer_timeout'] = None if int(new_timeout) == 0 else int(new_timeout)

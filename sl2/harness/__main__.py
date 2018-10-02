@@ -33,6 +33,7 @@ from .state import (
 )
 
 
+## Call os.exit to totally kill the harness
 @atexit.register
 def goodbye():
     # We use os._exit instead of sys.exit here to make sure that we totally
@@ -41,11 +42,13 @@ def goodbye():
     os._exit(0)
 
 
+## Print exit message and exit
 def interrupted(_signal, _frame):
     print_l("[!] Harness interrupted by Ctrl-C. Exiting.")
     goodbye()
 
 
+## Helper function to select an int from a range
 def select_from_range(max_range, message):
     """ Helper function for selecting an int between 0 and some value """
     index = -1
@@ -96,6 +99,7 @@ def select_and_dump_wizard_findings(wizard_findings, target_file):
     return wizard_findings
 
 
+## Dump buffer byte array to stdout for user selection
 def hexdump(buffer, lines=4, line_len=16):
     """ Dump buffer byte array to stdout """
     for address in range(0, len(buffer), line_len):
@@ -107,6 +111,7 @@ def hexdump(buffer, lines=4, line_len=16):
         print_l("%08X:  %s  | %s" % (address, hexstr + " " * (line_len * 3 - len(hexstr)), asciistr))
 
 
+## Run single stages, or the complete fuzzing lifecycle
 def _main():
     sanity_checks()
 
@@ -177,6 +182,8 @@ def _main():
             # Wait for exit
             concurrent.futures.wait(fuzz_futures)
 
+
+## wrapper around_main that handles keyboard interrupts
 def main():
     signal.signal(signal.SIGINT, interrupted)
 
