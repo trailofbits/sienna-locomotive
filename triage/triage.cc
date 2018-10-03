@@ -39,11 +39,11 @@ using google_breakpad::SimpleSymbolSupplier;
 namespace sl2 {
 
 
-////////////////////////////////////////////////////////////////////////////
-// Triage()
-//
-// Constructor for Triage class which loads a minidump file at minidumpPath
-////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Constructor for Triage class which loads a minidump file
+ * @param minidumpPath path to the minidump to load
+ */
 Triage::Triage( const string& minidumpPath )
     :   minidumpPath_(minidumpPath),
         symbolSupplier_(minidumpPath),
@@ -52,7 +52,10 @@ Triage::Triage( const string& minidumpPath )
 
 }
 
-
+/**
+ * Reads in the minidump and calls breakpad
+ * @return success code
+ */
 StatusCode Triage::preProcess() {
     ProcessResult   sc;
 
@@ -71,9 +74,11 @@ StatusCode Triage::preProcess() {
     return StatusCode::GOOD;
 }
 
-////////////////////////////////////////////////////////////////////////////
-// process()
-//      Does actual processing a minidump file
+
+/**
+ * Does actual processing a minidump file
+ * @return Status code
+ */
 StatusCode Triage::process() {
 
 
@@ -121,9 +126,11 @@ StatusCode Triage::process() {
 }
 
 
-////////////////////////////////////////////////////////////////////////////
-// processEngine()
-//      process a single exploitability engine
+
+/**
+ * process a single exploitability engine
+ * @param x Which exploitability engine (!exploitable, tracer, breakpad) to use
+ */
 void Triage::processEngine(Xploitability& x) {
     try {
         cout << "Processing engine: " << x.name() << endl;
@@ -139,24 +146,25 @@ void Triage::processEngine(Xploitability& x) {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////
-// normalize()
-//  Normalizes scores between 0 and 1
+
+/**
+ * Normalizes scores between 0 and 1
+ */
 double Triage::normalize(double x) {
     x = std::max(0.0,   x);
     x = std::min(1.0,   x);
     return x;
 }
 
-////////////////////////////////////////////////////////////////////////////
-// signalType()
 int Triage::signalType() {
     return 0;
 }
 
 
-////////////////////////////////////////////////////////////////////////////
-// callStack()
+/**
+ * Retrieves the call stack from the minidump
+ * @return Vector of stack frames
+ */
 const vector<uint64_t> Triage::callStack() const {
     int threadid = state_.requesting_thread();
     const CallStack* stack = state_.threads()->at(threadid);
@@ -171,14 +179,13 @@ const vector<uint64_t> Triage::callStack() const {
 }
 
 
-////////////////////////////////////////////////////////////////////////////
-// crashash()
-//      Returns the hash of the callstack.  This should uniquely identifiy
-// a crash (even with ASLR) by using the last 3 nibbles of the offset for
-// each call in the callstack.
-// The format is a 6 nibble hex value.  The top 12 bits are the major hash,
-// the bottom 12 bits are the minor hash.  The major hash relates to where
-// it crashes, and the minor is of the callstack
+/**
+ * Returns the hash of the callstack.  This should uniquely identifiy
+ * a crash (even with ASLR) by using the last 3 nibbles of the offset for each call in the callstack.
+ * The format is a 6 nibble hex value.  The top 12 bits are the major hash, the bottom 12 bits are the minor hash.
+ * The major hash relates to where it crashes, and the minor is of the callstack
+ * @return crash hash
+ */
 const string Triage::crashash() const {
     uint64_t    stackhash = 0;
     auto calls = callStack();
@@ -199,10 +206,11 @@ const string Triage::crashash() const {
     return oss.str();
 }
 
-////////////////////////////////////////////////////////////////////////////
-// triageTag()
-//      A tag is basically a string that uniquely identifies the crash.  Its
-// includes exploitability, crash reason, and eventually a unique address
+/**
+ * A tag is basically a string that uniquely identifies the crash.
+ * It includes exploitability, crash reason, and eventually a unique address
+ * @return tag
+ */
 const string Triage::triageTag() const {
     fs::path  tPath;
     tPath.append( exploitability() );
@@ -212,9 +220,10 @@ const string Triage::triageTag() const {
     return ret;
 }
 
-////////////////////////////////////////////////////////////////////////////
-// crashReason()
-//      The reason for the crash as far as the exception that caused it.
+/**
+ * The reason for the crash as far as the exception that caused it.
+ * @return Stringified reason
+ */
 const string Triage::crashReason()  const {
     string ret;
     regex regexFilter { "[^a-zA-Z0-9_]+" };
@@ -230,30 +239,31 @@ const string Triage::crashReason()  const {
     return ret;
 }
 
-////////////////////////////////////////////////////////////////////////////
-// crashAddress()
-//      This is the offending memory address
+/**
+ * @return Memory address where the crash occurred
+ */
 const uint64_t Triage::crashAddress() const {
     return state_.crash_address();
 }
 
-////////////////////////////////////////////////////////////////////////////
-// stackPointer()
+/**
+ * @return the stack pointer when the crash occurred
+ */
 const uint64_t Triage::stackPointer() const {
     return xploitabilityEngine_->stackPointer();
 }
 
-////////////////////////////////////////////////////////////////////////////
-// instructionPointer()
+/**
+ * @return instruction pointer when the crash occurred
+ */
 const uint64_t Triage::instructionPointer() const {
     return xploitabilityEngine_->instructionPointer();
 }
 
 
-////////////////////////////////////////////////////////////////////////////
-// exploitability()
-//      returns value from 0 to 4 for exploitability.  0 being None, 4 being
-// High
+/**
+ * @return  value from 0 to 4 for exploitability.  0 being None, 4 being High
+ */
 XploitabilityRank Triage::exploitabilityRank() const {
     XploitabilityRank rank = XploitabilityRank::XPLOITABILITY_NONE;
     for( auto arank : ranks() ) {
@@ -264,18 +274,18 @@ XploitabilityRank Triage::exploitabilityRank() const {
     return rank;
 }
 
-////////////////////////////////////////////////////////////////////////////
-// exploitability()
-//      String version of exploitability from None to High
+
+/*! @return Stringified exploitability rank */
 const string Triage::exploitability() const {
     //return Xploitability::rankToString( exploitabilityRank() );
     XploitabilityRank rank = exploitabilityRank();
     return ~rank;
 }
 
-////////////////////////////////////////////////////////////////////////////
-// ranks()
-//      Creates a vector of the ranks from the 3 engines
+
+/**
+ * @return a vector of the ranks from the 3 engines
+ */
 vector<XploitabilityRank>   Triage::ranks() const {
     vector<XploitabilityRank> ret;
     for( auto result : results_ ) {
@@ -285,9 +295,9 @@ vector<XploitabilityRank>   Triage::ranks() const {
 }
 
 
-////////////////////////////////////////////////////////////////////////////
-// ranksString()
-//      Each of the 3 engines give a 0-4 rank, so this stringifies them all
+/**
+ * @return Stringified version of all three ranks
+ */
 const string Triage::ranksString() const {
     ostringstream ss;
     for( auto& rank : ranks() ) {
@@ -296,17 +306,18 @@ const string Triage::ranksString() const {
     return ss.str();
 }
 
-////////////////////////////////////////////////////////////////////////////
-// minidumpPath()
-//      Path to the minidump file which was analyzed
+/**
+ * @return Path to the minidump file which was analyzed
+ */
 const string Triage::minidumpPath() const {
     return minidumpPath_;
 }
 
 
-////////////////////////////////////////////////////////////////////////////
-// toJson()
-//      Converts a Triage object into a json object for persistence
+/**
+ * Converts a Triage object into a json object for persistence
+ * @return the json object
+ */
 json Triage::toJson() const {
     auto ctx = xploitabilityEngine_->getContext();
     return json{
@@ -358,9 +369,7 @@ json Triage::toJson() const {
 }
 
 
-////////////////////////////////////////////////////////////////////////////
-// persist()
-//      Writes a triage object to triage.json
+/*! Writes a triage object to triage.json */
 void Triage::persist(const string minidumpPath)  const {
     ofstream ofs(minidumpPath);
     json j = toJson();
@@ -369,8 +378,7 @@ void Triage::persist(const string minidumpPath)  const {
 }
 
 
-////////////////////////////////////////////////////////////////////////////
-// <<()
+/*! Print operator */
 ostream& operator<<(ostream& os, Triage& self) {
     os << "Exploitability: "        << self.exploitability()        << endl;
     os << "Ranks         : "        << self.ranksString()           << endl;
