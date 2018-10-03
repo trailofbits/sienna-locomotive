@@ -237,7 +237,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.crashes_table.horizontalHeader().setStretchLastSection(True)
         self.crashes_table.resizeColumnsToContents()
         self.crashes_table.show()
-        self.crashes_table.clicked.connect(self.crashClicked)
+        self.crashes_table.clicked.connect(self.crash_clicked)
 
         # Crash Browser, details about a crash
         self.crash_browser = QtWidgets.QTextBrowser()
@@ -662,7 +662,7 @@ class MainWindow(QtWidgets.QMainWindow):
     ## Clicked on Crash
     # When a cell is clicked in the crashes table, find the row
     # and update the Crash browser to show triage.txt
-    def crashClicked(self, a):
+    def crash_clicked(self, a):
         # row, col = a.row(), a.column()
         data = a.data(Qt.UserRole)
         crash = db.Crash.factory(data.runid)
