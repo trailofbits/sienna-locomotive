@@ -253,8 +253,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stop_button.hide()
         self._layout.addWidget(self.stop_button)
 
-        self.triageExport = QtWidgets.QPushButton("Export Triage")
-        self._layout.addWidget(self.triageExport)
+        self.triage_export_button = QtWidgets.QPushButton("Export Triage")
+        self._layout.addWidget(self.triage_export_button)
 
         # Set up status bar
         self.status_bar = QtWidgets.QStatusBar()
@@ -317,7 +317,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Handle checks/unchecks in the target tree
         self._func_tree.itemCheckedStateChanged.connect(self.tree_changed)
 
-        self.triageExport.clicked.connect(self.triageExportGui)
+        self.triage_export_button.clicked.connect(self.triageExportGui)
 
         # Fuzzer control buttons for showing the panel and starting a run
         self.expand_button.clicked.connect(self.toggle_expansion)
