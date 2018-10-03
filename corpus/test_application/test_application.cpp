@@ -7,7 +7,7 @@
 #include "winsock_recv.h"
 #include "win_http_web_socket_receive.h"
 
-
+/*! Force a crash */
 void crash() {
     printf("Crashing!!!!\n");
     char buf[1];
@@ -16,7 +16,10 @@ void crash() {
 }
 
 
-// RegQueryValueEx
+/**
+ * Try reading from a registry key
+ * @param fuzzing If we're not fuzzing, guarantee a crash. Otherwise, require a minimal mutation to cause a crash.
+ */
 int test_RegQueryValueEx(bool fuzzing) {
     BYTE buf[4096];
     DWORD size = 4096;
@@ -61,7 +64,7 @@ int test_RegQueryValueEx(bool fuzzing) {
     return 0;
 }
 
-// ReadFile
+/*! Create a file to read from if it doesnt' already exist */
 int prep_read_file_test(LPWSTR name) {
     HANDLE file = CreateFile(name, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (file == INVALID_HANDLE_VALUE) {
@@ -81,7 +84,10 @@ int prep_read_file_test(LPWSTR name) {
 }
 
 
-
+/**
+ * Read a buffer from a file and see if we can mutate it to cause a crash
+ * @param fuzzing If we're not fuzzing, guarantee a crash. Otherwise, require a minimal mutation to cause a crash.
+ */
 int test_ReadFile(bool fuzzing) {
     LPWSTR name = L"test_ReadFile.txt";
     prep_read_file_test(name);
@@ -116,6 +122,10 @@ int test_ReadFile(bool fuzzing) {
     return 0;
 }
 
+/**
+ * Cause an infinite loop to test timeouts
+ * @param fuzzing If we're not fuzzing, guarantee a crash. Otherwise, require a minimal mutation to cause a crash.
+ */
 int test_ReadFile_inf_loop(bool fuzzing) {
     LPWSTR name = L"test_ReadFile.txt";
     prep_read_file_test(name);
@@ -153,6 +163,10 @@ int test_ReadFile_inf_loop(bool fuzzing) {
     CloseHandle(file);
     return 0;
 }
+
+/**
+ * Wraps ReadFile
+ */
 int readfile(LPWSTR path, uint8_t* buf=nullptr ) {
 
     BYTE bufStack[0x1000] = {};
@@ -179,6 +193,10 @@ int readfile(LPWSTR path, uint8_t* buf=nullptr ) {
     return 0;
 }
 
+/**
+ * Similar to test_Readfile, but uses fread instead
+ * @param fuzzing If we're not fuzzing, guarantee a crash. Otherwise, require a minimal mutation to cause a crash.
+ */
 int test_fread(bool fuzzing) {
     LPWSTR name = L"test_ReadFile.txt";
     prep_read_file_test(name);
@@ -206,6 +224,7 @@ int test_fread(bool fuzzing) {
     return 0;
 }
 
+/*! Used for unit tests*/
 int test_argCompare(bool fuzzing) {
 
     readfile(L"sl2\\test\\test_argCompare_fail.txt");
@@ -217,6 +236,7 @@ int test_argCompare(bool fuzzing) {
     return 0;
 }
 
+/*! Used for unit tests*/
 int test_captureStdout(bool fuzzing) {
     readfile(L"test_argCompare_fail.txt");
 
@@ -225,6 +245,7 @@ int test_captureStdout(bool fuzzing) {
 }
 
 
+/*! Used for unit tests*/
 int test_quickCrash(bool fuzzing) {
     printf("Starting quickCrash()...\n");
     char buf[1024];
@@ -238,6 +259,7 @@ int test_quickCrash(bool fuzzing) {
 }
 
 
+/*! Print list of test numbers */
 int show_help(LPWSTR *argv) {
     printf("\nUSAGE: %S [TEST NUMBER] [-f]\n", argv[0]);
     printf("\nTEST NUMBERS:\n");
@@ -259,6 +281,10 @@ int show_help(LPWSTR *argv) {
 }
 
 
+/**
+ * Dispatch tests based on argument
+ * @return exit code
+ */
 int main()
 {
     int argc;
