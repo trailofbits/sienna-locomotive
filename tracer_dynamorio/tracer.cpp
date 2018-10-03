@@ -1003,16 +1003,16 @@ on_exception(void *drcontext, dr_exception_t *excpt)
                 		   false, false, false, false);
     }
 
-    // Divide by zero is probably not bad
+    // Divide by zero is probably not too bad
     if (exception_code == EXCEPTION_INT_DIVIDE_BY_ZERO) {
-        reason = "floating point exception";
-        score = 0;
+        reason = "divide by zero";
+        score = 50;
         dump_crash(drcontext, excpt, reason, score, disassembly, pc_tainted, stack_tainted, is_ret, is_indirect, is_direct, is_call,
         		   mem_write, mem_read, tainted_src, tainted_dst);
     }
 
-    // Breakpoints - could indicate we're executing non-instructions?
-    // TODO figure out if 25 points makes sense
+    // Breakpoints
+    // Could indicate we're executing non-instructions, but probably just indicates a debugger.
     if (exception_code == EXCEPTION_BREAKPOINT) {
         reason = "breakpoint";
         score = 25;
