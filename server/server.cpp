@@ -226,7 +226,7 @@ static uint32_t bucket_score(sl2_arena *arena)
 /**
  * Scores the coverage of the given arena with a dumb hit counter:
  * the ultimate score is the number of nonzero cells in the arena.
- * @return the covarege score
+ * @return the coverage score
  */
 static uint32_t coverage_count(sl2_arena *arena)
 {

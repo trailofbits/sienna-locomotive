@@ -8,21 +8,26 @@
 #include "vendor/picosha2.h"
 using namespace std;
 
+/*! Creates a client for the wizard to use (not inherited) */
 static SL2Client client;
 
-/* Run whenever a thread inits/exits */
+/** Print a debug message when a new thread starts */
 static void
 on_thread_init(void *drcontext)
 {
     SL2_DR_DEBUG("wizard#on_thread_init\n");
 }
 
+/** Print a debug message when a thread exits */
 static void
 on_thread_exit(void *drcontext)
 {
     SL2_DR_DEBUG("wizard#on_thread_exit\n");
 }
 
+/** We shouldn't need to handle exceptions in the wizard.
+ *  Just records the exception and exits.
+ */
 static bool
 on_exception(void *drcontext, dr_exception_t *excpt)
 {
@@ -39,7 +44,7 @@ on_exception(void *drcontext, dr_exception_t *excpt)
     return true;
 }
 
-/* Clean up after the target binary exits */
+/** Clean up after the target binary exits */
 static void
 on_dr_exit(void)
 {
@@ -63,73 +68,89 @@ Below we have a number of functions that instrument metadata retrieval for the i
 // TODO: hook functions that open the handles for these
 //       so we can track the names of the resources getting read
 
+
+/** Transparent wrapper around SL2Client.wrap_pre_ReadEventLog */
 static void
 wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_ReadEventLog(wrapcxt, user_data);
 }
 
+/** Transparent wrapper around SL2Client.wrap_pre_RegQueryValueEx */
 static void
 wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_RegQueryValueEx(wrapcxt, user_data);
 }
 
+/** Transparent wrapper around SL2Client.wrap_pre_WinHttpWebSocketReceive */
 static void
 wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_WinHttpWebSocketReceive(wrapcxt, user_data);
 }
 
+/** Transparent wrapper around SL2Client.wrap_pre_InternetReadFile */
 static void
 wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_InternetReadFile(wrapcxt, user_data);
 }
 
+/** Transparent wrapper around SL2Client.wrap_pre_WinHttpReadData */
 static void
 wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_WinHttpReadData(wrapcxt, user_data);
 }
 
+/** Transparent wrapper around SL2Client.wrap_pre_recv */
 static void
 wrap_pre_recv(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_recv(wrapcxt, user_data);
 }
 
+/** Transparent wrapper around SL2Client.wrap_pre_ReadFile */
 static void
 wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_ReadFile(wrapcxt, user_data);
 }
 
+/** Transparent wrapper around SL2Client.wrap_pre_fread_s */
 static void
 wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_fread_s(wrapcxt, user_data);
 }
 
+/** Transparent wrapper around SL2Client.wrap_pre_fread */
 static void
 wrap_pre_fread(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_fread(wrapcxt, user_data);
 }
 
+/** Transparent wrapper around SL2Client.wrap_pre__read */
 static void
 wrap_pre__read(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre__read(wrapcxt, user_data);
 }
 
+/** Transparent wrapper around SL2Client.wrap_pre_MapViewOfFile */
 static void
 wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_MapViewOfFile(wrapcxt, user_data);
 }
 
-/* prints information about the function call to stderr so the harness can ingest it */
+/**
+ * Prints information about the function call caught by the pre-wrapper to stderr so the harness can ingest it
+ * @param wrapcxt DynamoRIO Wrap context. Only used as an argument to DynamoRIO's helper methods
+ * @param user_data struct with metadata about the function call
+ */
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data)
 {
@@ -190,8 +211,9 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     dr_thread_free(drcontext, info, sizeof(client_read_info));
 }
 
-// NOTE(ww): MapViewOfFile can't use the Generic post-hook, as
-// we need the address of the mapped view that it returns.
+/**
+ * MapViewOfFile can't use the Generic post-hook, as we need the address of the mapped view that it returns.
+ */
 static void
 wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 {
@@ -262,6 +284,13 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     dr_thread_free(drcontext, info, sizeof(client_read_info));
 }
 
+/**
+ * Called every time a module loads. Wraps target-able functions with pre and post callbacks
+ * if they're in the right module.
+ * @param drcontext - DynamoRIO context
+ * @param mod Module Data
+ * @param loaded Unused
+ */
 static void
 on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 {
@@ -347,7 +376,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     }
 }
 
-/* Parses options and calls wizard helper */
+/*! Parses options and calls wizard helper */
 DR_EXPORT void
 dr_client_main(client_id_t id, int argc, const char *argv[])
 {
