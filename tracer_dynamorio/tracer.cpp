@@ -25,7 +25,9 @@ static bool no_mutate = false;
 static bool crashed = false;
 static uint32_t mutate_count = 0;
 
+/*! Set that tracks over time which registers have become tainted */
 static std::set<reg_id_t, std::less<reg_id_t>, sl2_dr_allocator<reg_id_t>> tainted_regs;
+/*! Set that tracks over time which memory addresses have become tainted */
 static std::set<app_pc, std::less<app_pc>, sl2_dr_allocator<app_pc>> tainted_mems;
 
 #define LAST_COUNT 5 // WARNING: If you change this, you need to update the database schema
@@ -35,11 +37,14 @@ static int last_insn_idx = 0;
 static app_pc last_calls[LAST_COUNT] = { 0 };
 static app_pc last_insns[LAST_COUNT] = { 0 };
 
+/*! memory map information for target module */
 static app_pc module_start = 0;
+/*! memory map information for target module */
 static app_pc module_end = 0;
+/*! memory map information for target module */
 static size_t baseAddr;
 
-/* Mostly used to debug if taint tracking is too slow */
+/** Mostly used to debug if taint tracking is too slow */
 static droption_t<unsigned int> op_no_taint(
     DROPTION_SCOPE_CLIENT,
     "nt",
@@ -47,7 +52,7 @@ static droption_t<unsigned int> op_no_taint(
     "no-taint",
     "Do not do instruction level instrumentation.");
 
-/* Used when replaying a run from the server */
+/** Used when replaying a run from the server */
 static droption_t<std::string> op_replay(
     DROPTION_SCOPE_CLIENT,
     "r",
@@ -55,6 +60,9 @@ static droption_t<std::string> op_replay(
     "replay",
     "The run id for a crash to replay.");
 
+/**
+ * Run the tracer without mutating anything (but still taint the input buffer)
+ */
 static droption_t<bool> op_no_mutate(
     DROPTION_SCOPE_CLIENT,
     "nm",
@@ -63,7 +71,7 @@ static droption_t<bool> op_no_mutate(
     "Don't use the mutated buffer when replaying.");
 
 
-/* Currently unused as this runs on 64 bit applications */
+/** Currently unused as this runs on 64 bit applications */
 static reg_id_t reg_to_full_width32(reg_id_t reg)
 {
     switch(reg) {
@@ -96,7 +104,7 @@ static reg_id_t reg_to_full_width32(reg_id_t reg)
     }
 }
 
-/* Converts a register to full width for taint tracking */
+/** Converts a register to full width for taint tracking */
 static reg_id_t reg_to_full_width64(reg_id_t reg)
 {
     switch(reg) {
@@ -169,12 +177,12 @@ static reg_id_t reg_to_full_width64(reg_id_t reg)
     }
 }
 
-/* Check whether and operand is tainted */
+/** Check whether and operand is tainted */
 static bool
 is_tainted(void *drcontext, opnd_t opnd)
 {
     if (opnd_is_reg(opnd)) {
-        /* Check if a register is in tainted_regs */
+        /** Check if a register is in tainted_regs */
         reg_id_t reg = opnd_get_reg(opnd);
         reg = reg_to_full_width64(reg);
 
@@ -223,7 +231,7 @@ is_tainted(void *drcontext, opnd_t opnd)
     return false;
 }
 
-/* Mark a memory address as tainted */
+/** Mark a memory address as tainted */
 static void
 taint_mem(app_pc addr, size_t size)
 {
@@ -232,7 +240,7 @@ taint_mem(app_pc addr, size_t size)
     }
 }
 
-/* Unmark a memory address as tainted */
+/** Unmark a memory address as tainted */
 static bool
 untaint_mem(app_pc addr, uint size)
 {
@@ -249,7 +257,7 @@ untaint_mem(app_pc addr, uint size)
     return untainted;
 }
 
-/* Mark an operand as tainted. Could be a register or memory reference. */
+/** Mark an operand as tainted. Could be a register or memory reference. */
 static void
 taint(void *drcontext, opnd_t opnd)
 {
@@ -283,7 +291,7 @@ taint(void *drcontext, opnd_t opnd)
     return;
 }
 
-/* Untaint an operand */
+/** Untaint an operand */
 static bool
 untaint(void *drcontext, opnd_t opnd)
 {
@@ -321,7 +329,7 @@ untaint(void *drcontext, opnd_t opnd)
 }
 
 
-/* Handle special case of xor regA, regA - untaint the destination since it's inevitably 0 */
+/** Handle special case of xor regA, regA - untaint the destination since it's inevitably 0 */
 static bool
 handle_xor(void *drcontext, instr_t *instr)
 {
@@ -350,7 +358,7 @@ handle_xor(void *drcontext, instr_t *instr)
     return result;
 }
 
-/* Handle push and pop by not tainting RSP (included in operands) */
+/** Handle push and pop by not tainting RSP (included in operands) */
 static void
 handle_push_pop(void *drcontext, instr_t *instr)
 {
@@ -404,7 +412,7 @@ handle_push_pop(void *drcontext, instr_t *instr)
     // }
 }
 
-/* Xchg of a tainted reg and non tainted reg should swap taint */
+/** Xchg of a tainted reg and non tainted reg should swap taint */
 static bool
 handle_xchg(void *drcontext, instr_t *instr)
 {
@@ -439,7 +447,7 @@ handle_xchg(void *drcontext, instr_t *instr)
     return result;
 }
 
-/* Special cases for tainting / untainting PC */
+/** Special cases for tainting / untainting PC */
 static bool
 handle_branches(void *drcontext, instr_t *instr)
 {
@@ -523,7 +531,7 @@ handle_branches(void *drcontext, instr_t *instr)
     return true;
 }
 
-/* Dispatch to instruction-specific taint handling for things that don't fit the general
+/** Dispatch to instruction-specific taint handling for things that don't fit the general
     model of tainted operand -> tainted result */
 static bool
 handle_specific(void *drcontext, instr_t *instr)
@@ -553,7 +561,7 @@ handle_specific(void *drcontext, instr_t *instr)
 
 }
 
-/* Called on each instruction. Spreads taint from sources to destinations,
+/** Called on each instruction. Spreads taint from sources to destinations,
     wipes tainted destinations with untainted sources. */
 static void
 propagate_taint(app_pc pc)
@@ -632,7 +640,7 @@ propagate_taint(app_pc pc)
     instr_free(drcontext, &instr);
 }
 
-/* Called upon basic block insertion with each individual instruction as an argument.
+/** Called upon basic block insertion with each individual instruction as an argument.
     Inserts a clean call to propagate_taint before every instruction */
 static dr_emit_flags_t
 on_bb_instrument(
@@ -668,7 +676,7 @@ on_thread_exit(void *drcontext)
     SL2_DR_DEBUG("tracer#on_thread_exit\n");
 }
 
-/* Clean up registered callbacks before exiting */
+/** Clean up registered callbacks before exiting */
 static void
 on_dr_exit(void)
 {
@@ -707,7 +715,7 @@ on_dr_exit(void)
     drmgr_exit();
 }
 
-/* Debug functionality. If you need to use it, add the relevant print statements */
+/** Debug functionality. If you need to use it, add the relevant print statements */
 static void
 dump_regs(void *drcontext, app_pc exception_address) {
     reg_id_t regs[16] = {
@@ -760,7 +768,7 @@ dump_regs(void *drcontext, app_pc exception_address) {
     }
 }
 
-/* Get crash info as JSON for dumping to stderr */
+/** Get crash info as JSON for dumping to stderr */
 std::string
 dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *excpt, std::string disassembly,
 		  bool pc_tainted, bool stack_tainted, bool is_ret, bool is_indirect, bool is_direct, bool is_call,
@@ -861,7 +869,7 @@ dump_json(void *drcontext, uint8_t score, std::string reason, dr_exception_t *ex
     return j.dump();
 }
 
-/* Get Run ID and dump crash info into JSON file in the run folder. */
+/** Get Run ID and dump crash info into JSON file in the run folder. */
 static void
 dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t score, std::string disassembly,
 		   bool pc_tainted, bool stack_tainted, bool is_ret, bool is_indirect, bool is_direct, bool is_call,
@@ -926,7 +934,7 @@ dump_crash(void *drcontext, dr_exception_t *excpt, std::string reason, uint8_t s
     dr_exit_process(1);
 }
 
-/* Scoring function. Checks exception code, then checks taint state in order to calculate the severity score */
+/** Scoring function. Checks exception code, then checks taint state in order to calculate the severity score */
 static bool
 on_exception(void *drcontext, dr_exception_t *excpt)
 {
@@ -1103,21 +1111,33 @@ on_exception(void *drcontext, dr_exception_t *excpt)
     return true;
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_IsProcessorFeaturePresent
+ */
 static void wrap_pre_IsProcessorFeaturePresent(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_IsProcessorFeaturePresent(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_post_IsProcessorFeaturePresent
+ */
 static void wrap_post_IsProcessorFeaturePresent(void *wrapcxt, void *user_data)
 {
     client.wrap_post_IsProcessorFeaturePresent(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_UnhandledExceptionFilter
+ */
 static void wrap_pre_UnhandledExceptionFilter(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_UnhandledExceptionFilter(wrapcxt, user_data, on_exception);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_VerifierStopMessage
+ */
 static void wrap_pre_VerifierStopMessage(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_VerifierStopMessage(wrapcxt, user_data, on_exception);
@@ -1129,73 +1149,106 @@ static void wrap_pre_VerifierStopMessage(void *wrapcxt, OUT void **user_data)
 *
 */
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_ReadEventLog
+ */
 static void
 wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_ReadEventLog(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_RegQueryValueEx
+ */
 static void
 wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_RegQueryValueEx(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_WinHttpWebSocketReceive
+ */
 static void
 wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_WinHttpWebSocketReceive(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_InternetReadFile
+ */
 static void
 wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_InternetReadFile(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_WinHttpReadData
+ */
 static void
 wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_WinHttpReadData(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_recv
+ */
 static void
 wrap_pre_recv(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_recv(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_ReadFile
+ */
 static void
 wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_ReadFile(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_fread_s
+ */
 static void
 wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_fread_s(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_fread
+ */
 static void
 wrap_pre_fread(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_fread(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre__read
+ */
 static void
 wrap_pre__read(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre__read(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_MapViewOfFile
+ */
 static void
 wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_MapViewOfFile(wrapcxt, user_data);
 }
 
-/* Called after each targeted function to replay mutation and mark bytes as tainted */
+/** Called after each targeted function to replay mutation and mark bytes as tainted */
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data)
 {
@@ -1243,6 +1296,9 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     dr_thread_free(drcontext, info, sizeof(client_read_info));
 }
 
+/**
+ * Replays mutation and marks bytes as tainted. MapViewOfFile can't use the generic callback.
+ */
 static void
 wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 {
@@ -1308,7 +1364,7 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     dr_thread_free(drcontext, info, sizeof(client_read_info));
 }
 
-/* Register function pre/post callbacks in each module */
+/** Register function pre/post callbacks in each module */
 static void
 on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 {
@@ -1445,6 +1501,9 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
     }
 }
 
+/**
+ * Initializes tracer
+ */
 DR_EXPORT void
 dr_client_main(client_id_t id, int argc, const char *argv[])
 {
