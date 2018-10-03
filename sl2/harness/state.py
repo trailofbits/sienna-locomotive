@@ -359,16 +359,16 @@ class TriageExport:
                      'r9', 'r10', 'r11', 'r12', 'r13', 'r14', 'r15', 'rax', 'rbp', 'rbx', 'rcx', 'rdi', 'rdx', 'rip',
                      'rsi', 'rsp', 'ss']
 
+    ## Retrieves the number of exportable crashes.
+    # @return the number of exportable crashes
     def get_crashes(self):
         return db.getSession().query(Crash).filter(Crash.target_config_slug == self.slug).all()
 
-    ## Exports crash from run directories to appropriate directory structure.  Also generates
-    # triage.csv file with summary of crashes
-    def export(self, size_cb=None, export_cb=None):
+    ## Exports crash from run directories to appropriate directory structure.
+    # Also generates triage.csv file with summary of crashes
+    # @param export_cb A callback that receives the index of the crash being exported
+    def export(self, export_cb=None):
         crashes = self.get_crashes()
-
-        if size_cb:
-            size_cb(len(crashes))
 
         csvPath = os.path.join(self.exportDir, "triage.csv")
         with open(csvPath, "w") as f:

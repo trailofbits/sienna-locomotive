@@ -643,8 +643,20 @@ class MainWindow(QtWidgets.QMainWindow):
         if len(path) == 0:
             return
 
-        triageExporter = TriageExport(path, get_target_slug(config.config))
-        triageExporter.export(size_cb=None, export_cb=None)
+        exporter = TriageExport(path, get_target_slug(config.config))
+        num_crashes = len(exporter.get_crashes())
+
+        print("Exporting {} crashes".format(num_crashes))
+
+        exporter_progress = QtWidgets.QProgressDialog(
+            "Exporting crashes...", None, 0, num_crashes - 1, self)
+        exporter_progress.setAutoClose(True)
+        exporter_progress.setWindowModality(Qt.WindowModal)
+        # Only show the progressbar if the operation is expectdd to take more than 1.5 seconds.
+        exporter_progress.setMinimumDuration(1500)
+
+        exporter.export(export_cb=exporter_progress.setValue)
+
         generate_report(dest=path, browser=self.open_report_in_browser.isChecked())
 
     ## Clicked on Crash
