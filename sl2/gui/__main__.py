@@ -335,7 +335,6 @@ class MainWindow(QtWidgets.QMainWindow):
         # Connect the thread counter to the thread pool
         self.thread_count.valueChanged.connect(self.change_thread_count)
         self.change_thread_count(self.thread_count.value())
-        self.customContextMenuRequested.connect(self.contextMenuEvent)
 
     def change_profile(self):
         self.close()
@@ -563,16 +562,6 @@ class MainWindow(QtWidgets.QMainWindow):
         for index in self.get_visible_indices():
             self.model.itemFromIndex(index).setCheckState(Qt.Unchecked)
         self.target_data.unpause()
-
-    ## Handler for displaying a custom context menu
-    def contextMenuEvent(self, QContextMenuEvent):
-        """ Displays the right-click menu """
-        menu = QtWidgets.QMenu(self)
-        menu.addAction(self.expand_action)
-        menu.addAction(self.collapse_action)
-        menu.addAction(self.check_action)
-        menu.addAction(self.uncheck_action)
-        menu.popup(QContextMenuEvent.globalPos())
 
     ## Signal handler that handles checksec results after the executable finishes.
     def checksec_finished(self, checksec_output):
