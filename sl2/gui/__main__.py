@@ -253,8 +253,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stop_button.hide()
         self._layout.addWidget(self.stop_button)
 
-        self.triage_export_button = QtWidgets.QPushButton("Export Triage")
-        self._layout.addWidget(self.triage_export_button)
+        self.export_triage_button = QtWidgets.QPushButton("Export Triage")
+        self._layout.addWidget(self.export_triage_button)
 
         # Set up status bar
         self.status_bar = QtWidgets.QStatusBar()
@@ -317,7 +317,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Handle checks/unchecks in the target tree
         self._func_tree.itemCheckedStateChanged.connect(self.tree_changed)
 
-        self.triage_export_button.clicked.connect(self.triageExportGui)
+        self.export_triage_button.clicked.connect(self.export_triage)
 
         # Fuzzer control buttons for showing the panel and starting a run
         self.expand_button.clicked.connect(self.toggle_expansion)
@@ -638,8 +638,8 @@ class MainWindow(QtWidgets.QMainWindow):
         config.config['verbose'] = 2 if state else False
 
     ## Button callback that allows the user to select a location to save a csv file and a fuzzing report
-    def triageExportGui(self):
-        path = QtWidgets.QFileDialog.getExistingDirectory(dir=".")
+    def export_triage(self):
+        path = QtWidgets.QFileDialog.getExistingDirectory(self, caption="Export Directory", dir=".")
         if len(path) == 0:
             return
 
