@@ -359,9 +359,17 @@ class TriageExport:
                      'r9', 'r10', 'r11', 'r12', 'r13', 'r14', 'r15', 'rax', 'rbp', 'rbx', 'rcx', 'rdi', 'rdx', 'rip',
                      'rsi', 'rsp', 'ss']
 
+    def get_crashes(self):
+        return db.getSession().query(Crash).filter(Crash.target_config_slug == self.slug).all()
+
     ## Exports crash from run directories to appropriate directory structure.  Also generates
     # triage.csv file with summary of crashes
-    def export(self):
+    def export(self, size_cb=None, export_cb=None):
+        crashes = self.get_crashes()
+
+        if size_cb:
+            size_cb(len(crashes))
+
         csvPath = os.path.join(self.exportDir, "triage.csv")
         with open(csvPath, "w") as f:
             csvWriter = csv.writer(f, lineterminator='\n')
@@ -375,7 +383,7 @@ class TriageExport:
             checksec = session.query(Checksec).filter(Checksec.hash == target.hash).first()
             if not checksec:
                 print("[!} Could not retrieve Checksec results!")
-            for crash in session.query(Crash).filter(Crash.target_config_slug == self.slug).all():
+            for crash in crashes:
                 tracer = session.query(Tracer).filter(Tracer.runid == crash.runid).first()
                 if not tracer:
                     print("[!] Could not retrive Tracer results!")
@@ -387,9 +395,10 @@ class TriageExport:
                 row.append(tracer.formatted)
                 csvWriter.writerow(row)
 
-        crashies = db.getSession().query(Crash).filter(Crash.target_config_slug == self.slug).all()
-        for crash in crashies:
+        for idx, crash in enumerate(crashes):
             try:
+                if export_cb:
+                    export_cb(idx)
                 dstdir = os.path.join(self.exportDir,
                                       sanitizeString(crash.exploitability),
                                       sanitizeString(crash.crashReason),

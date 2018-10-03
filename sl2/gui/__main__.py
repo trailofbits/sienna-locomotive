@@ -157,8 +157,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tracer_timeout_box.setValue(config.config['tracer_timeout'])
         self.tracer_timeout_box.setSpecialValueText("None")
         self.tracer_timeout_box.setSingleStep(10)
-        self.verboseCheckBox = QtWidgets.QCheckBox()
-        self.verboseCheckBox.clicked.connect(self.verboseCheckBox_clicked)
+        self.verbose_cbox = QtWidgets.QCheckBox()
+        self.verbose_cbox.clicked.connect(self.toggle_verbose_state)
 
         # Create spinbox for controlling simultaneous fuzzing instances
         self.thread_count = QtWidgets.QSpinBox()
@@ -196,7 +196,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.extension_layout.addWidget(self.thread_count, 0, 4, 1, 1, Qt.AlignLeft)
 
         self.extension_layout.addWidget(QtWidgets.QLabel("Verbose:"), 1, 3, 1, 1, Qt.AlignRight)
-        self.extension_layout.addWidget(self.verboseCheckBox, 1, 4, 1, 1, Qt.AlignLeft)
+        self.extension_layout.addWidget(self.verbose_cbox, 1, 4, 1, 1, Qt.AlignLeft)
 
         self.fuzz_controls_inner_right.addWidget(self.expand_button)
 
@@ -633,8 +633,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.pause_mode_cbox.setChecked(False)
 
     ## Signal handler that updates the verbosity state when the checkbox in the gui is clicked
-    def verboseCheckBox_clicked(self):
-        state = self.verboseCheckBox.isChecked()
+    def toggle_verbose_state(self):
+        state = self.verbose_cbox.isChecked()
         config.config['verbose'] = 2 if state else False
 
     ## Button callback that allows the user to select a location to save a csv file and a fuzzing report
@@ -644,7 +644,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
         triageExporter = TriageExport(path, get_target_slug(config.config))
-        triageExporter.export()
+        triageExporter.export(size_cb=None, export_cb=None)
         generate_report(dest=path, browser=self.open_report_in_browser.isChecked())
 
     ## Clicked on Crash
