@@ -7,6 +7,7 @@ using namespace std;
 // NOTE(ww): As of Windows 10, both KERNEL32.dll and ADVAPI32.dll
 // get forwarded to KERNELBASE.DLL, apparently.
 // TODO(ww): Since we iterate over these, order them by likelihood of occurrence?
+/** Maps functions to the DLL's we _expect_ them to appear in  */
 sl2_funcmod SL2_FUNCMOD_TABLE[] = {
     {"ReadFile", "KERNELBASE.DLL"},
     {"recv", "WS2_32.DLL"},                     // TODO(ww): Is this right?
@@ -32,15 +33,19 @@ sl2_funcmod SL2_FUNCMOD_TABLE[] = {
     {"MapViewOfFile", "KERNELBASE.DLL"},
 };
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// SL2Client
-//
-// Intended to be for common functionality for DynamoRio clients. This should be moved inside
+// This should be moved inside
 // the DR build process eventually and be the superclass of Fuzzer and Tracer subclasses.
-/////////////////////////////////////////////////////////////////////////////////////////////////
+/**
+ * Common functionality for DynamoRIO clients
+ */
 SL2Client::SL2Client() {
 }
 
+/**
+ * Creates a SHA256 hash of the arguments to a function
+ * @param argHash pointer to the char buffer to write the hex-encoded hash into
+ * @param hash_ctx pointer to the context containing the information to hash
+ */
 void
 SL2Client::hash_args(char * argHash, hash_context *hash_ctx){
     std::vector<unsigned char> blob_vec((unsigned char *) hash_ctx,
@@ -51,10 +56,11 @@ SL2Client::hash_args(char * argHash, hash_context *hash_ctx){
     memcpy((void *) argHash, hash_str.c_str(), SL2_HASH_LEN);
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// is_function_targeted()
-//
-// Returns true if the current function should be targeted.
+/**
+ * Implements targeting strategies to determine whether we should fuzz a given function call.
+ * @param info - struct containing information about the last function call hooked via pre callback
+ * @return true if the current function should be targeted.
+ */
 bool SL2Client::
 is_function_targeted(client_read_info* info)
 {
@@ -107,18 +113,42 @@ is_function_targeted(client_read_info* info)
     return false;
 }
 
+/**
+ * compares the name of the file argument to this function with the name of the file argument recorded by the wizard
+ * @param t - struct describing the desired function to target, loaded from disk
+ * @param info - information about the last hooked function call
+ * @return true if they match, false if they don't
+ */
 bool SL2Client::compare_filenames(targetFunction &t, client_read_info* info){
     return !wcscmp(t.source.c_str(), info->source);
 }
 
+/**
+ * compares the number of times we've seen the given function
+ * @param t - struct describing the desired function to target, loaded from disk
+ * @param function - the function currently hooked
+ * @return true if they match, false if they don't
+ */
 bool SL2Client::compare_indices(targetFunction &t, Function &function){
     return call_counts[function] == t.index;
 }
 
+/**
+ * compares the number of times we've encountered the given return address with the count from the wizard
+ * @param t - struct describing the desired function to target, loaded from disk
+ * @param info - information about the last hooked function call
+ * @return true if they match, false if they don't
+ */
 bool SL2Client::compare_index_at_retaddr(targetFunction &t, client_read_info* info){
     return ret_addr_counts[info->retAddrOffset] == t.retAddrCount;
 }
 
+/**
+ * compares the return address of the function with the one recorded by the wizard
+ * @param t - struct describing the desired function to target, loaded from disk
+ * @param info - information about the last hooked function call
+ * @return true if they match, false if they don't
+ */
 bool SL2Client::compare_return_addresses(targetFunction &t, client_read_info* info){
     // Get around ASLR by only examining the bottom bits. This is something of a cheap hack and we should
     // ideally store a copy of the memory map in every run
@@ -128,10 +158,22 @@ bool SL2Client::compare_return_addresses(targetFunction &t, client_read_info* in
     return left == right;
 }
 
+/**
+ * compares the hash of the arguments for the function
+ * @param t - struct describing the desired function to target, loaded from disk
+ * @param info - information about the last hooked function call
+ * @return true if they match, false if they don't
+ */
 bool SL2Client::compare_arg_hashes(targetFunction &t, client_read_info* info){
     return STREQ(t.argHash.c_str(), info->argHash);
 }
 
+/**
+ * compares the first 16 bytes of the argument buffer for a function vs the one recorded by the wizard
+ * @param t - struct describing the desired function to target, loaded from disk
+ * @param info - information about the last hooked function call
+ * @return true if they match, false if they don't
+ */
 bool SL2Client::compare_arg_buffers(targetFunction &t, client_read_info* info){ // Not working
     size_t minimum = min(16, t.buffer.size());
     if( info->lpNumberOfBytesRead ) {
@@ -144,25 +186,32 @@ bool SL2Client::compare_arg_buffers(targetFunction &t, client_read_info* info){ 
     return !memcmp(t.buffer.data(), info->lpBuffer, minimum);
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// increment_call_count()
-//
-// Increments the total number of call counts for this function
+/**
+ * Increments the total number of call counts for this function
+ * @param function
+ * @return the incremented value
+ */
 uint64_t    SL2Client::
 increment_call_count(Function function) {
     return call_counts[function]++;
 }
 
+/**
+ * Increments the total number of return address counts for this return address
+ * @param retAddr
+ * @return the incremented value
+ */
 uint64_t    SL2Client::
 increment_retaddr_count(uint64_t retAddr) {
     return ret_addr_counts[retAddr]++;
 }
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// loadTargets()
-//
-// Loads the msgpack blob containing target information into the client.
+/**
+ * Loads the msgpack blob containing target information into the client.
+ * @param path - location of the target file to read from
+ * @return succes
+ */
 bool SL2Client::
 loadTargets(string path)
 {
@@ -207,6 +256,9 @@ loadTargets(string path)
     Keep them synced!
 */
 
+/**
+ * Hack to tell the target process that __fastfail isn't available
+ */
 void
 SL2Client::wrap_pre_IsProcessorFeaturePresent(void *wrapcxt, OUT void **user_data)
 {
@@ -217,6 +269,9 @@ SL2Client::wrap_pre_IsProcessorFeaturePresent(void *wrapcxt, OUT void **user_dat
     *user_data = (void *) feature;
 }
 
+/**
+ * Hack to tell the target process that __fastfail isn't available
+ */
 void
 SL2Client::wrap_post_IsProcessorFeaturePresent(void *wrapcxt, void *user_data)
 {
@@ -229,6 +284,9 @@ SL2Client::wrap_post_IsProcessorFeaturePresent(void *wrapcxt, void *user_data)
     }
 }
 
+/**
+ * Hack to tell the target process that __fastfail isn't available
+ */
 void
 SL2Client::wrap_pre_UnhandledExceptionFilter(void *wrapcxt, OUT void **user_data, bool (*on_exception)(void *, dr_exception_t *))
 {
@@ -241,12 +299,12 @@ SL2Client::wrap_pre_UnhandledExceptionFilter(void *wrapcxt, OUT void **user_data
     on_exception(drwrap_get_drcontext(wrapcxt), &excpt);
 }
 
-/*
+/**
     We also intercept VerifierStopMessage and VerifierStopMessageEx,
     which are supplied by Application Verifier for the purpose of catching
     heap corruptions.
-*/
-
+ * @param on_exception function pointer to call with the wrap context
+ */
 void
 SL2Client::wrap_pre_VerifierStopMessage(void *wrapcxt, OUT void **user_data, bool (*on_exception)(void *, dr_exception_t *))
 {
@@ -266,7 +324,8 @@ SL2Client::wrap_pre_VerifierStopMessage(void *wrapcxt, OUT void **user_data, boo
   records metadata about the target function call for use later.
 */
 
-/*
+/** Pre-function wrapper for ReadEventLog
+
     bool ReadEventLog(
       _In_  HANDLE hEventLog,
       _In_  DWORD  dwReadFlags,
@@ -278,6 +337,8 @@ SL2Client::wrap_pre_VerifierStopMessage(void *wrapcxt, OUT void **user_data, boo
     );
 
     Return: If the function succeeds, the return value is nonzero.
+     * @param wrapcxt dynamorio wrap context
+     * @param user_data pointer to a client_read_info struct to which we write information about this call
 */
 void
 SL2Client::wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
@@ -317,7 +378,8 @@ SL2Client::wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
 }
 
 
-/*
+/** Pre-function wrapper for RegQueryValu
+
     LONG WINAPI RegQueryValueEx(
       _In_        HKEY    hKey,
       _In_opt_    LPCTSTR lpValueName,
@@ -328,6 +390,8 @@ SL2Client::wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
     );
 
     Return: If the function succeeds, the return value is ERROR_SUCCESS.
+     * @param wrapcxt dynamorio wrap context
+     * @param user_data pointer to a client_read_info struct to which we write information about this call
 */
 void
 SL2Client::wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
@@ -367,7 +431,8 @@ SL2Client::wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
 }
 
 
-/*
+/** Pre-function wrapper for WinHttpWebS
+
     DWORD WINAPI WinHttpWebSocketReceive(
       _In_  HINTERNET                      hWebSocket,
       _Out_ PVOID                          pvBuffer,
@@ -377,6 +442,8 @@ SL2Client::wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
     );
 
     Return: NO_ERROR on success. Otherwise an error code.
+     * @param wrapcxt dynamorio wrap context
+     * @param user_data pointer to a client_read_info struct to which we write information about this call
 */
 void
 SL2Client::wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
@@ -416,7 +483,8 @@ SL2Client::wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
     hash_args(info->argHash, &hash_ctx);
 }
 
-/*
+/** Pre-function wrapper for InternetReadFile
+
     bool InternetReadFile(
       _In_  HINTERNET hFile,
       _Out_ LPVOID    lpBuffer,
@@ -425,6 +493,8 @@ SL2Client::wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
     );
 
     Return: Returns TRUE if successful
+     * @param wrapcxt dynamorio wrap context
+     * @param user_data pointer to a client_read_info struct to which we write information about this call
 */
 void
 SL2Client::wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
@@ -461,7 +531,8 @@ SL2Client::wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
     hash_args(info->argHash, &hash_ctx);
 }
 
-/*
+/** Pre-function wrapper for WinHttpReadD
+
     bool WINAPI WinHttpReadData(
       _In_  HINTERNET hRequest,
       _Out_ LPVOID    lpBuffer,
@@ -470,6 +541,8 @@ SL2Client::wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
     );
 
     Return: Returns TRUE if successful
+     * @param wrapcxt dynamorio wrap context
+     * @param user_data pointer to a client_read_info struct to which we write information about this call
 */
 void
 SL2Client::wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
@@ -507,7 +580,8 @@ SL2Client::wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
 }
 
 
-/*
+/** Pre-function wrapper for recv
+
     int recv(
       _In_  SOCKET s,
       _Out_ char   *buf,
@@ -516,6 +590,8 @@ SL2Client::wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
     );
 
     Return: recv returns the number of bytes received
+
+     * @param user_data pointer to a client_read_info struct to which we write information about this call
 */
 void
 SL2Client::wrap_pre_recv(void *wrapcxt, OUT void **user_data)
@@ -549,7 +625,8 @@ SL2Client::wrap_pre_recv(void *wrapcxt, OUT void **user_data)
     hash_args(info->argHash, &hash_ctx);
 }
 
-/*
+/** Pre-function wrapper for ReadFile
+
     bool WINAPI ReadFile(
       _In_        HANDLE       hFile,
       _Out_       LPVOID       lpBuffer,
@@ -559,6 +636,9 @@ SL2Client::wrap_pre_recv(void *wrapcxt, OUT void **user_data)
     );
 
     Return: If the function succeeds, the return value is nonzero (TRUE).
+
+ * @param wrapcxt the DynamoRIO Context for the wrapped function
+ * @param user_data pointer to a client_read_info struct to which we write information about this call
 */
 void
 SL2Client::wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
@@ -598,6 +678,11 @@ SL2Client::wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
     hash_args(info->argHash, &hash_ctx);
 }
 
+/**
+ * Pre-function wrapper for fread_s
+ * @param wrapcxt - dynamorio wrap context
+ * @param user_data - pointer to client_read_info struct to populate with information about the function call
+ */
 void
 SL2Client::wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
 {
@@ -636,6 +721,11 @@ SL2Client::wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
     hash_args(info->argHash, &hash_ctx);
 }
 
+/**
+ * Pre-function wrapper for fread
+ * @param wrapcxt - dynamorio wrap context
+ * @param user_data - pointer to client_read_info struct to populate with information about the function call
+ */
 void
 SL2Client::wrap_pre_fread(void *wrapcxt, OUT void **user_data)
 {
@@ -674,6 +764,11 @@ SL2Client::wrap_pre_fread(void *wrapcxt, OUT void **user_data)
     hash_args(info->argHash, &hash_ctx);
 }
 
+/**
+ * Pre-function wrapper for _read
+  * @param wrapcxt - dynamorio wrap context
+ * @param user_data - pointer to client_read_info struct to populate with information about the function call
+ */
 void
 SL2Client::wrap_pre__read(void *wrapcxt, OUT void **user_data)
 {
@@ -708,6 +803,11 @@ SL2Client::wrap_pre__read(void *wrapcxt, OUT void **user_data)
     hash_args(info->argHash, &hash_ctx);
 }
 
+/**
+ * Pre-function wrapper for MapViewOfFile. Hsa to rewrite the access arguments to FILE_MAP_COPY
+  * @param wrapcxt - dynamorio wrap context
+ * @param user_data - pointer to client_read_info struct to populate with information about the function call
+ */
 void
 SL2Client::wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
 {
@@ -753,6 +853,13 @@ SL2Client::wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
     }
 }
 
+/**
+ * Sanity check to make sure we don't get null pointers in the post hook. Important for file mapping since we rewrite the arguments
+ * @param wrapcxt the dynamorio wrap context
+ * @param user_data pointer to the function call info struct
+ * @param drcontext the dynamorio execution context
+ * @return whether everything looks okay
+ */
 bool
 SL2Client::is_sane_post_hook(void *wrapcxt, void *user_data, void **drcontext)
 {
@@ -772,6 +879,11 @@ SL2Client::is_sane_post_hook(void *wrapcxt, void *user_data, void **drcontext)
     return true;
 }
 
+/**
+ * Simple mapping from functions to their stringified names
+ * @param function member of the Function enum
+ * @return a string with the name of the function
+ */
 const char *
 SL2Client::function_to_string(Function function)
 {
@@ -803,6 +915,11 @@ SL2Client::function_to_string(Function function)
     return "unknown";
 }
 
+/**
+ * maps exception codes to strings
+ * @param exception_code
+ * @return - stringifed version of the exception code
+ */
 const char *
 SL2Client::exception_to_string(DWORD exception_code)
 {
@@ -880,6 +997,12 @@ SL2Client::exception_to_string(DWORD exception_code)
     return exception_str;
 }
 
+/**
+ * iterates over SL2_FUNCMOD_TABLE and checks whether the function exists somewhere
+ * @param func - function to check
+ * @param mod - mane of the module to check against
+ * @return whether we found a corresponding mapping from function -> module
+ */
 bool
 SL2Client::function_is_in_expected_module(const char *func, const char *mod)
 {
@@ -893,6 +1016,27 @@ SL2Client::function_is_in_expected_module(const char *func, const char *mod)
 }
 
 // TODO(ww): Document the fallback values here.
+/**
+ * Converts a msgpack-encoded target object on the disk into a target function struct
+ *
+ * FALLBACK VALUES (If one of the keys is missing):
+
+    selected --  false
+
+    callCount --  -1
+
+    retAddrCount --  -1
+
+    mode --  MATCH_INDEX
+
+    retAddrOffset --  -1
+
+    func_name --  ""
+
+    argHash --  ""
+ * @param j - values loaded from target file on disk
+ * @param t - struct to fill out
+ */
 SL2_EXPORT
 void from_json(const json& j, targetFunction& t)
 {
