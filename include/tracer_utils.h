@@ -65,7 +65,7 @@ generic_file_open(
     const char *suffix, 
     uint flags);
 
-/* open a log file
+/** open a log file
  * - id:        client id for getting the client library path
  * - drcontext: DR's context for per-thread logging, pass NULL if global logging
  * - path:      where the log file should be, pass NULL if using client library path
@@ -76,15 +76,15 @@ file_t
 log_file_open(client_id_t id, void *drcontext,
               const char *path, const char *name, uint flags);
 
-/* close a log file opened by log_file_open */
+/** close a log file opened by log_file_open */
 void
 log_file_close(file_t log);
 
-/* Converts a raw file descriptor into a FILE stream. */
+/** Converts a raw file descriptor into a FILE stream. */
 FILE *
 log_stream_from_file(file_t f);
 
-/* log_file_close does *not* need to be called when calling this on a
+/** log_file_close does *not* need to be called when calling this on a
  * stream converted from a file descriptor.
  */
 void
