@@ -231,7 +231,7 @@ SL2Response sl2_conn_request_arena(sl2_conn *conn, sl2_arena *arena)
     SL2_CONN_EVT(EVT_GET_ARENA);
 
     // Then, tell the server which coverage arena we'd like.
-    // NOTE(ww): This identifier is a hash of targetting information known to
+    // NOTE(ww): This identifier is a hash of targettng information known to
     // every instance of the fuzzer, meaning that each run on the same target application
     // and function(s) should produce the same identifier.
     sl2_conn_write_prefixed_string(conn, arena->id);

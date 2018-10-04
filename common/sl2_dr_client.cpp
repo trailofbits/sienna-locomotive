@@ -6,6 +6,7 @@ using namespace std;
 
 // NOTE(ww): As of Windows 10, both KERNEL32.dll and ADVAPI32.dll
 // get forwarded to KERNELBASE.DLL, apparently.
+// https://docs.microsoft.com/en-us/windows/desktop/Win7AppQual/new-low-level-binaries
 // TODO(ww): Since we iterate over these, order them by likelihood of occurrence?
 /** Maps functions to the DLL's we _expect_ them to appear in  */
 sl2_funcmod SL2_FUNCMOD_TABLE[] = {

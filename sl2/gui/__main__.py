@@ -157,8 +157,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tracer_timeout_box.setValue(config.config['tracer_timeout'])
         self.tracer_timeout_box.setSpecialValueText("None")
         self.tracer_timeout_box.setSingleStep(10)
-        self.verboseCheckBox = QtWidgets.QCheckBox()
-        self.verboseCheckBox.clicked.connect(self.verboseCheckBox_clicked)
+        self.verbose_cbox = QtWidgets.QCheckBox()
+        self.verbose_cbox.clicked.connect(self.toggle_verbose_state)
 
         # Create spinbox for controlling simultaneous fuzzing instances
         self.thread_count = QtWidgets.QSpinBox()
@@ -196,7 +196,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.extension_layout.addWidget(self.thread_count, 0, 4, 1, 1, Qt.AlignLeft)
 
         self.extension_layout.addWidget(QtWidgets.QLabel("Verbose:"), 1, 3, 1, 1, Qt.AlignRight)
-        self.extension_layout.addWidget(self.verboseCheckBox, 1, 4, 1, 1, Qt.AlignLeft)
+        self.extension_layout.addWidget(self.verbose_cbox, 1, 4, 1, 1, Qt.AlignLeft)
 
         self.fuzz_controls_inner_right.addWidget(self.expand_button)
 
@@ -237,7 +237,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.crashes_table.horizontalHeader().setStretchLastSection(True)
         self.crashes_table.resizeColumnsToContents()
         self.crashes_table.show()
-        self.crashes_table.clicked.connect(self.crashClicked)
+        self.crashes_table.clicked.connect(self.crash_clicked)
 
         # Crash Browser, details about a crash
         self.crash_browser = QtWidgets.QTextBrowser()
@@ -253,8 +253,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stop_button.hide()
         self._layout.addWidget(self.stop_button)
 
-        self.triageExport = QtWidgets.QPushButton("Export Triage")
-        self._layout.addWidget(self.triageExport)
+        self.export_triage_button = QtWidgets.QPushButton("Export Triage")
+        self._layout.addWidget(self.export_triage_button)
 
         # Set up status bar
         self.status_bar = QtWidgets.QStatusBar()
@@ -317,7 +317,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Handle checks/unchecks in the target tree
         self._func_tree.itemCheckedStateChanged.connect(self.tree_changed)
 
-        self.triageExport.clicked.connect(self.triageExportGui)
+        self.export_triage_button.clicked.connect(self.export_triage)
 
         # Fuzzer control buttons for showing the panel and starting a run
         self.expand_button.clicked.connect(self.toggle_expansion)
@@ -335,7 +335,6 @@ class MainWindow(QtWidgets.QMainWindow):
         # Connect the thread counter to the thread pool
         self.thread_count.valueChanged.connect(self.change_thread_count)
         self.change_thread_count(self.thread_count.value())
-        self.customContextMenuRequested.connect(self.contextMenuEvent)
 
     def change_profile(self):
         self.close()
@@ -447,8 +446,9 @@ class MainWindow(QtWidgets.QMainWindow):
     def handle_tracer_failure(self):
         """ Alert the user if a tracer run fails. """
         # TODO(ww): Does it make sense to pause the fuzzing threads here?
-        QtWidgets.QMessageBox.critical(None, "Tracer failure",
-                                       "Found a crash but couldn't trace it.\nTry running the tracer manually via sl2-cli?")
+        QtWidgets.QMessageBox.critical(
+            None, "Tracer failure",
+            "Found a crash but couldn't trace it.\nTry running the tracer manually via sl2-cli?")
 
     ## Builds the tree of targetable functions to display
     def build_func_tree(self):
@@ -563,16 +563,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.model.itemFromIndex(index).setCheckState(Qt.Unchecked)
         self.target_data.unpause()
 
-    ## Handler for displaying a custom context menu
-    def contextMenuEvent(self, QContextMenuEvent):
-        """ Displays the right-click menu """
-        menu = QtWidgets.QMenu(self)
-        menu.addAction(self.expand_action)
-        menu.addAction(self.collapse_action)
-        menu.addAction(self.check_action)
-        menu.addAction(self.uncheck_action)
-        menu.popup(QContextMenuEvent.globalPos())
-
     ## Signal handler that handles checksec results after the executable finishes.
     def checksec_finished(self, checksec_output):
         target_path = config.config['target_application_path']
@@ -632,24 +622,38 @@ class MainWindow(QtWidgets.QMainWindow):
             self.pause_mode_cbox.setChecked(False)
 
     ## Signal handler that updates the verbosity state when the checkbox in the gui is clicked
-    def verboseCheckBox_clicked(self):
-        state = self.verboseCheckBox.isChecked()
+    def toggle_verbose_state(self):
+        state = self.verbose_cbox.isChecked()
         config.config['verbose'] = 2 if state else False
 
     ## Button callback that allows the user to select a location to save a csv file and a fuzzing report
-    def triageExportGui(self):
-        path = QtWidgets.QFileDialog.getExistingDirectory(dir=".")
+    def export_triage(self):
+        path = QtWidgets.QFileDialog.getExistingDirectory(self, caption="Export Directory", dir=".")
         if len(path) == 0:
             return
 
-        triageExporter = TriageExport(path, get_target_slug(config.config))
-        triageExporter.export()
+        exporter = TriageExport(path, get_target_slug(config.config))
+        num_crashes = len(exporter.get_crashes())
+
+        print("Exporting {} crashes".format(num_crashes))
+
+        if num_crashes > 0:
+            exporter_progress = QtWidgets.QProgressDialog(
+                "Exporting crashes...", None, 0, num_crashes - 1, self)
+            exporter_progress.setAutoClose(True)
+            exporter_progress.setWindowModality(Qt.WindowModal)
+            # Only show the progressbar if the operation is expected to take more than 1.5 seconds.
+            exporter_progress.setMinimumDuration(1500)
+            exporter.export(export_cb=exporter_progress.setValue)
+        else:
+            exporter.export()
+
         generate_report(dest=path, browser=self.open_report_in_browser.isChecked())
 
     ## Clicked on Crash
     # When a cell is clicked in the crashes table, find the row
     # and update the Crash browser to show triage.txt
-    def crashClicked(self, a):
+    def crash_clicked(self, a):
         # row, col = a.row(), a.column()
         data = a.data(Qt.UserRole)
         crash = db.Crash.factory(data.runid)
