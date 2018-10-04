@@ -78,7 +78,11 @@ XploitabilityBreakpad::XploitabilityBreakpad(Minidump *dump,
     : Xploitability(dump, process_state, "breakzpad") {       
     }
 
-
+/**
+ * Starts off with a weight of zero. Checks for a number of "interesting" conditions and increments the weight by
+ * an appropriate amount each time it finds one.
+ * @return The exploitability score
+ */
 ExploitabilityRating XploitabilityBreakpad::processExploitabilityRating() {
     uint64_t exploitabilityWeight = 0;
 
@@ -245,9 +249,14 @@ ExploitabilityRating XploitabilityBreakpad::processExploitabilityRating() {
 
   return EXPLOITABILITY_NONE;
 }
-////////////////////////////////////////////////////////////////////////////
-// <<()
-//      Converts a google breakpad rating to an sl2 result with a ranking
+
+
+/**
+ * Converts a google breakpad rating to an sl2 result with a ranking
+ * @param result - SL2 result we modify
+ * @param rating - exploitabilty from Breakpad
+ * @return the results that was passed in
+ */
 XploitabilityResult& operator<<( XploitabilityResult& result, const ExploitabilityRating& rating ) {
     switch(rating) {
         case EXPLOITABILITY_HIGH:
@@ -268,7 +277,11 @@ XploitabilityResult& operator<<( XploitabilityResult& result, const Exploitabili
     }
     return result;
 }
-    
+
+/**
+ * wrapper around processExploitabilityRating
+ * @return SL2 ranking from breakpad
+ */
 XploitabilityResult XploitabilityBreakpad::process() {
     XploitabilityResult result(name());
     ExploitabilityRating rating = processExploitabilityRating();

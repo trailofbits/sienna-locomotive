@@ -11,29 +11,30 @@ using namespace std;
 
 namespace sl2 {
 
-////////////////////////////////////////////////////////////////////////////
-// XploitabilityTracer()
-//      tracer.cpp for Xploitability
+/**
+ * Default constructor. Uses tracer.cpp to calculate exploitability
+ * @param dump minidump file spit out by tracer
+ * @param process_state
+ * @param crashJson JSON dump of tracer output
+ */
 XploitabilityTracer::XploitabilityTracer(
         Minidump *dump,
         ProcessState *process_state,
         const string crashJson )
     :   Xploitability(dump, process_state, "sl2"),
         crashJsonPath_(crashJson)  {
-
 }
 
-////////////////////////////////////////////////////////////////////////////
-// toJson()
-//      Copies the tracer.cpp json into triage.json for extra information
+/**
+ * Copies the tracer.cpp json into triage.json for extra information
+ */
  json XploitabilityTracer::toJson() const {
     return json_;
  }
 
-////////////////////////////////////////////////////////////////////////////
-// process()
-//      Reads the crash.json file from tracer.cpp. There is potential to
-// include information from the minidump processing here.
+/**
+ * Reads the crash.json file from tracer.cpp. There is potential to include information from the minidump processing here.
+ */
 XploitabilityResult XploitabilityTracer::process() {
     XploitabilityResult ret(name());
 
