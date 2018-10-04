@@ -669,6 +669,15 @@ def main():
                                        "\n".join(errors))
         sys.exit(1)
 
+    try:
+        import qdarkstyle, os
+        os.environ['QT_API'] = 'pyside2'
+        app.setStyleSheet(qdarkstyle.load_stylesheet())
+    except (ImportError, NotImplementedError):
+        pass
+    except Exception as e:
+        print("Unexpected exception when loading stylesheet:", e)
+
     mainWin = MainWindow()
     mainWin.show()
     sys.exit(app.exec_())
