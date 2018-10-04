@@ -6,7 +6,6 @@
 // details from the crash and minidump analysis are put in a triage.json file.
 
 #include "triage.h"
-#include "common/rc4x.hh"
 
 #include <algorithm>
 #include <fstream>
