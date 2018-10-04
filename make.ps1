@@ -3,6 +3,7 @@ $cwd=(Get-Item -Path ".\").FullName
 
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+Add-Type -AssemblyName Microsoft.VisualBasic
 function Unzip
 {
     param([string]$zipfile, [string]$outpath)
@@ -76,7 +77,7 @@ Function SafeDelete {
 Function Reconfig {
     taskkill.exe /IM test_application.exe /F
     taskkill.exe /IM server.exe /F
-    SafeDelete "$env:APPDATA\Trail of Bits\fuzzkit"
+    [Microsoft.VisualBasic.FileIO.FileSystem]::Deletedirectory("$env:APPDATA\Trail of Bits\fuzzkit",'OnlyErrorDialogs','SendToRecycleBin')
 }
 
 Function Test {
