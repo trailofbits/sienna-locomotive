@@ -637,14 +637,16 @@ class MainWindow(QtWidgets.QMainWindow):
 
         print("Exporting {} crashes".format(num_crashes))
 
-        exporter_progress = QtWidgets.QProgressDialog(
-            "Exporting crashes...", None, 0, num_crashes - 1, self)
-        exporter_progress.setAutoClose(True)
-        exporter_progress.setWindowModality(Qt.WindowModal)
-        # Only show the progressbar if the operation is expected to take more than 1.5 seconds.
-        exporter_progress.setMinimumDuration(1500)
-
-        exporter.export(export_cb=exporter_progress.setValue)
+        if num_crashes > 0:
+            exporter_progress = QtWidgets.QProgressDialog(
+                "Exporting crashes...", None, 0, num_crashes - 1, self)
+            exporter_progress.setAutoClose(True)
+            exporter_progress.setWindowModality(Qt.WindowModal)
+            # Only show the progressbar if the operation is expected to take more than 1.5 seconds.
+            exporter_progress.setMinimumDuration(1500)
+            exporter.export(export_cb=exporter_progress.setValue)
+        else:
+            exporter.export()
 
         generate_report(dest=path, browser=self.open_report_in_browser.isChecked())
 
