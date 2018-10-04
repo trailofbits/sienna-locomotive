@@ -146,14 +146,14 @@ struct client_read_info {
     /*! The place within the buffer we're reading from */
     size_t      position;
     /*! The return address (releative to the module) of this function */
-    size_t      retAddrOff
-    /*! Which function we've hooked */set;
-    Function    functio
-    /*! Handle to the target */n;
+    size_t      retAddrOffset;
+    /*! Which function we've hooked */
+    Function    function;
+    /*! Handle to the target */
     HANDLE      hFile;
     /*! Number of bytes this function actually read */
-    DWORD       *lpNumberOf
-    /*! Pointer to the buffer containing the user bytes (ie - the file being read) */BytesRead;
+    DWORD       *lpNumberOfBytesRead;
+    /*! Pointer to the buffer containing the user bytes (ie - the file being read) */
     void        *lpBuffer;
      /*! Pointer to the hex-encoded hash of the arguments */ // TODO(ww): Make this a wchar_t * for consistency.
     char        *argHash;
