@@ -223,6 +223,13 @@ void strategyEndianSwap(uint8_t *buf, size_t size)
     }
 }
 
+/**
+ * Applies the mutation strategy given by the index
+ * @param buf - pointer to the buffer to be mutated
+ * @param size - number of bytes to mutate
+ * @param choice - index of the strategy to use
+ * @return bool indicating success
+ */
 static
 bool mutate_buffer_choice(uint8_t *buf, size_t size, uint32_t choice)
 {
@@ -235,6 +242,13 @@ bool mutate_buffer_choice(uint8_t *buf, size_t size, uint32_t choice)
     return true;
 }
 
+/**
+ * Allows directly passing in a specific strategy to be applied
+ * @param buf - pointer to the buffer to be mutated
+ * @param size - number of bytes to mutate
+ * @param strategy - function pointer to the strategy
+ * @return bool indicating success
+ */
 static
 bool mutate_buffer_custom(uint8_t *buf, size_t size, sl2_strategy_t strategy)
 {

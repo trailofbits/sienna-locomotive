@@ -3,11 +3,10 @@
 
 #include <memory>
 
-/*
-    Defines a templatized allocator that's backed by DynamoRIO's
-    private heap.
-*/
-
+/**
+ * Defines a templatized allocator that's backed by DynamoRIO's private heap.
+ * @tparam T - Type to allocate memory for
+ */
 template<typename T>
 struct sl2_dr_allocator {
     using value_type = T;

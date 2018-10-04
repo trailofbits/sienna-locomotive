@@ -6,7 +6,7 @@
 
 #include "droption.h"
 
-/* Required, which specific call to target */
+/*! Required, which specific call to target */
 static droption_t<std::string> op_target(
     DROPTION_SCOPE_CLIENT,
     "t",
@@ -14,7 +14,7 @@ static droption_t<std::string> op_target(
     "target",
     "Specific call to target.");
 
-
+/*! Enables Tracking of ReqQueryValueExA/W. Probably never needed for most workflows. */
 static droption_t<bool> op_registry (
         DROPTION_SCOPE_CLIENT,
         "registry",

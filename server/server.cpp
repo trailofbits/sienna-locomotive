@@ -24,7 +24,7 @@
 
 #include "server.hpp"
 
-// Convenience macros for logging.
+/*! Convenience macros for logging. */
 #define SL2_SERVER_LOG(level, fmt, ...) LOG_F(level, __FUNCTION__ ": " fmt, __VA_ARGS__)
 // NOTE(ww): The MS preprocessor is smart enough to remove the trailing comma in most
 // sitations, but not when __VA_ARGS__ is *not* the last argument. So we put
@@ -35,6 +35,7 @@
 #define SL2_SERVER_LOG_ERROR(fmt, ...) SL2_SERVER_LOG_GLE(ERROR, fmt, __VA_ARGS__)
 #define SL2_SERVER_LOG_FATAL(fmt, ...) SL2_SERVER_LOG_GLE(FATAL, fmt, __VA_ARGS__)
 
+/*! Stores metadata for a given arena, like the last score and which fuzzing strategy was recommended */
 struct strategy_state {
     sl2_arena arena;
     uint32_t score;
@@ -43,13 +44,19 @@ struct strategy_state {
     std::map<uint32_t, int64_t> success_map;
 };
 
+/*! Store server command line options */
 struct server_opts {
+    /*! Whether the server should dump mutated bytes to stdout for debugging */
     bool dump_mut_buffer;
+    /*! Whether we should pin the server to one CPU core */
     bool pinned;
+    /*! Whether score bucketing should be enabled */
     bool bucketing;
+    /*! How long to stick with a given strategy if it's stopped yielding results */
     uint32_t stickiness;
 };
 
+/*! maps different targets to their arenas */
 typedef std::map<std::wstring, strategy_state> sl2_strategy_map_t;
 
 static server_opts opts = {0};
@@ -66,7 +73,12 @@ static std::shared_mutex arena_mutex;
 static std::shared_mutex strategy_mutex;
 static sl2_strategy_map_t strategy_map;
 
-// Gets the processor affinity mask for the given process ID.
+/** Gets the processor affinity mask for the given process ID.
+ *
+ * @param pid
+ * @param mask
+ * @return
+ */
 static bool get_process_affinity(uint32_t pid, uint64_t *mask)
 {
     HANDLE handle;
@@ -89,8 +101,11 @@ static bool get_process_affinity(uint32_t pid, uint64_t *mask)
     return true;
 }
 
-// Finds the first free processor, i.e. the first processor
-// that doesn't already have a process pinned to it.
+/**
+ * Finds the first free processor, i.e. the first processor that doesn't already have a process pinned to it.
+ * @param mask
+ * @return
+ */
 static bool find_free_processor(uint64_t *mask)
 {
     uint64_t cpu_mask = 0;
@@ -136,7 +151,11 @@ static bool find_free_processor(uint64_t *mask)
     CloseHandle(snapshot);
 }
 
-// Pins the server's process to the first free processor.
+
+/**
+ * Pins the server's process to the first free processor.
+ * @return success
+ */
 static bool pin_to_free_processor()
 {
     SYSTEM_INFO info = {0};
@@ -166,10 +185,12 @@ static bool pin_to_free_processor()
     return true;
 }
 
-// Scores the coverage of the given arena by placing
-// hit counts into buckets: higher scores are given
-// for relatively small counts, while large counts
-// are given lower scores.
+/**
+ * Scores the coverage of the given arena by placing hit counts into buckets: higher scores are given
+ * for relatively small counts, while large counts are given lower scores.
+ * @param arena
+ * @return
+ */
 static uint32_t bucket_score(sl2_arena *arena)
 {
     uint32_t score = 0;
@@ -202,9 +223,11 @@ static uint32_t bucket_score(sl2_arena *arena)
     return score;
 }
 
-// Scores the coverage of the given arena with
-// a dumb hit counter: the ultimate score
-// is the number of nonzero cells in the arena.
+/**
+ * Scores the coverage of the given arena with a dumb hit counter:
+ * the ultimate score is the number of nonzero cells in the arena.
+ * @return the coverage score
+ */
 static uint32_t coverage_count(sl2_arena *arena)
 {
     uint32_t score = 0;
@@ -218,6 +241,10 @@ static uint32_t coverage_count(sl2_arena *arena)
     return score;
 }
 
+/**
+ * Return the coverage score (depending on whether bucketing is on)
+ * @return the score
+ */
 static uint32_t coverage_score(sl2_arena *arena)
 {
     if (opts.bucketing) {
@@ -227,7 +254,9 @@ static uint32_t coverage_score(sl2_arena *arena)
     return coverage_count(arena);
 }
 
-/* concurrency protection */
+/**
+ * Concurrency protection. Prevent multiple servers from starting simultaneously
+ */
 static void lock_process()
 {
     process_mutex = CreateMutex(NULL, false, L"fuzz_server_mutex");
@@ -242,7 +271,9 @@ static void lock_process()
     }
 }
 
-// Called on process termination (by atexit).
+/**
+ * Called on process termination (by atexit).
+ */
 static void server_cleanup()
 {
     SL2_SERVER_LOG_INFO("cleaning things up");
@@ -253,7 +284,9 @@ static void server_cleanup()
     CloseHandle(process_mutex);
 }
 
-// Called on session termination.
+/**
+ * Called on session termination.
+ */
 static void destroy_pipe(HANDLE pipe)
 {
     if (!FlushFileBuffers(pipe)) {
@@ -269,9 +302,12 @@ static void destroy_pipe(HANDLE pipe)
     }
 }
 
-// Initialize the global variable (FUZZ_LOG) containing the path to the logging file.
-// NOTE(ww): We separate this from init_working_paths so that we can log any errors that
-// happen to occur in init_working_paths.
+
+/**
+ * Initialize the global variable (FUZZ_LOG) containing the path to the logging file.
+ * NOTE(ww): We separate this from init_working_paths so that we can log any errors that
+ * happen to occur in init_working_paths.
+ */
 static void init_logging_path()
 {
     wchar_t *roaming_path;
@@ -284,9 +320,12 @@ static void init_logging_path()
     CoTaskMemFree(roaming_path);
 }
 
-// Initialize the global variables containins the paths to the working directory,
-// as well as the subdirectories and files we expect individual runs to produce.
-// NOTE(ww): This should be kept up-to-date with fuzzer_config.py.
+
+/**
+ * Initialize the global variables containins the paths to the working directory,
+ * as well as the subdirectories and files we expect individual runs to produce.
+ * NOTE(ww): This should be kept up-to-date with fuzzer_config.py.
+ */
 static void init_working_paths()
 {
     wchar_t *roaming_path;
@@ -306,7 +345,10 @@ static void init_working_paths()
     CoTaskMemFree(roaming_path);
 }
 
-/* Writes the fkt file in the event we found a crash. Stores information about the mutation that caused it */
+/**
+ * Writes the fkt file in the event we found a crash. Stores information about the mutation that caused it. See the sl2_mutation struct for parameter details.
+ * @return return code
+ */
 static uint8_t write_fkt(wchar_t *target_file, uint32_t type, uint32_t mutation_type, size_t resource_size, wchar_t *resource_path, size_t position, size_t size, uint8_t* buf)
 {
     uint8_t rc = 0;
@@ -381,7 +423,12 @@ static uint8_t write_fkt(wchar_t *target_file, uint32_t type, uint32_t mutation_
     return rc;
 }
 
-/* Gets the mutated bytes stored in the FKT file for mutation replay */
+/**
+ * Gets the mutated bytes stored in the FKT file for mutation replay
+ * @param target_file - path to the fkt file
+ * @param buf - buffer to overwrite
+ * @param size - length of the buffer
+ */
 static void get_bytes_fkt(wchar_t *target_file, uint8_t *buf, size_t size)
 {
     DWORD txsize;
@@ -428,6 +475,11 @@ static void get_bytes_fkt(wchar_t *target_file, uint8_t *buf, size_t size)
     }
 }
 
+/**
+ * Dump the raw arena to the disk. No encoding, just the bytes straight from memory
+ * @param arena_path where to dump the arena
+ * @param arena the arena to dump
+ */
 static void dump_arena_to_disk(wchar_t *arena_path, sl2_arena *arena)
 {
     std::unique_lock<std::shared_mutex> arena_lock(arena_mutex);
@@ -459,6 +511,12 @@ static void dump_arena_to_disk(wchar_t *arena_path, sl2_arena *arena)
     }
 }
 
+/**
+ * Reads the arena from the disk, straight into the memory
+ * @param arena_path the path from which to read the arema
+ * @param arena the arena to load into
+ * @return success
+ */
 static bool load_arena_from_disk(wchar_t *arena_path, sl2_arena *arena)
 {
     bool rc = true;
@@ -503,6 +561,10 @@ static bool load_arena_from_disk(wchar_t *arena_path, sl2_arena *arena)
     return rc;
 }
 
+/**
+ * Receives mutated bytes from the fuzzer
+ * @param pipe handle to the named pipe that communicates with the client 
+ */
 static void handle_register_mutation(HANDLE pipe)
 {
     DWORD txsize;
@@ -638,7 +700,10 @@ static void handle_register_mutation(HANDLE pipe)
     RpcStringFree((RPC_WSTR *)&run_id_s);
 }
 
-/* Handles requests over the named pipe from the triage client for replays of mutated bytes */
+/**
+ * Handles requests over the named pipe from the triage client for replays of mutated bytes
+ * @param pipe handle to the named pipe that communicates with the client 
+ */
 static void handle_replay(HANDLE pipe)
 {
     DWORD txsize;
@@ -694,6 +759,10 @@ static void handle_replay(HANDLE pipe)
     RpcStringFree((RPC_WSTR *)&run_id_s);
 }
 
+/**
+ * Sends the requested arena to the client
+ * @param pipe handle to the named pipe that communicates with the client 
+ */
 static void handle_get_arena(HANDLE pipe)
 {
     DWORD txsize;
@@ -755,6 +824,10 @@ static void handle_get_arena(HANDLE pipe)
     }
 }
 
+/**
+ * Merges the arena sent by the client with the one previously stored for incremental coverage measurements
+ * @param pipe handle to the named pipe that communicates with the client 
+ */
 static void handle_set_arena(HANDLE pipe)
 {
     DWORD txsize;
@@ -870,6 +943,10 @@ static void handle_set_arena(HANDLE pipe)
     dump_arena_to_disk(arena_path, &arena);
 }
 
+/**
+ * Renders full paths for writing dump files to the client
+ * @param pipe handle to the named pipe that communicates with the client 
+ */
 static void handle_crash_paths(HANDLE pipe)
 {
     DWORD txsize;
@@ -946,6 +1023,10 @@ static void handle_crash_paths(HANDLE pipe)
     RpcStringFree((RPC_WSTR *)&run_id_s);
 }
 
+/**
+ * Confirms that the server is still alive
+ * @param pipe handle to the named pipe that communicates with the client 
+ */
 static void handle_ping(HANDLE pipe)
 {
     DWORD txsize;
@@ -958,6 +1039,10 @@ static void handle_ping(HANDLE pipe)
     }
 }
 
+/**
+ * Handles PID registration for child processes (so we can kill them if they time out)
+ * @param pipe handle to the named pipe that communicates with the client 
+ */
 static void handle_register_pid(HANDLE pipe)
 {
     DWORD txsize;
@@ -1023,6 +1108,10 @@ static void handle_register_pid(HANDLE pipe)
     }
 }
 
+/**
+ * Suggests a mutation to the fuzzer based on coverage info
+ * @param pipe handle to the named pipe that communicates with the client 
+ */
 static void handle_advise_mutation(HANDLE pipe)
 {
     DWORD txsize;
@@ -1057,6 +1146,10 @@ static void handle_advise_mutation(HANDLE pipe)
     }
 }
 
+/**
+ * Sends the client a dump of the current coverage score and related info
+ * @param pipe handle to the named pipe that communicates with the client 
+ */
 static void handle_coverage_info(HANDLE pipe)
 {
     DWORD txsize;
@@ -1112,7 +1205,11 @@ static void handle_coverage_info(HANDLE pipe)
     }
 }
 
-/* Handles incoming connections from clients */
+/**
+ * Handles incoming connections from clients
+ * @param data HANDLE to the named pipe
+ * @return error code (0)
+ */
 static DWORD WINAPI thread_handler(void *data)
 {
     HANDLE pipe = (HANDLE) data;
@@ -1206,7 +1303,9 @@ static DWORD WINAPI thread_handler(void *data)
     return 0;
 }
 
-// Init dirs and create a new thread to handle input from the named pipe
+/**
+ * Init dirs and create a new thread to handle input from the named pipe
+ */
 int main(int argc, char **argv)
 {
     init_logging_path();

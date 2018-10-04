@@ -15,7 +15,11 @@
     SL2_CONN_WRITE(&evt, sizeof(evt)); \
 } while(0)
 
-// Writes a length-prefixed wide string to the server.
+/**
+ * Writes a length-prefixed wide string to the server.
+ * @param conn
+ * @param message
+ */
 static
 void sl2_conn_write_prefixed_string(sl2_conn *conn, wchar_t *message)
 {
@@ -30,9 +34,15 @@ void sl2_conn_write_prefixed_string(sl2_conn *conn, wchar_t *message)
     }
 }
 
-// Reads a length-prefixed wide string from the server, up to `maxlen` wide chars.
-// `maxlen` does *not* include the trailing NULL, so callers *must* ensure that
-// `message` can hold at at least `(maxlen * sizeof(wchar_t)) + 1` bytes.
+/**
+ *  Reads a length-prefixed wide string from the server, up to `maxlen` wide chars.
+ * `maxlen` does *not* include the trailing NULL, so callers *must* ensure that
+ * `message` can hold at at least `(maxlen * sizeof(wchar_t)) + 1` bytes.
+ * @param conn
+ * @param message
+ * @param maxlen
+ * @return
+ */
 static
 SL2Response sl2_conn_read_prefixed_string(sl2_conn *conn, wchar_t *message, size_t maxlen)
 {
@@ -51,8 +61,7 @@ SL2Response sl2_conn_read_prefixed_string(sl2_conn *conn, wchar_t *message, size
     return SL2Response::OK;
 }
 
-SL2_EXPORT
-SL2Response sl2_conn_open(sl2_conn *conn)
+SL2_EXPORT SL2Response sl2_conn_open(sl2_conn *conn)
 {
     HANDLE pipe;
 

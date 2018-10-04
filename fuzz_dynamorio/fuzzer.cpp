@@ -44,11 +44,18 @@ static sl2_conn sl2_conn;
 static sl2_exception_ctx fuzz_exception_ctx;
 static bool crashed = false;
 static uint32_t mut_count = 0;
+/*! Blank arena that tracks our path for this single run. Gets sent to the server and merged with old arenas*/
 static sl2_arena arena = {0};
 static bool coverage_guided = false;
+/*! Map of the modules we've ssen so far (so we can find the base addresses) */
 static std::array<module_data_t *, SL2_MAX_MODULES> seen_modules;
 static uint32_t nmodules = 0;
 
+/**
+ * Finds the base address of the module containing a given memory address
+ * @param addr memory address of a basic block
+ * @return base address of the module containing addr
+ */
 static app_pc
 get_base_pc(app_pc addr)
 {
@@ -72,6 +79,10 @@ get_base_pc(app_pc addr)
     return containing_module->start;
 }
 
+/**
+ * Instruments each basic block to insert instructions that update the arena in order to measure code coverage
+ * @return DynamoRIO flags indicating return code
+ */
 static dr_emit_flags_t
 on_bb_instrument(void *drcontext, void *tag, instrlist_t *bb, instr_t *inst, bool for_trace, bool translating, void *user_data)
 {
@@ -101,7 +112,7 @@ on_bb_instrument(void *drcontext, void *tag, instrlist_t *bb, instr_t *inst, boo
     return DR_EMIT_DEFAULT;
 }
 
-/* Maps exception code to an exit status. Print it out, then exit. */
+/*! Maps exception code to an exit status. Print it out, save the exception context, then exit. */
 static bool
 on_exception(void *drcontext, dr_exception_t *excpt)
 {
@@ -125,7 +136,7 @@ on_exception(void *drcontext, dr_exception_t *excpt)
     return true;
 }
 
-/* Runs after the target application has exited */
+/** Runs after the target application has exited. Reports crash state to the server and dumps coverage info. */
 static void
 on_dr_exit(void)
 {
@@ -205,8 +216,12 @@ on_dr_exit(void)
     drreg_exit();
 }
 
-// Mutates a function's input buffer, registers the mutation with the server, and writes the
-// buffer into memory for fuzzing.
+/**
+ * Mutates a function's input buffer, registers the mutation with the server,
+ * and writes the buffer into memory for fuzzing.
+ * @param info client_read_info with function metadata
+ * @return success
+ */
 static bool
 mutate(client_read_info *info)
 {
@@ -244,93 +259,168 @@ mutate(client_read_info *info)
     return true;
 }
 
+/**
+  Transparent wrapper around SL2Client.wrap_pre_IsProcessorFeaturePresent
+ * @param wrapcxt - DynamoRIO Wrap Context. Opaque pointer that can be passed to DR helper functions.
+ * @param user_data - client_read_info struct containing information about the function call hooked by wrap_pre
+ */
 static void wrap_pre_IsProcessorFeaturePresent(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_IsProcessorFeaturePresent(wrapcxt, user_data);
 }
 
+/**
+  Transparent wrapper around SL2Client.wrap_post_IsProcessorFeaturePresent
+ * @param wrapcxt - DynamoRIO Wrap Context. Opaque pointer that can be passed to DR helper functions.
+ * @param user_data - client_read_info struct containing information about the function call hooked by wrap_pre
+ */
 static void wrap_post_IsProcessorFeaturePresent(void *wrapcxt, void *user_data)
 {
     client.wrap_post_IsProcessorFeaturePresent(wrapcxt, user_data);
 }
 
+/**
+  Transparent wrapper around SL2Client.wrap_pre_UnhandledExceptionFilter
+ * @param wrapcxt - DynamoRIO Wrap Context. Opaque pointer that can be passed to DR helper functions.
+ * @param user_data - client_read_info struct containing information about the function call hooked by wrap_pre
+ */
 static void wrap_pre_UnhandledExceptionFilter(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_UnhandledExceptionFilter(wrapcxt, user_data, on_exception);
 }
 
+/**
+  Transparent wrapper around SL2Client.wrap_pre_VerifierStopMessage
+ * @param wrapcxt - DynamoRIO Wrap Context. Opaque pointer that can be passed to DR helper functions.
+ * @param user_data - client_read_info struct containing information about the function call hooked by wrap_pre
+ */
 static void wrap_pre_VerifierStopMessage(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_VerifierStopMessage(wrapcxt, user_data, on_exception);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_ReadEventLog
+ * @param wrapcxt - DynamoRIO Wrap Context. Opaque pointer that can be passed to DR helper functions.
+ * @param user_data - client_read_info struct containing information about the function call hooked by wrap_pre
+ */
 static void
 wrap_pre_ReadEventLog(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_ReadEventLog(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_RegQueryValueEx
+ * @param wrapcxt - DynamoRIO Wrap Context. Opaque pointer that can be passed to DR helper functions.
+ * @param user_data - client_read_info struct containing information about the function call hooked by wrap_pre
+ */
 static void
 wrap_pre_RegQueryValueEx(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_RegQueryValueEx(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_WinHttpWebSocketReceive
+ * @param wrapcxt - DynamoRIO Wrap Context. Opaque pointer that can be passed to DR helper functions.
+ * @param user_data - client_read_info struct containing information about the function call hooked by wrap_pre
+ */
 static void
 wrap_pre_WinHttpWebSocketReceive(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_WinHttpWebSocketReceive(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_InternetReadFile
+ * @param wrapcxt - DynamoRIO Wrap Context. Opaque pointer that can be passed to DR helper functions.
+ * @param user_data - client_read_info struct containing information about the function call hooked by wrap_pre
+ */
 static void
 wrap_pre_InternetReadFile(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_InternetReadFile(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_WinHttpReadData
+ * @param wrapcxt - DynamoRIO Wrap Context. Opaque pointer that can be passed to DR helper functions.
+ * @param user_data - client_read_info struct containing information about the function call hooked by wrap_pre
+ */
 static void
 wrap_pre_WinHttpReadData(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_WinHttpReadData(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_recv
+ * @param wrapcxt - DynamoRIO Wrap Context. Opaque pointer that can be passed to DR helper functions.
+ * @param user_data - client_read_info struct containing information about the function call hooked by wrap_pre
+ */
 static void
 wrap_pre_recv(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_recv(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_ReadFile
+ * @param wrapcxt - DynamoRIO Wrap Context. Opaque pointer that can be passed to DR helper functions.
+ * @param user_data - client_read_info struct containing information about the function call hooked by wrap_pre
+ */
 static void
 wrap_pre_ReadFile(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_ReadFile(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_fread_s
+ * @param wrapcxt - DynamoRIO Wrap Context. Opaque pointer that can be passed to DR helper functions.
+ * @param user_data - client_read_info struct containing information about the function call hooked by wrap_pre
+ */
 static void
 wrap_pre_fread_s(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_fread_s(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_fread
+ * @param wrapcxt - DynamoRIO Wrap Context. Opaque pointer that can be passed to DR helper functions.
+ * @param user_data - client_read_info struct containing information about the function call hooked by wrap_pre
+ */
 static void
 wrap_pre_fread(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_fread(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre__read
+ * @param wrapcxt - DynamoRIO Wrap Context. Opaque pointer that can be passed to DR helper functions.
+ * @param user_data - client_read_info struct containing information about the function call hooked by wrap_pre
+ */
 static void
 wrap_pre__read(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre__read(wrapcxt, user_data);
 }
 
+/**
+ * Transparent wrapper around SL2Client.wrap_pre_MapViewOfFile
+ * @param wrapcxt - DynamoRIO Wrap Context. Opaque pointer that can be passed to DR helper functions.
+ * @param user_data - client_read_info struct containing information about the function call hooked by wrap_pre
+ */
 static void
 wrap_pre_MapViewOfFile(void *wrapcxt, OUT void **user_data)
 {
     client.wrap_pre_MapViewOfFile(wrapcxt, user_data);
 }
 
-/* Mutates whatever data the hooked function wrote */
+/*! Mutates whatever data the hooked function wrote (calls mutate) */
 static void
 wrap_post_Generic(void *wrapcxt, void *user_data)
 {
@@ -375,8 +465,10 @@ wrap_post_Generic(void *wrapcxt, void *user_data)
     dr_thread_free(drcontext, info, sizeof(client_read_info));
 }
 
-// NOTE(ww): MapViewOfFile can't use the Generic post-hook, as
-// we need the address of the mapped view that it returns.
+/**
+ * Mutates target buffer similar to the generic post callback, but since MapViewOfFile needs the address of the mapped
+ * view, we can't use the Generic post-hook.
+ */
 static void
 wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
 {
@@ -432,8 +524,8 @@ wrap_post_MapViewOfFile(void *wrapcxt, void *user_data)
     dr_thread_free(drcontext, info, sizeof(client_read_info));
 }
 
-/* Runs when a new module (typically an exe or dll) is loaded. Tells DynamoRIO to hook all the interesting functions
-    in that module. */
+/** Runs when a new module (typically an exe or dll) is loaded. Tells DynamoRIO to hook all the interesting functions
+  *  in that module. */
 static void
 on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 {
@@ -575,7 +667,7 @@ on_module_load(void *drcontext, const module_data_t *mod, bool loaded)
 }
 
 
-/* Runs after process initialization. Initializes DynamoRIO */
+/** Runs after process initialization. Initializes DynamoRIO */
 DR_EXPORT void dr_client_main(client_id_t id, int argc, const char *argv[])
 {
     dr_set_client_name("Sienna-Locomotive Fuzzer",
