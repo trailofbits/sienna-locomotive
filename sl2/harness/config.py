@@ -26,6 +26,9 @@ CONFIG_SCHEMA = {}
 # This could be database schema changes, paths, file glob patterns, etc..
 VERSION = 12
 
+# Recommended Windows Release. Increment this as new DynamoRIO builds come out.
+RECOMMENDED_WIN10_VERSION = 1803
+
 PATH_KEYS = ['drrun_path', 'client_path', 'server_path', 'wizard_path', 'tracer_path', 'triager_path']
 ARGS_KEYS = ['drrun_args', 'client_args', 'server_args', 'target_args']
 INT_KEYS = ['runs', 'simultaneous', 'fuzz_timeout', 'tracer_timeout', 'seed', 'verbose', 'function_number']

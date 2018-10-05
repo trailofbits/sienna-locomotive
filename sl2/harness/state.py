@@ -438,11 +438,40 @@ def sanity_checks(exit=True):
     sane = True
     errors = []
 
+    # Check that we're running an okay Python
+    if (sys.version_info.major == 3 and sys.version_info.minor < 6) or sys.version_info.major == 2:
+        sane = False
+        errors.append("Sienna Locomotive requires at least Python 3.6. You have Python {}.{}.{}."
+                      .format(sys.version_info.major, sys.version_info.minor, sys.version_info.micro))
+
+    # Check that we're running on Windows 10
+    if sys.getwindowsversion().major != 10:
+        sane = False
+        errors.append("Sienna Locomotive only supports Windows 10!")
+
+    # Check that we're on a supported build
+    try:
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion")
+        release_id = int(winreg.QueryValueEx(key, r"ReleaseID")[0])
+        winreg.CloseKey(key)
+
+        if release_id > config.RECOMMENDED_WIN10_VERSION:
+            sane = False
+            errors.append("The provided version of DynamoRIO only supports Windows 10 up through release {}. You have "
+                          "release {}.".format(config.RECOMMENDED_WIN10_VERSION, release_id))
+        elif release_id < config.RECOMMENDED_WIN10_VERSION:
+            print("Sienna Locomotive recommends running on release {} of Windows 10, but you have release {}."
+                  .format(config.RECOMMENDED_WIN10_VERSION, release_id))
+
+    except Exception as e:
+        print("[+] Unexpected exception when checking Windows build version:", e)
+
     bad_keys = [
         'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\DebugObjectRPCEnabled',
         'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AeDebug\\Auto',
     ]
 
+    # Check for incompatible debugging features
     for bad_key in bad_keys:
         try:
             reg = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
@@ -461,6 +490,7 @@ def sanity_checks(exit=True):
         except Exception as e:
             print("[+] Unexpected exception during sanity checks:", e)
 
+    # Check for Windows Error Reporting
     try:
         reg = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
         key = winreg.OpenKey(reg, "SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting", 0,
