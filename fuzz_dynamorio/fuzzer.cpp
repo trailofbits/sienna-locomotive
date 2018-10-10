@@ -161,7 +161,7 @@ on_dr_exit(void)
             NULL);
 
         if (dump_file == INVALID_HANDLE_VALUE) {
-            SL2_DR_DEBUG("fuzzer#on_dr_exit: could not open the initial dump file (0x%x)\n", GetLastError());
+            SL2_DR_DEBUG("fuzzer#on_dr_exit: could not open the initial dump file (GLE=%d)\n", GetLastError());
         }
 
         EXCEPTION_POINTERS exception_pointers = {0};
@@ -178,13 +178,10 @@ on_dr_exit(void)
         // parts of the instrumentation showing up in our initial dump.
         dr_switch_to_app_state(dr_get_current_drcontext());
 
-        MiniDumpWriteDump(
-            GetCurrentProcess(),
-            GetCurrentProcessId(),
-            dump_file,
-            MiniDumpNormal,
-            &mdump_info,
-            NULL, NULL);
+        if (!MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), dump_file,
+                               MiniDumpNormal, &mdump_info, NULL, NULL)) {
+            SL2_DR_DEBUG("fuzzer#on_dr_exit: MiniDumpWriteDump failed (GLE=%d)\n", GetLastError());
+        }
 
         dr_switch_to_dr_state(dr_get_current_drcontext());
 
