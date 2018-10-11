@@ -2,17 +2,7 @@ $ErrorActionPreference = "Stop"
 $cwd=(Get-Item -Path ".\").FullName
 
 Function InstallPython{
-    $url="https://www.python.org/ftp/python/3.7.0/python-3.7.0-amd64-webinstall.exe"
-
-    [Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
-    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]'Tls,Tls11,Tls12'
-    $client = New-Object System.Net.WebClient
-
-    "Downloading Python from " + $url
-    $exe = "$cwd\python_install.exe"
-    $client.DownloadFile($url, $exe)
-
-   & .\python_install.exe
+    Start-Process .\python_install.exe -NoNewWindow -Wait
 
     "Python has finished installing. Please restart Powershell and run install.ps1 again."
 
@@ -34,7 +24,7 @@ catch {
     InstallPython
 }
 
-python -m pip install setuptools
+python -m pip install --no-index --find-links .\pypy setuptools
 if ($lastExitCode -ne 0) {
     "Failed to install setuptools! Try running ``pip install setuptools`` in Powershell"
 
@@ -42,7 +32,7 @@ if ($lastExitCode -ne 0) {
     exit
 }
 
-python -m pip install -r requirements.txt
+python -m pip install --no-index --find-links .\pypy -r requirements.txt
 if ($lastExitCode -ne 0) {
     "Failed to install Python dependencies!"
 

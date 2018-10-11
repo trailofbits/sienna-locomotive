@@ -120,6 +120,7 @@ Function Deploy{
     New-Item sl2-deploy\build\triage -Type Directory
     New-Item sl2-deploy\build\winchecksec -Type Directory
     New-Item sl2-deploy\build\wizard -Type Directory
+    New-Item sl2-deploy\pypy -Type Directory
 
     "Copying Compiled Binaries"
     Copy-Item build\common\Debug sl2-deploy\build\common -Recurse -Force
@@ -147,6 +148,19 @@ Function Deploy{
     Copy-Item setup.py sl2-deploy
     Copy-Item README.md sl2-deploy
     Copy-Item requirements.txt sl2-deploy
+
+    $url="https://www.python.org/ftp/python/3.7.0/python-3.7.0-amd64.exe"
+
+    [Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]'Tls,Tls11,Tls12'
+    $client = New-Object System.Net.WebClient
+
+    "Downloading Python from " + $url
+    $exe = "$cwd\sl2-deploy\python_install.exe"
+    $client.DownloadFile($url, $exe)
+
+    "Downloading Python Dependencies"
+    pip download -d sl2-deploy\pypy -r requirements.txt
 
     "Compressing Deployment Archive"
     if (-not (test-path "$env:ProgramFiles\7-Zip\7z.exe")) {throw "$env:ProgramFiles\7-Zip\7z.exe missing"}

@@ -61,7 +61,8 @@ class TestWizard(unittest.TestCase):
                r'-f']
 
         out = runAndCaptureOutput(cmd)
-        self.assertTrue(r'[60,104,116,109,108,62,10,32]' in out)
+        self.assertTrue(r'[60,104,116,109,108,62,10,32]' in out,
+                        msg="This test will fail if the computer does not have an internet connection.")
 
     ## Tests that the wizard can capture Registry Queries
     def test_registry(self):
