@@ -43,6 +43,7 @@ static SL2Client client;
 static sl2_conn sl2_conn;
 static sl2_exception_ctx fuzz_exception_ctx;
 static bool crashed = false;
+static bool exiting = false;
 static uint32_t mut_count = 0;
 /*! Blank arena that tracks our path for this single run. Gets sent to the server and merged with old arenas*/
 static sl2_arena arena = {0};
@@ -116,7 +117,12 @@ on_bb_instrument(void *drcontext, void *tag, instrlist_t *bb, instr_t *inst, boo
 static bool
 on_exception(void *drcontext, dr_exception_t *excpt)
 {
-    dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#on_exception: Exception occurred!\n");
+    if (exiting) {
+        SL2_DR_DEBUG("fuzzer#on_exception: Exception while exiting! Probably an instrumentation failure.\n");
+        dr_abort();
+        return false;
+    }
+
     crashed = true;
     DWORD exception_code = excpt->record->ExceptionCode;
 
@@ -140,13 +146,13 @@ on_exception(void *drcontext, dr_exception_t *excpt)
 static void
 on_dr_exit(void)
 {
+    exiting = true;
     SL2_DR_DEBUG("Dynamorio exiting (fuzzer)\n");
 
     if (crashed) {
         char run_id_s[SL2_UUID_SIZE];
         sl2_uuid_to_string(sl2_conn.run_id, run_id_s);
         SL2_DR_DEBUG("<crash found for run id %s>\n", run_id_s);
-        dr_log(NULL, DR_LOG_ALL, ERROR, "fuzzer#on_dr_exit: Crash found for run id %s!", run_id_s);
 
         sl2_crash_paths crash_paths = {0};
         sl2_conn_request_crash_paths(&sl2_conn, dr_get_process_id(), &crash_paths);
