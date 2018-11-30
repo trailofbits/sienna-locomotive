@@ -1,8 +1,8 @@
 #ifndef SL2_SERVER_API
 #define SL2_SERVER_API
 
-#include "common/mutation.hpp"
 #include "common/util.h"
+#include "common/mutation.hpp"
 #include "server.hpp"
 #include <Rpc.h>
 
@@ -11,54 +11,55 @@
  * their success or failure.
  */
 enum class SL2Response {
-  /*! Nothing went wrong. */
-  OK,
-  /*! The pipe used to talk to the server is invalid or closed. */
-  BadPipe,
-  /*! We expected a valid path from the server, but were given something too long. */
-  MaxPath,
-  /*! The server is not running, or not accepting connections. */
-  ServerNotRunning,
-  /*! We expected more bytes from the server than we received. */
-  ShortRead,
-  /*! We wrote fewer bytes to the server than we expected. */
-  ShortWrite,
-  /*! We expected fewer bytes from the server than we received. */
-  LongRead,
-  /*! We wrote more bytes to the server that it expected. */
-  LongWrite,
-  /*! We tried to perform an action on the server without a run ID. */
-  MissingRunID,
-  /*! We tried to request a run ID from the server while already having one. */
-  AlreadyHasRunID,
-  /*! We tried to perform an action on the server without an arena ID. */
-  MissingArenaID,
-  /*! We sent a request to the server, and the server failed to fulfill it. */
-  ServerError,
-  /*! We sent a request to the server, and got a bad/nonsensical response back. */
-  BadValue,
+    /*! Nothing went wrong. */
+    OK,
+    /*! The pipe used to talk to the server is invalid or closed. */
+    BadPipe,
+    /*! We expected a valid path from the server, but were given something too long. */
+    MaxPath,
+    /*! The server is not running, or not accepting connections. */
+    ServerNotRunning,
+    /*! We expected more bytes from the server than we received. */
+    ShortRead,
+    /*! We wrote fewer bytes to the server than we expected. */
+    ShortWrite,
+    /*! We expected fewer bytes from the server than we received. */
+    LongRead,
+    /*! We wrote more bytes to the server that it expected. */
+    LongWrite,
+    /*! We tried to perform an action on the server without a run ID. */
+    MissingRunID,
+    /*! We tried to request a run ID from the server while already having one. */
+    AlreadyHasRunID,
+    /*! We tried to perform an action on the server without an arena ID. */
+    MissingArenaID,
+    /*! We sent a request to the server, and the server failed to fulfill it. */
+    ServerError,
+    /*! We sent a request to the server, and got a bad/nonsensical response back. */
+    BadValue,
 };
 
-/**
- * A structure representing an active connection between a
- * DynamoRIO client and the SL2 server.
- */
+ /**
+  * A structure representing an active connection between a
+  * DynamoRIO client and the SL2 server.
+  */
 struct sl2_conn {
-  /*! The named pipe to the server */
-  HANDLE pipe;
-  /*! The run id (if any) that has been assigned to this run*/
-  UUID run_id;
-  /*! Whether we've been given a run ID */
-  bool has_run_id;
+    /*! The named pipe to the server */
+    HANDLE pipe;
+    /*! The run id (if any) that has been assigned to this run*/
+    UUID run_id;
+    /*! Whether we've been given a run ID */
+    bool has_run_id;
 };
+
 
 /**
  * Represents the advice given to a fuzzer by the server, for coverage
  * guided fuzzing.
  */
 struct sl2_mutation_advice {
-  sl2_strategy_t strategy;
-  uint32_t table_idx;
+    sl2_strategy_t strategy;
+    uint32_t table_idx;
 };
 
 /**
@@ -114,8 +115,7 @@ SL2Response sl2_conn_register_mutation(sl2_conn *conn, sl2_mutation *mutation);
  * @return SL2Response code
  */
 SL2_EXPORT
-SL2Response sl2_conn_request_replay(sl2_conn *conn, uint32_t mut_count, size_t bufsize,
-                                    void *buffer);
+SL2Response sl2_conn_request_replay(sl2_conn *conn, uint32_t mut_count, size_t bufsize, void *buffer);
 
 /**
  *  Requests information about a run's crash from the SL2 server.
@@ -137,6 +137,7 @@ SL2Response sl2_conn_request_crash_paths(sl2_conn *conn, uint64_t pid, sl2_crash
 SL2_EXPORT
 SL2Response sl2_conn_request_arena(sl2_conn *conn, sl2_arena *arena);
 
+
 /**
  * Registers a coverage arena with the SL2 server.
  * @param conn sl2_conn struct containing a pipe to the server
@@ -146,6 +147,7 @@ SL2Response sl2_conn_request_arena(sl2_conn *conn, sl2_arena *arena);
 SL2_EXPORT
 SL2Response sl2_conn_register_arena(sl2_conn *conn, sl2_arena *arena);
 
+
 /**
  * Pings the SL2 server.
  * @param conn sl2_conn struct containing a pipe to the server
@@ -154,6 +156,7 @@ SL2Response sl2_conn_register_arena(sl2_conn *conn, sl2_arena *arena);
  */
 SL2_EXPORT
 SL2Response sl2_conn_ping(sl2_conn *conn, uint8_t *ok);
+
 
 /**
  * Registers a pid with the SL2 server.
@@ -166,6 +169,7 @@ SL2Response sl2_conn_ping(sl2_conn *conn, uint8_t *ok);
 SL2_EXPORT
 SL2Response sl2_conn_register_pid(sl2_conn *conn, uint64_t pid, bool tracing);
 
+
 /**
  * Requests advice about mutation strategies from the server, based on previous
  * code coverage statistics.
@@ -177,6 +181,7 @@ SL2Response sl2_conn_register_pid(sl2_conn *conn, uint64_t pid, bool tracing);
 SL2_EXPORT
 SL2Response sl2_conn_advise_mutation(sl2_conn *conn, sl2_arena *arena, sl2_mutation_advice *advice);
 
+
 /**
  * Requests information about code coverage so far
  * @param conn sl2_conn struct containing a pipe to the server
@@ -185,6 +190,6 @@ SL2Response sl2_conn_advise_mutation(sl2_conn *conn, sl2_arena *arena, sl2_mutat
  * @return SL2Response code
  */
 SL2_EXPORT
-SL2Response sl2_conn_get_coverage(sl2_conn *conn, sl2_arena *arena, sl2_coverage_info *cov);
+SL2Response sl2_conn_get_coverage(sl2_conn *conn, sl2_arena *arena, sl2_coverage_info * cov);
 
 #endif
