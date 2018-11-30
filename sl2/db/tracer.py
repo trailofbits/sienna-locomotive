@@ -12,8 +12,25 @@ from sl2 import db
 from .base import Base
 
 
-regs = ["rax", "rbx", "rcx", "rdx", "rsp", "rbp", "rsi", "rdi",
-        "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "rip"]
+regs = [
+    "rax",
+    "rbx",
+    "rcx",
+    "rdx",
+    "rsp",
+    "rbp",
+    "rsi",
+    "rdi",
+    "r8",
+    "r9",
+    "r10",
+    "r11",
+    "r12",
+    "r13",
+    "r14",
+    "r15",
+    "rip",
+]
 
 
 ## Represents a tracer run
@@ -59,7 +76,7 @@ regs = ["rax", "rbx", "rcx", "rdx", "rsp", "rbp", "rsi", "rdi",
 # }
 # </pre>
 class Tracer(Base):
-    __tablename__ = 'tracer'
+    __tablename__ = "tracer"
 
     ## Runid for the tracer run
     runid = Column(String(40), primary_key=True)
@@ -70,7 +87,7 @@ class Tracer(Base):
     ## Foreign key to crash object
     crash = relationship("Crash", back_populates="tracer", uselist=False)
     ## Unique crash id
-    crashId = Column(Integer, ForeignKey('crash.id'))
+    crashId = Column(Integer, ForeignKey("crash.id"))
     ## The exploitability rank based solely on tracer
     rank = Column(Integer)
 
@@ -193,7 +210,7 @@ class Tracer(Base):
             else:
                 print("[!] The tracer didn't return a value for {}".format(reg))
             if flattened_regs[reg][1]:
-                reg_taint += (1 << index)
+                reg_taint += 1 << index
         self.regTaint = reg_taint
 
         self.pc_tainted = rawJson["pc_tainted"]

@@ -71,10 +71,7 @@ class SqlalchemyModel(QSqlTableModel):
     def update(self):
         self.layoutAboutToBeChanged.emit()
 
-        self.rows = self.session.query(self.table_colmn). \
-            filter_by(**self.filters). \
-            order_by(self.orderBy). \
-            all()
+        self.rows = self.session.query(self.table_colmn).filter_by(**self.filters).order_by(self.orderBy).all()
         self.layoutChanged.emit()
 
     ## Return number of rows

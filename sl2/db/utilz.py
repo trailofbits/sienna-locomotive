@@ -28,7 +28,7 @@ def runidToDumpPath(runid):
     dumpPath = None
     cfg = config
 
-    dumpsGlob = os.path.join(cfg.sl2_runs_dir, runid, 'initial.*.dmp')
+    dumpsGlob = os.path.join(cfg.sl2_runs_dir, runid, "initial.*.dmp")
     for dumpPath in glob.glob(dumpsGlob):
         return dumpPath
 
@@ -41,9 +41,9 @@ def runidToDumpPath(runid):
 @lru_cache()
 def hash_file(filename: str):
     m = sha256()
-    with open(filename, 'rb') as f:
+    with open(filename, "rb") as f:
         while True:
-            data = f.read(1024*512)
+            data = f.read(1024 * 512)
             if not data:
                 break
             m.update(data)

@@ -10,7 +10,7 @@ from .base import Base
 ## class PathRecord
 #  Records unique execution paths through a given target
 class PathRecord(Base):
-    __tablename__ = 'paths'
+    __tablename__ = "paths"
 
     ## Stores the hash of the coverage table that we use to identify paths
     hash = Column(String(64), primary_key=True)
@@ -68,10 +68,17 @@ class PathRecord(Base):
 
         session.close()
         # TODO - is it fair to calculate assuming at least one doubleton here?
-        c = num_paths / (num_paths + ((num_runs - 1) / num_runs) * ((num_singletons ** 2) / (2 * max(num_doubletons, 1))))
-        print("Total Paths:", num_paths,
-              # "Singletons:", num_singletons,
-              # "Doubletons:", num_doubletons,
-              "Total Runs:", num_runs,
-              "Estimated Path Fraction:", c)
+        c = num_paths / (
+            num_paths + ((num_runs - 1) / num_runs) * ((num_singletons ** 2) / (2 * max(num_doubletons, 1)))
+        )
+        print(
+            "Total Paths:",
+            num_paths,
+            # "Singletons:", num_singletons,
+            # "Doubletons:", num_doubletons,
+            "Total Runs:",
+            num_runs,
+            "Estimated Path Fraction:",
+            c,
+        )
         return num_paths, c

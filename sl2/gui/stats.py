@@ -55,11 +55,11 @@ class StatsWidget(QtWidgets.QWidget):
             self.dupesCount,
             self.ranksMean,
             self.ranksMedian,
-            self.exploitabilityCnts['High'],
-            self.exploitabilityCnts['Medium'],
-            self.exploitabilityCnts['Low'],
-            self.exploitabilityCnts['Unknown'],
-            self.exploitabilityCnts['None']
+            self.exploitabilityCnts["High"],
+            self.exploitabilityCnts["Medium"],
+            self.exploitabilityCnts["Low"],
+            self.exploitabilityCnts["Unknown"],
+            self.exploitabilityCnts["None"],
         )
 
     ## Requeries the database and updates the table
@@ -71,13 +71,7 @@ class StatsWidget(QtWidgets.QWidget):
         # Set default values
         self.crashes = basequery.all()
         self.crashesCnt = len(self.crashes)
-        self.exploitabilityCnts = {
-            'High': 0,
-            'Medium': 0,
-            'Low': 0,
-            'Unknown': 0,
-            'None': 0
-        }
+        self.exploitabilityCnts = {"High": 0, "Medium": 0, "Low": 0, "Unknown": 0, "None": 0}
 
         self.uniquesCnt = 0
         self.dupesCount = 0
@@ -91,11 +85,11 @@ class StatsWidget(QtWidgets.QWidget):
             self.ranks = [_.rank for _ in self.crashes]
             self.ranksMean = statistics.mean(self.ranks)
             self.ranksMedian = statistics.median(self.ranks)
-            self.exploitabilityCnts['High'] = basequery.filter(Crash.rank == 4).count()
-            self.exploitabilityCnts['Medium'] = basequery.filter(Crash.rank == 3).count()
-            self.exploitabilityCnts['Low'] = basequery.filter(Crash.rank == 2).count()
-            self.exploitabilityCnts['Unknown'] = basequery.filter(Crash.rank == 1).count()
-            self.exploitabilityCnts['None'] = basequery.filter(Crash.rank == 0).count()
+            self.exploitabilityCnts["High"] = basequery.filter(Crash.rank == 4).count()
+            self.exploitabilityCnts["Medium"] = basequery.filter(Crash.rank == 3).count()
+            self.exploitabilityCnts["Low"] = basequery.filter(Crash.rank == 2).count()
+            self.exploitabilityCnts["Unknown"] = basequery.filter(Crash.rank == 1).count()
+            self.exploitabilityCnts["None"] = basequery.filter(Crash.rank == 0).count()
 
         html = self.toHTML()
         self.web.setText(html)

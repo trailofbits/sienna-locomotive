@@ -153,7 +153,7 @@ class Crash(Base):
             self.runid = runid
             ## Json object
             self.output = j["output"]
-            del(j["output"])
+            del (j["output"])
             self.obj = j
 
             self.stackPointer = self.obj["stackPointer"]
@@ -187,10 +187,39 @@ class Crash(Base):
             ## A colon separated list of each engines exploitability.  For example 1:2:2
             self.ranksString = self.ranksStringGenerate()
             ## Summary of triage information
-            regs = ["cs", "dr0", "dr1", "dr2", "dr3", "dr6", "dr7", "ds", "eflags", "es",
-                    "fs", "gs", "mx_csr", "r10", "r11", "r12", "r13", "r14", "r15", "r8",
-                    "r9", "rax", "rbp", "rbx", "rcx", "rdi", "rdx", "rip", "rsi", "rsp",
-                    "ss"]
+            regs = [
+                "cs",
+                "dr0",
+                "dr1",
+                "dr2",
+                "dr3",
+                "dr6",
+                "dr7",
+                "ds",
+                "eflags",
+                "es",
+                "fs",
+                "gs",
+                "mx_csr",
+                "r10",
+                "r11",
+                "r12",
+                "r13",
+                "r14",
+                "r15",
+                "r8",
+                "r9",
+                "rax",
+                "rbp",
+                "rbx",
+                "rcx",
+                "rdi",
+                "rdx",
+                "rip",
+                "rsi",
+                "rsp",
+                "ss",
+            ]
             for reg in regs:
                 setattr(self, reg, hex(j[reg]))
 
@@ -199,7 +228,7 @@ class Crash(Base):
 
     @property
     def int_exploitability(self):
-        return {'High': 10, 'Medium': 20, 'Low': 30, 'Unknown': 40}[self.exploitability]
+        return {"High": 10, "Medium": 20, "Low": 30, "Unknown": 40}[self.exploitability]
 
     @property
     def occurrences(self):
@@ -211,7 +240,7 @@ class Crash(Base):
     # @return string
     @staticmethod
     def rankToExploitability(rank):
-        xploitabilities = ['None', 'Unknown', 'Low', 'Medium', 'High ']
+        xploitabilities = ["None", "Unknown", "Low", "Medium", "High "]
         return xploitabilities[rank]
 
     ## Merges results from tracer db row
@@ -230,7 +259,7 @@ class Crash(Base):
         self.crashAddress = self.obj["crashAddress"]
         self.instructionPointer = self.obj["instructionPointer"]
 
-        if hasattr(self, 'ranks'):
+        if hasattr(self, "ranks"):
             if self.tracer:
                 self.ranks.append(self.tracer.rank)
 
@@ -268,7 +297,7 @@ class Crash(Base):
         # Runs triager, which will give us exploitability info
         # using 2 engines: Google's breakpad and an reimplementation of Microsofts
         # !exploitable
-        cmd = [cfg.config['triager_path'], dmpPath]
+        cmd = [cfg.config["triager_path"], dmpPath]
         out = subprocess.check_output(cmd, shell=False)
         # TODO: sorry didn't have time to clean this up before leave
         dirname = os.path.dirname(dmpPath)
@@ -276,13 +305,13 @@ class Crash(Base):
         with open(path, "wb", newline=None) as f:
             f.write(out)
 
-        out = out.decode('utf8')
+        out = out.decode("utf8")
         j = None
         for line in out.splitlines():
             line = line.strip()
             if re.match(r"{.*}", line):
                 j = json.loads(line)
-                j['output'] = out
+                j["output"] = out
 
         if not j:
             return None
@@ -308,13 +337,19 @@ class Crash(Base):
         tracerInfo = "None"
         if self.tracer:
             tracerInfo = self.tracer.formatted
-        return """Exploitability: %s (%s)   Crash Reason: %s   Crash Address: %X    Instruction: %X   Crashash: %s    Tag: %s    Tracer: %s""" % (
-            self.exploitability,
-            self.ranksString,
-            self.crashReason,
-            self.crashAddress,
-            self.instructionPointer,
-            self.crashash,
-            self.tag,
-            tracerInfo)
+        return (
+            """Exploitability: %s (%s)   Crash Reason: %s   Crash Address: %X    Instruction: %X   Crashash: %s    Tag: %s    Tracer: %s"""
+            % (
+                self.exploitability,
+                self.ranksString,
+                self.crashReason,
+                self.crashAddress,
+                self.instructionPointer,
+                self.crashash,
+                self.tag,
+                tracerInfo,
+            )
+        )
+
+
 #

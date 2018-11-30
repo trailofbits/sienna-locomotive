@@ -44,6 +44,7 @@ class QFloatVariable(QObject):
 class QTextAdapter(QObject):
     """ Text adapter - pass a format string and a set of variables and bind .update to each of the variables
         valueChanged signals """
+
     ## Signal that fires when the value is updated - contains the new value
     updated = Signal(str)
 

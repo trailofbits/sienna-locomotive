@@ -11,8 +11,8 @@ import unittest
 ## Set to true for stdout/stderr
 DEBUG = False
 
-TEST_APPLICATION = 'build/corpus/test_application/Debug/test_application.exe'
-TRIAGER = r'build\triage\Debug\triager.exe'
+TEST_APPLICATION = "build/corpus/test_application/Debug/test_application.exe"
+TRIAGER = r"build\triage\Debug\triager.exe"
 
 
 ## Wrapper for subprocess.run() which is 8bit clean
@@ -21,11 +21,18 @@ def runAndCaptureOutput(cmd):
         cmd = " ".join(cmd)
 
     if DEBUG:
-        print('\n[%s]' % cmd)
+        print("\n[%s]" % cmd)
     # Modify the next line at your own risk. There are subtle char encoding issues than can arise.
     # We did pass `text=True` early but this is only supported in >= Python 3.7
-    out = subprocess.run(cmd, universal_newlines=True, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                         shell=False, encoding='iso8859')
+    out = subprocess.run(
+        cmd,
+        universal_newlines=True,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=False,
+        encoding="iso8859",
+    )
     out = out.stdout + out.stderr
 
     if DEBUG:
@@ -38,13 +45,15 @@ class TestWizard(unittest.TestCase):
 
     ## Tests that the wizard can succesfully capture the buffer from ReadFile
     def test_0(self):
-        cmd = [r'dynamorio\bin64\drrun.exe',
-               r'-c',
-               r'build/wizard/Debug/wizard.dll',
-               r'--',
-               TEST_APPLICATION,
-               r'0',
-               r'-f']
+        cmd = [
+            r"dynamorio\bin64\drrun.exe",
+            r"-c",
+            r"build/wizard/Debug/wizard.dll",
+            r"--",
+            TEST_APPLICATION,
+            r"0",
+            r"-f",
+        ]
 
         out = runAndCaptureOutput(cmd)
         self.assertTrue(r'buffer":[65,65,65,65,65,65,65,65]' in out)
@@ -52,53 +61,57 @@ class TestWizard(unittest.TestCase):
     ## Tests wizard buffer capture from WinHTTPReadData
     def test_2(self):
 
-        cmd = [r'dynamorio\bin64\drrun.exe',
-               r'-c',
-               r'build/wizard/Debug/wizard.dll',
-               r'--',
-               TEST_APPLICATION,
-               r'2',
-               r'-f']
+        cmd = [
+            r"dynamorio\bin64\drrun.exe",
+            r"-c",
+            r"build/wizard/Debug/wizard.dll",
+            r"--",
+            TEST_APPLICATION,
+            r"2",
+            r"-f",
+        ]
 
         out = runAndCaptureOutput(cmd)
-        self.assertTrue(r'[60,104,116,109,108,62,10,32]' in out,
-                        msg="This test will fail if the computer does not have an internet connection.")
+        self.assertTrue(
+            r"[60,104,116,109,108,62,10,32]" in out,
+            msg="This test will fail if the computer does not have an internet connection.",
+        )
 
     ## Tests that the wizard can capture Registry Queries
     def test_registry(self):
-        cmd = r'sl2-cli -fn 0 -r3 -l -v -e WIZARD -t ' + TEST_APPLICATION + ' -a 4 -f'
+        cmd = r"sl2-cli -fn 0 -r3 -l -v -e WIZARD -t " + TEST_APPLICATION + " -a 4 -f"
         out = runAndCaptureOutput(cmd)
-        self.assertFalse('0) RegQueryValueEx' in out)
-        self.assertTrue('CRASH PTR' in out)
+        self.assertFalse("0) RegQueryValueEx" in out)
+        self.assertTrue("CRASH PTR" in out)
 
     ## Tests whether we can capture stdout from the wizard/fuzzer
     def test_captureStdout(self):
-        targetString = 'XXXWWWXXX'
+        targetString = "XXXWWWXXX"
         # First version have -l, inlining stdout for us to capture.   String "XXXWWWXXX" should appear
-        cmd = r'sl2-cli -fn 0 -r3 -l -v -t ' + TEST_APPLICATION + ' -a 9 -f'
+        cmd = r"sl2-cli -fn 0 -r3 -l -v -t " + TEST_APPLICATION + " -a 9 -f"
         out = runAndCaptureOutput(cmd)
         self.assertTrue(targetString in out)
         # This version does not have have -l, so we aren't capturing stdout and String "XXXWWWXXX" should NOT appear
-        cmd = r'sl2-cli -fn 0 -r3 -v -t ' + TEST_APPLICATION + ' -a 9 -f'
+        cmd = r"sl2-cli -fn 0 -r3 -v -t " + TEST_APPLICATION + " -a 9 -f"
         out = runAndCaptureOutput(cmd)
         self.assertFalse(targetString in out)
 
     ## Test single-stage harness running
     def test_TheWiz(self):
-        cmd = r'sl2-cli -v -fn 0'
+        cmd = r"sl2-cli -v -fn 0"
         out = runAndCaptureOutput(cmd)
-        self.assertTrue('Process completed after' in out)
+        self.assertTrue("Process completed after" in out)
 
     ## est case #10, that an application actually crashes and that we catch the appropriate informationT
     def test_quickCrash(self):
-        cmd = r'sl2-cli -fn 0 -c -x -l -v -t ' + TEST_APPLICATION + ' -a 10 -f'
+        cmd = r"sl2-cli -fn 0 -c -x -l -v -t " + TEST_APPLICATION + " -a 10 -f"
         out = runAndCaptureOutput(cmd)
-        self.assertTrue('Process completed after' in out)
+        self.assertTrue("Process completed after" in out)
         # self.assertRegex(  out, r'Triage .*: breakpoint .*caused EXCEPTION_BREAKPOINT'  )
-        self.assertTrue('Crashash' in out)
-        self.assertTrue(' None/EXCEPTION_BREAKPOINT' in out)
+        self.assertTrue("Crashash" in out)
+        self.assertTrue(" None/EXCEPTION_BREAKPOINT" in out)
 
-        workingdir = os.path.join(os.environ['APPDATA'], "Trail of Bits", "fuzzkit", "runs")
+        workingdir = os.path.join(os.environ["APPDATA"], "Trail of Bits", "fuzzkit", "runs")
         pattern = "%s/*/*.dmp" % workingdir
         paths = glob.glob(pattern)
         self.assertTrue(len(paths) > 0)
@@ -110,16 +123,16 @@ class TestWizard(unittest.TestCase):
     ## Test the triaging is working with crashash, exploitability, etc...
     def test_triage(self):
         for _ in range(3):
-            cmd = r'sl2-cli -fn 0 -c -x -l -v -t ' + TEST_APPLICATION + ' -a 10 -f'
+            cmd = r"sl2-cli -fn 0 -c -x -l -v -t " + TEST_APPLICATION + " -a 10 -f"
             out = runAndCaptureOutput(cmd)
 
-        workingdir = os.path.join(os.environ['APPDATA'], "Trail of Bits", "fuzzkit", "runs")
+        workingdir = os.path.join(os.environ["APPDATA"], "Trail of Bits", "fuzzkit", "runs")
         pattern = "%s/*/initial.dmp" % workingdir
         for path in glob.glob(pattern):
             # paths = " ".join(paths)
             cmd = '%s "%s"' % (TRIAGER, path)
             out = runAndCaptureOutput(cmd)
-            for _ in ['Crashash', 'Exploitability', 'Ranks', 'Crash Reason']:
+            for _ in ["Crashash", "Exploitability", "Ranks", "Crash Reason"]:
                 self.assertTrue(_ in out)
 
     # def test_fuzzgoat(self):
@@ -141,7 +154,7 @@ def main():
     support.run_unittest(clazz)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print("Make sure to  ./make reconfig  first.")
     print("You can also pass a specific test class to run on the command line like `sl2-test test_triage`")
     main()
