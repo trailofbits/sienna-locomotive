@@ -37,7 +37,7 @@ def getSession():
 # ABI version and will throw and error to protect the user
 def checkVersionNumber():
     versionNow = config.VERSION
-    confVersion = Conf.factory('version')
+    confVersion = Conf.factory("version")
     if not confVersion:
         Conf.factory("version", versionNow)
         return
@@ -48,7 +48,11 @@ This means your configuration and data in the SL2 directory are older than the c
 Options include:
   * Run  ./make reconfig
   * Remove the SL2 directory in %s
-        """ % (confVersion.value, versionNow, config.sl2_dir)
+        """ % (
+            confVersion.value,
+            versionNow,
+            config.sl2_dir,
+        )
         print("!" * 77)
         print(msg)
         print("!" * 77)
@@ -57,10 +61,10 @@ Options include:
 
 
 ## File path to db
-dbpath = '%s/%s' % (config.sl2_dir, 'sl2.db')
+dbpath = "%s/%s" % (config.sl2_dir, "sl2.db")
 
 ## URL to db for sqlalchemy
-dburl = os.path.join('sqlite:///%s' % dbpath)
+dburl = os.path.join("sqlite:///%s" % dbpath)
 
 ## sqlalchemy database engine
 engine = create_engine(dburl, poolclass=NullPool)

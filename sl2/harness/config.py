@@ -29,52 +29,40 @@ VERSION = 12
 # Recommended Windows Release. Increment this as new DynamoRIO builds come out.
 RECOMMENDED_WIN10_VERSION = 1803
 
-PATH_KEYS = ['drrun_path', 'client_path', 'server_path', 'wizard_path', 'tracer_path', 'triager_path']
-ARGS_KEYS = ['drrun_args', 'client_args', 'server_args', 'target_args']
-INT_KEYS = ['runs', 'simultaneous', 'fuzz_timeout', 'tracer_timeout', 'seed', 'verbose', 'function_number']
-FLAG_KEYS = ['debug', 'nopersist', 'continuous', 'exit_early', 'inline_stdout', 'preserve_runs']
+PATH_KEYS = ["drrun_path", "client_path", "server_path", "wizard_path", "tracer_path", "triager_path"]
+ARGS_KEYS = ["drrun_args", "client_args", "server_args", "target_args"]
+INT_KEYS = ["runs", "simultaneous", "fuzz_timeout", "tracer_timeout", "seed", "verbose", "function_number"]
+FLAG_KEYS = ["debug", "nopersist", "continuous", "exit_early", "inline_stdout", "preserve_runs"]
 
-profile = 'DEFAULT'
+profile = "DEFAULT"
 
 for path in PATH_KEYS:
-    CONFIG_SCHEMA[path] = {
-        'test': os.path.isfile,
-        'expected': 'path to an existing file',
-        'required': True,
-    }
+    CONFIG_SCHEMA[path] = {"test": os.path.isfile, "expected": "path to an existing file", "required": True}
 
 for args in ARGS_KEYS:
     CONFIG_SCHEMA[args] = {
-        'test': lambda xs: type(xs) is list and all(type(x) is str for x in xs),
-        'expected': 'command-line arguments (array of strings)',
-        'required': True,
+        "test": lambda xs: type(xs) is list and all(type(x) is str for x in xs),
+        "expected": "command-line arguments (array of strings)",
+        "required": True,
     }
 
 for num in INT_KEYS:
-    CONFIG_SCHEMA[num] = {
-        'test': lambda x: type(x) is int,
-        'expected': 'integer value',
-        'required': False,
-    }
+    CONFIG_SCHEMA[num] = {"test": lambda x: type(x) is int, "expected": "integer value", "required": False}
 
 for flag in FLAG_KEYS:
-    CONFIG_SCHEMA[flag] = {
-        'test': lambda x: type(x) is bool,
-        'expected': 'boolean',
-        'required': False,
-    }
+    CONFIG_SCHEMA[flag] = {"test": lambda x: type(x) is bool, "expected": "boolean", "required": False}
 
 # NOTE(ww): Keep these up-to-data with include/server.hpp!
 sl2_server_pipe_path = "\\\\.\\pipe\\fuzz_server"
 ## Path to SL2 data and configuration
-sl2_dir = os.path.join(os.getenv('APPDATA', default="."), 'Trail of Bits', 'fuzzkit')
+sl2_dir = os.path.join(os.getenv("APPDATA", default="."), "Trail of Bits", "fuzzkit")
 ## Path to runs directory
-sl2_runs_dir = os.path.join(sl2_dir, 'runs')
-sl2_arenas_dir = os.path.join(sl2_dir, 'arenas')
+sl2_runs_dir = os.path.join(sl2_dir, "runs")
+sl2_arenas_dir = os.path.join(sl2_dir, "arenas")
 ## Path to log files
-sl2_log_dir = os.path.join(sl2_dir, 'log')
-sl2_targets_dir = os.path.join(sl2_dir, 'targets')
-sl2_config_path = os.path.join(sl2_dir, 'config.ini')
+sl2_log_dir = os.path.join(sl2_dir, "log")
+sl2_targets_dir = os.path.join(sl2_dir, "targets")
+sl2_config_path = os.path.join(sl2_dir, "config.ini")
 
 # This is a pointer to the current db session for convience
 
@@ -87,25 +75,25 @@ os.makedirs(sl2_targets_dir, exist_ok=True)
 if not os.path.exists(sl2_config_path):
     default_config = configparser.ConfigParser()
     default_config[profile] = {
-        'drrun_path': 'dynamorio\\bin64\\drrun.exe',
-        'drrun_args': '',
-        'client_path': 'build\\fuzz_dynamorio\\Debug\\fuzzer.dll',
-        'client_args': '',
-        'server_path': 'build\\server\\Debug\\server.exe',
-        'server_args': '-s 2 -b',
-        'wizard_path': 'build\\wizard\\Debug\\wizard.dll',
-        'tracer_path': 'build\\tracer_dynamorio\\Debug\\tracer.dll',
-        'triager_path': 'build\\triage\\Debug\\triager.exe',
-        'checksec_path': r'build\winchecksec\Debug\winchecksec.exe',
-        'target_application_path': 'build\\corpus\\test_application\\Debug\\test_application.exe',
-        'target_args': '0 -f',
-        'runs': 1,
-        'simultaneous': 1,
-        'function_number': -1,
-        'inline_stdout': False,
-        'preserve_runs': False,
+        "drrun_path": "dynamorio\\bin64\\drrun.exe",
+        "drrun_args": "",
+        "client_path": "build\\fuzz_dynamorio\\Debug\\fuzzer.dll",
+        "client_args": "",
+        "server_path": "build\\server\\Debug\\server.exe",
+        "server_args": "-s 2 -b",
+        "wizard_path": "build\\wizard\\Debug\\wizard.dll",
+        "tracer_path": "build\\tracer_dynamorio\\Debug\\tracer.dll",
+        "triager_path": "build\\triage\\Debug\\triager.exe",
+        "checksec_path": r"build\winchecksec\Debug\winchecksec.exe",
+        "target_application_path": "build\\corpus\\test_application\\Debug\\test_application.exe",
+        "target_args": "0 -f",
+        "runs": 1,
+        "simultaneous": 1,
+        "function_number": -1,
+        "inline_stdout": False,
+        "preserve_runs": False,
     }
-    with open(sl2_config_path, 'w') as configfile:
+    with open(sl2_config_path, "w") as configfile:
         default_config.write(configfile)
 
 # Read the config file
@@ -118,143 +106,160 @@ except configparser.Error as e:
 
 # Set up argument parser
 parser = argparse.ArgumentParser(
-    description='Run the DynamoRIO fuzzing harness. \
+    description="Run the DynamoRIO fuzzing harness. \
     You can pass arguments to the command line to override \
-    the defaults in config.ini')
+    the defaults in config.ini"
+)
 
 parser.add_argument(
-    '-v', '--verbose',
-    action='count',
-    default=0,
-    dest='verbose',
-    help="Tell drrun to run in verbose mode")
+    "-v", "--verbose", action="count", default=0, dest="verbose", help="Tell drrun to run in verbose mode"
+)
 
 parser.add_argument(
-    '-d', '--debug',
-    action='store_true',
-    dest='debug',
+    "-d", "--debug", action="store_true", dest="debug", default=False, help="Tell drrun to run in debug mode"
+)
+
+parser.add_argument(
+    "-n",
+    "--nopersist",
+    action="store_true",
+    dest="nopersist",
     default=False,
-    help="Tell drrun to run in debug mode")
+    help="Tell drrun not to use persistent code caches (slower)",
+)
 
 parser.add_argument(
-    '-n', '--nopersist',
-    action='store_true',
-    dest='nopersist',
-    default=False,
-    help="Tell drrun not to use persistent code caches (slower)")
-
-parser.add_argument(
-    '-p', '--profile',
-    action='store',
-    dest='profile',
+    "-p",
+    "--profile",
+    action="store",
+    dest="profile",
     default=profile,
     type=str,
-    help="Load the given profile (from config.ini). Defaults to DEFAULT")
+    help="Load the given profile (from config.ini). Defaults to DEFAULT",
+)
 
 parser.add_argument(
-    '-c', '--continuous',
-    action='store_true',
-    dest='continuous',
+    "-c",
+    "--continuous",
+    action="store_true",
+    dest="continuous",
     default=False,
-    help="Continuously fuzz the target application")
+    help="Continuously fuzz the target application",
+)
 
 parser.add_argument(
-    '-x', '--exit',
-    action='store_true',
-    dest='exit_early',
+    "-x",
+    "--exit",
+    action="store_true",
+    dest="exit_early",
     default=False,
-    help="Exit the application once it finds and triages a single crash")
+    help="Exit the application once it finds and triages a single crash",
+)
 
 parser.add_argument(
-    '-f', '--fuzztimeout',
-    action='store',
-    dest='fuzz_timeout',
+    "-f",
+    "--fuzztimeout",
+    action="store",
+    dest="fuzz_timeout",
     type=int,
     help="Timeout (seconds) after which fuzzing runs should be killed. \
-    By default, runs are not killed.")
+    By default, runs are not killed.",
+)
 
 parser.add_argument(
-    '-fn', '--functionnumber',
-    action='store',
-    dest='function_number',
+    "-fn",
+    "--functionnumber",
+    action="store",
+    dest="function_number",
     default=-1,
     type=int,
-    help="Function call number to run")
+    help="Function call number to run",
+)
 
 parser.add_argument(
-    '-g', '--registry',
-    action='store_true',
-    dest='registry',
-    help="Enable tracking registry calls like RegQuery()")
+    "-g", "--registry", action="store_true", dest="registry", help="Enable tracking registry calls like RegQuery()"
+)
 
 parser.add_argument(
-    '-i', '--triagetimeout',
-    action='store',
-    dest='tracer_timeout',
+    "-i",
+    "--triagetimeout",
+    action="store",
+    dest="tracer_timeout",
     type=int,
     help="Timeout (seconds) after which triage runs should be killed. \
-    By default, runs are not killed.")
+    By default, runs are not killed.",
+)
 
 parser.add_argument(
-    '-r', '--runs',
-    action='store',
-    dest='runs',
+    "-r", "--runs", action="store", dest="runs", type=int, help="Number of times to run the target application"
+)
+
+parser.add_argument(
+    "-s",
+    "--simultaneous",
+    action="store",
+    dest="simultaneous",
     type=int,
-    help="Number of times to run the target application")
+    help="Number of simultaneous instances of the target application to run",
+)
 
 parser.add_argument(
-    '-s', '--simultaneous',
-    action='store',
-    dest='simultaneous',
-    type=int,
-    help="Number of simultaneous instances of the target application to run")
-
-parser.add_argument(
-    '-t', '--target',
-    action='store',
-    dest='target_application_path',
+    "-t",
+    "--target",
+    action="store",
+    dest="target_application_path",
     type=str,
     help="Path to the target application. \
-    Note: Ignores arguments in the config file")
+    Note: Ignores arguments in the config file",
+)
 
 parser.add_argument(
-    '-e', '--stage',
-    action='store',
-    dest='stage',
+    "-e",
+    "--stage",
+    action="store",
+    dest="stage",
     type=str,
-    choices=['WIZARD', 'FUZZER', 'TRACER'],
-    help="Synchronously re-run a single stage (for debugging purposes)")
+    choices=["WIZARD", "FUZZER", "TRACER"],
+    help="Synchronously re-run a single stage (for debugging purposes)",
+)
 
 parser.add_argument(
-    '-a', '--arguments',
-    action='store',
-    dest='target_args',
+    "-a",
+    "--arguments",
+    action="store",
+    dest="target_args",
     nargs=argparse.REMAINDER,
     type=str,
     help="Arguments for the target application. \
-    Multiple arguments are supported, but must come last.")
+    Multiple arguments are supported, but must come last.",
+)
 
 parser.add_argument(
-    '-l', '--inline_stdout',
-    action='store_true',
-    dest='inline_stdout',
+    "-l",
+    "--inline_stdout",
+    action="store_true",
+    dest="inline_stdout",
     default=False,
-    help="Inline stdout of program under test to console stdout")
+    help="Inline stdout of program under test to console stdout",
+)
 
 parser.add_argument(
-    '-P', '--preserve_runs',
-    action='store_true',
-    dest='preserve_runs',
+    "-P",
+    "--preserve_runs",
+    action="store_true",
+    dest="preserve_runs",
     default=False,
-    help="Preserve all fuzzer runs, even when they don't cause crashes")
+    help="Preserve all fuzzer runs, even when they don't cause crashes",
+)
 
 parser.add_argument(
-    '--run_id',
-    action='store',
-    dest='run_id',
+    "--run_id",
+    action="store",
+    dest="run_id",
     type=str,
     help="Set the Run ID for a given run to a specific value instead \
-    of using an auto-generated value. Useful for replaying triage runs.")
+    of using an auto-generated value. Useful for replaying triage runs.",
+)
 
 args = parser.parse_args()
 
@@ -288,25 +293,25 @@ def set_profile(new_profile):
 def create_new_profile(name, dynamorio_exe, build_dir, target_path, target_args):
     global _config
     _config[name] = {
-        'drrun_path': dynamorio_exe,
-        'drrun_args': '',
-        'client_path': os.path.join(build_dir, 'fuzz_dynamorio\\Debug\\fuzzer.dll'),
-        'client_args': '',
-        'server_path': os.path.join(build_dir, 'server\\Debug\\server.exe'),
-        'server_args': '-s 2 -b',
-        'wizard_path': os.path.join(build_dir, 'wizard\\Debug\\wizard.dll'),
-        'tracer_path': os.path.join(build_dir, 'tracer_dynamorio\\Debug\\tracer.dll'),
-        'triager_path': os.path.join(build_dir, 'triage\\Debug\\triager.exe'),
-        'checksec_path': os.path.join(build_dir, r'winchecksec\Debug\winchecksec.exe'),
-        'target_application_path': target_path,
-        'target_args': target_args,
-        'runs': 1,
-        'simultaneous': 1,
-        'function_number': -1,
-        'inline_stdout': False,
+        "drrun_path": dynamorio_exe,
+        "drrun_args": "",
+        "client_path": os.path.join(build_dir, "fuzz_dynamorio\\Debug\\fuzzer.dll"),
+        "client_args": "",
+        "server_path": os.path.join(build_dir, "server\\Debug\\server.exe"),
+        "server_args": "-s 2 -b",
+        "wizard_path": os.path.join(build_dir, "wizard\\Debug\\wizard.dll"),
+        "tracer_path": os.path.join(build_dir, "tracer_dynamorio\\Debug\\tracer.dll"),
+        "triager_path": os.path.join(build_dir, "triage\\Debug\\triager.exe"),
+        "checksec_path": os.path.join(build_dir, r"winchecksec\Debug\winchecksec.exe"),
+        "target_application_path": target_path,
+        "target_args": target_args,
+        "runs": 1,
+        "simultaneous": 1,
+        "function_number": -1,
+        "inline_stdout": False,
     }
 
-    with open(sl2_config_path, 'w') as config_file:
+    with open(sl2_config_path, "w") as config_file:
         _config.write(config_file)
 
 
@@ -326,21 +331,21 @@ def update_config_from_args():
     for opt in ARGS_KEYS:
         config[opt] = [] if (len(config[opt]) == 0) else winshlex.split(config[opt])
 
-    if args.target_application_path is not None and len(config['target_args']) > 0:
-        config['target_args'] = []
+    if args.target_application_path is not None and len(config["target_args"]) > 0:
+        config["target_args"] = []
 
     if args.verbose:
-        config['drrun_args'].append('-verbose')
+        config["drrun_args"].append("-verbose")
 
     if args.debug:
         print("WARNING: debug mode may destabilize the binary instrumentation!")
-        config['drrun_args'].append('-debug')
+        config["drrun_args"].append("-debug")
 
     if not args.nopersist:
-        config['drrun_args'].append('-persist')
+        config["drrun_args"].append("-persist")
 
     if args.registry:
-        config['client_args'].append('-registry')
+        config["client_args"].append("-registry")
 
     # Replace any values in the config dict with the optional value from the argument.
     # Note that if you set a default value for an arg, this will overwrite its value in the config
@@ -352,7 +357,7 @@ def update_config_from_args():
 
     for key in PATH_KEYS:
         root, extension = os.path.splitdrive(config[key])
-        if len(root) > 0 and ':' not in root:  # UNC Path
+        if len(root) > 0 and ":" not in root:  # UNC Path
             print("WARNING: Replacing UNC Path", config[key], "with", extension)
             config[key] = extension
 
@@ -366,19 +371,19 @@ def validate_config():
     """
     for key in CONFIG_SCHEMA:
         # If the key is required but not present, fail loudly.
-        if CONFIG_SCHEMA[key]['required'] and key not in config:
+        if CONFIG_SCHEMA[key]["required"] and key not in config:
             print("ERROR: Missing required key:", key)
             sys.exit()
         # If they key is present but doesn't validate, fail loudly.
         if key in config:
-            if not CONFIG_SCHEMA[key]['test'](config[key]):
-                print("ERROR: Failed to validate %s: expected %s" % (key, CONFIG_SCHEMA[key]['expected']))
+            if not CONFIG_SCHEMA[key]["test"](config[key]):
+                print("ERROR: Failed to validate %s: expected %s" % (key, CONFIG_SCHEMA[key]["expected"]))
                 sys.exit()
 
 
 set_profile(args.profile)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from pprint import pprint
 
     pprint(config)

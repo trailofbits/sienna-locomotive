@@ -33,10 +33,9 @@ def plot_run_rate(target_slug):
     stddev = statistics.stdev(rates)
     mean = statistics.mean(rates)
 
-    no_outliers = list(filter(lambda x: abs(x[0] - mean) < 4*stddev, zip(rates, target_runs)))
+    no_outliers = list(filter(lambda x: abs(x[0] - mean) < 4 * stddev, zip(rates, target_runs)))
 
-
-    plt.plot(get_fuzzing_time(k[1] for k in no_outliers), [k[0] for k in no_outliers], marker='o')
+    plt.plot(get_fuzzing_time(k[1] for k in no_outliers), [k[0] for k in no_outliers], marker="o")
     plt.xlabel("Seconds spent fuzzing")
     plt.ylabel("Runs/Second (single threaded)")
     return plt
@@ -51,15 +50,17 @@ def plot_discovered_paths(target_slug):
     figure, count = plt.subplots()
 
     # Plot the number of paths over time
-    count.plot(get_fuzzing_time(target_runs), [block.num_paths for block in target_runs], marker='.', color='black')
+    count.plot(get_fuzzing_time(target_runs), [block.num_paths for block in target_runs], marker=".", color="black")
     count.set_xlabel("Seconds spent fuzzing")
     count.set_ylabel("Unique Paths Encountered")
-    count.legend(['Unique Paths'])
+    count.legend(["Unique Paths"])
 
     # Plot the estimated percentage of all paths over time
     percentage = count.twinx()
-    percentage.plot(get_fuzzing_time(target_runs), [(block.path_coverage * 100) for block in target_runs], marker=',', color='r')
-    percentage.legend(['Estimated Completion'])
+    percentage.plot(
+        get_fuzzing_time(target_runs), [(block.path_coverage * 100) for block in target_runs], marker=",", color="r"
+    )
+    percentage.legend(["Estimated Completion"])
     percentage.set_ylabel("Estimated path completion percentage")
 
     plt.title("Code Paths Over Time")
@@ -76,4 +77,3 @@ def main():
     # plt.show()
     plot_discovered_paths(slug)
     plt.show()
-

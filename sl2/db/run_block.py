@@ -12,7 +12,7 @@ from sl2.db.coverage import PathRecord
 ## class RunBlock
 # Stores information about a given set of runs. Can hold up to 25 runs by default (configured in the session manager)
 class RunBlock(Base):
-    __tablename__ = 'runs'
+    __tablename__ = "runs"
 
     ## Unique ID for this block
     id = Column(Integer, primary_key=True)
@@ -85,8 +85,15 @@ class SessionManager(object):
     def _handle_completion(self):
         session = db.getSession()
 
-        record = RunBlock(self.target_slug, self.started, self.runs_counted, self.crash_counter,
-                          self.run_dict["bkt"], self.run_dict["scr"], self.run_dict["rem"])
+        record = RunBlock(
+            self.target_slug,
+            self.started,
+            self.runs_counted,
+            self.crash_counter,
+            self.run_dict["bkt"],
+            self.run_dict["scr"],
+            self.run_dict["rem"],
+        )
 
         session.add(record)
         session.commit()

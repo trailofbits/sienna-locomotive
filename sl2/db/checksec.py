@@ -20,18 +20,18 @@ from .utilz import hash_file
 # See https://github.com/trailofbits/winchecksec for more information
 class Checksec(Base):
     PROBABILITIES = {
-        'aslr': 0.792031321971442,
-        'authenticode': 0.374942422846614,
-        'cfg': 0.492860432980193,
-        'dynamicBase': 0.796867802855827,
-        'forceIntegrity': 0.0322432058959005,
-        'gs': 0.652003684937817,
-        'highEntropyVA': 0.437586365730078,
-        'isolation': 1.0,
-        'nx': 0.795485951174574,
-        'rfg': 0.0631045601105481,
-        'safeSEH': 0.257254721326578,
-        'seh': 0.913403961308153
+        "aslr": 0.792031321971442,
+        "authenticode": 0.374942422846614,
+        "cfg": 0.492860432980193,
+        "dynamicBase": 0.796867802855827,
+        "forceIntegrity": 0.0322432058959005,
+        "gs": 0.652003684937817,
+        "highEntropyVA": 0.437586365730078,
+        "isolation": 1.0,
+        "nx": 0.795485951174574,
+        "rfg": 0.0631045601105481,
+        "safeSEH": 0.257254721326578,
+        "seh": 0.913403961308153,
     }
 
     __tablename__ = "checksec"
@@ -86,7 +86,7 @@ class Checksec(Base):
         if ret:
             session.close()
             return ret
-        checker = cfg.config['checksec_path']
+        checker = cfg.config["checksec_path"]
         cmd = [checker, "-j", path]
 
         try:
@@ -144,6 +144,6 @@ class Checksec(Base):
             t.append("SEH")
         if self.safeSEH:
             t.append("SafeSEH")
-        tags = ' | '.join(t)
+        tags = " | ".join(t)
 
         return "{0:3.0f}% ({1})".format(self._protection_percent() * 100, tags)

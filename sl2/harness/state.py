@@ -35,10 +35,10 @@ class InvocationState(NamedTuple):
 
 
 def esc_quote_paren(raw):
-    if (" " not in raw and "(" not in raw) or '\"' in raw:
+    if (" " not in raw and "(" not in raw) or '"' in raw:
         return raw
     else:
-        return "\"{}\"".format(raw)
+        return '"{}"'.format(raw)
 
 
 ## Returns an InvocationState containing the command run
@@ -46,24 +46,20 @@ def esc_quote_paren(raw):
 def create_invocation_statement(config_dict, run_id):
     seed = str(generate_seed(run_id))
     program_arr = [
-        config_dict['drrun_path'],
-        *config_dict['drrun_args'],
-        '-prng_seed',
+        config_dict["drrun_path"],
+        *config_dict["drrun_args"],
+        "-prng_seed",
         seed,
         # '-no_follow_children', # NOTE(ww): We almost certainly don't want this.
-        '-c',
-        config_dict['client_path'],
-        *config_dict['client_args'],
-        '--',
-        config_dict['target_application_path'].strip('\"'),
-        *config_dict['target_args']
+        "-c",
+        config_dict["client_path"],
+        *config_dict["client_args"],
+        "--",
+        config_dict["target_application_path"].strip('"'),
+        *config_dict["target_args"],
     ]
 
-    return InvocationState(
-        program_arr,
-        stringify_program_array(program_arr[0], program_arr[1:]),
-        seed
-    )
+    return InvocationState(program_arr, stringify_program_array(program_arr[0], program_arr[1:]), seed)
 
 
 ## Takes a UUID, strips out the non-random bits, and returns the rest as an int
@@ -71,7 +67,7 @@ def create_invocation_statement(config_dict, run_id):
 #     :return: 120-bit random int
 def generate_seed(run_id):
     if re.match(uuid_regex, str(run_id)):
-        parsed = str(run_id).replace('-', '')
+        parsed = str(run_id).replace("-", "")
         parsed = parsed[:12] + parsed[13:16] + parsed[17:]  # Strip the non-random bits
         return int(parsed, 16)
     else:
@@ -82,8 +78,7 @@ def generate_seed(run_id):
 def stringify_program_array(target_application_path, target_args_array):
 
     out = "{} {}\n".format(
-        esc_quote_paren(target_application_path),
-        ' '.join(esc_quote_paren(k) for k in target_args_array)
+        esc_quote_paren(target_application_path), " ".join(esc_quote_paren(k) for k in target_args_array)
     )
 
     return out
@@ -96,12 +91,12 @@ def stringify_program_array(target_application_path, target_args_array):
 def unstringify_program_array(stringified):
     invoke = []
     # TODO use this for config file parsing
-    split = re.split('(\".*?\")', stringified)
+    split = re.split('(".*?")', stringified)
     for token in split:
-        if "\"" in token:
+        if '"' in token:
             invoke.append(token)
         else:
-            for inner_token in token.split(' '):
+            for inner_token in token.split(" "):
                 invoke.append(inner_token)
     invoke = list(filter(lambda b: len(b) > 0, invoke))
     return invoke[0], invoke[1:]
@@ -112,9 +107,9 @@ def unstringify_program_array(stringified):
 def get_target_slug(_config):
     # TODO(ww): Use os.path.basename for this?
 
-    exe_name = _config['target_application_path'].split('\\')[-1].strip('.exe').upper()
+    exe_name = _config["target_application_path"].split("\\")[-1].strip(".exe").upper()
     dir_hash = sha1(
-        "{} {}".format(_config['target_application_path'], _config['target_args']).encode('utf-8')
+        "{} {}".format(_config["target_application_path"], _config["target_args"]).encode("utf-8")
     ).hexdigest()
     return "{}_{}".format(exe_name, dir_hash)
 
@@ -131,21 +126,20 @@ def get_target_dir(_config):
 
     if not os.path.isdir(dir_name):
         os.makedirs(dir_name)
-    arg_file = os.path.join(dir_name, 'arguments.txt')
+    arg_file = os.path.join(dir_name, "arguments.txt")
 
     if not os.path.exists(arg_file):
-        with open(arg_file, 'w') as argfile:
-            argfile.write(stringify_program_array(_config['target_application_path'], _config['target_args']))
+        with open(arg_file, "w") as argfile:
+            argfile.write(stringify_program_array(_config["target_application_path"], _config["target_args"]))
 
     # Primes the db for checksec for this target if it doesn't already exist
-    db.TargetConfig.bySlug(slug, _config['target_application_path'])
+    db.TargetConfig.bySlug(slug, _config["target_application_path"])
     return dir_name
 
 
 ## class TargetAdapter
 # Stores a list of targets and writes changes back to a target file on the disk
 class TargetAdapter(object):
-
     def __init__(self, target_list, filename):
         super().__init__()
         self.target_list = target_list
@@ -180,19 +174,19 @@ class TargetAdapter(object):
 
     ## Write the file to the disk
     def save(self):
-        with open(self.filename, 'wb') as msgfile:
-            msgpack.dump(list(filter(lambda k: k['selected'], self.target_list)), msgfile)
-        with open(self.filename.replace("targets.msg", "all_targets.msg"), 'wb') as msgfile:
+        with open(self.filename, "wb") as msgfile:
+            msgpack.dump(list(filter(lambda k: k["selected"], self.target_list)), msgfile)
+        with open(self.filename.replace("targets.msg", "all_targets.msg"), "wb") as msgfile:
             msgpack.dump(self.target_list, msgfile)
 
 
 ## Get the target adapter for a given config
 # @return adapter: TargetAdapter
 def get_target(_config):
-    target_file = os.path.join(get_target_dir(_config), 'targets.msg')
+    target_file = os.path.join(get_target_dir(_config), "targets.msg")
     try:
-        with open(target_file.replace("targets.msg", "all_targets.msg"), 'rb') as target_msg:
-            return TargetAdapter(msgpack.load(target_msg, encoding='utf-8'), target_file)
+        with open(target_file.replace("targets.msg", "all_targets.msg"), "rb") as target_msg:
+            return TargetAdapter(msgpack.load(target_msg, encoding="utf-8"), target_file)
     except FileNotFoundError:
         return TargetAdapter([], target_file)
 
@@ -204,12 +198,12 @@ def get_all_targets():
 
     """
     targets = {}
-    for _dir in glob.glob(os.path.join(config.sl2_targets_dir, '*')):
-        argfile = os.path.join(_dir, 'arguments.txt')
+    for _dir in glob.glob(os.path.join(config.sl2_targets_dir, "*")):
+        argfile = os.path.join(_dir, "arguments.txt")
         if not os.path.exists(argfile):
             print("Warning: {} is missing".format(argfile))
             continue
-        with open(argfile, 'r') as program_string_file:
+        with open(argfile, "r") as program_string_file:
             targets[_dir] = unstringify_program_array(program_string_file.read().strip())
     return targets
 
@@ -220,13 +214,13 @@ def get_runs(run_id=None):
     """
     """
     runs = {}
-    for _dir in glob.glob(os.path.join(config.sl2_runs_dir, '*' if run_id is None else run_id)):
-        argfile = os.path.join(_dir, 'arguments.txt')
+    for _dir in glob.glob(os.path.join(config.sl2_runs_dir, "*" if run_id is None else run_id)):
+        argfile = os.path.join(_dir, "arguments.txt")
         if not os.path.exists(argfile):
             print("Warning: {} is missing".format(argfile))
             continue
-        with open(argfile, 'rb') as program_string_file:
-            runs[_dir] = unstringify_program_array(program_string_file.read().decode('utf-16').strip())
+        with open(argfile, "rb") as program_string_file:
+            runs[_dir] = unstringify_program_array(program_string_file.read().decode("utf-16").strip())
     return runs
 
 
@@ -244,13 +238,13 @@ def get_paths_to_run_file(run_id, pattern):
 ## Writes the PRNG seed, stdout, and stderr buffers for a particular stage into a run's directory.
 def write_output_files(run, run_id, stage_name):
     try:
-        with open(get_path_to_run_file(run_id, '{}.seed'.format(stage_name)), 'w') as seedfile:
+        with open(get_path_to_run_file(run_id, "{}.seed".format(stage_name)), "w") as seedfile:
             seedfile.write(run.seed)
         if run.process.stdout is not None:
-            with open(get_path_to_run_file(run_id, '{}.stdout'.format(stage_name)), 'wb') as stdoutfile:
+            with open(get_path_to_run_file(run_id, "{}.stdout".format(stage_name)), "wb") as stdoutfile:
                 stdoutfile.write(run.process.stdout)
         if run.process.stderr is not None:
-            with open(get_path_to_run_file(run_id, '{}.stderr'.format(stage_name)), 'wb') as stderrfile:
+            with open(get_path_to_run_file(run_id, "{}.stderr".format(stage_name)), "wb") as stderrfile:
                 stderrfile.write(run.process.stderr)
     except FileNotFoundError:
         print("Couldn't find an output directory for run %s" % run_id)
@@ -258,40 +252,35 @@ def write_output_files(run, run_id, stage_name):
 
 ## Parses the results of a tracer run and returns them in human-readable form.
 def parse_tracer_crash_files(run_id):
-    crash_files = get_paths_to_run_file(run_id, 'crash.*.json')
+    crash_files = get_paths_to_run_file(run_id, "crash.*.json")
 
     if not crash_files:
         message = "The tracer tool exited improperly during run {}, \
 but no crash files could be found. It may have timed out. \
 To retry it manually, run \
-`python harness.py -v -e TRIAGE -p {} --run_id {}`".format(run_id, config.profile, run_id)
+`python harness.py -v -e TRIAGE -p {} --run_id {}`".format(
+            run_id, config.profile, run_id
+        )
         print(message)
-        return 'ERROR', None
+        return "ERROR", None
 
     # TODO(ww): Parse all crash files, not just the first.
     crash_file = crash_files[0]
-    with open(crash_file, 'r') as crash_json:
+    with open(crash_file, "r") as crash_json:
         results = json.loads(crash_json.read())
-        results['run_id'] = run_id
-        results['crash_file'] = crash_file
+        results["run_id"] = run_id
+        results["crash_file"] = crash_file
         formatted = "Tracer ({score}): {reason} in run {run_id} caused {exception}".format(**results)
-        formatted += ("\n\t0x{location:02x}: {instruction}".format(**results))
+        formatted += "\n\t0x{location:02x}: {instruction}".format(**results)
         return formatted, results
+
 
 ## (DEPRECATED) Dumps the crash data for a given set of crashs to a CSV file. Not currently used.
 def export_crash_data_to_csv(crashes, csv_filename):
-    fields = [
-        'score',
-        'run_id',
-        'exception',
-        'reason',
-        'instruction',
-        'location',
-        'crash_file',
-    ]
+    fields = ["score", "run_id", "exception", "reason", "instruction", "location", "crash_file"]
 
-    with open(csv_filename, 'w') as csvfile:
-        writer = DictWriter(csvfile, fields, extrasaction='ignore')
+    with open(csv_filename, "w") as csvfile:
+        writer = DictWriter(csvfile, fields, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(crashes)
 
@@ -299,19 +288,20 @@ def export_crash_data_to_csv(crashes, csv_filename):
 ## Creates a new Run ID from a given config dict
 #  @return run_id: str - hex-encoded uuid4
 def generate_run_id(config_dict):
-    run_id = uuid.uuid4() if 'run_id' not in config_dict else config_dict['run_id']
+    run_id = uuid.uuid4() if "run_id" not in config_dict else config_dict["run_id"]
 
     os.makedirs(os.path.join(config.sl2_runs_dir, str(run_id)))
 
-    program = esc_quote_paren(config_dict['target_application_path'])
+    program = esc_quote_paren(config_dict["target_application_path"])
 
     with open(get_path_to_run_file(run_id, "program.txt"), "wb") as program_file:
         program_file.write(program.encode("utf-16"))
 
     with open(get_path_to_run_file(run_id, "arguments.txt"), "wb") as arguments_file:
-        arguments_file.write(stringify_program_array(program, config_dict['target_args']).encode("utf-16"))
+        arguments_file.write(stringify_program_array(program, config_dict["target_args"]).encode("utf-16"))
 
     return run_id
+
 
 ## Attempt to parse a line as JSON, returning a tuple of the crash state
 #  and the exception code. If no crash can be detected in the line, return
@@ -347,17 +337,67 @@ class TriageExport:
         self.exportDir = exportDir
         self.slug = slug
         self.checksec_cols = [
-                     # Checksec table.
-                     'aslr', 'authenticode', 'cfg', 'dynamicBase', 'forceIntegrity', 'gs', 'highEntropyVA',
-                     'isolation', 'nx', 'rfg', 'safeSEH', 'seh', 'path']
+            # Checksec table.
+            "aslr",
+            "authenticode",
+            "cfg",
+            "dynamicBase",
+            "forceIntegrity",
+            "gs",
+            "highEntropyVA",
+            "isolation",
+            "nx",
+            "rfg",
+            "safeSEH",
+            "seh",
+            "path",
+        ]
 
         self.crash_cols = [
-                     # Crash table.
-                     'runid', 'crashAddressString', 'crashReason', 'crashash', 'exploitability',
-                     'instructionPointerString', 'minidumpPath', 'ranksString', 'stackPointerString', 'timestamp', 'tag',
-                     'cs', 'dr0', 'dr1', 'dr2', 'dr3', 'dr6', 'dr7', 'ds', 'eflags', 'es', 'fs', 'gs', 'mx_csr', 'r8',
-                     'r9', 'r10', 'r11', 'r12', 'r13', 'r14', 'r15', 'rax', 'rbp', 'rbx', 'rcx', 'rdi', 'rdx', 'rip',
-                     'rsi', 'rsp', 'ss']
+            # Crash table.
+            "runid",
+            "crashAddressString",
+            "crashReason",
+            "crashash",
+            "exploitability",
+            "instructionPointerString",
+            "minidumpPath",
+            "ranksString",
+            "stackPointerString",
+            "timestamp",
+            "tag",
+            "cs",
+            "dr0",
+            "dr1",
+            "dr2",
+            "dr3",
+            "dr6",
+            "dr7",
+            "ds",
+            "eflags",
+            "es",
+            "fs",
+            "gs",
+            "mx_csr",
+            "r8",
+            "r9",
+            "r10",
+            "r11",
+            "r12",
+            "r13",
+            "r14",
+            "r15",
+            "rax",
+            "rbp",
+            "rbx",
+            "rcx",
+            "rdi",
+            "rdx",
+            "rip",
+            "rsi",
+            "rsp",
+            "ss",
+        ]
 
     ## Retrieves the number of exportable crashes.
     # @return the number of exportable crashes
@@ -372,10 +412,10 @@ class TriageExport:
 
         csvPath = os.path.join(self.exportDir, "triage.csv")
         with open(csvPath, "w") as f:
-            csvWriter = csv.writer(f, lineterminator='\n')
+            csvWriter = csv.writer(f, lineterminator="\n")
             checksec_no_gs = self.checksec_cols.copy()
-            checksec_no_gs[checksec_no_gs.index('gs')] = 'guardStack'
-            csvWriter.writerow(checksec_no_gs + self.crash_cols + ['tracer.formatted'])
+            checksec_no_gs[checksec_no_gs.index("gs")] = "guardStack"
+            csvWriter.writerow(checksec_no_gs + self.crash_cols + ["tracer.formatted"])
             session = db.getSession()
             target = session.query(TargetConfig).filter(TargetConfig.target_slug == self.slug).first()
             if not target:
@@ -399,11 +439,13 @@ class TriageExport:
             try:
                 if export_cb:
                     export_cb(idx)
-                dstdir = os.path.join(self.exportDir,
-                                      sanitizeString(crash.exploitability),
-                                      sanitizeString(crash.crashReason),
-                                      sanitizeString(crash.crashash),
-                                      crash.runid)
+                dstdir = os.path.join(
+                    self.exportDir,
+                    sanitizeString(crash.exploitability),
+                    sanitizeString(crash.crashReason),
+                    sanitizeString(crash.crashash),
+                    crash.runid,
+                )
                 # os.makedirs( dstdir, exist_ok=True )
                 srcdir = os.path.dirname(crash.minidumpPath)
                 print("%s -> %s" % (srcdir, dstdir))
@@ -417,14 +459,14 @@ class TriageExport:
         if checksec is None:
             return 0
         attrmap = {
-            'aslr': 1,
-            'authenticode': 0,
-            'cfg': 1,
-            'dynamicBase': 1,  # maybe 0?
-            'forceIntegrity': 0,
-            'gs': 1,
-            'highEntropyVA': 0,
-            'nx': 1,
+            "aslr": 1,
+            "authenticode": 0,
+            "cfg": 1,
+            "dynamicBase": 1,  # maybe 0?
+            "forceIntegrity": 0,
+            "gs": 1,
+            "highEntropyVA": 0,
+            "nx": 1,
         }
         return attrmap
 
@@ -441,8 +483,11 @@ def sanity_checks(exit=True):
     # Check that we're running an okay Python
     if (sys.version_info.major == 3 and sys.version_info.minor < 6) or sys.version_info.major == 2:
         sane = False
-        errors.append("Sienna Locomotive requires at least Python 3.6. You have Python {}.{}.{}."
-                      .format(sys.version_info.major, sys.version_info.minor, sys.version_info.micro))
+        errors.append(
+            "Sienna Locomotive requires at least Python 3.6. You have Python {}.{}.{}.".format(
+                sys.version_info.major, sys.version_info.minor, sys.version_info.micro
+            )
+        )
 
     # Check that we're running on Windows 10
     if sys.getwindowsversion().major != 10:
@@ -457,18 +502,23 @@ def sanity_checks(exit=True):
 
         if release_id > config.RECOMMENDED_WIN10_VERSION:
             sane = False
-            errors.append("The provided version of DynamoRIO only supports Windows 10 up through release {}. You have "
-                          "release {}.".format(config.RECOMMENDED_WIN10_VERSION, release_id))
+            errors.append(
+                "The provided version of DynamoRIO only supports Windows 10 up through release {}. You have "
+                "release {}.".format(config.RECOMMENDED_WIN10_VERSION, release_id)
+            )
         elif release_id < config.RECOMMENDED_WIN10_VERSION:
-            print("Sienna Locomotive recommends running on release {} of Windows 10, but you have release {}."
-                  .format(config.RECOMMENDED_WIN10_VERSION, release_id))
+            print(
+                "Sienna Locomotive recommends running on release {} of Windows 10, but you have release {}.".format(
+                    config.RECOMMENDED_WIN10_VERSION, release_id
+                )
+            )
 
     except Exception as e:
         print("[+] Unexpected exception when checking Windows build version:", e)
 
     bad_keys = [
-        'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\DebugObjectRPCEnabled',
-        'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AeDebug\\Auto',
+        "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\DebugObjectRPCEnabled",
+        "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AeDebug\\Auto",
     ]
 
     # Check for incompatible debugging features
@@ -493,8 +543,9 @@ def sanity_checks(exit=True):
     # Check for Windows Error Reporting
     try:
         reg = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
-        key = winreg.OpenKey(reg, "SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting", 0,
-                             (winreg.KEY_WOW64_64KEY + winreg.KEY_READ))
+        key = winreg.OpenKey(
+            reg, "SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting", 0, (winreg.KEY_WOW64_64KEY + winreg.KEY_READ)
+        )
         disabled = winreg.QueryValueEx(key, "Disabled")[0]
 
         if disabled != 1:
@@ -502,7 +553,8 @@ def sanity_checks(exit=True):
             if exit:
                 print("[+] Fatal: Cowardly refusing to run with WER enabled.")
                 print(
-                      "[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue.")
+                    "[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue."
+                )
                 sys.exit()
             else:
                 sane = False
@@ -515,7 +567,8 @@ def sanity_checks(exit=True):
         if exit:
             print("[+] Fatal: Cowardly refusing to run with WER enabled.")
             print(
-                  "[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue.")
+                "[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue."
+            )
             sys.exit()
         else:
             sane = False

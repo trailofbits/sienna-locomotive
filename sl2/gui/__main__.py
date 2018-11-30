@@ -28,7 +28,8 @@ from .checkbox_tree import (
     CheckboxTreeModel,
     CheckboxTreeSortFilterProxyModel,
     ComboboxTreeItemDelegate,
-    mode_labels)
+    mode_labels,
+)
 
 ## class MainWindow
 # Main window for gui
@@ -58,7 +59,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Set up Checksec, Wizard and Server threads so we don't block the UI
         # when they're running
-        self.checksec_thread = ChecksecThread(config.config['target_application_path'])
+        self.checksec_thread = ChecksecThread(config.config["target_application_path"])
         self.wizard_thread = WizardThread(config.config)
         self.server_thread = ServerThread(close_on_exit=True)
 
@@ -68,8 +69,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.menu_bar = self.menuBar()
         self.file_menu = self.menu_bar.addMenu("&File")
         self.change_profile_action = self.file_menu.addAction("Change Profile")
-        self.open_report_in_browser = QtWidgets.QAction("Open exported report in browser",
-                                                        self, checkable=True)
+        self.open_report_in_browser = QtWidgets.QAction("Open exported report in browser", self, checkable=True)
         self.file_menu.addAction(self.open_report_in_browser)
         self.open_report_in_browser.setChecked(True)
 
@@ -138,23 +138,23 @@ class MainWindow(QtWidgets.QMainWindow):
         # Create checkboxes for continuous mode
         self.continuous_mode_cbox = QtWidgets.QCheckBox("Continuous")
         self.pause_mode_cbox = QtWidgets.QCheckBox("Pause on crash")
-        if config.config['continuous']:
+        if config.config["continuous"]:
             self.continuous_mode_cbox.setChecked(True)
-        if config.config['exit_early']:
+        if config.config["exit_early"]:
             self.pause_mode_cbox.setChecked(True)
 
         # Set up spinboxes for setting timeout values
         self.fuzz_timeout_box = QtWidgets.QSpinBox()
         self.fuzz_timeout_box.setSuffix(" seconds")
         self.fuzz_timeout_box.setMaximum(1200)
-        if 'fuzz_timeout' in config.config:
-            self.fuzz_timeout_box.setValue(config.config['fuzz_timeout'])
+        if "fuzz_timeout" in config.config:
+            self.fuzz_timeout_box.setValue(config.config["fuzz_timeout"])
         self.fuzz_timeout_box.setSpecialValueText("None")
         self.tracer_timeout_box = QtWidgets.QSpinBox()
         self.tracer_timeout_box.setSuffix(" seconds")
         self.tracer_timeout_box.setMaximum(2400)
-        if 'tracer_timeout' in config.config:
-            self.tracer_timeout_box.setValue(config.config['tracer_timeout'])
+        if "tracer_timeout" in config.config:
+            self.tracer_timeout_box.setValue(config.config["tracer_timeout"])
         self.tracer_timeout_box.setSpecialValueText("None")
         self.tracer_timeout_box.setSingleStep(10)
         self.verbose_cbox = QtWidgets.QCheckBox()
@@ -164,8 +164,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.thread_count = QtWidgets.QSpinBox()
         self.thread_count.setSuffix(" threads")
         self.thread_count.setRange(1, 2 * cpu_count())
-        if 'simultaneous' in config.config:
-            self.thread_count.setValue(config.config['simultaneous'])
+        if "simultaneous" in config.config:
+            self.thread_count.setValue(config.config["simultaneous"])
 
         # Create button for hiding and showing the extended controls
         self.expand_button = QtWidgets.QToolButton()
@@ -211,25 +211,26 @@ class MainWindow(QtWidgets.QMainWindow):
             session,
             db.Crash,
             [
-                ('Time', db.Crash.timestamp, 'timestamp', {}),
-                ('RunID', db.Crash.runid, 'runid', {}),
-                ('Reason', db.Crash.crashReason, 'crashReason', {}),
-                ('Exploitability', db.Crash.exploitability, 'exploitability', {}),
-                ('Ranks', db.Crash.ranksString, 'ranksString', {}),
-                ('Crashash', db.Crash.crashash, 'crashash', {}),
-                ('Crash Address', db.Crash.crashAddressString, 'crashAddressString', {}),
-                ('RIP', db.Crash.instructionPointerString, 'instructionPointerString', {}),
-                ('RSP', db.Crash.stackPointerString, 'stackPointerString', {}),
-                ('RDI', db.Crash.rdi, 'rdi', {}),
-                ('RSI', db.Crash.rsi, 'rsi', {}),
-                ('RBP', db.Crash.rdx, 'rbp', {}),
-                ('RAX', db.Crash.rax, 'rax', {}),
-                ('RBX', db.Crash.rbx, 'rbx', {}),
-                ('RCX', db.Crash.rcx, 'rcx', {}),
-                ('RDX', db.Crash.rdx, 'rdx', {}),
+                ("Time", db.Crash.timestamp, "timestamp", {}),
+                ("RunID", db.Crash.runid, "runid", {}),
+                ("Reason", db.Crash.crashReason, "crashReason", {}),
+                ("Exploitability", db.Crash.exploitability, "exploitability", {}),
+                ("Ranks", db.Crash.ranksString, "ranksString", {}),
+                ("Crashash", db.Crash.crashash, "crashash", {}),
+                ("Crash Address", db.Crash.crashAddressString, "crashAddressString", {}),
+                ("RIP", db.Crash.instructionPointerString, "instructionPointerString", {}),
+                ("RSP", db.Crash.stackPointerString, "stackPointerString", {}),
+                ("RDI", db.Crash.rdi, "rdi", {}),
+                ("RSI", db.Crash.rsi, "rsi", {}),
+                ("RBP", db.Crash.rdx, "rbp", {}),
+                ("RAX", db.Crash.rax, "rax", {}),
+                ("RBX", db.Crash.rbx, "rbx", {}),
+                ("RCX", db.Crash.rcx, "rcx", {}),
+                ("RDX", db.Crash.rdx, "rdx", {}),
             ],
             orderBy=desc(db.Crash.timestamp),
-            filters={"target_config_slug": get_target_slug(config.config)})
+            filters={"target_config_slug": get_target_slug(config.config)},
+        )
         self.crashes_table = QtWidgets.QTableView()
         self.crashes_table.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self.crashes_table.setModel(self.crashes_model)
@@ -360,7 +361,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.fuzzer_button.setDisabled(True)
         self.busy_label.show()
 
-        focus_threads = self.thread_holder[:int(self.thread_count.value())]
+        focus_threads = self.thread_holder[: int(self.thread_count.value())]
 
         for thread in focus_threads:
             if (not thread.isRunning() and thread.should_fuzz) or thread in self.paused_fuzzer_threads:
@@ -447,38 +448,46 @@ class MainWindow(QtWidgets.QMainWindow):
         """ Alert the user if a tracer run fails. """
         # TODO(ww): Does it make sense to pause the fuzzing threads here?
         QtWidgets.QMessageBox.critical(
-            None, "Tracer failure",
-            "Found a crash but couldn't trace it.\nTry running the tracer manually via sl2-cli?")
+            None, "Tracer failure", "Found a crash but couldn't trace it.\nTry running the tracer manually via sl2-cli?"
+        )
 
     ## Builds the tree of targetable functions to display
     def build_func_tree(self):
         """ Build the function target display tree """
         self._func_tree.setSortingEnabled(False)
         self.model.clear()
-        self.model.setHorizontalHeaderLabels(["Function Name",
-                                              "File",
-                                              "File Offset",
-                                              "Order Seen",
-                                              "Calling Module",
-                                              # "Return Address",
-                                              "Targeting Mode"])
+        self.model.setHorizontalHeaderLabels(
+            [
+                "Function Name",
+                "File",
+                "File Offset",
+                "Order Seen",
+                "Calling Module",
+                # "Return Address",
+                "Targeting Mode",
+            ]
+        )
 
         self.model.horizontalHeaderItem(0).setToolTip("The name of a fuzzable function")
         self.model.horizontalHeaderItem(1).setToolTip("The name of the file (if any) the function tried to read")
         self.model.horizontalHeaderItem(2).setToolTip(
-            "The bytes in the file that the program tried to read (if available)")
+            "The bytes in the file that the program tried to read (if available)"
+        )
         self.model.horizontalHeaderItem(3).setToolTip("The order in which the wizard encountered this function")
         self.model.horizontalHeaderItem(4).setToolTip(
-            "Which part of the program called this function. .exe modules are generally the most promising")
+            "Which part of the program called this function. .exe modules are generally the most promising"
+        )
         self.model.horizontalHeaderItem(5).setToolTip("How we re-identify whether we're calling this function again")
 
         for index, option in enumerate(self.target_data):
             funcname_widget = CheckboxTreeWidgetItem(self._func_tree, index, "{func_name}".format(**option))
-            filename_widget = QStandardItem(option.get('source', None))
+            filename_widget = QStandardItem(option.get("source", None))
             filename_widget.setEditable(False)
-            offset_widget = QStandardItem("0x{:x} - 0x{:x}".format(option['start'], option['end'])
-                                          if ('end' in option and 'start' in option)
-                                          else None)
+            offset_widget = QStandardItem(
+                "0x{:x} - 0x{:x}".format(option["start"], option["end"])
+                if ("end" in option and "start" in option)
+                else None
+            )
             offset_widget.setEditable(False)
             funcname_widget.setCheckState(Qt.Checked if option["selected"] else Qt.Unchecked)
             funcname_widget.setColumnCount(3)
@@ -488,12 +497,13 @@ class MainWindow(QtWidgets.QMainWindow):
             asc = []
             for address in range(0, min(len(option["buffer"]), 16 * 5), 16):
                 add.append("0x%04X" % address)
-                hx.append(" ".join("{:02X}".format(c) for c in option["buffer"][address:address + 16]))
+                hx.append(" ".join("{:02X}".format(c) for c in option["buffer"][address : address + 16]))
                 asc.append(
-                    "".join((chr(c) if c in range(31, 127) else '.') for c in option["buffer"][address:address + 16]))
-            addr = QStandardItem('\n'.join(add))
-            hexstr = QStandardItem('\n'.join(hx))
-            asciistr = QStandardItem('\n'.join(asc))
+                    "".join((chr(c) if c in range(31, 127) else ".") for c in option["buffer"][address : address + 16])
+                )
+            addr = QStandardItem("\n".join(add))
+            hexstr = QStandardItem("\n".join(hx))
+            asciistr = QStandardItem("\n".join(asc))
             addr.setEditable(False)
             hexstr.setEditable(False)
             asciistr.setEditable(False)
@@ -504,24 +514,28 @@ class MainWindow(QtWidgets.QMainWindow):
 
             idx_widget = QStandardItem(str(index))
             idx_widget.setEditable(False)
-            mod_widget = QStandardItem(str(option.get('called_from', None)))
+            mod_widget = QStandardItem(str(option.get("called_from", None)))
             mod_widget.setEditable(False)
 
-            addr_widget = QStandardItem(str(option.get('retAddrOffset', None)))
+            addr_widget = QStandardItem(str(option.get("retAddrOffset", None)))
             addr_widget.setEditable(False)
 
-            mode_widget = QStandardItem(mode_labels[option.get('mode')])
-            mode_widget.setData(option.get('mode'), role=Qt.UserRole)
+            mode_widget = QStandardItem(mode_labels[option.get("mode")])
+            mode_widget.setData(option.get("mode"), role=Qt.UserRole)
             mode_widget.setData(index, role=Qt.UserRole + 1)
             mode_widget.setData(QBrush(QColor(0, 0, 0, 16)), role=Qt.BackgroundRole)
 
-            self.model.appendRow([funcname_widget,
-                                  filename_widget,
-                                  offset_widget,
-                                  idx_widget,
-                                  mod_widget,
-                                  # addr_widget,
-                                  mode_widget])
+            self.model.appendRow(
+                [
+                    funcname_widget,
+                    filename_widget,
+                    offset_widget,
+                    idx_widget,
+                    mod_widget,
+                    # addr_widget,
+                    mode_widget,
+                ]
+            )
             # self._func_tree.edit(self.model.indexFromItem(mode_widget))
 
         self._func_tree.expandAll()
@@ -544,8 +558,9 @@ class MainWindow(QtWidgets.QMainWindow):
         for row in range(self.module_proxy_model.rowCount()):
             yield self.func_proxy_model.mapToSource(
                 self.file_proxy_model.mapToSource(
-                    self.module_proxy_model.mapToSource(
-                        self.module_proxy_model.index(row, 0))))
+                    self.module_proxy_model.mapToSource(self.module_proxy_model.index(row, 0))
+                )
+            )
 
     ## Checks/Unchecks all members of the function targeting tree
     def check_all(self):
@@ -565,7 +580,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     ## Signal handler that handles checksec results after the executable finishes.
     def checksec_finished(self, checksec_output):
-        target_path = config.config['target_application_path']
+        target_path = config.config["target_application_path"]
         target_string = "Target: {}\t Protections: {}".format(target_path, checksec_output)
         self.target_label.setText(target_string)
 
@@ -577,8 +592,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.build_func_tree()
             self.fuzzer_button.setEnabled(True)
         else:
-            QtWidgets.QMessageBox.critical(None, "Wizard failure",
-                                           "No wizard results; is the target 64-bit?")
+            QtWidgets.QMessageBox.critical(None, "Wizard failure", "No wizard results; is the target 64-bit?")
 
     ## (DEPRECATED) saves a csv file of the crash results. No longer used.
     def save_crashes(self):
@@ -624,7 +638,7 @@ class MainWindow(QtWidgets.QMainWindow):
     ## Signal handler that updates the verbosity state when the checkbox in the gui is clicked
     def toggle_verbose_state(self):
         state = self.verbose_cbox.isChecked()
-        config.config['verbose'] = 2 if state else False
+        config.config["verbose"] = 2 if state else False
 
     ## Button callback that allows the user to select a location to save a csv file and a fuzzing report
     def export_triage(self):
@@ -638,8 +652,7 @@ class MainWindow(QtWidgets.QMainWindow):
         print("Exporting {} crashes".format(num_crashes))
 
         if num_crashes > 0:
-            exporter_progress = QtWidgets.QProgressDialog(
-                "Exporting crashes...", None, 0, num_crashes - 1, self)
+            exporter_progress = QtWidgets.QProgressDialog("Exporting crashes...", None, 0, num_crashes - 1, self)
             exporter_progress.setAutoClose(True)
             exporter_progress.setWindowModality(Qt.WindowModal)
             # Only show the progressbar if the operation is expected to take more than 1.5 seconds.
@@ -659,19 +672,20 @@ class MainWindow(QtWidgets.QMainWindow):
         crash = db.Crash.factory(data.runid)
         self.crash_browser.setText(crash.output)
 
+
 ## Build a GUI window and display it to the user.
 def main():
     app = QtWidgets.QApplication(sys.argv)
     sane, errors = sanity_checks(exit=False)
 
     if not sane:
-        QtWidgets.QMessageBox.critical(None, "Sanity check failure",
-                                       "\n".join(errors))
+        QtWidgets.QMessageBox.critical(None, "Sanity check failure", "\n".join(errors))
         sys.exit(1)
 
     try:
         import qdarkstyle, os
-        os.environ['QT_API'] = 'pyside2'
+
+        os.environ["QT_API"] = "pyside2"
         app.setStyleSheet(qdarkstyle.load_stylesheet())
     except (ImportError, NotImplementedError):
         pass
@@ -683,5 +697,5 @@ def main():
     sys.exit(app.exec_())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

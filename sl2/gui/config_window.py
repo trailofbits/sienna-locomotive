@@ -62,10 +62,12 @@ class ConfigWindow(QtWidgets.QDialog):
         # set placeholder text in path text boxes
         self.profile_name.setPlaceholderText("Profile Name")
         # self.drrun_path.setPlaceholderText("Path to drrun.exe")
-        self.drrun_path.setText(config._config['DEFAULT']['drrun_path'])
+        self.drrun_path.setText(config._config["DEFAULT"]["drrun_path"])
 
         # self.build_dir.setPlaceholderText("Path to SL2 build directory")
-        self.build_dir.setText(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))), "build"))
+        self.build_dir.setText(
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))), "build")
+        )
 
         self.target_path.setPlaceholderText("Path to target application")
         self.target_args.setPlaceholderText("Target arguments")
@@ -85,7 +87,8 @@ class ConfigWindow(QtWidgets.QDialog):
         self.bad_dr_path_warning = QtWidgets.QLabel()
         self.bad_dr_path_warning.setPixmap(icon.pixmap(32, 32))
         self.bad_dr_path_warning.setToolTip(
-            "This path doesn't look quite right. It might be invalid, or drrun.exe may have been moved?")
+            "This path doesn't look quite right. It might be invalid, or drrun.exe may have been moved?"
+        )
         self.bad_dr_path_warning.hide()
 
         icon = self.style().standardIcon(QStyle.SP_MessageBoxCritical)
@@ -138,7 +141,7 @@ class ConfigWindow(QtWidgets.QDialog):
         self.build_dir.textChanged.connect(self.validate_build_path)
 
         self.show()
-        if config.profile != 'DEFAULT':
+        if config.profile != "DEFAULT":
             self.profiles.setCurrentText(config.profile)
 
     ## When the "Add Config" button is clicked, read the values from the text boxes and write them into the config file
@@ -156,9 +159,13 @@ class ConfigWindow(QtWidgets.QDialog):
         if len(self.target_path.text()) == 0:
             QtWidgets.QMessageBox.critical(self, "Invalid Path", "Target application path cannot be empty")
             return
-        config.create_new_profile(name, os.path.normpath(self.drrun_path.text()),
-                                  os.path.normpath(self.build_dir.text()),
-                                  os.path.normpath(self.target_path.text()), self.target_args.text())
+        config.create_new_profile(
+            name,
+            os.path.normpath(self.drrun_path.text()),
+            os.path.normpath(self.build_dir.text()),
+            os.path.normpath(self.target_path.text()),
+            self.target_args.text(),
+        )
 
         self.profiles.clear()
         profile_names = list(config._config.keys())
@@ -173,7 +180,7 @@ class ConfigWindow(QtWidgets.QDialog):
 
     ## Get the path returned by the Qt dialog
     def get_drrun_path(self):
-        path, good = QFileDialog.getOpenFileName(filter="*.exe", dir=config._config['DEFAULT']['drrun_path'])
+        path, good = QFileDialog.getOpenFileName(filter="*.exe", dir=config._config["DEFAULT"]["drrun_path"])
         if good:
             self.drrun_path.setText(path)
 
@@ -185,7 +192,7 @@ class ConfigWindow(QtWidgets.QDialog):
 
     ## Get the path returned by the Qt dialog
     def get_build_dir(self):
-        path = QFileDialog.getExistingDirectory(dir='build')
+        path = QFileDialog.getExistingDirectory(dir="build")
         if len(path) > 0:
             self.build_dir.setText(path)
 
@@ -193,7 +200,8 @@ class ConfigWindow(QtWidgets.QDialog):
         if len(new_profile_name) > 32:
             self.bad_profile_name_warning.show()
             self.bad_profile_name_warning.setToolTip(
-                "Profile name is too long ({} > 32).".format(len(new_profile_name)))
+                "Profile name is too long ({} > 32).".format(len(new_profile_name))
+            )
             self.add_button.setEnabled(False)
         elif not re.match("^[a-zA-Z1-9]+$", new_profile_name):
             self.bad_profile_name_warning.show()
@@ -205,8 +213,8 @@ class ConfigWindow(QtWidgets.QDialog):
 
     ## Validate the path to drrun.exe
     def validate_drrun_path(self, new_path):
-        good = 'drrun.exe' in new_path
-        good = good and ('bin32' in new_path or 'bin64' in new_path)
+        good = "drrun.exe" in new_path
+        good = good and ("bin32" in new_path or "bin64" in new_path)
         good = good and os.path.isfile(new_path)
 
         if not good:
@@ -218,10 +226,12 @@ class ConfigWindow(QtWidgets.QDialog):
 
     ## Validate the path to the build directory
     def validate_build_path(self, new_path):
-        paths = ['server\\Debug\\server.exe',
-                 'fuzz_dynamorio\\Debug\\fuzzer.dll',
-                 'wizard\\Debug\\wizard.dll',
-                 'tracer_dynamorio\\Debug\\tracer.dll']
+        paths = [
+            "server\\Debug\\server.exe",
+            "fuzz_dynamorio\\Debug\\fuzzer.dll",
+            "wizard\\Debug\\wizard.dll",
+            "tracer_dynamorio\\Debug\\tracer.dll",
+        ]
         missing = []
         for path in paths:
             if not os.path.isfile(os.path.join(new_path, path)):
@@ -229,7 +239,8 @@ class ConfigWindow(QtWidgets.QDialog):
         if len(missing) > 0:
             self.bad_build_dir_warning.show()
             self.bad_build_dir_warning.setToolTip(
-                "This build root is missing some expected child paths: " + '\n'.join(missing))
+                "This build root is missing some expected child paths: " + "\n".join(missing)
+            )
             self.add_button.setEnabled(False)
         else:
             self.bad_build_dir_warning.hide()
