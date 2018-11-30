@@ -55,7 +55,7 @@ class SqlalchemyModel(QSqlTableModel):
     def headerData(self, section, orientation, role):
         try:
             ret = self.cols[section][0]
-        except:
+        except:  # noqa: E722
             return None
 
         if role != Qt.DisplayRole or orientation != Qt.Horizontal:

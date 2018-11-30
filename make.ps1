@@ -1,4 +1,5 @@
 #Set-PSDebug -Trace 1
+
 $cwd=(Get-Item -Path ".\").FullName
 
 
@@ -13,7 +14,7 @@ function Unzip
 
 
 Function InstallDependencies {
-    pip install -r requirements.txt
+    python -m pip install -r requirements.txt
     python setup.py develop
 }
 
@@ -160,7 +161,7 @@ Function Deploy{
     $client.DownloadFile($url, $exe)
 
     "Downloading Python Dependencies"
-    pip download -d sl2-deploy\pypy -r requirements.txt
+    python -m pip download -d sl2-deploy\pypy -r requirements.txt
 
     "Compressing Deployment Archive"
     if (-not (test-path "$env:ProgramFiles\7-Zip\7z.exe")) {throw "$env:ProgramFiles\7-Zip\7z.exe missing"}

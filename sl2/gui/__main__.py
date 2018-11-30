@@ -31,6 +31,7 @@ from .checkbox_tree import (
     mode_labels,
 )
 
+
 ## class MainWindow
 # Main window for gui
 class MainWindow(QtWidgets.QMainWindow):
@@ -497,9 +498,9 @@ class MainWindow(QtWidgets.QMainWindow):
             asc = []
             for address in range(0, min(len(option["buffer"]), 16 * 5), 16):
                 add.append("0x%04X" % address)
-                hx.append(" ".join("{:02X}".format(c) for c in option["buffer"][address : address + 16]))
+                hx.append(" ".join("{:02X}".format(c) for c in option["buffer"][address: address + 16]))
                 asc.append(
-                    "".join((chr(c) if c in range(31, 127) else ".") for c in option["buffer"][address : address + 16])
+                    "".join((chr(c) if c in range(31, 127) else ".") for c in option["buffer"][address: address + 16])
                 )
             addr = QStandardItem("\n".join(add))
             hexstr = QStandardItem("\n".join(hx))
@@ -683,7 +684,8 @@ def main():
         sys.exit(1)
 
     try:
-        import qdarkstyle, os
+        import qdarkstyle
+        import os
 
         os.environ["QT_API"] = "pyside2"
         app.setStyleSheet(qdarkstyle.load_stylesheet())

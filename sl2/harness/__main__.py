@@ -92,8 +92,8 @@ def hexdump(buffer, lines=4, line_len=16):
         if address > lines * line_len:
             print_l("...")
             break
-        hexstr = " ".join("{:02X}".format(c) for c in buffer[address : address + line_len])
-        asciistr = "".join((chr(c) if c in range(31, 127) else ".") for c in buffer[address : address + line_len])
+        hexstr = " ".join("{:02X}".format(c) for c in buffer[address: address + line_len])
+        asciistr = "".join((chr(c) if c in range(31, 127) else ".") for c in buffer[address: address + line_len])
         print_l("%08X:  %s  | %s" % (address, hexstr + " " * (line_len * 3 - len(hexstr)), asciistr))
 
 
@@ -101,7 +101,7 @@ def hexdump(buffer, lines=4, line_len=16):
 def _main():
     sanity_checks()
 
-    start_server()
+    start_server(no_window=config["no_server_window"])
 
     target_file = os.path.join(get_target_dir(config), "targets.msg")
 

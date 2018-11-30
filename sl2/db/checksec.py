@@ -20,18 +20,18 @@ from .utilz import hash_file
 # See https://github.com/trailofbits/winchecksec for more information
 class Checksec(Base):
     PROBABILITIES = {
-        "aslr": 0.792031321971442,
-        "authenticode": 0.374942422846614,
-        "cfg": 0.492860432980193,
-        "dynamicBase": 0.796867802855827,
-        "forceIntegrity": 0.0322432058959005,
-        "gs": 0.652003684937817,
-        "highEntropyVA": 0.437586365730078,
+        "aslr": 0.792_031_321_971_442,
+        "authenticode": 0.374_942_422_846_614,
+        "cfg": 0.492_860_432_980_193,
+        "dynamicBase": 0.796_867_802_855_827,
+        "forceIntegrity": 0.032_243_205_895_900_5,
+        "gs": 0.652_003_684_937_817,
+        "highEntropyVA": 0.437_586_365_730_078,
         "isolation": 1.0,
-        "nx": 0.795485951174574,
-        "rfg": 0.0631045601105481,
-        "safeSEH": 0.257254721326578,
-        "seh": 0.913403961308153,
+        "nx": 0.795_485_951_174_574,
+        "rfg": 0.063_104_560_110_548_1,
+        "safeSEH": 0.257_254_721_326_578,
+        "seh": 0.913_403_961_308_153,
     }
 
     __tablename__ = "checksec"

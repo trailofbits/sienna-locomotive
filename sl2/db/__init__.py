@@ -12,14 +12,14 @@ from . import base
 
 ## Imports of the other classes
 from .conf import Conf
-from .tracer import Tracer
-from .checksec import Checksec
-from .crash import Crash
-from .target_config import TargetConfig
-from .run_block import RunBlock
-from .coverage import PathRecord
+from .tracer import Tracer  # noqa: F401
+from .checksec import Checksec  # noqa: F401
+from .crash import Crash  # noqa: F401
+from .target_config import TargetConfig  # noqa: F401
+from .run_block import RunBlock  # noqa: F401
+from .coverage import PathRecord  # noqa: F401
 
-from . import utilz
+from . import utilz  # noqa: F401
 
 
 ## Gets sqlalchemy database session

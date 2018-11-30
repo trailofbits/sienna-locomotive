@@ -33,7 +33,7 @@ from sl2 import db
 #     'crashash': 'f96808cfc4798256',
 #     'exploitability': 'None',
 #     'instructionPointer': 140702400817557,
-#     'minidumpPath': 'C:\\Users\\IEUser\\AppData\\Roaming\\Trail of Bits\\fuzzkit\\runs\\4b390ae5-c838-4c7f-b79a-5b47db029036\\initial.4156.dmp',
+#     'minidumpPath': 'long_path_to\\initial.PID.dmp',
 #     'rank': 0,
 #     'ranks': [
 #         0,
@@ -317,7 +317,7 @@ class Crash(Base):
             return None
         try:
             ret = Crash(j, slug, runid, targetPath)
-        except:
+        except:  # noqa: E722
             print("Unable to process crash json")
             return None
 
@@ -338,7 +338,13 @@ class Crash(Base):
         if self.tracer:
             tracerInfo = self.tracer.formatted
         return (
-            """Exploitability: %s (%s)   Crash Reason: %s   Crash Address: %X    Instruction: %X   Crashash: %s    Tag: %s    Tracer: %s"""
+            """Exploitability: %s (%s)   \
+Crash Reason: %s   \
+Crash Address: %X    \
+Instruction: %X   \
+Crashash: %s    \
+Tag: %s    \
+Tracer: %s"""
             % (
                 self.exploitability,
                 self.ranksString,

@@ -5,6 +5,7 @@ from .instrument import wizard_run, fuzzer_run, start_server, triager_run
 from sl2 import db
 from sl2.db.run_block import SessionManager
 
+
 ## class ChecksecThread
 #  Runs Checksec once in a background thread so as not to stall the GUI
 class ChecksecThread(QThread):
