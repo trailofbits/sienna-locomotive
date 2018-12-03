@@ -1,5 +1,7 @@
 # Sienna Locomotive 2
 
+[![Build Status](https://travis-ci.com/trailofbits/sienna-locomotive.svg?token=DQQpqJG5gna6rypMg4Lk&branch=master)](https://travis-ci.com/trailofbits/sienna-locomotive)
+
 Sienna Locomotive is a fuzzing and crash triage system with usability features that are intended to attract a wider user base than conventional fuzzing tools. The goal is to bring all the power that software fuzzing has to offer into the hands of less-experienced users. Focusing on ease of use won't stop us from trying to make it smarter and faster than the competition.
 
 ## Getting Started
