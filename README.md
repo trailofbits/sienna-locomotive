@@ -115,7 +115,7 @@ From the root of the project -
 .\dynamorio\bin64\drrun.exe -c build\client_name\Debug\client.dll [client_args] -- C:\path\to\target_application [target_args]
 
 # triage
-.\dynamorio\bin64\drrun.exe -c build\tracer_dynamorio\Debug\tracer.dll -- corpus\win_asm\crashes.exe 7
+.\dynamorio\bin64\drrun.exe -c build\tracer\Debug\tracer.dll -- corpus\win_asm\crashes.exe 7
 
 # wizard
 .\dynamorio\bin64\drrun.exe -c build\wizard\Debug\wizard.dll -- build\corpus\test_application\Debug\test_application.exe 0
@@ -124,15 +124,15 @@ From the root of the project -
 build\server\Debug\server.exe
 
 # fuzzer
-.\dynamorio\bin64\drrun.exe -c build\fuzz_dynamorio\Debug\fuzzer.dll -- build\corpus\test_application\Debug\test_application.exe 0 -f
+.\dynamorio\bin64\drrun.exe -c build\fuzzer\Debug\fuzzer.dll -- build\corpus\test_application\Debug\test_application.exe 0 -f
 
 # triage crash
-.\dynamorio\bin64\drrun.exe -c sienna-locomotive\build\tracer_dynamorio\Debug\tracer.dll -r [RUN_ID] -- build\corpus\test_application\Debug\test_application.exe 0 -f
+.\dynamorio\bin64\drrun.exe -c sienna-locomotive\build\tracer\Debug\tracer.dll -r [RUN_ID] -- build\corpus\test_application\Debug\test_application.exe 0 -f
 
 # targeting
-.\dynamorio\bin64\drrun.exe -c build\fuzz_dynamorio\Debug\fuzzer.dll -t 0,ReadFile -- build\corpus\test_application\Debug\test_application.exe 0 -f
+.\dynamorio\bin64\drrun.exe -c build\fuzzer\Debug\fuzzer.dll -t 0,ReadFile -- build\corpus\test_application\Debug\test_application.exe 0 -f
 
-.\dynamorio\bin64\drrun.exe -c build\tracer_dynamorio\Debug\tracer.dll -r [RUN_ID] -t 0,ReadFile -- build\corpus\test_application\Debug\test_application.exe 0 -f
+.\dynamorio\bin64\drrun.exe -c build\tracer\Debug\tracer.dll -r [RUN_ID] -t 0,ReadFile -- build\corpus\test_application\Debug\test_application.exe 0 -f
 ```
 
 #### Regression Test

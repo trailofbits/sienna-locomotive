@@ -14,7 +14,7 @@ function clang-format {
 clang-format server/server.cpp include/server.hpp
 
 # DR clients.
-clang-format fuzz_dynamorio/fuzzer.cpp wizard/wizard.cpp tracer_dynamorio/tracer.cpp
+clang-format fuzzer/fuzzer.cpp wizard/wizard.cpp tracer/tracer.cpp
 
 # Common files.
 clang-format common/*.{c,cpp} include/common/*.{h,hpp}

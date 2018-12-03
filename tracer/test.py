@@ -4,7 +4,7 @@ import os
 
 # drrun_path -c tracer_path -- crashes_path N
 drrun_path = 'C:\\Users\\dgoddard\\Documents\\work\\DynamoRIO\\bin64\\drrun.exe'
-tracer_path = 'C:\\Users\\dgoddard\\Documents\\GitHub\\sienna-locomotive\\tracer_dynamorio\\build\\Debug\\tracer.dll'
+tracer_path = 'C:\\Users\\dgoddard\\Documents\\GitHub\\sienna-locomotive\\tracer\\build\\Debug\\tracer.dll'
 crashes_path = 'C:\\Users\\dgoddard\\Documents\\GitHub\\sienna-locomotive\\corpus\\win_asm\\crashes.exe'
 
 proc = subprocess.Popen([crashes_path], stdout=subprocess.PIPE)

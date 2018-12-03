@@ -51,9 +51,9 @@ file( GLOB BREAKPAD_LIBS  ${BREAKPAD_DIR}/client/windows/${CONFIGMODE}/lib/*.lib
 ################################################################################################
 include_directories(include)
 add_subdirectory(common)
-add_subdirectory(fuzz_dynamorio)
+add_subdirectory(fuzzer)
 add_subdirectory(server)
-add_subdirectory(tracer_dynamorio)
+add_subdirectory(tracer)
 add_subdirectory(wizard)
 add_subdirectory(corpus/test_application)
 add_subdirectory(triage)
