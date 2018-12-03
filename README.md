@@ -2,114 +2,96 @@
 
 [![Build Status](https://travis-ci.com/trailofbits/sienna-locomotive.svg?token=DQQpqJG5gna6rypMg4Lk&branch=master)](https://travis-ci.com/trailofbits/sienna-locomotive)
 
-Sienna Locomotive is a fuzzing and crash triage system with usability features that are intended to attract a wider user base than conventional fuzzing tools. The goal is to bring all the power that software fuzzing has to offer into the hands of less-experienced users. Focusing on ease of use won't stop us from trying to make it smarter and faster than the competition.
+Sienna Locomotive is a integrated fuzzing and crash triage platform with usability features
+that are intended to attract a wider user base than conventional fuzzing tools.
+
+Sienna Locomotive's primary goal is to bring all the power that software fuzzing has to offer into
+the hands of less-experienced users. Of course, focusing on ease of use won't stop us from trying
+to make it smarter and faster than the competition.
 
 ## Getting Started
 
+Read this [blog post]().
+
+Watch this [demo video]().
+
+Check out the [user manual](./_assets/manual.pdf).
+
 ### High level architecture
 
-```
-Wizard
-  Run the target program once
-  Find all the functions the fuzzer can target
-  Return a list the user can select from
+![A diagram of SL2's architecture.](./_assets/overview.svg)
 
-Fuzzing harness
-  Run the target program
-  Hook attack surface functions
-  Execute program with mutated inputs
-  Catch crashes for tracer
+### Installation
 
-Triage
-  Traces and performs taint tracking on a crashing execution
-  Combines data about crash, inputs, and taint
-  Output score and JSON info about crash
+**IMPORTANT**: Sienna Locomotive 2 makes changes to the system it runs on in order to
+facilitate its instrumentation. It will run best when installed on its own machine (including
+virtual machines).
 
-Mutation Server
-  Sent bytes and coverage statistics by fuzzing harness
-  Sends back mutation advice
-  Responsible for logging information about corrupted inputs
+Pre-built binaries are available on the
+[releases page](https://github.com/trailofbits/sienna-locomotive/releases).
 
-Python harness
-  Handles user input and configuration
-  Runs all the other components
-```
+To build Sienna Locomotive for yourself, continue reading.
 
 ### Building
 First, clone the repository:
 `git clone https://github.com/trailofbits/sienna-locomotive.git` (or download a zip)
 
 #### Dependencies
-Next, install the following dependencies
+
+Building SL2 requires the following:
+
+* Windows 10, release 1803
+    * Earlier versions of Windows 10 will probably work, 1809 support is pending.
 * [CMake](https://cmake.org/download/)
 * Visual Studio 2017 (Install components for Windows Console dev)
-* DynamoRIO (Automatically installed with make.ps1)
-* Python (3.6+)
+* DynamoRIO (Automatically installed with `make.ps1`)
+* Python (3.7+)
 
 #### Build Commands
 
-Then, from the root of the Sienna Locomotive repository:
-In powershell, run make.ps1:
+Compilation, deployment, and cleanup is done via `make.ps1` in Sienna Locomotive's
+root directory.
+
+To install DynamoRIO and build the project:
 
 `PS C:\proj\sl2\sienna-locomotive> .\make.ps1`
 
-This should download and install DynamoRIO in the sienna-locomotive directive if it does not already exist.  It will then compile the project.
+If any part of the build complains about missing tools or libraries, try running under
+the Visual Studio Developer Command Prompt.
 
-You might need to use the Visual Studio Developer Command Prompt in order for cmake to be able to see the VS compiler.
+To clean the project of build artifacts, run `.\make.ps1 clean`.
 
-Next, run the following to configure the python environment:
+Try `make.ps1 help` for more options and information.
 
-`python setup.py develop`
+#### Internal API Documentation
 
-Use `.\make.ps1 clean` for a clean build .
+SL2's internals are documented using Doxygen.
 
-Usage `make.ps1 help` for more info.
-
-```
-PS C:\proj\sl2\sienna-locomotive> .\make.ps1 help
-Usage: make1.ps [clean|dep|reconfig|help]
-
-make1.ps without any options will build
-
-clean
-    Cleans build directory and configuration (reconfigs)
-
-dep
-    Rebuild dependencies
-
-reconfig
-    Deletes fuzzkit directory with run configuration
-
-help
-    This info
-```
-
-#### Documents
 If you want to build the doxygen documents.
   1. Install doxygen from http://ftp.stack.nl/pub/users/dimitri/doxygen-1.8.14-setup.exe
-  1. `./make doc`
-  1. Look in `doc/html/index.html`
-
-### Configuring
-Open up powershell in the project root and run the gui for the first time.
-
-`PS C:\proj\sl2\sienna-locomotive> sl2`
-
-It'll create a default configuration file in `%APPDATA\Trail of Bits\fuzzkit\`. You can leave everything in there and it will work, but you might want to update the file paths to be relative to C: so that you can invoke it from anywhere. If you want to create a new profile, just copy the default one and change the name. Then you can use the `-p` flag to `sl2` to change which profile it pulls settings from.
-
-Using -h on the harness will print out the list of command line options it supports. You can set a number of things permanently by adding lines to the configuration file. As a general rule though, the command line parameters will overwrite what's in the config file if you explicitly pass them in. This isn't the case for everything, so if a command isn't working the way you expect, run fuzzer_config.py with the same arguments to see exactly what settings are getting passed to the harness.
+  1. `./make.ps1 doc`
+  1. Open `doc/html/index.html` in your browser
 
 ### Running
 
 #### Via the GUI
-`sl2` will run the Qt frontend for the fuzzer. While it provides a convenient way of invoking the components, it doesn't provide as many configuration options. Fortunately, it accepts most of the same command line arguments as the harness, so you can simply pass these in when you invoke the GUI.
-For example: `sl2 -f 15 -i 360` will run the gui such that it invokes the fuzzer with a timeout of 15 seconds for each fuzzing run and a timeout of 360 seconds for each triage run. However, it does NOT respect the -e flag, nor any of the flags that would be overwritten from the config file if invoked on the harness.
 
-#### Via the harness
-`sl2-cli` will run the test application in fuzzing mode. By default, the test application will crash after a few fuzzing attempts, so if it doesn't do so when you need it to, you can pass `-a 0` to the harness (as the last argument) and it will crash every time. Play around with the command flags to see what else you can do.
+Running `sl2` will start the Qt frontend for the fuzzer.
+
+This frontend is the default user interface, and should suffice for most use cases.
+
+#### Via the CLI
+
+For more advanced users, `sl2-cli` can be used to configure and run each SL2 component individually.
+
+`sl2-cli -h` will print out a listing of all available options.
 
 #### To run individual components manually
-From the root of the project -
+
+**NOTE**: Normal users can ignore this information.
+
+From the root of the project:
+
 ```
 # General Pattern:
 .\dynamorio\bin64\drrun.exe -c build\client_name\Debug\client.dll [client_args] -- C:\path\to\target_application [target_args]
@@ -136,22 +118,10 @@ build\server\Debug\server.exe
 ```
 
 #### Regression Test
-```cmd
-> sl2-test.exe
 
-test_0 (sl2.test.regress.TestWizard) ... ok
-test_2 (sl2.test.regress.TestWizard) ... ok
-test_TheWiz (sl2.test.regress.TestWizard) ... ok
-test_captureStdout (sl2.test.regress.TestWizard) ... ok
-test_quickCrash (sl2.test.regress.TestWizard) ... ok
-test_registry (sl2.test.regress.TestWizard) ... ok
-test_triage (sl2.test.regress.TestWizard) ... ok
+`sl2-test` runs the SL2 regression tests.
 
-----------------------------------------------------------------------
-Ran 7 tests in 49.421s
-
-OK
-```
+You can also run the tests directly via `python sl2/test/__main__.py`.
 
 ## Triage
 
@@ -204,7 +174,7 @@ After the tracer has been run, `triager.exe` is run on the minidump file. It als
     "instructionPointer": 14757395258967641292,
 
     // Path to the minidump analyzed
-    "minidumpPath": "C:\\Users\\IEUser\\AppData\\Roaming\\Trail of Bits\\fuzzkit\\runs\\78f20c60-eb12-410a-8378-342c3afec986\\initial.dmp",
+    "minidumpPath": "C:\\Users\\IEUser\\AppData\\Roaming\\Trail of Bits\\sl2\\runs\\78f20c60-eb12-410a-8378-342c3afec986\\initial.dmp",
 
     // Rank, or numeric version of exploitability from 0-4
     "rank": 1,
@@ -265,15 +235,8 @@ After the tracer has been run, `triager.exe` is run on the minidump file. It als
 }
 ```
 
-### Outdated components
-You can safely ignore most of the stuff in `corpus/asm`.
-
-# Changes
-
-## 20180808
-Changed passing of arguments to clients and target applications from using comma separated to just normally how it would appear on the command line. The `shlex.split()` function will split them up appropriately
-
-
 # Developer Information
 
-If you change anything that would break backwards compatibility, increment  `harness.config.VERSION`.  This includes any database changes, formats, directory structures, filenames etc..
+If you change anything that would break backwards compatibility, increment
+`harness.config.VERSION`.  Examples of breaking changes include changes to the database structure,
+changes to various binary formats, directory structures, and so forth.
