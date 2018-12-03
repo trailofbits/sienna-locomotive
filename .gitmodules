@@ -1,6 +1,6 @@
 [submodule "fuzzgoat"]
 	path = fuzzgoat
-	url = git@github.com:haxmeadroom/fuzzgoat.git
+	url = https://github.com/haxmeadroom/fuzzgoat
 [submodule "winchecksec"]
 	path = winchecksec
-	url = git@github.com:trailofbits/winchecksec.git
+	url = https://github.com/trailofbits/winchecksec

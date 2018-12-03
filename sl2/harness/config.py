@@ -32,7 +32,7 @@ RECOMMENDED_WIN10_VERSION = 1803
 PATH_KEYS = ["drrun_path", "client_path", "server_path", "wizard_path", "tracer_path", "triager_path"]
 ARGS_KEYS = ["drrun_args", "client_args", "server_args", "target_args"]
 INT_KEYS = ["runs", "simultaneous", "fuzz_timeout", "tracer_timeout", "seed", "verbose", "function_number"]
-FLAG_KEYS = ["debug", "nopersist", "continuous", "exit_early", "inline_stdout", "preserve_runs"]
+FLAG_KEYS = ["debug", "nopersist", "continuous", "exit_early", "inline_stdout", "preserve_runs", "no_server_window"]
 
 profile = "DEFAULT"
 
@@ -261,6 +261,15 @@ parser.add_argument(
     of using an auto-generated value. Useful for replaying triage runs.",
 )
 
+parser.add_argument(
+    "-W",
+    "--no_server_window",
+    action="store_true",
+    dest="no_server_window",
+    default=False,
+    help="Run the server in the background, instead of in its own window"
+)
+
 args = parser.parse_args()
 
 # Read the ConfigParser object into a standard dict
@@ -275,7 +284,7 @@ def set_profile(new_profile):
     global profile
     try:
         config = dict(_config[new_profile])
-    except:
+    except:  # noqa: E722
         print("ERROR: No such profile:", new_profile)
         sys.exit()
 

@@ -6,6 +6,7 @@ from sl2.db.run_block import RunBlock
 from sl2.harness import config
 from sl2.harness.state import get_target_slug
 
+
 ## Gets a list of the total number of CPU seconds spent fuzzing after each block
 # @param run_blocks: List[RunBlock] - A list of run blocks
 # @return timing: List[int] - strictly increasing list of number of seconds spent after each block

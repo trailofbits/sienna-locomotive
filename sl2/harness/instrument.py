@@ -39,6 +39,7 @@ from .state import (
 print_lock = threading.Lock()
 can_fuzz = True
 
+
 ## class Mode
 #  Enum storing bit flags that control how the fuzzer and tracer target functions
 class Mode(IntEnum):
@@ -99,25 +100,29 @@ def pwarning(*args):
 
 
 ## Run a command in a powershell wrapper so a new window pops up
-def ps_run(command, close_on_exit=False):
+def ps_run(command, close_on_exit=False, no_window=False):
     """
     Runs the given command in a new PowerShell session.
     """
-    if close_on_exit:
-        subprocess.Popen(["powershell", "start", "powershell", "{", "-Command", '"{}"}}'.format(command)])
+    if no_window:
+        flags = subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS
+        subprocess.Popen(command, close_fds=True, creationflags=flags)
     else:
-        subprocess.Popen(["powershell", "start", "powershell", "{-NoExit", "-Command", '"{}"}}'.format(command)])
+        if close_on_exit:
+            subprocess.Popen(["powershell", "start", "powershell", "{", "-Command", '"{}"}}'.format(command)])
+        else:
+            subprocess.Popen(["powershell", "start", "powershell", "{-NoExit", "-Command", '"{}"}}'.format(command)])
 
 
 ## Run the server in a new powershell window, if it's not already running
-def start_server(close_on_exit=False):
+def start_server(close_on_exit=False, no_window=False):
     """
     Start the server, if it's not already running.
     """
     # NOTE(ww): This is technically a TOCTOU, but it's probably reliable enough for our purposes.
     server_cmd = " ".join([config.config["server_path"], *config.config["server_args"]])
     if named_mutex.test_named_mutex("fuzz_server_mutex"):
-        ps_run(server_cmd, close_on_exit=close_on_exit)
+        ps_run(server_cmd, close_on_exit=close_on_exit, no_window=no_window)
     named_mutex.spin_named_mutex("fuzz_server_mutex")
 
 

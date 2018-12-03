@@ -553,7 +553,7 @@ def sanity_checks(exit=True):
             if exit:
                 print("[+] Fatal: Cowardly refusing to run with WER enabled.")
                 print(
-                    "[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue."
+                    "[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD)."
                 )
                 sys.exit()
             else:
@@ -567,7 +567,7 @@ def sanity_checks(exit=True):
         if exit:
             print("[+] Fatal: Cowardly refusing to run with WER enabled.")
             print(
-                "[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD) to continue."
+                "[+] Set HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\Disabled to 1 (DWORD)."
             )
             sys.exit()
         else:
