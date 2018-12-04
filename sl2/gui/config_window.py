@@ -228,9 +228,9 @@ class ConfigWindow(QtWidgets.QDialog):
     def validate_build_path(self, new_path):
         paths = [
             "server\\Debug\\server.exe",
-            "fuzz_dynamorio\\Debug\\fuzzer.dll",
+            "fuzzer\\Debug\\fuzzer.dll",
             "wizard\\Debug\\wizard.dll",
-            "tracer_dynamorio\\Debug\\tracer.dll",
+            "tracer\\Debug\\tracer.dll",
         ]
         missing = []
         for path in paths:

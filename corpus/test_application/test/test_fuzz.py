@@ -50,7 +50,7 @@ def main():
     sienna_path = config['sienna_path']
 
     drrun_path = os.path.join(dr_path, r'bin64\drrun.exe')
-    fuzzer_path = os.path.join(sienna_path, r'build\fuzz_dynamorio\Debug\fuzzer.dll')
+    fuzzer_path = os.path.join(sienna_path, r'build\fuzzer\Debug\fuzzer.dll')
     test_application_path = os.path.join(sienna_path, r'build\corpus\test_application\Debug\test_application.exe')
 
     while True:

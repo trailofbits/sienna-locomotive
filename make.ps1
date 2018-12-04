@@ -84,7 +84,7 @@ Function Reconfig {
 Function Test {
     python harness.py  -v -r10  -t build\corpus\test_application\Debug\test_application -a 8
     #python harness.py  -v -r10 -e FUZZER -t build\corpus\test_application\Debug\test_application -a 8
-    #dynamorio\bin64\drrun.exe -pidfile pidfile -verbose -persist -c build\tracer_dynamorio\Debug\tracer.dll -t "C:\Users\IEUser\AppData\Roaming\Trail of Bits\fuzzkit\targets\TEST_APPLICATION_acfa4ea300cade2f47bc7f8ab4502453a7fe774b\targets.json" -r d3e03566-8db8-4c94-bb69-353008abae49 -- build\corpus\test_application\Debug\test_application.exe "0 -f"
+    #dynamorio\bin64\drrun.exe -pidfile pidfile -verbose -persist -c build\tracer\Debug\tracer.dll -t "C:\Users\IEUser\AppData\Roaming\Trail of Bits\fuzzkit\targets\TEST_APPLICATION_acfa4ea300cade2f47bc7f8ab4502453a7fe774b\targets.json" -r d3e03566-8db8-4c94-bb69-353008abae49 -- build\corpus\test_application\Debug\test_application.exe "0 -f"
 }
 
 
@@ -114,10 +114,10 @@ Function Deploy{
     "Creating Binary Directories"
     New-Item sl2-deploy\build\common -Type Directory
     New-Item sl2-deploy\build\corpus\test_application -Type Directory
-    New-Item sl2-deploy\build\fuzz_dynamorio -Type Directory
+    New-Item sl2-deploy\build\fuzzer -Type Directory
     New-Item sl2-deploy\build\fuzzgoat -Type Directory
     New-Item sl2-deploy\build\server -Type Directory
-    New-Item sl2-deploy\build\tracer_dynamorio -Type Directory
+    New-Item sl2-deploy\build\tracer -Type Directory
     New-Item sl2-deploy\build\triage -Type Directory
     New-Item sl2-deploy\build\winchecksec -Type Directory
     New-Item sl2-deploy\build\wizard -Type Directory
@@ -126,10 +126,10 @@ Function Deploy{
     "Copying Compiled Binaries"
     Copy-Item build\common\Debug sl2-deploy\build\common -Recurse -Force
     Copy-Item build\corpus\test_application\Debug sl2-deploy\build\corpus\test_application -Recurse -Force
-    Copy-Item build\fuzz_dynamorio\Debug sl2-deploy\build\fuzz_dynamorio -Recurse -Force
+    Copy-Item build\fuzzer\Debug sl2-deploy\build\fuzzer -Recurse -Force
     Copy-Item build\fuzzgoat\Debug sl2-deploy\build\fuzzgoat -Recurse -Force
     Copy-Item build\server\Debug sl2-deploy\build\server -Recurse -Force
-    Copy-Item build\tracer_dynamorio\Debug sl2-deploy\build\tracer_dynamorio -Recurse -Force
+    Copy-Item build\tracer\Debug sl2-deploy\build\tracer -Recurse -Force
     Copy-Item build\triage\Debug sl2-deploy\build\triage -Recurse -Force
     Copy-Item build\winchecksec\Debug sl2-deploy\build\winchecksec -Recurse -Force
     Copy-Item build\wizard\Debug sl2-deploy\build\wizard -Recurse -Force
