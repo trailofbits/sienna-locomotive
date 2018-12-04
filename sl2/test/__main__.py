@@ -106,7 +106,7 @@ class TestWizard(unittest.TestCase):
         self.assertTrue(b"Crashash" in out)
         self.assertTrue(b" None/EXCEPTION_BREAKPOINT" in out)
 
-        workingdir = os.path.join(os.environ["APPDATA"], "Trail of Bits", "fuzzkit", "runs")
+        workingdir = os.path.join(os.environ["APPDATA"], "Trail of Bits", "sl2", "runs")
         pattern = "%s/*/*.dmp" % workingdir
         paths = glob.glob(pattern)
         self.assertTrue(len(paths) > 0)
@@ -120,7 +120,7 @@ class TestWizard(unittest.TestCase):
         cmd = r"sl2-cli -W -fn 0 -c -x -l -v -t " + TEST_APPLICATION + " -a 10 -f"
         out = runAndCaptureOutput(cmd)
 
-        workingdir = os.path.join(os.environ["APPDATA"], "Trail of Bits", "fuzzkit", "runs")
+        workingdir = os.path.join(os.environ["APPDATA"], "Trail of Bits", "sl2", "runs")
         pattern = "%s/*/initial.dmp" % workingdir
         for path in glob.glob(pattern):
             # paths = " ".join(paths)

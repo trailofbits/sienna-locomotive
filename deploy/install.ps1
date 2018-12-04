@@ -70,7 +70,7 @@ $Shortcut.Description = "Sienna Locomotive 2 Graphical Fuzzing Interface"
 
 $Shortcut.Save()
 
-$TargetFile = "`"$env:APPDATA\Trail of Bits\fuzzkit\`""
+$TargetFile = "`"$env:APPDATA\Trail of Bits\sl2\`""
 $ShortcutFile = "$env:USERPROFILE\Desktop\SL2 Working Files.lnk"
 $WScriptShell = New-Object -ComObject WScript.Shell
 $Shortcut = $WScriptShell.CreateShortcut($ShortcutFile)
