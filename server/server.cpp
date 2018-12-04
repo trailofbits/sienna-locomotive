@@ -302,7 +302,7 @@ static void init_logging_path() {
   SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roaming_path);
 
   if (PathCchCombine(FUZZ_LOG, MAX_PATH, roaming_path,
-                     L"Trail of Bits\\fuzzkit\\log\\server.log") != S_OK) {
+                     L"Trail of Bits\\sl2\\log\\server.log") != S_OK) {
     SL2_SERVER_LOG_FATAL("failed to combine logfile path");
   }
 
@@ -317,13 +317,13 @@ static void init_logging_path() {
 static void init_working_paths() {
   wchar_t *roaming_path;
   SHGetKnownFolderPath(FOLDERID_RoamingAppData, NULL, NULL, &roaming_path);
-  wchar_t runs_local_path[MAX_PATH] = L"Trail of Bits\\fuzzkit\\runs";
+  wchar_t runs_local_path[MAX_PATH] = L"Trail of Bits\\sl2\\runs";
 
   if (PathCchCombine(FUZZ_WORKING_PATH, MAX_PATH, roaming_path, runs_local_path) != S_OK) {
     SL2_SERVER_LOG_FATAL("failed to combine working dir path");
   }
 
-  wchar_t arenas_local_path[MAX_PATH] = L"Trail of Bits\\fuzzkit\\arenas";
+  wchar_t arenas_local_path[MAX_PATH] = L"Trail of Bits\\sl2\\arenas";
 
   if (PathCchCombine(FUZZ_ARENAS_PATH, MAX_PATH, roaming_path, arenas_local_path) != S_OK) {
     SL2_SERVER_LOG_FATAL("failed to combine arenas dir path");

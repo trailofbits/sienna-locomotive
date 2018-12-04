@@ -55,7 +55,7 @@ for flag in FLAG_KEYS:
 # NOTE(ww): Keep these up-to-data with include/server.hpp!
 sl2_server_pipe_path = "\\\\.\\pipe\\fuzz_server"
 ## Path to SL2 data and configuration
-sl2_dir = os.path.join(os.getenv("APPDATA", default="."), "Trail of Bits", "fuzzkit")
+sl2_dir = os.path.join(os.getenv("APPDATA", default="."), "Trail of Bits", "sl2")
 ## Path to runs directory
 sl2_runs_dir = os.path.join(sl2_dir, "runs")
 sl2_arenas_dir = os.path.join(sl2_dir, "arenas")
