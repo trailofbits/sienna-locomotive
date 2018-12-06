@@ -1,0 +1,24 @@
+.section{
+  margin-top: 4%;
+  padding-bottom: 4%;
+  border-bottom: 1px;
+  border-bottom-style: solid;
+}
+
+@media print {
+    .section {page-break-after: always;}
+}
+
+.subsection{
+  margin-bottom: 2%;
+}
+
+.bignum{
+   text-align: center;
+   font-weight: bold;
+   font-size: 4rem;
+}
+
+.statheader{
+  text-align: center;
+}

@@ -1,0 +1,4 @@
+[flake8]
+max-line-length = 120
+# ignore doxygen-formatted comments, star import warnings
+ignore = E266, F403, F405

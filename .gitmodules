@@ -1,0 +1,6 @@
+[submodule "fuzzgoat"]
+	path = fuzzgoat
+	url = https://github.com/haxmeadroom/fuzzgoat
+[submodule "winchecksec"]
+	path = winchecksec
+	url = https://github.com/trailofbits/winchecksec

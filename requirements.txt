@@ -1,0 +1,6 @@
+setuptools
+msgpack
+PySide2
+sqlalchemy
+matplotlib
+Jinja2

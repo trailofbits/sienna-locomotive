@@ -1,0 +1,30 @@
+language: cpp
+
+matrix:
+  include:
+    - os: linux # linting
+      dist: xenial
+      language: python
+      python:
+        - "3.7"
+      addons:
+        apt:
+          sources:
+            - llvm-toolchain-xenial-7
+          packages:
+            - clang-format-7
+      before_install:
+        - pip install flake8
+      script:
+        - ci/lint.sh
+    - os: windows # building, testing
+      before_install:
+        - choco install python3
+        - export PATH="/c/Python37:/c/Python37/Scripts:$PATH"
+        - python -m pip install --upgrade pip
+      install:
+        - powershell -ExecutionPolicy Bypass -File make.ps1
+        - powershell -ExecutionPolicy Bypass -File ./ci/wer-be-gone.ps1
+        - powershell -ExecutionPolicy Bypass -File ./ci/qe-be-gone.ps1
+      script:
+        - python ./sl2/test/__main__.py
