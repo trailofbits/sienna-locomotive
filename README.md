@@ -11,9 +11,9 @@ to make it smarter and faster than the competition.
 
 ## Getting Started
 
-Read this [blog post]().
+Read this [blog post](https://blog.trailofbits.com/user-friendly-fuzzing-with-sienna-locomotive).
 
-Watch this [demo video]().
+Watch this [demo video](https://drive.google.com/file/d/1KKh0dif3jwfr4bzpvkTv5alBJV1QOlJU/view?usp=sharing).
 
 Check out the [user manual](./_assets/manual.pdf).
 
