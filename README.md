@@ -235,8 +235,12 @@ After the tracer has been run, `triager.exe` is run on the minidump file. It als
 }
 ```
 
-# Developer Information
+## Developer Information
 
 If you change anything that would break backwards compatibility, increment
 `harness.config.VERSION`.  Examples of breaking changes include changes to the database structure,
 changes to various binary formats, directory structures, and so forth.
+
+## License
+
+Slither is licensed and distributed under the AGPLv3 license. [Contact us](mailto:opensource@trailofbits.com) if you're looking for an exception to the terms.
