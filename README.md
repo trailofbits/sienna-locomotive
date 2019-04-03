@@ -243,4 +243,4 @@ changes to various binary formats, directory structures, and so forth.
 
 ## License
 
-Slither is licensed and distributed under the AGPLv3 license. [Contact us](mailto:opensource@trailofbits.com) if you're looking for an exception to the terms.
+Sienna Locomotive is licensed and distributed under the AGPLv3 license. [Contact us](mailto:opensource@trailofbits.com) if you're looking for an exception to the terms.
